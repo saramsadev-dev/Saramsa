@@ -1,12 +1,12 @@
-name:  Saramsa-backend (master)
+name: Saramsa-backend (master)
 
 on:
   push:
     branches:
       - master
     paths:
-      - "backend/**"
-      - ".github/workflows/saramsa-backend.yml"
+      - 'backend/**'
+      - '.github/workflows/master_saramsa-backend.yml'
   workflow_dispatch:
 
 jobs:
@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
       - uses: actions/checkout@v4
@@ -23,25 +27,12 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Create and activate venv
-        run: |
-          cd backend
-          python -m venv venv
-          source venv/bin/activate
-
       - name: Install dependencies
         run: |
-          cd backend
-          source venv/bin/activate
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run Django migrations & collectstatic
-        run: |
-          cd backend
-          source venv/bin/activate
-          python manage.py migrate --noinput
-          python manage.py collectstatic --noinput
         env:
           DJANGO_SETTINGS_MODULE: apis.settings
           API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
@@ -51,14 +42,23 @@ jobs:
           AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
 
       # If you want to run tests, add a step here
+
+      - name: Create deployment bundle
+        run: |
+          mkdir -p ../artifact
+          rm -f ../artifact/backend.zip
+          zip -r ../artifact/backend.zip . -x 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc' 'db.sqlite3*'
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
           name: backend-build
-          path: backend
+          path: artifact/backend.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -72,6 +72,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-build
+          path: artifact
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -86,7 +87,7 @@ jobs:
         with:
           app-name: 'saramsa-backend'
           slot-name: 'Production'
-          package: '.'
+          package: artifact/backend.zip
         env:
           API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
