@@ -27,7 +27,14 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here-change-in-production')
 DEBUG = True
 
-ALLOWED_HOSTS = ['.azurewebsites.net', '*', '127.0.0.1', 'localhost']
+# Allow all Azure Web App hostnames and localhost
+ALLOWED_HOSTS = os.environ.get(
+    'ALLOWED_HOSTS',
+    '.azurewebsites.net,127.0.0.1,localhost'
+).split(',')
+# Ensure .azurewebsites.net is always included for Azure deployments
+if '.azurewebsites.net' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('.azurewebsites.net')
 
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv(
     'APPLICATIONINSIGHTS_CONNECTION_STRING',
@@ -291,7 +298,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-    'https://gray-sea-02102141e.3.azurestaticapps.net',
+    'https://mango-pebble-0a60bb60f.3.azurestaticapps.net', 
     'http://localhost:3000',      
     'http://localhost:8000',   
 ]
@@ -317,7 +324,7 @@ CORS_ALLOW_HEADERS = [
 
 # Trust requests coming from the static frontend domain (needed for some POSTs)
 CSRF_TRUSTED_ORIGINS = [
-    'https://saramsa-backend-c4g2e4fbfqeuhehm.centralus-01.azurewebsites.net/',
+    'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
     'http://localhost:3000',
     'http://localhost:8000',
 ]
