@@ -1,0 +1,159 @@
+"use client";
+
+import type { ReactNode, MouseEvent } from "react";
+import { useId } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { X } from "lucide-react";
+
+type ModalSize = "sm" | "md" | "lg";
+
+const panelSizes: Record<ModalSize, string> = {
+  sm: "max-w-md",
+  md: "max-w-2xl",
+  lg: "max-w-4xl",
+};
+
+export interface BaseModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  /**
+   * Optional title rendered in the modal header.
+   */
+  title?: ReactNode;
+  /**
+   * Optional supporting text rendered under the title.
+   */
+  description?: ReactNode;
+  /**
+   * Optional icon or element displayed next to the title.
+   */
+  icon?: ReactNode;
+  /**
+   * Primary modal content.
+   */
+  children: ReactNode;
+  /**
+   * Footer node (usually action buttons).
+   */
+  footer?: ReactNode;
+  /**
+   * Override the default header with custom content.
+   */
+  headerContent?: ReactNode;
+  /**
+   * Size preset that controls the panel max width.
+   */
+  size?: ModalSize;
+  /**
+    * Additional classes for the motion panel.
+    */
+  className?: string;
+  /**
+   * Additional classes for the overlay.
+   */
+  overlayClassName?: string;
+  /**
+   * Hide the default close button.
+   */
+  hideCloseButton?: boolean;
+  /**
+   * Accessible label for the close button.
+   */
+  closeButtonLabel?: string;
+}
+
+export function BaseModal({
+  isOpen,
+  onClose,
+  title,
+  description,
+  icon,
+  children,
+  footer,
+  headerContent,
+  size = "md",
+  className = "",
+  overlayClassName = "",
+  hideCloseButton = false,
+  closeButtonLabel = "Close modal",
+}: BaseModalProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+
+  const handleOverlayClick = () => {
+    onClose();
+  };
+
+  const handlePanelClick = (event: MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+  };
+
+  const sizeClass = panelSizes[size] ?? panelSizes.md;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className={`fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 ${overlayClassName}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={handleOverlayClick}
+        >
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={title ? titleId : undefined}
+            aria-describedby={description ? descriptionId : undefined}
+            className={`w-full ${sizeClass} rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-100 dark:border-gray-800 ${className}`}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.2 }}
+            onClick={handlePanelClick}
+          >
+            {(title || description || icon || headerContent || !hideCloseButton) && (
+              <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100 dark:border-gray-800">
+                {headerContent ?? (
+                  <div className="flex items-start gap-4">
+                    {icon && <div className="flex-shrink-0">{icon}</div>}
+                    <div className="space-y-1">
+                      {title && (
+                        <h3 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {title}
+                        </h3>
+                      )}
+                      {description && (
+                        <p id={descriptionId} className="text-sm text-gray-600 dark:text-gray-300">
+                          {description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {!hideCloseButton && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    aria-label={closeButtonLabel}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="p-6">{children}</div>
+
+            {footer && (
+              <div className="p-6 border-t border-gray-100 dark:border-gray-800">
+                {footer}
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

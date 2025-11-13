@@ -1,0 +1,84 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/useAuth';
+import { PlatformSelectionScreen } from '@/components/config/PlatformSelectionScreen';
+import { AzureDevOpsConfigScreen } from '@/components/config/azure/AzureDevOpsConfigScreen';
+import { JiraConfigScreen } from '@/components/config/jira/JiraConfigScreen';
+
+
+export default function ConfigPage() {
+  const router = useRouter();
+  const {} = useAuth();
+  const [selectedPlatform, setSelectedPlatform] = useState<'azure' | 'jira' | null>(null);
+
+  const handlePlatformSelect = (platform: 'azure' | 'jira') => {
+    setSelectedPlatform(platform);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selected_platform', platform);
+    }
+  };
+
+  const handleBackToPlatformSelection = () => {
+    setSelectedPlatform(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('selected_platform');
+    }
+  };
+
+  const handleContinue = async () => {
+    console.log('Config page handleContinue called');
+    console.log('Project selected, redirecting to dashboard...');
+    try {
+      // The config screens will already have stored project/organization
+      // Here we just ensure a project id exists; creation is triggered inside the config screen flow
+    } catch (e) {
+      console.error('Persist project error', e);
+    }
+    router.push('/dashboard');
+  };
+
+  const handleSkipConfig = () => {
+    console.log('Skipping configuration, redirecting to dashboard...');
+    router.push('/dashboard');
+  };
+
+  // Show platform selection first
+  if (!selectedPlatform) {
+    return (
+      <div className="h-full bg-background z-0">
+        <PlatformSelectionScreen 
+          onPlatformSelect={handlePlatformSelect}
+          onSkipConfig={handleSkipConfig}
+        />
+      </div>
+    );
+  }
+
+  // Show Azure DevOps config for Azure platform
+  if (selectedPlatform === 'azure') {
+    return (
+      <div className="">
+        <AzureDevOpsConfigScreen 
+          onContinue={handleContinue}
+          onBack={handleBackToPlatformSelection}
+        />
+      </div>
+    );
+  }
+
+  // Show Jira config for Jira platform
+  if (selectedPlatform === 'jira') {
+    return (
+      <div className="min-h-screen bg-background">
+        <JiraConfigScreen 
+          onContinue={handleContinue}
+          onBack={handleBackToPlatformSelection}
+        />
+      </div>
+    );
+  }
+
+  return null;
+} 

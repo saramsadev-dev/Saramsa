@@ -1,0 +1,78 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setUser } from '@/store/features/auth/authSlice';
+import { getStoredUser, getValidAccessToken, getTokens, clearTokens } from '@/lib/auth';
+
+interface AuthInitializerProps {
+  children: React.ReactNode;
+}
+
+export const AuthInitializer: React.FC<AuthInitializerProps> = ({ children }) => {
+  const dispatch = useAppDispatch();
+  useAppSelector((state) => state.auth);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    // Initialize authentication state from localStorage
+    const initializeAuth = async () => {
+      console.log('AuthInitializer: Starting authentication initialization...');
+      
+      try {
+        const storedUser = getStoredUser();
+        const tokens = getTokens();
+        const validAccessToken = getValidAccessToken();
+
+        console.log('AuthInitializer: Found tokens:', {
+          hasUser: !!storedUser,
+          hasTokens: !!tokens,
+          hasValidAccessToken: !!validAccessToken
+        });
+
+        if (storedUser && validAccessToken) {
+          // User has valid tokens, restore authentication state
+          console.log('AuthInitializer: Restoring user from localStorage:', storedUser.username);
+          dispatch(setUser(storedUser));
+        } else if (tokens && !validAccessToken) {
+          // User has tokens but access token is expired
+          // The axios interceptor will handle token refresh automatically
+          console.log('AuthInitializer: Access token expired, will be refreshed on next API call');
+          if (storedUser) {
+            dispatch(setUser(storedUser));
+          }
+        } else {
+          console.log('AuthInitializer: No valid authentication data found');
+          if (!storedUser) console.log('AuthInitializer: No user data in localStorage');
+          if (!validAccessToken) console.log('AuthInitializer: No valid access token');
+          
+          // Clear any invalid/corrupted data
+          clearTokens();
+        }
+      } catch (error) {
+        console.error('AuthInitializer: Error initializing authentication:', error);
+        // Clear corrupted data
+        clearTokens();
+      } finally {
+        console.log('AuthInitializer: Initialization complete');
+        setIsInitialized(true);
+      }
+    };
+
+    initializeAuth();
+  }, [dispatch]);
+
+  // Show loading while initializing
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-300">Initializing authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}; 
