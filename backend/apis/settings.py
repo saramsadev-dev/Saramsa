@@ -317,8 +317,7 @@ CORS_ALLOW_HEADERS = [
 
 # Trust requests coming from the static frontend domain (needed for some POSTs)
 CSRF_TRUSTED_ORIGINS = [
-    'https://gray-sea-02102141e.3.azurestaticapps.net',
-    'https://saramsa-backend-acgnfuf2d0dqdgds.centralindia-01.azurewebsites.net',
+    'https://saramsa-backend-c4g2e4fbfqeuhehm.centralus-01.azurewebsites.net/',
     'http://localhost:3000',
     'http://localhost:8000',
 ]
