@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
@@ -23,7 +25,6 @@ export function generateStaticParams() {
 }
 
 export default function ProjectDashboardPage() {
-  "use client";
   const params = useParams();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
