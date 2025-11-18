@@ -91,13 +91,13 @@ export default function LoginPage() {
               }
               if (first?.name) localStorage.setItem('azure_project_name', first.name);
             }
-            router.push('/projects');
+            router.push('/');
           } else {
-            // If no projects exist, still prefer projects page if Azure is configured
+            // If no projects exist, still prefer home page if Azure is configured
             try {
               const saved = await apiRequest('get', '/workitems/azure/config', undefined, true);
               if (saved.data?.success) {
-                router.push('/projects');
+                router.push('/');
               } else {
                 router.push('/config');
               }
@@ -106,8 +106,8 @@ export default function LoginPage() {
             }
           }
         } catch {
-          // On error fetching projects, go to projects page; config if needed will be prompted there
-          router.push('/projects');
+          // On error fetching projects, go to home page; config if needed will be prompted there
+          router.push('/');
         }
       } else {
         setError(result.error || 'Login failed. Please check your credentials and try again.');

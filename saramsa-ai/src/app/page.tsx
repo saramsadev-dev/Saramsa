@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { ProjectDashboard } from '@/components/ui/dashboard/ProjectDashboard';
 import { encryptProjectId } from '@/lib/encryption';
 import type { Project } from '@/store/features/projects/projectsSlice';
@@ -10,29 +10,13 @@ import type { Project } from '@/store/features/projects/projectsSlice';
 export default function HomePage() {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const hasRedirectedRef = useRef(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    // Prevent multiple redirects
-    if (hasRedirectedRef.current || isRedirecting) return;
-    
-    // Wait for auth to be determined
-    if (loading) return;
-    
-    // Only redirect to login if not authenticated
-    if (!isAuthenticated) {
-      console.log("Redirecting to login");
-      hasRedirectedRef.current = true;
-      setIsRedirecting(true);
-      
-      const timer = setTimeout(() => {
-        router.replace('/login');
-      }, 100);
-      
-      return () => clearTimeout(timer);
+    // Only redirect to login if auth check is complete and user is not authenticated
+    if (!loading && !isAuthenticated) {
+      router.replace('/login');
     }
-  }, [isAuthenticated, loading, router, isRedirecting]);
+  }, [isAuthenticated, loading, router]);
 
   const handleGoToProject = useCallback((project: Project) => {
     try {
@@ -51,22 +35,15 @@ export default function HomePage() {
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Checking authentication...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Show loading while redirecting to login
-  if (!isAuthenticated && isRedirecting) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Redirecting...</p>
-        </div>
-      </div>
-    );
+  // If not authenticated, show nothing (will redirect)
+  if (!isAuthenticated) {
+    return null;
   }
 
   // Show projects dashboard if authenticated
