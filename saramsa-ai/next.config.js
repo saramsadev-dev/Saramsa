@@ -2,7 +2,7 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: 'export', // Disabled to support dynamic routes
+  output: 'export',
   trailingSlash: true,
   
   // Enable React strict mode
