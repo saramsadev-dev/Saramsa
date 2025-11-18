@@ -19,11 +19,6 @@ import {
 } from "@/lib/encryption";
 import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 
-// Generate static params for build time (empty array allows client-side routing)
-export function generateStaticParams() {
-  return [];
-}
-
 export default function ProjectDashboardPage() {
   const params = useParams();
   const router = useRouter();
