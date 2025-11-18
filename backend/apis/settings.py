@@ -298,7 +298,8 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-    'https://mango-pebble-0a60bb60f.3.azurestaticapps.net', 
+    'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
+    'https://saramsa-chi.vercel.app',
     'http://localhost:3000',      
     'http://localhost:8000',   
 ]
@@ -325,6 +326,7 @@ CORS_ALLOW_HEADERS = [
 # Trust requests coming from the static frontend domain (needed for some POSTs)
 CSRF_TRUSTED_ORIGINS = [
     'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
+    'https://saramsa-chi.vercel.app',
     'http://localhost:3000',
     'http://localhost:8000',
 ]
