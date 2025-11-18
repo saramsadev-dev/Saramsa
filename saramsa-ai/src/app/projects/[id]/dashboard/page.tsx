@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
@@ -19,7 +17,13 @@ import {
 } from "@/lib/encryption";
 import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 
+// Generate static params for build time (empty array allows client-side routing)
+export function generateStaticParams() {
+  return [];
+}
+
 export default function ProjectDashboardPage() {
+  "use client";
   const params = useParams();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
