@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from "@/store/store";
 import { fetchIntegrationAccounts } from "@/store/features/integrations/integrationsSlice";
+import { fetchProjects } from "@/store/features/projects/projectsSlice";
 
 type AzureDevOpsProject = {
   id: string;
@@ -24,6 +25,7 @@ interface AzureDevOpsConfigScreenProps {
 export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfigScreenProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { accounts } = useSelector((state: RootState) => state.integrations);
+  const { projects: saramsaProjects } = useSelector((state: RootState) => state.projects);
   
   const [orgName, setOrgName] = useState("");
   const [pat, setPat] = useState("");
@@ -33,9 +35,20 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [isExistingIntegration, setIsExistingIntegration] = useState(false);
 
+  // Build a map of external project IDs to Saramsa projects
+  const linkedProjects: { [key: string]: { id: string; name: string } } = {};
+  saramsaProjects.forEach(project => {
+    project.externalLinks?.forEach(link => {
+      if (link.provider === 'azure') {
+        linkedProjects[link.externalId] = { id: project.id, name: project.name };
+      }
+    });
+  });
+
   useEffect(() => {
-    // Check if Azure integration already exists
+    // Check if Azure integration already exists and fetch projects
     dispatch(fetchIntegrationAccounts());
+    dispatch(fetchProjects());
   }, [dispatch]);
 
   useEffect(() => {
@@ -265,6 +278,7 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
               onContinue={handleContinue}
               onBack={onBack}
               isExistingIntegration={isExistingIntegration}
+              linkedProjects={linkedProjects}
             />
           </motion.section>
         </div>

@@ -2711,7 +2711,7 @@ class UserStorySubmissionView(APIView):
             
             results = []
             
-            async with httpx.AsyncClient(timeout=90.0) as client:
+            async with httpx.AsyncClient(timeout=270.0) as client:
                 for item in items:
                     try:
                         # Build work item fields
@@ -2921,7 +2921,7 @@ class UserStorySubmissionView(APIView):
             
             results = []
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=270.0) as client:
                 for item in items:
                     try:
                         # Build description with additional fields

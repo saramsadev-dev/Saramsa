@@ -15,8 +15,7 @@ import { submitUserStories, setDeepAnalysis } from "@/store/features/analysis/an
 import type { UserStory } from "@/store/features/userStories/userStoriesSlice";
 import { deleteWorkItems, fetchUserStoriesByProject, setCurrentProjectUserStories } from "@/store/features/userStories/userStoriesSlice";
 import { DeleteWorkItemsModal } from './DeleteWorkItemsModal';
-import { BaseModal } from './modals/BaseModal';
-import { PlatformSelectionScreen } from '@/components/config/PlatformSelectionScreen';
+import { DashboardIntegrationModal } from './dashboard/DashboardIntegrationModal';
 import { useRouter } from 'next/navigation';
 import type {
   ActionItem,
@@ -1054,31 +1053,11 @@ export const UserStoryList = ({
       )}
 
       {/* Integration Setup Modal */}
-      <BaseModal
+      <DashboardIntegrationModal
         isOpen={showIntegrationModal}
         onClose={() => setShowIntegrationModal(false)}
-        title="Integration Required"
-        description="To push work items to Azure DevOps or Jira, you need to configure an integration first."
-        size="lg"
-        className="max-h-[90vh] overflow-hidden"
-      >
-        <div className="max-h-[70vh] overflow-y-auto -mx-6 -mt-6">
-          <div className="p-6">
-            <PlatformSelectionScreen
-              onPlatformSelect={(selectedPlatform) => {
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('selected_platform', selectedPlatform);
-                }
-                router.push('/config');
-              }}
-              onSkipConfig={() => {
-                // Close modal if they skip
-                setShowIntegrationModal(false);
-              }}
-            />
-          </div>
-        </div>
-      </BaseModal>
+        projectId={projectId || ''}
+      />
     </div>
   );
 };

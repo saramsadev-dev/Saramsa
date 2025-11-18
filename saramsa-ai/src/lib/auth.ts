@@ -10,7 +10,7 @@ export type User = {
   last_name?: string;
 };
 
-type LoginParams = { username: string; password: string };
+type LoginParams = { email: string; password: string };
 type RegisterParams = {
   username: string;
   email: string;

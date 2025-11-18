@@ -170,6 +170,81 @@ class CosmosDBService:
             print(f"Error getting user by username: {e}")
             return None
     
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get user by email from users container"""
+        try:
+            self.create_container_if_not_exists('users', '/id')
+            container = self.get_container('users')
+            query = "SELECT * FROM c WHERE c.type = 'user' AND c.email = @email"
+            parameters = [{"name": "@email", "value": email}]
+            
+            items = list(container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ))
+            
+            return items[0] if items else None
+        except Exception as e:
+            print(f"Error getting user by email: {e}")
+            return None
+    
+    def save_reset_token(self, email: str, token: str, expires_at: str) -> bool:
+        """Save password reset token to Cosmos DB"""
+        try:
+            self.create_container_if_not_exists('users', '/id')
+            container = self.get_container('users')
+            
+            reset_token_data = {
+                'id': f'reset_token_{token}',
+                'type': 'password_reset_token',
+                'email': email,
+                'token': token,
+                'expires_at': expires_at,
+                'created_at': datetime.now().isoformat(),
+                'used': False
+            }
+            
+            container.upsert_item(reset_token_data)
+            return True
+        except Exception as e:
+            print(f"Error saving reset token: {e}")
+            return False
+    
+    def get_reset_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """Get password reset token from Cosmos DB"""
+        try:
+            self.create_container_if_not_exists('users', '/id')
+            container = self.get_container('users')
+            query = "SELECT * FROM c WHERE c.type = 'password_reset_token' AND c.token = @token"
+            parameters = [{"name": "@token", "value": token}]
+            
+            items = list(container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ))
+            
+            return items[0] if items else None
+        except Exception as e:
+            print(f"Error getting reset token: {e}")
+            return None
+    
+    def mark_reset_token_used(self, token: str) -> bool:
+        """Mark a reset token as used"""
+        try:
+            token_data = self.get_reset_token(token)
+            if not token_data:
+                return False
+            
+            token_data['used'] = True
+            container = self.get_container('users')
+            container.upsert_item(token_data)
+            return True
+        except Exception as e:
+            print(f"Error marking reset token as used: {e}")
+            return False
+    
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save analysis data to analysis container with versioning support"""
         if not analysis_data.get('id'):

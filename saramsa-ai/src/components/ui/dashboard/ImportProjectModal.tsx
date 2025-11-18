@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store/store';
 import { 
-  fetchAzureProjects, 
-  fetchJiraProjects,
+  fetchExternalProjects,
   clearExternalProjects 
 } from '@/store/features/integrations/integrationsSlice';
 import { importProjectFromExternal } from '@/store/features/projects/projectsSlice';
@@ -32,13 +31,25 @@ interface ImportProjectModalProps {
 export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProjectModalProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { externalProjects, fetchingProjects, error, accounts } = useSelector((state: RootState) => state.integrations);
-  const { importing, importError } = useSelector((state: RootState) => state.projects);
+  const { projects, importing, importError } = useSelector((state: RootState) => state.projects);
+  
+  const fetchingProjectsForProvider = fetchingProjects[provider] || false;
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
 
   const providerAccounts = accounts.filter(acc => acc.provider === provider && acc.status === 'active');
+
+  // Helper function to check if an external project is already linked
+  const getLinkedProject = (externalProjectId: string) => {
+    return projects.find(p => 
+      p.externalLinks?.some(link => 
+        link.provider === provider && 
+        link.externalId === externalProjectId
+      )
+    );
+  };
 
   useEffect(() => {
     if (providerAccounts.length > 0) {
@@ -49,11 +60,7 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
   useEffect(() => {
     if (selectedAccount) {
       dispatch(clearExternalProjects());
-      if (provider === 'azure') {
-        dispatch(fetchAzureProjects());
-      } else {
-        dispatch(fetchJiraProjects());
-      }
+      dispatch(fetchExternalProjects({ provider, accountId: selectedAccount }));
     }
   }, [dispatch, provider, selectedAccount]);
 
@@ -83,14 +90,14 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
       case 'azure':
         return {
           name: 'Azure DevOps',
-          color: 'bg-blue-500',
+          color: 'bg-gradient-to-r from-[#E603EB] to-[#8B5FBF]',
           icon: <Cloud className="w-5 h-5 text-white" />,
           baseUrl: 'https://dev.azure.com'
         };
       case 'jira':
         return {
           name: 'Jira',
-          color: 'bg-blue-600',
+          color: 'bg-gradient-to-r from-[#E603EB] to-[#8B5FBF]',
           icon: <span className="text-white font-bold">J</span>,
           baseUrl: 'https://atlassian.net'
         };
@@ -165,7 +172,7 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search projects..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-[#E603EB] focus:border-transparent"
             />
           </div>
         </div>
@@ -182,9 +189,27 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
           </div>
         )}
 
+        {/* Info Banner */}
+        {!fetchingProjectsForProvider && filteredProjects.length > 0 && (
+          <div className="px-6 pb-4">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                {filteredProjects.filter(p => getLinkedProject(p.id)).length > 0 ? (
+                  <>
+                    <strong>{filteredProjects.filter(p => getLinkedProject(p.id)).length}</strong> project(s) already linked. 
+                    They cannot be imported again.
+                  </>
+                ) : (
+                  'All projects are available to import.'
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Projects List */}
         <div className="flex-1 overflow-y-auto max-h-96">
-          {fetchingProjects ? (
+          {fetchingProjectsForProvider ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
               <span className="ml-2 text-gray-600 dark:text-gray-400">Loading projects...</span>
@@ -206,17 +231,23 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
             </div>
           ) : (
             <div className="p-6 space-y-3">
-              {filteredProjects.map((project) => (
-                <motion.div
-                  key={project.id}
-                  whileHover={{ scale: 1.01 }}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    selectedProject?.id === project.id
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                  onClick={() => setSelectedProject(project)}
-                >
+              {filteredProjects.map((project) => {
+                const linkedProject = getLinkedProject(project.id);
+                const isAlreadyLinked = !!linkedProject;
+                
+                return (
+                  <motion.div
+                    key={project.id}
+                    whileHover={{ scale: isAlreadyLinked ? 1 : 1.01 }}
+                    className={`p-4 border-2 rounded-lg transition-all ${
+                      isAlreadyLinked
+                        ? 'opacity-60 cursor-not-allowed border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800'
+                        : selectedProject?.id === project.id
+                        ? 'border-[#E603EB] bg-[#E603EB]/10 dark:bg-[#E603EB]/20 cursor-pointer'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer'
+                    }`}
+                    onClick={() => !isAlreadyLinked && setSelectedProject(project)}
+                  >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -235,6 +266,15 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
                         </p>
                       )}
                       
+                      {/* Already linked warning */}
+                      {isAlreadyLinked && (
+                        <div className="mt-2 p-2 bg-orange-100 dark:bg-orange-900/30 rounded">
+                          <p className="text-xs text-orange-700 dark:text-orange-400">
+                            Already linked to "{linkedProject.name}"
+                          </p>
+                        </div>
+                      )}
+                      
                       {/* Project metadata */}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                         {project.templateName && (
@@ -249,7 +289,7 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-1 hover:text-blue-500"
+                            className="flex items-center gap-1 hover:text-[#E603EB]"
                           >
                             <ExternalLink className="w-3 h-3" />
                             View in {config.name}
@@ -258,12 +298,18 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
                       </div>
                     </div>
                     
-                    {selectedProject?.id === project.id && (
-                      <CheckCircle className="w-5 h-5 text-blue-500" />
+                    {selectedProject?.id === project.id && !isAlreadyLinked && (
+                      <CheckCircle className="w-5 h-5 text-[#E603EB]" />
+                    )}
+                    {isAlreadyLinked && (
+                      <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded">
+                        Linked
+                      </span>
                     )}
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -273,7 +319,13 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {selectedProject ? (
-                <span>Selected: <strong>{selectedProject.name}</strong></span>
+                getLinkedProject(selectedProject.id) ? (
+                  <span className="text-orange-600 dark:text-orange-400">
+                    This project is already linked to "{getLinkedProject(selectedProject.id)?.name}"
+                  </span>
+                ) : (
+                  <span>Selected: <strong>{selectedProject.name}</strong></span>
+                )
               ) : (
                 'Select a project to import'
               )}
@@ -288,8 +340,8 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
               </button>
               <button
                 onClick={handleImport}
-                disabled={!selectedProject || importing}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-lg transition-colors disabled:cursor-not-allowed"
+                disabled={!selectedProject || importing || (selectedProject && !!getLinkedProject(selectedProject.id))}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:shadow-lg disabled:opacity-50 text-white rounded-lg transition-all disabled:cursor-not-allowed"
               >
                 {importing ? (
                   <>

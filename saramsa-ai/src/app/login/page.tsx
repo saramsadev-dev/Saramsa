@@ -27,7 +27,7 @@ const BrandLogo = dynamic(
 
 // Form validation schema
 const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
+  email: z.string().email('Please enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
     
     try {
       const result = await login({
-        username: data.username,
+        email: data.email,
         password: data.password,
       });
       
@@ -80,16 +80,24 @@ export default function LoginPage() {
             const projectId = first?.id || first?.project_id;
             if (projectId && typeof window !== 'undefined') {
               localStorage.setItem('project_id', projectId);
-              if (first?.organization) localStorage.setItem('azure_organization', first.organization);
-              if (first?.project_name) localStorage.setItem('azure_project_name', first.project_name);
+              // Extract organization from externalLinks if it's an Azure project
+              const azureLink = first?.externalLinks?.find((link: any) => link.provider === 'azure');
+              if (azureLink?.url) {
+                // Extract organization from URL like https://dev.azure.com/{organization}/{project}
+                const match = azureLink.url.match(/dev\.azure\.com\/([^\/]+)/);
+                if (match) {
+                  localStorage.setItem('azure_organization', match[1]);
+                }
+              }
+              if (first?.name) localStorage.setItem('azure_project_name', first.name);
             }
-            router.push('/dashboard');
+            router.push('/projects');
           } else {
-            // If no projects exist, still prefer dashboard if Azure is configured
+            // If no projects exist, still prefer projects page if Azure is configured
             try {
               const saved = await apiRequest('get', '/workitems/azure/config', undefined, true);
               if (saved.data?.success) {
-                router.push('/dashboard');
+                router.push('/projects');
               } else {
                 router.push('/config');
               }
@@ -98,8 +106,8 @@ export default function LoginPage() {
             }
           }
         } catch {
-          // On error fetching projects, go to dashboard shell; config if needed will be prompted there
-          router.push('/dashboard');
+          // On error fetching projects, go to projects page; config if needed will be prompted there
+          router.push('/projects');
         }
       } else {
         setError(result.error || 'Login failed. Please check your credentials and try again.');
@@ -128,9 +136,9 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/5 via-transparent to-saramsa-gradient-to/5" />
         
         {/* Data Stream Animation - Hidden on tablet/iPad */}
-        <div className="hidden lg:block">
+        {/* <div className="hidden lg:block">
           <DataStream />
-        </div>
+        </div> */}
         
         {/* Floating Task Cards - Hidden on tablet/iPad */}
         <div className="hidden lg:block">
@@ -219,24 +227,24 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
             <div className="space-y-3 sm:space-y-4">
-              {/* Username */}
+              {/* Email */}
               <div>
-                <label htmlFor="username" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
-                  Username
+                <label htmlFor="email" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                  Email Address
                 </label>
                 <div className="relative mt-1 sm:mt-2">
                   <input
-                    {...register('username')}
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
+                    {...register('email')}
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email address"
                     className="w-full pl-8 sm:pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 
                     dark:border-gray-700 rounded-lg focus:border-[#E603EB] focus:ring-[#E603EB]/20 focus:outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                   />
                   <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
                 </div>
-                {errors.username && (
-                  <p className="mt-1 text-xs sm:text-sm text-red-500">{errors.username.message}</p>
+                {errors.email && (
+                  <p className="mt-1 text-xs sm:text-sm text-red-500">{errors.email.message}</p>
                 )}
               </div>
 
@@ -270,12 +278,12 @@ export default function LoginPage() {
 
             {/* Forgot Password */}
             <div className="text-right">
-              <button
-                type="button"
+              <Link
+                href="/forgot-password"
                 className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-[#E603EB] hover:text-[#E603EB]/80 transition-colors"
               >
                 Forgot password?
-              </button>
+              </Link>
             </div>
 
             {/* Login CTA */}

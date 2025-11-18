@@ -13,4 +13,6 @@ export { ActionItems } from './ActionItems';
 export { NavigationTabs } from './NavigationTabs';
 export { ProjectCard } from './ProjectCard';
 export { DeleteProjectModal } from './DeleteProjectModal';
+export { CreateProjectModal } from './CreateProjectModal';
+export { EditProjectModal } from './EditProjectModal';
 export { KeywordCloud } from './KeywordCloud';

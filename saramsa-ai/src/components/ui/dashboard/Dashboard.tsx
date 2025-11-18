@@ -24,7 +24,6 @@ import {
 import type { AnalysisData } from '../../../lib/uploadService';
 import { apiRequest } from '@/lib/apiRequest';
 import { Sparkles } from 'lucide-react';
-import { ProjectSelector } from './ProjectSelector';
 import { AnalysisProjectSelector } from './AnalysisProjectSelector';
 import { UploadPanel } from './UploadPanel';
 import { MetricsCards } from './MetricsCards';
@@ -34,7 +33,7 @@ import { KeywordCloud } from './KeywordCloud';
 import { AdvancedWordCloud } from './AdvancedWordCloud';
 // import { NavigationTabs } from './NavigationTabs'; // Inlined below
 import { UserStoryList } from '../userStoryList';
-import JiraIntegration from '../jira-integration';
+
 import { LoaderForDashboard } from '@/components/dashboard/analysisDashboard/LoaderForDashboard';
 
 // Local interface for the component
@@ -53,9 +52,12 @@ interface LocalFeatureSentiment {
 
 interface DashboardProps {
   data?: AnalysisData;
+  onProjectSelect?: (projectId: string) => void;
+  initialProjectId?: string;
+  skipBootstrapFetches?: boolean; // when true, parent handles projects/integrations fetching
 }
 
-export function DashboardComponent({ data }: DashboardProps) {
+export function DashboardComponent({ data, onProjectSelect, initialProjectId, skipBootstrapFetches = false }: DashboardProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { 
     analysisData, 
@@ -83,6 +85,12 @@ export function DashboardComponent({ data }: DashboardProps) {
   const [editedKeywords, setEditedKeywords] = useState<{ [key: string]: string[] }>({});
   const [currentProjectId, setCurrentProjectId] = useState<string>("");
   const [personalProjectId, setPersonalProjectId] = useState<string>('');
+  const [isGeneratingUserStories, setIsGeneratingUserStories] = useState<boolean>(false);
+  
+  // Declare all refs at the top to prevent recreation on every render
+  const didInitRef = useRef(false);
+  const hasConsolidatedFetchRef = useRef(false);
+  const lastFetchedProjectRef = useRef<string | null>(null);
   useEffect(() => {
     const contextProjectId = projectContext?.project_id;
     if (!contextProjectId) return;
@@ -98,7 +106,7 @@ export function DashboardComponent({ data }: DashboardProps) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('project_id', contextProjectId);
     }
-  }, [projectContext, currentProjectId]);
+  }, [projectContext]); // Removed currentProjectId from dependencies to prevent loop
   const [wordCloudView, setWordCloudView] = useState<'split' | 'advanced'>('split');
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
@@ -306,19 +314,25 @@ export function DashboardComponent({ data }: DashboardProps) {
   }, [latestAnalysis, currentProjectId, user, dispatch]);
 
   // Fetch projects and integration accounts on mount (guard against double-invoke in dev)
-  const didInitRef = useRef(false);
   useEffect(() => {
+    if (skipBootstrapFetches) return;
     if (didInitRef.current) return;
     didInitRef.current = true;
     dispatch(fetchProjects());
     dispatch(fetchIntegrationAccounts());
-  }, [dispatch]);
+  }, [dispatch, skipBootstrapFetches]);
 
   // Handle page refresh - fetch consolidated dashboard data for the current project
   useEffect(() => {
+    // Prevent duplicate fetches
+    if (hasConsolidatedFetchRef.current) return;
+    
     const currentProjectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
     
     if (currentProjectId) {
+      hasConsolidatedFetchRef.current = true;
+      // Mark latest fetch as satisfied for this project to avoid a subsequent getLatestAnalysis call
+      lastFetchedProjectRef.current = currentProjectId;
       // Fetch consolidated dashboard data (analysis + user stories + comments + submission status)
       console.log('🔍 Dashboard: Fetching consolidated data for project:', currentProjectId);
       dispatch(getConsolidatedDashboardData(currentProjectId));
@@ -327,6 +341,13 @@ export function DashboardComponent({ data }: DashboardProps) {
 
   // Handle project selection
   const handleProjectSelect = (projectId: string) => {
+    // If external handler is provided (from route-based component), use it
+    if (onProjectSelect) {
+      onProjectSelect(projectId);
+      return;
+    }
+    
+    // Otherwise, use the original logic for backward compatibility
     setCurrentProjectId(projectId);
     if (typeof window !== 'undefined') {
       localStorage.setItem('project_id', projectId);
@@ -340,6 +361,8 @@ export function DashboardComponent({ data }: DashboardProps) {
     // Fetch consolidated dashboard data for the selected project
     if (projectId) {
       console.log('🔍 Dashboard: Fetching consolidated data for selected project:', projectId);
+      // Mark latest fetch as satisfied for this project to avoid triggering getLatestAnalysis
+      lastFetchedProjectRef.current = projectId;
       dispatch(getConsolidatedDashboardData(projectId));
     }
   };
@@ -406,12 +429,14 @@ export function DashboardComponent({ data }: DashboardProps) {
 
 
 
-  // Set currentProjectId from localStorage when component mounts
+  // Set currentProjectId from initialProjectId prop or localStorage when component mounts
   useEffect(() => {
-    if (projectId && !currentProjectId) {
+    if (initialProjectId && !currentProjectId) {
+      setCurrentProjectId(initialProjectId);
+    } else if (projectId && !currentProjectId && !initialProjectId) {
       setCurrentProjectId(projectId);
     }
-  }, [projectId, currentProjectId]);
+  }, [projectId, currentProjectId, initialProjectId]);
 
 
   function parseDeepAnalysis(value: any): any {
@@ -432,6 +457,10 @@ export function DashboardComponent({ data }: DashboardProps) {
   // When project changes, fetch latest analysis for it
   useEffect(() => {
     if (!currentProjectId) return;
+    // Prevent fetching for the same project multiple times
+    if (lastFetchedProjectRef.current === currentProjectId) return;
+    lastFetchedProjectRef.current = currentProjectId;
+    
     (async () => {
       try {
         const result = await dispatch(getLatestAnalysis(currentProjectId)).unwrap();
@@ -574,8 +603,11 @@ export function DashboardComponent({ data }: DashboardProps) {
           dispatch(setDeepAnalysis(payload.deepAnalysis));
         }
         
-        // Generate work items based on the analysis
-        await generateWorkItemsFromAnalysis(payload);
+        // Generate work items asynchronously in the background (don't await)
+        // This allows the dashboard to display analysis results immediately
+        generateWorkItemsFromAnalysis(payload).catch(e => {
+          console.error('Background work item generation failed:', e);
+        });
         
       }
       
@@ -587,6 +619,8 @@ export function DashboardComponent({ data }: DashboardProps) {
   // Generate work items from analysis data
   async function generateWorkItemsFromAnalysis(analysisData: any) {
     try {
+      setIsGeneratingUserStories(true);
+      
       // Use platform derived from selected project (default to Azure for personal workspaces)
       const currentPlatform = selectedPlatform ?? 'azure';
       
@@ -615,6 +649,7 @@ export function DashboardComponent({ data }: DashboardProps) {
       
       if (!commentsToUse || commentsToUse.length === 0) {
         console.error('❌ No comments available for work item generation');
+        setIsGeneratingUserStories(false);
         return;
       }
       
@@ -770,6 +805,8 @@ export function DashboardComponent({ data }: DashboardProps) {
     } catch (e: any) {
       console.error('❌ Error generating work items:', e);
       // Don't show error to user as this is not critical for analysis
+    } finally {
+      setIsGeneratingUserStories(false);
     }
   }
 
@@ -977,10 +1014,10 @@ export function DashboardComponent({ data }: DashboardProps) {
   ];
 
   // Show loader while:
-  // - analysis request is loading, or
-  // - projects are still loading, or
-  // - no project has been resolved yet (prevents flashing the empty template)
-  if (loading || projectsLoading) {
+  // - projects are still loading (initial load only)
+  // Note: We don't show full-screen loader for analysis loading anymore
+  // Analysis loading is handled within the dashboard section
+  if (projectsLoading && projects.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         {/* Main Content */}
@@ -1041,9 +1078,6 @@ export function DashboardComponent({ data }: DashboardProps) {
                   onAnalyze={handleTopAnalyze}
                   onCloudConnect={handleCloudConnect}
                 />
-
-                {/* Loading State for Analysis Components */}
-                <LoaderForDashboard />
               </>
             ) : activeView === 'user-stories' ? (
               /* User Stories View Loading */
@@ -1099,7 +1133,7 @@ export function DashboardComponent({ data }: DashboardProps) {
             </div>
 
             {/* Navigation Tabs - Inlined */}
-            <div className="flex gap-4">
+            <div className="flex gap-4 items-center">
               <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                 <button
                   onClick={() => setActiveView('dashboard')}
@@ -1123,12 +1157,23 @@ export function DashboardComponent({ data }: DashboardProps) {
                 </button>
               </div>
               
+              {/* Projects Button */}
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = '/projects';
+                  }
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white rounded-lg hover:shadow-lg transition-all duration-200 text-sm font-medium"
+              >
+                Projects
+              </button>
             </div>
           </div>
 
           {activeView === 'dashboard' ? (
             <>
-              {/* Upload Panel */}
+              {/* Upload Panel - Always visible */}
               <UploadPanel
                 dbProjectId={currentProjectId}
                 topFile={topFile}
@@ -1140,8 +1185,7 @@ export function DashboardComponent({ data }: DashboardProps) {
                 onCloudConnect={handleCloudConnect}
               />
 
-
-
+              {/* Analysis Results Section */}
               {isAnalyzing ? (
                 <LoaderForDashboard />
               ) : (
@@ -1219,7 +1263,7 @@ export function DashboardComponent({ data }: DashboardProps) {
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                           Word Cloud Analysis
                         </h3>
-                        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                        {/* <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                           <button
                             onClick={() => setWordCloudView('split')}
                             className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
@@ -1240,7 +1284,7 @@ export function DashboardComponent({ data }: DashboardProps) {
                           >
                             Advanced View
                           </button>
-                        </div>
+                        </div> */}
                       </div>
 
                       {/* Word Cloud Components */}
@@ -1279,7 +1323,12 @@ export function DashboardComponent({ data }: DashboardProps) {
           ) : activeView === 'user-stories' ? (
             /* User Stories View */
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
-              {selectedPlatform === 'jira' ? (
+              {isGeneratingUserStories ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <LoaderForDashboard />
+                  <p className="mt-4 text-gray-600 dark:text-gray-400">Generating user stories from analysis...</p>
+                </div>
+              ) : selectedPlatform === 'jira' ? (
                 /* Jira User Stories View */
                 loadedComments && loadedComments.length > 0 ? (
                   (() => {

@@ -117,9 +117,9 @@ export default function RegisterPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/5 via-transparent to-saramsa-gradient-to/5" />
         
         {/* Data Stream Animation - Hidden on tablet/iPad */}
-        <div className="hidden lg:block">
+        {/* <div className="hidden lg:block">
           <DataStream />
-        </div>
+        </div> */}
         
         {/* AI Processing Nodes - Hidden on tablet/iPad */}
         <div className="hidden lg:block">

@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store/store';
 import { 
   fetchProjects, 
   createProject, 
+  updateProject,
+  syncProjectWithExternal,
   setCurrentProject,
   clearError,
   deleteProject,
@@ -13,6 +15,7 @@ import {
 } from '@/store/features/projects/projectsSlice';
 import { fetchIntegrationAccounts } from '@/store/features/integrations/integrationsSlice';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { 
   Plus, 
   FolderPlus, 
@@ -30,6 +33,8 @@ import {
 import { ProjectCard } from '@/components/ui/dashboard/ProjectCard';
 import { NewProjectDropdown } from '@/components/ui/dashboard/NewProjectDropdown';
 import { ImportProjectModal } from '@/components/ui/dashboard/ImportProjectModal';
+import { CreateProjectModal } from '@/components/ui/dashboard/CreateProjectModal';
+import { EditProjectModal } from '@/components/ui/dashboard/EditProjectModal';
 
 interface ProjectDashboardProps {
   onNavigateToAnalysis?: () => void;
@@ -42,22 +47,77 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
   const { accounts } = useSelector((state: RootState) => state.integrations);
   
   const [showNewProjectDropdown, setShowNewProjectDropdown] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<'azure' | 'jira' | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  const [syncingProjectId, setSyncingProjectId] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent double fetching in development strict mode
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+    
     dispatch(fetchProjects());
     dispatch(fetchIntegrationAccounts());
   }, [dispatch]);
 
-  const handleCreateProject = async (name: string, description?: string) => {
+  const handleCreateProject = async (
+    name: string, 
+    description?: string, 
+    externalLink?: { provider: 'azure' | 'jira', accountId: string, projectId: string, projectName: string, projectUrl?: string, projectKey?: string }
+  ) => {
     try {
-      const result = await dispatch(createProject({ name, description })).unwrap();
+      let result;
+      if (externalLink) {
+        // Create project with external link
+        const externalLinks = [{
+          provider: externalLink.provider,
+          integrationAccountId: externalLink.accountId,
+          externalId: externalLink.projectId,
+          externalKey: externalLink.projectKey,
+          url: externalLink.projectUrl,
+          status: 'ok',
+          lastSyncedAt: null,
+          syncMetadata: {}
+        }];
+        
+        result = await dispatch(createProject({ 
+          name, 
+          description,
+          externalLinks 
+        })).unwrap();
+      } else {
+        // Create standalone project
+        result = await dispatch(createProject({ name, description })).unwrap();
+      }
+      
       dispatch(setCurrentProject(result));
-    } catch (err) {
+      setShowCreateModal(false);
+      toast.success('Project created successfully');
+      
+      // Refetch projects to ensure consistency
+      await dispatch(fetchProjects());
+    } catch (err: any) {
       console.error('Failed to create project:', err);
+      const errorMessage = typeof err === 'string' ? err : err?.message || 'Failed to create project';
+      
+      if (errorMessage.includes('already imported') || errorMessage.includes('already linked')) {
+        const match = errorMessage.match(/Project "([^"]+)"/);
+        const projectName = match ? match[1] : 'another project';
+        toast.error(`This external project is already linked to ${projectName}`);
+      } else {
+        toast.error(errorMessage);
+      }
     }
+  };
+
+  const handleOpenCreateModal = () => {
+    setShowNewProjectDropdown(false);
+    setShowCreateModal(true);
   };
 
   const handleImportProject = (provider: 'azure' | 'jira') => {
@@ -74,19 +134,45 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
     setShowNewProjectDropdown(false);
   };
 
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (projectId: string, name: string, description?: string) => {
+    try {
+      await dispatch(updateProject({ id: projectId, name, description })).unwrap();
+      setShowEditModal(false);
+      setEditingProject(null);
+      toast.success('Project updated successfully');
+    } catch (err: any) {
+      console.error('Failed to update project:', err);
+      toast.error(err?.message || 'Failed to update project. Please try again.');
+    }
+  };
+
+  const handleSyncProject = async (project: Project, provider: 'azure' | 'jira') => {
+    try {
+      setSyncingProjectId(project.id);
+      await dispatch(syncProjectWithExternal({ projectId: project.id, provider })).unwrap();
+      // Refresh projects to get updated data
+      await dispatch(fetchProjects());
+      alert(`Successfully synced "${project.name}" with ${provider === 'azure' ? 'Azure DevOps' : 'Jira'}`);
+    } catch (err: any) {
+      console.error('Failed to sync project:', err);
+      alert(err?.message || 'Failed to sync project. Please try again.');
+    } finally {
+      setSyncingProjectId(null);
+    }
+  };
+
   const handleDeleteProject = async (projectId: string) => {
     try {
       setDeletingProjectId(projectId);
-      console.log('Attempting to delete project:', projectId);
       await dispatch(deleteProject(projectId)).unwrap();
-      console.log('Project deleted successfully:', projectId);
+      toast.success('Project deleted successfully');
     } catch (err: any) {
       console.error('Failed to delete project:', err);
-      console.error('Delete error details:', {
-        message: err?.message,
-        status: err?.status,
-        response: err?.response?.data
-      });
       
       let errorMessage = 'Failed to delete project. Please try again.';
       if (err?.message?.includes('404')) {
@@ -95,8 +181,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
         errorMessage = 'You do not have permission to delete this project.';
       }
       
-      console.error(errorMessage);
-      // TODO: Replace with toast notification system
+      toast.error(errorMessage);
     } finally {
       setDeletingProjectId(null);
     }
@@ -139,11 +224,30 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projects</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Manage your analysis projects and integrations
-            </p>
+            
+            {/* Stats Cards */}
+            {projects.length > 0 && (
+              <div className="flex items-center gap-3">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 flex items-center gap-2">
+                  <FolderPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">{projects.length}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Projects</span>
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 flex items-center gap-2">
+                  <ExternalLink className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">
+                      {projects.filter(p => p.externalLinks && p.externalLinks.length > 0).length}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Integrations</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-3">
@@ -173,7 +277,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
               {showNewProjectDropdown && (
                 <NewProjectDropdown
                   onClose={() => setShowNewProjectDropdown(false)}
-                  onCreateProject={handleCreateProject}
+                  onCreateProject={handleOpenCreateModal}
                   onImportProject={handleImportProject}
                   integrations={accounts}
                 />
@@ -260,80 +364,45 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
                 <ProjectCard
                   project={project}
                   onClick={() => dispatch(setCurrentProject(project))}
+                  onEdit={handleEditProject}
+                  onSync={handleSyncProject}
                   onDelete={handleDeleteProject}
                   onGoToProject={onGoToProject}
                   isSelected={currentProject?.id === project.id}
                   deleteLoading={deletingProjectId === project.id}
+                  syncLoading={syncingProjectId === project.id}
                 />
               </motion.div>
             ))}
           </div>
         )}
 
-        {/* Quick Stats */}
-        {projects.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="grid grid-cols-1 md:grid-cols-4 gap-6"
-          >
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <FolderPlus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{projects.length}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Projects</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {projects.filter(p => p.metadata?.analysisStatus === 'completed').length}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Analyzed</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <ExternalLink className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {projects.filter(p => p.externalLinks && p.externalLinks.length > 0).length}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Integrated</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                  <Users className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {projects.reduce((sum, p) => sum + (p.metadata?.totalComments || 0), 0)}
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Total Feedback</p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
+
       </div>
+
+      {/* Create Project Modal */}
+      {showCreateModal && (
+        <CreateProjectModal
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreateProject}
+          onImport={handleImportProject}
+          integrations={accounts}
+          loading={loading}
+        />
+      )}
+
+      {/* Edit Project Modal */}
+      {showEditModal && editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingProject(null);
+          }}
+          onSave={handleSaveEdit}
+          loading={loading}
+        />
+      )}
 
       {/* Import Project Modal */}
       {showImportModal && selectedProvider && (

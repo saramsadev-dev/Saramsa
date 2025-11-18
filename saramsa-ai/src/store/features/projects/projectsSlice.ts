@@ -60,13 +60,51 @@ export const fetchProjects = createAsyncThunk(
 
 export const createProject = createAsyncThunk(
   'projects/createProject',
-  async (data: { name: string; description?: string }) => {
-    const response = await apiRequest('post', '/integrations/projects/create/', {
-      project_name: data.name,
-      description: data.description,
-      platform: 'standalone', // No external integration
-    }, true);
-    return response.data.project;
+  async (data: { 
+    name: string; 
+    description?: string;
+    externalLinks?: Array<{
+      provider: string;
+      integrationAccountId: string;
+      externalId: string;
+      externalKey?: string;
+      url?: string;
+      status: string;
+      lastSyncedAt: string | null;
+      syncMetadata: any;
+    }>;
+  }, { rejectWithValue }) => {
+    try {
+      const payload: any = {
+        project_name: data.name,
+        description: data.description,
+      };
+
+      // If external links provided, use the first one to set platform and integration details
+      if (data.externalLinks && data.externalLinks.length > 0) {
+        const link = data.externalLinks[0];
+        payload.platform = link.provider === 'azure' ? 'azure_devops' : 'jira';
+        payload.external_project_id = link.externalId;
+        payload.integration_account_id = link.integrationAccountId;
+        payload.external_url = link.url;
+        if (link.externalKey) {
+          payload.jira_project_key = link.externalKey;
+        }
+      } else {
+        payload.platform = 'standalone';
+      }
+
+      const response = await apiRequest('post', '/integrations/projects/create/', payload, true);
+      
+      if (!response.data.success) {
+        return rejectWithValue(response.data.error || 'Failed to create project');
+      }
+      
+      return response.data.project;
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create project';
+      return rejectWithValue(errorMessage);
+    }
   }
 );
 
@@ -85,7 +123,7 @@ export const importProjectFromExternal = createAsyncThunk(
     };
   }) => {
     // First check if project already exists with this external link
-    const checkResponse = await apiRequest('get', `/projects/check-external?provider=${data.provider}&externalId=${data.externalProject.id}`, undefined, true);
+    const checkResponse = await apiRequest('get', `/integrations/projects/check-external/?provider=${data.provider}&externalId=${data.externalProject.id}`, undefined, true);
     
     if (checkResponse.data.exists) {
       throw new Error(`Project "${data.externalProject.name}" is already imported`);
@@ -125,9 +163,17 @@ export const importProjectFromExternal = createAsyncThunk(
 
 export const updateProject = createAsyncThunk(
   'projects/updateProject',
-  async (data: { projectId: string; updates: Partial<Project> }) => {
-    const response = await apiRequest('patch', `/integrations/projects/${data.projectId}/`, data.updates, true);
-    return response.data.project;
+  async (data: { id: string; name: string; description?: string }) => {
+    const response = await apiRequest('patch', `/integrations/projects/${data.id}/`, {
+      project_name: data.name,
+      description: data.description,
+    }, true);
+    
+    if (response.data.success) {
+      return response.data.project;
+    } else {
+      throw new Error(response.data.error || 'Failed to update project');
+    }
   }
 );
 
@@ -236,7 +282,14 @@ const projectsSlice = createSlice({
       })
       .addCase(createProject.fulfilled, (state, action) => {
         state.loading = false;
-        state.projects.push(action.payload);
+        // Check if project already exists before adding
+        const existingIndex = state.projects.findIndex(p => p.id === action.payload.id);
+        if (existingIndex === -1) {
+          state.projects.push(action.payload);
+        } else {
+          // Update existing project
+          state.projects[existingIndex] = action.payload;
+        }
       })
       .addCase(createProject.rejected, (state, action) => {
         state.loading = false;
@@ -250,7 +303,14 @@ const projectsSlice = createSlice({
       })
       .addCase(importProjectFromExternal.fulfilled, (state, action) => {
         state.importing = false;
-        state.projects.push(action.payload);
+        // Check if project already exists before adding
+        const existingIndex = state.projects.findIndex(p => p.id === action.payload.id);
+        if (existingIndex === -1) {
+          state.projects.push(action.payload);
+        } else {
+          // Update existing project
+          state.projects[existingIndex] = action.payload;
+        }
       })
       .addCase(importProjectFromExternal.rejected, (state, action) => {
         state.importing = false;
@@ -258,7 +318,12 @@ const projectsSlice = createSlice({
       })
       
       // Update project
+      .addCase(updateProject.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(updateProject.fulfilled, (state, action) => {
+        state.loading = false;
         const index = state.projects.findIndex(p => p.id === action.payload.id);
         if (index !== -1) {
           state.projects[index] = action.payload;
@@ -266,6 +331,10 @@ const projectsSlice = createSlice({
         if (state.currentProject?.id === action.payload.id) {
           state.currentProject = action.payload;
         }
+      })
+      .addCase(updateProject.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to update project';
       })
       
       // Delete project

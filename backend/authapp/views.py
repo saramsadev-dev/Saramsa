@@ -9,11 +9,15 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 import logging
 from aiCore.cosmos_service import cosmos_service
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
+from django.conf import settings
 from .serializers import (
     CosmosDBUserSerializer, 
     CosmosDBTokenObtainPairSerializer,
-    CosmosDBTokenRefreshSerializer
+    CosmosDBTokenRefreshSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer
 )
 from .authentication import CosmosDBJWTAuthentication, CosmosDBUser
 import bcrypt
@@ -244,17 +248,17 @@ class LoginView(APIView):
     
     def post(self, request):
         """Custom login endpoint for Cosmos DB users"""
-        username = request.data.get('username')
+        email = request.data.get('email')
         password = request.data.get('password')
         
-        if not username or not password:
+        if not email or not password:
             return Response({
-                "error": "Username and password are required"
+                "error": "Email and password are required"
             }, status=400)
         
         try:
-            # Get user from Cosmos DB
-            user_data = cosmos_service.get_user_by_username(username)
+            # Get user from Cosmos DB by email
+            user_data = cosmos_service.get_user_by_email(email)
             if not user_data:
                 return Response({
                     "error": "Invalid credentials"
@@ -290,7 +294,7 @@ class LoginView(APIView):
             from .serializers import CosmosDBTokenObtainPairSerializer
             serializer = CosmosDBTokenObtainPairSerializer()
             token_data = serializer.validate({
-                'username': username,
+                'email': email,
                 'password': password
             })
             
@@ -299,4 +303,119 @@ class LoginView(APIView):
         except Exception as e:
             return Response({
                 "error": f"Login failed: {str(e)}"
+            }, status=500)
+
+class ForgotPasswordView(APIView):
+    permission_classes = [NoAuthentication]
+    logger = logging.getLogger(__name__)
+    
+    def post(self, request):
+        """Generate and send password reset token"""
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        
+        email = serializer.validated_data['email']
+        
+        try:
+            # Check if user exists
+            user_data = cosmos_service.get_user_by_email(email)
+            if not user_data:
+                # Don't reveal if email exists for security
+                return Response({
+                    "success": True,
+                    "message": "If an account exists with this email, you will receive a password reset link."
+                }, status=200)
+            
+            # Generate secure token
+            token = secrets.token_urlsafe(32)
+            
+            # Set expiration (1 hour from now)
+            expires_at = (datetime.now() + timedelta(hours=1)).isoformat()
+            
+            # Save reset token
+            cosmos_service.save_reset_token(email, token, expires_at)
+            
+            # TODO: Send email with reset link
+            # For now, we'll return the token in the response (remove this in production)
+            # In production, send email with link like: /reset-password?token=...
+            reset_link = f"/reset-password?token={token}"
+            
+            # Log the reset link for development (remove in production)
+            print(f"Password reset link for {email}: {reset_link}")
+            
+            return Response({
+                "success": True,
+                "message": "If an account exists with this email, you will receive a password reset link.",
+                # Remove this in production - only for development
+                "reset_link": reset_link if settings.DEBUG else None
+            }, status=200)
+            
+        except Exception as e:
+            self.logger.exception(f"Error in forgot password: {e}")
+            return Response({
+                "error": "Failed to process password reset request"
+            }, status=500)
+
+class ResetPasswordView(APIView):
+    permission_classes = [NoAuthentication]
+    logger = logging.getLogger(__name__)
+    
+    def post(self, request):
+        """Reset password using token"""
+        serializer = ResetPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        
+        token = serializer.validated_data['token']
+        new_password = serializer.validated_data['new_password']
+        
+        try:
+            # Get reset token
+            token_data = cosmos_service.get_reset_token(token)
+            if not token_data:
+                return Response({
+                    "error": "Invalid or expired reset token"
+                }, status=400)
+            
+            # Check if token is used
+            if token_data.get('used', False):
+                return Response({
+                    "error": "This reset link has already been used"
+                }, status=400)
+            
+            # Check if token is expired
+            expires_at = datetime.fromisoformat(token_data['expires_at'])
+            if datetime.now() > expires_at:
+                return Response({
+                    "error": "This reset link has expired"
+                }, status=400)
+            
+            # Get user by email
+            email = token_data['email']
+            user_data = cosmos_service.get_user_by_email(email)
+            if not user_data:
+                return Response({
+                    "error": "User not found"
+                }, status=404)
+            
+            # Hash new password
+            hashed_password = ResetPasswordSerializer().hash_password(new_password)
+            
+            # Update user password
+            user_data['password'] = hashed_password
+            cosmos_service.save_user(user_data)
+            
+            # Mark token as used
+            cosmos_service.mark_reset_token_used(token)
+            
+            return Response({
+                "success": True,
+                "message": "Password has been reset successfully"
+            }, status=200)
+            
+        except Exception as e:
+            self.logger.exception(f"Error in reset password: {e}")
+            return Response({
+                "error": "Failed to reset password"
             }, status=500)

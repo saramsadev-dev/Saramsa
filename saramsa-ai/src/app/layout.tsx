@@ -5,6 +5,7 @@ import "./globals.css";
 import StoreProvider from "@/store/StoreProvider";
 import { Navbar } from "@/components/ui/navbar";
 import { Providers } from "@/components/providers/providers";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,6 +31,12 @@ export default function RootLayout({
           <StoreProvider>
             <Navbar/>
             <main className="flex-1 overflow-hidden">{children}</main>
+            <Toaster 
+              position="top-right" 
+              richColors 
+              duration={2000}
+              closeButton
+            />
           </StoreProvider>
         </Providers>
       </body>

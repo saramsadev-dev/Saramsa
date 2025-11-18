@@ -30,9 +30,10 @@ class ProjectCreateView(APIView):
             # Check if external project already imported
             if platform != 'standalone' and external_project_id:
                 provider = 'azure' if platform == 'azure_devops' else 'jira'
-                existing = integrations_service.check_external_project_exists(provider, external_project_id)
+                existing = integrations_service.check_external_project_exists(provider, external_project_id, user_id)
                 if existing:
                     return Response({
+                        'success': False,
                         'error': f'Project "{existing["name"]}" is already imported',
                         'existing_project': existing
                     }, status=HTTPStatus.CONFLICT)
@@ -63,7 +64,7 @@ class ProjectCreateView(APIView):
                 external_links=external_links
             )
             
-            return Response({'project': project}, status=HTTPStatus.CREATED)
+            return Response({'success': True, 'project': project}, status=HTTPStatus.CREATED)
         except Exception as e:
             # Return error message to help diagnose 500s from the client
             return Response({'error': f'Project create failed: {str(e)}'}, status=HTTPStatus.INTERNAL_SERVER_ERROR)

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Upload, Cloud, BarChart3, FileText } from "lucide-react";
+import { Upload, Cloud, BarChart3, FileText, FolderOpen, Trash2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -153,104 +153,91 @@ export function UploadPanel({
               Connect Cloud
               {!isCloudEnabled && (
                 <span className="ml-2 text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                  Coming Soon
+                  {/* Coming Soon */}
                 </span>
               )}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="file" className="space-y-4 mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* File Upload Area */}
-              <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
-                <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="file-upload"
-                    className="text-gray-900 dark:text-white cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
-                  >
-                    Choose a file to upload
-                  </Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Support for CSV, JSON, and Excel files
-                  </p>
-                </div>
-                <Input
-                  id="file-upload"
-                  type="file"
-                  ref={fileInputRef}
-                  accept=".csv,.json,.xlsx,.xls"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    handleFileSelect(f);
-                  }}
-                  className="hidden"
-                />
-                <Button
-                  variant="outline"
-                  className="mt-4 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  onClick={() =>
-                    document.getElementById("file-upload")?.click()
-                  }
+            {/* Single Full-Width Upload Area */}
+            <div className="space-y-4">
+              {!topFile ? (
+                <div 
+                  className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors cursor-pointer"
+                  onClick={() => document.getElementById("file-upload")?.click()}
                 >
-                  Browse Files
-                </Button>
-              </div>
-
-              {/* File Preview Area */}
-              <div className="space-y-4">
-                {topFile ? (
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <FileText className="w-8 h-8 text-saramsa-brand" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {topFile.name}
-                      </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        {(topFile.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                    <Badge
-                      variant="secondary"
-                      className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                  <Upload className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="file-upload"
+                      className="text-gray-900 dark:text-white cursor-pointer hover:text-gray-700 dark:hover:text-gray-300 text-lg"
                     >
-                      Ready
-                    </Badge>
+                      Choose a file to upload
+                    </Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Support for CSV, JSON, and Excel files
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-center h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                    <div className="text-center">
-                      <FileText className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No file selected
-                      </p>
-                    </div>
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".csv,.json,.xlsx,.xls"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      handleFileSelect(f);
+                    }}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    className="mt-6 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      document.getElementById("file-upload")?.click();
+                    }}
+                  >
+                    <FolderOpen className="w-5 h-5" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-row items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <FileText className="w-8 h-8 text-saramsa-brand" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {topFile.name}
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {(topFile.size / 1024).toFixed(1)} KB
+                    </p>
                   </div>
-                )}
-
-                {/* Analyze Button */}
-                {topFile && (
-                  <div className="flex gap-20 justify-between items-center">
-                    <Button
-                      onClick={onAnalyze}
-                      disabled={topUploading}
-                      className="w-full bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#D602E0] hover:to-[#7A4FAF] disabled:opacity-50"
-                    >
-                      <BarChart3 className="w-4 h-4 mr-2" />
-                      {topUploading ? "Analyzing..." : "Analyze"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-[40%] h-9 bg-red-500 hover:bg-red-600 text-white"
-                      onClick={removeFile}
-                    >
-                      Remove file
-                    </Button>
-                  </div>
-                )}
-              </div>
+                  <Badge
+                    variant="secondary"
+                    className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                  >
+                    Ready
+                  </Badge>
+                  <Button
+                    onClick={onAnalyze}
+                    disabled={topUploading}
+                    className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#D602E0] hover:to-[#7A4FAF] disabled:opacity-50 w-10 h-10 p-0"
+                    title={topUploading ? "Analyzing..." : "Analyze"}
+                  >
+                    <BarChart3 className="w-5 h-5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="bg-red-500 hover:bg-red-600 text-white border-red-500 w-10 h-10 p-0"
+                    onClick={removeFile}
+                    title="Delete file"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -343,34 +330,6 @@ export function UploadPanel({
         <div className="px-6 pb-6">
           <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <p className="text-sm text-red-600 dark:text-red-400">{topError}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Loaded Comments Preview */}
-      {loadedComments && (
-        <div className="px-6 pb-6">
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/40 rounded-lg">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-              Loaded {loadedComments.length} comments (showing first 5):
-            </p>
-            <ul className="list-disc pl-5 space-y-1 max-h-24 overflow-auto">
-              {loadedComments.slice(0, 5).map((comment, i) => (
-                <li
-                  key={i}
-                  className="text-xs text-gray-700 dark:text-gray-300"
-                >
-                  {comment.length > 100
-                    ? `${comment.substring(0, 100)}...`
-                    : comment}
-                </li>
-              ))}
-              {loadedComments.length > 5 && (
-                <li className="text-xs text-gray-500">
-                  … and {loadedComments.length - 5} more
-                </li>
-              )}
-            </ul>
           </div>
         </div>
       )}

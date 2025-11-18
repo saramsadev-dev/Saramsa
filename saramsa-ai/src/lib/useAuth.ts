@@ -7,7 +7,7 @@ import { loginUser, registerUser, setUser, logout as sliceLogout } from '@/store
 import { getStoredUser, getTokens, getCurrentUser, setStoredUser, logout as clientLogout, type User } from '@/lib/auth';
 import { authService } from './authService';
 
-type LoginArgs = { username: string; password: string };
+type LoginArgs = { email: string; password: string };
 type RegisterArgs = {
   username: string;
   email: string;

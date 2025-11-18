@@ -560,6 +560,7 @@ def get_dashboard_jira_projects(request):
 @permission_classes([IsAuthenticated])
 def update_project(request, project_id):
     """Update or delete a project."""
+    logger.info(f"update_project view called: method={request.method}, project_id={project_id}")
     try:
         user_id = str(request.user.id)
         

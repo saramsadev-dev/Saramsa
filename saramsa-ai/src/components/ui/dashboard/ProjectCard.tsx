@@ -12,7 +12,9 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Edit,
+  RefreshCw
 } from 'lucide-react';
 import type { Project } from '@/store/features/projects/projectsSlice';
 import { DeleteProjectModal } from './DeleteProjectModal';
@@ -21,15 +23,20 @@ interface ProjectCardProps {
   project: Project;
   onClick: () => void;
   onDelete: (projectId: string) => void;
+  onEdit?: (project: Project) => void;
+  onSync?: (project: Project, provider: 'azure' | 'jira') => void;
   onGoToProject?: (project: Project) => void;
   isSelected?: boolean;
   deleteLoading?: boolean;
+  syncLoading?: boolean;
 }
 
-export function ProjectCard({ project, onClick, onDelete, onGoToProject, isSelected = false, deleteLoading = false }: ProjectCardProps) {
+export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoToProject, isSelected = false, deleteLoading = false, syncLoading = false }: ProjectCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  
+  const hasExternalLinks = project.externalLinks && project.externalLinks.length > 0;
   
   // Close menu when clicking outside
   useEffect(() => {
@@ -91,7 +98,7 @@ export function ProjectCard({ project, onClick, onDelete, onGoToProject, isSelec
   return (
     <motion.div
       whileHover={{ y: -2 }}
-      className={`relative bg-white dark:bg-gray-800 rounded-xl border-2 transition-all duration-200 cursor-pointer group ${
+      className={`relative bg-white dark:bg-gray-800 rounded-xl border-2 transition-all duration-200 cursor-pointer group flex flex-col ${
         isSelected 
           ? 'border-[#E603EB] shadow-lg shadow-[#E603EB]/20' 
           : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
@@ -99,17 +106,19 @@ export function ProjectCard({ project, onClick, onDelete, onGoToProject, isSelec
       onClick={onClick}
     >
       {/* Header */}
-      <div className="p-6 pb-4">
-        <div className="flex items-start justify-between">
+      <div className="p-6 pb-3">
+        <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
               {project.name}
             </h3>
-            {project.description && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                {project.description}
-              </p>
-            )}
+            <div className="h-5 mt-1">
+              {project.description && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                  {project.description}
+                </p>
+              )}
+            </div>
           </div>
           
           {/* Menu Button */}
@@ -125,14 +134,42 @@ export function ProjectCard({ project, onClick, onDelete, onGoToProject, isSelec
             </button>
             
             {showMenu && (
-              <div className="absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[150px]">
+              <div className="absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[150px] py-1">
+                {onEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      onEdit(project);
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </button>
+                )}
+                {hasExternalLinks && onSync && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      const provider = project.externalLinks[0].provider;
+                      onSync(project, provider);
+                    }}
+                    disabled={syncLoading}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncLoading ? 'animate-spin' : ''}`} />
+                    Sync with {project.externalLinks[0].provider === 'azure' ? 'Azure' : 'Jira'}
+                  </button>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowMenu(false);
                     setShowDeleteModal(true);
                   }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -143,23 +180,27 @@ export function ProjectCard({ project, onClick, onDelete, onGoToProject, isSelec
         </div>
 
         {/* Provider Badges */}
-        {project.externalLinks && project.externalLinks.length > 0 && (
-          <div className="flex gap-2 mt-3">
-            {project.externalLinks.map((link, index) => (
-              <div
+        <div className="flex gap-2">
+          {project.externalLinks && project.externalLinks.length > 0 ? (
+            project.externalLinks.map((link, index) => (
+              <span
                 key={index}
-                className={`inline-flex items-center gap-1 px-2 py-1 ${getProviderColor(link.provider)} text-white text-xs rounded-full`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 ${getProviderColor(link.provider)} text-white text-xs rounded-full h-5`}
               >
                 {getProviderIcon(link.provider)}
-                {link.provider === 'azure' ? 'Azure DevOps' : 'Jira'}
-              </div>
-            ))}
-          </div>
-        )}
+                <span>{link.provider === 'azure' ? 'Azure DevOps' : 'Jira'}</span>
+              </span>
+            ))
+          ) : (
+            <span className="inline-flex items-center px-2 py-0.5 bg-gray-500 text-white text-xs rounded-full h-5">
+              Basic
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="px-6 pb-4">
+      <div className="px-6 py-3">
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-gray-400" />
@@ -184,8 +225,8 @@ export function ProjectCard({ project, onClick, onDelete, onGoToProject, isSelec
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl">
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
+      <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl mt-auto">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             Created {formatDate(project.createdAt)}
@@ -200,7 +241,7 @@ export function ProjectCard({ project, onClick, onDelete, onGoToProject, isSelec
         </div>
         
         {project.metadata?.lastAnalysisAt && (
-          <div className="flex items-center gap-1 mb-3 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1 mb-2 text-xs text-gray-500 dark:text-gray-400">
             <BarChart3 className="w-3 h-3" />
             Last analyzed {formatDate(project.metadata.lastAnalysisAt)}
           </div>

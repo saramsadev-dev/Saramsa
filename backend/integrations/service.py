@@ -369,6 +369,29 @@ class IntegrationsService:
             logger.error(f"Error creating project: {e}")
             raise
     
+    def get_project(self, project_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single project by ID."""
+        try:
+            container = self.cosmos.get_container('projects')
+            
+            try:
+                project = container.read_item(item=project_id, partition_key=project_id)
+                
+                # Verify user has access
+                if project.get('userId') != user_id:
+                    logger.warning(f"Access denied: Project {project_id} belongs to user {project.get('userId')}, not {user_id}")
+                    return None
+                
+                return project
+                
+            except Exception as read_error:
+                logger.error(f"Project {project_id} not found: {read_error}")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error getting project {project_id}: {e}")
+            return None
+
     def get_projects_by_user(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all projects for a user."""
         try:
@@ -423,10 +446,17 @@ class IntegrationsService:
             project = results[0]
             
             # Update allowed fields
-            allowed_fields = ['name', 'description', 'metadata']
-            for field in allowed_fields:
-                if field in updates:
-                    project[field] = updates[field]
+            # Handle both 'name' and 'project_name' for compatibility
+            if 'project_name' in updates:
+                project['name'] = updates['project_name']
+            elif 'name' in updates:
+                project['name'] = updates['name']
+            
+            if 'description' in updates:
+                project['description'] = updates['description']
+            
+            if 'metadata' in updates:
+                project['metadata'] = updates['metadata']
             
             project['updatedAt'] = datetime.now(timezone.utc).isoformat()
             
@@ -443,9 +473,9 @@ class IntegrationsService:
         """Delete a project."""
         try:
             container = self.cosmos.get_container('projects')
-            logger.info(f"Searching for project {project_id} for user {user_id} (type: {type(user_id)})")
+            logger.info(f"DELETE PROJECT - project_id: {project_id}, user_id: {user_id}")
             
-            # Verify project exists and user has access
+            # First, query to find the project (works across partitions)
             query = """
                 SELECT * FROM c 
                 WHERE c.id = @project_id 
@@ -462,32 +492,36 @@ class IntegrationsService:
                 enable_cross_partition_query=True
             ))
             
-            logger.info(f"Found {len(results)} projects matching criteria")
-            
             if not results:
-                # Try to find project without user filter to see if it exists at all
-                query_all = "SELECT * FROM c WHERE c.id = @project_id"
-                all_results = list(container.query_items(
-                    query=query_all,
-                    parameters=[{"name": "@project_id", "value": project_id}],
-                    enable_cross_partition_query=True
-                ))
-                logger.info(f"Project exists for any user: {len(all_results) > 0}")
-                if all_results:
-                    actual_user_id = all_results[0].get('userId')
-                    logger.info(f"Project belongs to user: {actual_user_id} (type: {type(actual_user_id)})")
-                    logger.info(f"Requested user: {user_id} (type: {type(user_id)})")
-                    logger.info(f"User IDs match: {str(actual_user_id) == str(user_id)}")
+                logger.warning(f"Project {project_id} not found for user {user_id}")
                 return False
             
-            # Delete the project using the item from query results
             project_item = results[0]
-            container.delete_item(project_item['id'], partition_key=project_item['id'])
-            logger.info(f"Deleted project {project_id} for user {user_id}")
-            return True
+            logger.info(f"Found project: {project_item.get('id')}")
+            logger.info(f"Project keys: {list(project_item.keys())}")
+            
+            # Try different partition key strategies
+            # Strategy 1: Try with userId as partition key
+            try:
+                logger.info(f"Attempting delete with userId as partition key: {user_id}")
+                container.delete_item(item=project_item['id'], partition_key=user_id)
+                logger.info(f"Successfully deleted project {project_id} using userId partition key")
+                return True
+            except Exception as e1:
+                logger.warning(f"Delete with userId partition key failed: {e1}")
+                
+                # Strategy 2: Try with id as partition key
+                try:
+                    logger.info(f"Attempting delete with id as partition key: {project_item['id']}")
+                    container.delete_item(item=project_item['id'], partition_key=project_item['id'])
+                    logger.info(f"Successfully deleted project {project_id} using id partition key")
+                    return True
+                except Exception as e2:
+                    logger.error(f"Delete with id partition key also failed: {e2}")
+                    raise
             
         except Exception as e:
-            logger.error(f"Error deleting project: {e}")
+            logger.error(f"Error deleting project {project_id}: {e}", exc_info=True)
             return False
 
     def check_external_project_exists(self, provider: str, external_id: str, user_id: str = None) -> Optional[Dict[str, Any]]:

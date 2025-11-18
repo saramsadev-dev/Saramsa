@@ -28,15 +28,25 @@ export default function ConfigPage() {
   };
 
   const handleContinue = async () => {
-    console.log('Config page handleContinue called');
-    console.log('Project selected, redirecting to dashboard...');
     try {
       // The config screens will already have stored project/organization
-      // Here we just ensure a project id exists; creation is triggered inside the config screen flow
+      // Get the project ID from localStorage and route to the project dashboard
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
+      
+      if (projectId) {
+        // Import encryption function
+        const { encryptProjectId } = await import('@/lib/encryption');
+        const encryptedId = encryptProjectId(projectId);
+        router.push(`/projects/${encryptedId}/dashboard`);
+      } else {
+        // Fallback to projects page if no project ID
+        router.push('/projects');
+      }
     } catch (e) {
-      console.error('Persist project error', e);
+      console.error('Navigation error', e);
+      // Fallback to projects page on error
+      router.push('/projects');
     }
-    router.push('/dashboard');
   };
 
   const handleSkipConfig = () => {

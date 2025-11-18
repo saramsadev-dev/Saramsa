@@ -63,14 +63,14 @@ class CosmosDBTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Custom JWT serializer for Cosmos DB users"""
     
     def validate(self, attrs):
-        username = attrs.get('username')
+        email = attrs.get('email')
         password = attrs.get('password')
         
-        if not username or not password:
-            raise serializers.ValidationError("Username and password are required")
+        if not email or not password:
+            raise serializers.ValidationError("Email and password are required")
         
-        # Get user from Cosmos DB
-        user_data = cosmos_service.get_user_by_username(username)
+        # Get user from Cosmos DB by email
+        user_data = cosmos_service.get_user_by_email(email)
         if not user_data:
             raise serializers.ValidationError("Invalid credentials")
         
@@ -227,6 +227,38 @@ class CosmosDBPasswordChangeSerializer(serializers.Serializer):
             hashed = bcrypt.hashpw(password_bytes, salt)
             
             # Return as string for storage
+            return hashed.decode('utf-8')
+        except Exception as e:
+            raise serializers.ValidationError(f"Password hashing failed: {str(e)}")
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """Serializer for forgot password request"""
+    email = serializers.EmailField()
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """Serializer for password reset"""
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=6)
+    confirm_password = serializers.CharField(write_only=True, min_length=6)
+    
+    def validate(self, attrs):
+        """Validate that passwords match"""
+        new_password = attrs.get('new_password')
+        confirm_password = attrs.get('confirm_password')
+        
+        if new_password and confirm_password and new_password != confirm_password:
+            raise serializers.ValidationError({
+                'confirm_password': "Passwords don't match"
+            })
+        
+        return attrs
+    
+    def hash_password(self, password):
+        """Hash password using bcrypt"""
+        try:
+            password_bytes = password.encode('utf-8')
+            salt = bcrypt.gensalt()
+            hashed = bcrypt.hashpw(password_bytes, salt)
             return hashed.decode('utf-8')
         except Exception as e:
             raise serializers.ValidationError(f"Password hashing failed: {str(e)}")

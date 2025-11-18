@@ -2,31 +2,46 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function HomePage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
+  const hasRedirectedRef = useRef(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    console.log("isAuthenticated", isAuthenticated);
+    // Prevent multiple redirects
+    if (hasRedirectedRef.current || isRedirecting) return;
     
-    // If authenticated, go to dashboard by default
-    if (isAuthenticated) {
-      router.push('/dashboard');
-      return;
-    }
+    // Wait for auth to be determined
+    if (loading) return;
+    
+    console.log("Redirecting based on auth:", isAuthenticated);
+    
+    hasRedirectedRef.current = true;
+    setIsRedirecting(true);
+    
+    // Use setTimeout to prevent immediate redirect loops
+    const timer = setTimeout(() => {
+      if (isAuthenticated) {
+        router.replace('/projects');
+      } else {
+        router.replace('/login');
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, loading, router, isRedirecting]);
 
-    // If not authenticated, redirect to login
-    router.push('/login');
-  }, [isAuthenticated, router]);
-
-  // Show loading while redirecting
+  // Show loading while checking auth or redirecting
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Redirecting...</p>
+        <p className="text-gray-600 dark:text-gray-400">
+          {loading ? 'Checking authentication...' : 'Redirecting...'}
+        </p>
       </div>
     </div>
   );

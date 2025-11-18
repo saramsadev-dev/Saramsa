@@ -19,7 +19,7 @@ const initialState: AuthState = {
 // Async thunk for login
 export const loginUser = createAsyncThunk<
   User,
-  { username: string; password: string },
+  { email: string; password: string },
   { rejectValue: string }
 >('auth/loginUser', async (credentials, { rejectWithValue }) => {
   try {
@@ -31,7 +31,7 @@ export const loginUser = createAsyncThunk<
     if (err.code === 'ECONNREFUSED' || err.code === 'ERR_NETWORK') {
       errorMessage = 'Unable to connect to the server. Please check if the backend is running.';
     } else if (err.response?.status === 401) {
-      errorMessage = 'Invalid username or password. Please check your credentials.';
+      errorMessage = 'Invalid email or password. Please check your credentials.';
     } else if (err.response?.status === 400) {
       errorMessage = err.response?.data?.detail ||
         err.response?.data?.non_field_errors?.[0] ||
