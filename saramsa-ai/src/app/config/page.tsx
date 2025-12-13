@@ -54,7 +54,6 @@ export default function ConfigPage() {
     router.push('/');
   };
 
-  // Show platform selection first
   if (!selectedPlatform) {
     return (
       <div className="h-full bg-background z-0">
