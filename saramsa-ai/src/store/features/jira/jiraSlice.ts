@@ -54,13 +54,13 @@ export const configureJira = createAsyncThunk<
 >('jira/configure', async (credentials, { rejectWithValue }) => {
   try {
     const response = await apiRequest('post', '/workitems/jira/config', credentials, true, false);
-    return response.data;
+    return response.data.data; // StandardResponse format: response.data.data
   } catch (err: any) {
     let errorMessage = 'Failed to configure Jira connection.';
     if (err.response?.status === 401) {
       errorMessage = 'Invalid Jira credentials. Please check your domain, email, and API token.';
     } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.error || 'Invalid configuration data.';
+      errorMessage = err.response?.data?.detail || err.response?.data?.title || 'Invalid configuration data.';
     } else if (err.response?.status >= 500) {
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {
@@ -78,7 +78,7 @@ export const fetchJiraProjects = createAsyncThunk<
 >('jira/fetchProjects', async (_, { rejectWithValue }) => {
   try {
     const response = await apiRequest('get', '/workitems/jira/projects', {}, true, false);
-    return response.data.projects || [];
+    return response.data.data.projects || []; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to fetch Jira projects.';
     if (err.response?.status === 401) {
@@ -100,7 +100,7 @@ export const fetchJiraIssueTypes = createAsyncThunk<
 >('jira/fetchIssueTypes', async (projectId, { rejectWithValue }) => {
   try {
     const response = await apiRequest('get', `/workitems/jira/issue-types?projectId=${projectId}`, {}, true, false);
-    return response.data.issue_types || [];
+    return response.data.data.issue_types || []; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to fetch Jira issue types.';
     if (err.response?.status === 401) {
@@ -122,7 +122,7 @@ export const fetchJiraProjectMetadata = createAsyncThunk<
 >('jira/fetchProjectMetadata', async (projectId, { rejectWithValue }) => {
   try {
     const response = await apiRequest('get', `/workitems/jira/project-metadata?projectId=${projectId}`, {}, true, false);
-    return response.data.metadata;
+    return response.data.data.metadata; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to fetch Jira project metadata.';
     if (err.response?.status === 401) {
@@ -152,13 +152,13 @@ export const createJiraIssues = createAsyncThunk<
     }
     
     const response = await apiRequest('post', '/workitems/jira/create', payload, true, false);
-    return response.data;
+    return response.data.data; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to create Jira issues.';
     if (err.response?.status === 401) {
       errorMessage = 'Authentication required. Please login again.';
     } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.detail || 'Invalid work item data.';
+      errorMessage = err.response?.data?.detail || err.response?.data?.title || 'Invalid work item data.';
     } else if (err.response?.status >= 500) {
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {
@@ -184,13 +184,13 @@ export const createJiraProject = createAsyncThunk<
 >('jira/createProject', async (data, { rejectWithValue }) => {
   try {
     const response = await apiRequest('post', '/workitems/jira/project/create', data, true, false);
-    return response.data;
+    return response.data.data; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to create Jira project.';
     if (err.response?.status === 401) {
       errorMessage = 'Authentication required. Please login again.';
     } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.error || 'Invalid project data.';
+      errorMessage = err.response?.data?.detail || err.response?.data?.title || 'Invalid project data.';
     } else if (err.response?.status >= 500) {
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {

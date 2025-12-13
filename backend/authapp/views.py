@@ -1,8 +1,9 @@
 from http import HTTPStatus
 from rest_framework import generics, permissions, serializers
-from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from apis.response import StandardResponse
+
 from .permissions import NoAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -28,11 +29,14 @@ class RegisterView(generics.CreateAPIView):
     logger = logging.getLogger(__name__)
     
     def get(self, request):
-        return Response({
-            "db_engine": "cosmos_db",
-            "db_name": "saramsa-db",
-            "container": "users",
-        })
+        return StandardResponse.success(
+            data={
+                "db_engine": "cosmos_db",
+                "db_name": "saramsa-db",
+                "container": "users",
+            },
+            message="Database configuration retrieved"
+        )
 
     def create(self, request, *args, **kwargs):
         try:
@@ -57,7 +61,7 @@ class RegisterView(generics.CreateAPIView):
                 'is_staff': False,
                 'date_joined': datetime.now().isoformat(),
                 'profile': {
-                    'role': 'admin'
+                    'role': serializer.validated_data.get('role', 'user')
                 }
             }
 
@@ -66,34 +70,41 @@ class RegisterView(generics.CreateAPIView):
             saved_user = cosmos_service.save_user(user_data)
             if not saved_user:
                 self.logger.error("Cosmos save_user returned None")
-                return Response({"error": "Failed to create user (storage)"}, status=500)
+                return StandardResponse.internal_server_error(
+                    detail="Failed to create user (storage)",
+                    instance=request.path
+                )
 
             # Generate JWT tokens for the newly created user
             from .serializers import CosmosDBTokenObtainPairSerializer
             token_serializer = CosmosDBTokenObtainPairSerializer()
             token_data = token_serializer.validate({
-                'username': user_data['username'],
+                'email': user_data['email'],
                 'password': serializer.validated_data['password']
             })
 
-            return Response({
-                "success": True,
-                "username": user_data['username'],
-                "email": user_data['email'],
-                "user_id": user_id,
-                "message": "User created successfully",
-                "access": token_data['access'],
-                "refresh": token_data['refresh']
-            }, status=201)
+            return StandardResponse.created(
+                data={
+                    "username": user_data['username'],
+                    "email": user_data['email'],
+                    "user_id": user_id,
+                    "access": token_data['access'],
+                    "refresh": token_data['refresh']
+                },
+                message="User created successfully",
+                instance=f"/api/auth/users/{user_id}"
+            )
 
-        except serializers.ValidationError as ve:
-            # Return field-level validation errors with 400 status
-            self.logger.info(f"Validation error during registration: {ve.detail}")
-            return Response(ve.detail, status=400)
+        except serializers.ValidationError:
+            # Let exception handler format validation errors
+            raise
 
         except Exception as e:
             self.logger.exception(f"Error during registration: {e}")
-            return Response({"error": str(e)}, status=500)
+            return StandardResponse.internal_server_error(
+                detail="An unexpected error occurred during registration",
+                instance=request.path
+            )
 
 class CosmosDBTokenObtainPairView(TokenObtainPairView):
     """Custom token obtain view for Cosmos DB users"""
@@ -113,9 +124,10 @@ class ProfileMeView(APIView):
         user_data = cosmos_service.get_user_by_username(username)
         
         if not user_data:
-            return Response({
-                "error": "User not found"
-            }, status=404)
+            return StandardResponse.not_found(
+                detail="User not found",
+                instance=request.path
+            )
         
         # Debug logging
         print(f"🔍 ProfileMeView - username: {username}")
@@ -126,18 +138,21 @@ class ProfileMeView(APIView):
         print(f"🔍 ProfileMeView - request.user.username: {request.user.username}")
         
         # Use the authenticated user's ID directly instead of querying again
-        return Response({
-            "user_id": request.user.id,  # Use the authenticated user's ID directly
-            "username": user_data.get('username'),
-            "email": user_data.get('email'),
-            "first_name": user_data.get('first_name'),
-            "last_name": user_data.get('last_name'),
-            "company_name": user_data.get('company_name'),
-            "company_url": user_data.get('company_url'),
-            "avatar_url": user_data.get('avatar_url'),
-            "role": user_data.get('profile', {}).get('role', 'user'),
-            "date_joined": user_data.get('date_joined')
-        })
+        return StandardResponse.success(
+            data={
+                "user_id": request.user.id,
+                "username": user_data.get('username'),
+                "email": user_data.get('email'),
+                "first_name": user_data.get('first_name'),
+                "last_name": user_data.get('last_name'),
+                "company_name": user_data.get('company_name'),
+                "company_url": user_data.get('company_url'),
+                "avatar_url": user_data.get('avatar_url'),
+                "role": user_data.get('profile', {}).get('role', 'user'),
+                "date_joined": user_data.get('date_joined')
+            },
+            message="Profile retrieved successfully"
+        )
     
     def patch(self, request):
         """Update basic profile fields stored in Cosmos users container.
@@ -146,7 +161,10 @@ class ProfileMeView(APIView):
         username = request.user.username
         user_doc = cosmos_service.get_user_by_username(username)
         if not user_doc:
-            return Response({"error": "User not found"}, status=404)
+            return StandardResponse.not_found(
+                detail="User not found",
+                instance=request.path
+            )
 
         updatable = {"first_name", "last_name", "email", "company_name", "company_url", "avatar_url"}
         changed = False
@@ -158,13 +176,20 @@ class ProfileMeView(APIView):
             if changed:
                 cosmos_service.save_user_data(user_doc)
         except Exception as e:
-            return Response({"error": f"Failed to update profile: {str(e)}"}, status=500)
-        return Response({
-            "username": user_doc.get('username'),
-            "email": user_doc.get('email'),
-            "first_name": user_doc.get('first_name'),
-            "last_name": user_doc.get('last_name'),
-        })
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to update profile: {str(e)}",
+                instance=request.path
+            )
+        
+        return StandardResponse.success(
+            data={
+                "username": user_doc.get('username'),
+                "email": user_doc.get('email'),
+                "first_name": user_doc.get('first_name'),
+                "last_name": user_doc.get('last_name'),
+            },
+            message="Profile updated successfully"
+        )
     
 class CheckUsernameView(APIView):
     permission_classes = [NoAuthentication]
@@ -172,32 +197,43 @@ class CheckUsernameView(APIView):
     def get(self, request):
         username = request.query_params.get('username', '').strip()
         if not username:
-            return Response(
-                {"error": "Username parameter is required"}
+            return StandardResponse.validation_error(
+                detail="Username parameter is required",
+                errors=[{"field": "username", "message": "This parameter is required."}],
+                instance=request.path
             )
         
         # Check length
         if len(username) < 3:
-            return Response({
-                "available": False,
-                "message": "Username must be at least 3 characters"
-            })
+            return StandardResponse.success(
+                data={
+                    "available": False,
+                    "message": "Username must be at least 3 characters"
+                },
+                message="Username validation completed"
+            )
         
         # Check character validity
         import re
         if not re.match(r'^[\w.@+-]+\Z', username):
-            return Response({
-                "available": False,
-                "message": "Username can only contain letters, numbers, and @/./+/-/_ characters"
-            })
+            return StandardResponse.success(
+                data={
+                    "available": False,
+                    "message": "Username can only contain letters, numbers, and @/./+/-/_ characters"
+                },
+                message="Username validation completed"
+            )
         
         # Check availability in Cosmos DB only
         username_exists = cosmos_service.get_user_by_username(username) is not None
         
-        return Response({
-            "available": not username_exists,
-            "message": "Username is already taken" if username_exists else "Username is available"
-        })
+        return StandardResponse.success(
+            data={
+                "available": not username_exists,
+                "message": "Username is already taken" if username_exists else "Username is available"
+            },
+            message="Username availability checked"
+        )
 
 class UserListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -211,14 +247,19 @@ class UserListView(APIView):
             for user in users:
                 if 'password' in user:
                     user['password'] = '***HIDDEN***'
-            return Response({
-                "users": users,
-                "count": len(users)
-            })
+            
+            return StandardResponse.success(
+                data={
+                    "users": users,
+                    "count": len(users)
+                },
+                message="Users retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch users: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch users: {str(e)}",
+                instance=request.path
+            )
 
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -229,19 +270,24 @@ class UserDetailView(APIView):
         try:
             user_data = cosmos_service.get_user_by_id(user_id)
             if not user_data:
-                return Response({
-                    "error": "User not found"
-                }, status=404)
+                return StandardResponse.not_found(
+                    detail=f"User with ID '{user_id}' was not found",
+                    instance=request.path
+                )
             
             # Remove password hash from response for security
             if 'password' in user_data:
                 user_data['password'] = '***HIDDEN***'
             
-            return Response(user_data)
+            return StandardResponse.success(
+                data=user_data,
+                message="User retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch user: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch user: {str(e)}",
+                instance=request.path
+            )
 
 class LoginView(APIView):
     permission_classes = [NoAuthentication]
@@ -252,17 +298,23 @@ class LoginView(APIView):
         password = request.data.get('password')
         
         if not email or not password:
-            return Response({
-                "error": "Email and password are required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="Email and password are required",
+                errors=[
+                    {"field": "email", "message": "This field is required."} if not email else None,
+                    {"field": "password", "message": "This field is required."} if not password else None
+                ],
+                instance=request.path
+            )
         
         try:
             # Get user from Cosmos DB by email
             user_data = cosmos_service.get_user_by_email(email)
             if not user_data:
-                return Response({
-                    "error": "Invalid credentials"
-                }, status=401)
+                return StandardResponse.unauthorized(
+                    detail="Invalid credentials",
+                    instance=request.path
+                )
             
             # Check password using bcrypt
             stored_password = user_data.get('password', '')
@@ -276,19 +328,22 @@ class LoginView(APIView):
                 
                 # Use bcrypt to verify password
                 if not bcrypt.checkpw(password_bytes, stored_password):
-                    return Response({
-                        "error": "Invalid credentials"
-                    }, status=401)
+                    return StandardResponse.unauthorized(
+                        detail="Invalid credentials",
+                        instance=request.path
+                    )
             except Exception as e:
-                return Response({
-                    "error": "Invalid credentials"
-                }, status=401)
+                return StandardResponse.unauthorized(
+                    detail="Invalid credentials",
+                    instance=request.path
+                )
             
             # Check if user is active
             if not user_data.get('is_active', True):
-                return Response({
-                    "error": "User account is disabled"
-                }, status=401)
+                return StandardResponse.unauthorized(
+                    detail="User account is disabled",
+                    instance=request.path
+                )
             
             # Generate JWT token
             from .serializers import CosmosDBTokenObtainPairSerializer
@@ -298,12 +353,16 @@ class LoginView(APIView):
                 'password': password
             })
             
-            return Response(token_data)
+            return StandardResponse.success(
+                data=token_data,
+                message="Login successful"
+            )
             
         except Exception as e:
-            return Response({
-                "error": f"Login failed: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail="Login failed due to an unexpected error",
+                instance=request.path
+            )
 
 class ForgotPasswordView(APIView):
     permission_classes = [NoAuthentication]
@@ -312,8 +371,7 @@ class ForgotPasswordView(APIView):
     def post(self, request):
         """Generate and send password reset token"""
         serializer = ForgotPasswordSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
+        serializer.is_valid(raise_exception=True)
         
         email = serializer.validated_data['email']
         
@@ -322,10 +380,10 @@ class ForgotPasswordView(APIView):
             user_data = cosmos_service.get_user_by_email(email)
             if not user_data:
                 # Don't reveal if email exists for security
-                return Response({
-                    "success": True,
-                    "message": "If an account exists with this email, you will receive a password reset link."
-                }, status=200)
+                return StandardResponse.success(
+                    data={},
+                    message="If an account exists with this email, you will receive a password reset link."
+                )
             
             # Generate secure token
             token = secrets.token_urlsafe(32)
@@ -344,18 +402,20 @@ class ForgotPasswordView(APIView):
             # Log the reset link for development (remove in production)
             print(f"Password reset link for {email}: {reset_link}")
             
-            return Response({
-                "success": True,
-                "message": "If an account exists with this email, you will receive a password reset link.",
-                # Remove this in production - only for development
-                "reset_link": reset_link if settings.DEBUG else None
-            }, status=200)
+            return StandardResponse.success(
+                data={
+                    # Remove this in production - only for development
+                    "reset_link": reset_link if settings.DEBUG else None
+                },
+                message="If an account exists with this email, you will receive a password reset link."
+            )
             
         except Exception as e:
             self.logger.exception(f"Error in forgot password: {e}")
-            return Response({
-                "error": "Failed to process password reset request"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail="Failed to process password reset request",
+                instance=request.path
+            )
 
 class ResetPasswordView(APIView):
     permission_classes = [NoAuthentication]
@@ -364,8 +424,7 @@ class ResetPasswordView(APIView):
     def post(self, request):
         """Reset password using token"""
         serializer = ResetPasswordSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
+        serializer.is_valid(raise_exception=True)
         
         token = serializer.validated_data['token']
         new_password = serializer.validated_data['new_password']
@@ -374,30 +433,41 @@ class ResetPasswordView(APIView):
             # Get reset token
             token_data = cosmos_service.get_reset_token(token)
             if not token_data:
-                return Response({
-                    "error": "Invalid or expired reset token"
-                }, status=400)
+                return StandardResponse.validation_error(
+                    detail="Invalid or expired reset token",
+                    errors=[{"field": "token", "message": "This token is invalid or has expired."}],
+                    instance=request.path
+                )
             
             # Check if token is used
             if token_data.get('used', False):
-                return Response({
-                    "error": "This reset link has already been used"
-                }, status=400)
+                return StandardResponse.error(
+                    title="Token already used",
+                    detail="This reset link has already been used",
+                    status_code=400,
+                    error_type="token-already-used",
+                    instance=request.path
+                )
             
             # Check if token is expired
             expires_at = datetime.fromisoformat(token_data['expires_at'])
             if datetime.now() > expires_at:
-                return Response({
-                    "error": "This reset link has expired"
-                }, status=400)
+                return StandardResponse.error(
+                    title="Token expired",
+                    detail="This reset link has expired",
+                    status_code=400,
+                    error_type="token-expired",
+                    instance=request.path
+                )
             
             # Get user by email
             email = token_data['email']
             user_data = cosmos_service.get_user_by_email(email)
             if not user_data:
-                return Response({
-                    "error": "User not found"
-                }, status=404)
+                return StandardResponse.not_found(
+                    detail="User not found",
+                    instance=request.path
+                )
             
             # Hash new password
             hashed_password = ResetPasswordSerializer().hash_password(new_password)
@@ -409,13 +479,14 @@ class ResetPasswordView(APIView):
             # Mark token as used
             cosmos_service.mark_reset_token_used(token)
             
-            return Response({
-                "success": True,
-                "message": "Password has been reset successfully"
-            }, status=200)
+            return StandardResponse.success(
+                data={},
+                message="Password has been reset successfully"
+            )
             
         except Exception as e:
             self.logger.exception(f"Error in reset password: {e}")
-            return Response({
-                "error": "Failed to reset password"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail="Failed to reset password",
+                instance=request.path
+            )

@@ -54,12 +54,9 @@ class IntegrationsService:
             # Check if integration already exists for this user and organization
             existing_account = self.get_integration_account_by_provider(user_id, 'azure')
             if existing_account and existing_account.get('metadata', {}).get('organization') == organization:
-                # Instead of raising an error, update the existing integration
-                logger.info(f"Updating existing Azure integration for user {user_id}, org {organization}")
-                return self.update_integration_credentials(existing_account['id'], user_id, 'azure', {
-                    'organization': organization,
-                    'pat_token': pat_token
-                })
+                # Return existing integration
+                logger.info(f"Azure integration already exists for user {user_id}, org {organization}")
+                return existing_account
             
             # Encrypt the PAT token
             encrypted_pat = encrypt_token(pat_token)
@@ -82,26 +79,33 @@ class IntegrationsService:
     def create_jira_integration(self, user_id: str, domain: str, email: str, api_token: str) -> Dict[str, Any]:
         """Create Jira integration account."""
         try:
+            logger.info(f"Creating Jira integration for user {user_id}, domain {domain}, email {email}")
+            
             # Check if integration already exists for this user and domain
             existing_account = self.get_integration_account_by_provider(user_id, 'jira')
             if existing_account and existing_account.get('metadata', {}).get('domain') == domain:
-                # Instead of raising an error, update the existing integration
-                logger.info(f"Updating existing Jira integration for user {user_id}, domain {domain}")
-                return self.update_integration_credentials(existing_account['id'], user_id, 'jira', {
-                    'domain': domain,
-                    'email': email,
-                    'api_token': api_token
-                })
+                # Return existing integration
+                logger.info(f"Jira integration already exists for user {user_id}, domain {domain}")
+                return existing_account
             
             # Encrypt the API token
+            logger.info("Encrypting API token...")
             encrypted_token = encrypt_token(api_token)
+            logger.info("API token encrypted successfully")
             
             # Create account document
+            logger.info("Creating account document...")
             account_data = create_jira_integration_account(user_id, domain, email, encrypted_token)
+            logger.info(f"Account data created: {account_data}")
+            
+            logger.info("Validating account data...")
             validate_integration_account(account_data)
+            logger.info("Account data validated successfully")
             
             # Store in Cosmos DB integrations container
+            logger.info("Getting integrations container...")
             container = self.cosmos.get_container('integrations')
+            logger.info("Creating item in container...")
             result = container.create_item(account_data)
             
             logger.info(f"Created Jira integration for user {user_id}, domain {domain}")
@@ -109,6 +113,7 @@ class IntegrationsService:
             
         except Exception as e:
             logger.error(f"Error creating Jira integration: {e}")
+            logger.exception("Full traceback:")
             raise
     
     def get_integration_accounts_by_user(self, user_id: str) -> List[Dict[str, Any]]:

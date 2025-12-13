@@ -84,7 +84,7 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
       }
       
       if (projectsResponse.data.success) {
-        setProjects(projectsResponse.data.projects);
+        setProjects(projectsResponse.data.data.projects || []);
         setValidationStatus('success');
         setErrorMessage('');
       } else {
@@ -160,7 +160,7 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
         description: `Imported from Jira: ${config.domain}`,
         platform: 'jira',
         external_project_id: selectedProject,
-        external_url: `https://${config.domain}.atlassian.net/browse/${selectedProjectData?.key}`,
+        external_url: `https://${config.domain}/browse/${selectedProjectData?.key}`,
         integration_account_id: integrationAccountId, // Link to the integration account
         jira_project_key: selectedProjectData?.key
       }, true);
@@ -169,12 +169,12 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
         throw new Error(res.data.error || 'Failed to create project');
       }
       
-      const project = res.data.project;
+      const project = res.data.data.project;
       localStorage.setItem('project_id', project.id);
       localStorage.setItem('selected_project_name', selectedProjectData?.name || '');
       
       // Handle both new project creation and existing project navigation
-      if (res.data.already_exists) {
+      if (res.data.data.already_exists) {
         console.log('Project already exists, navigating to existing project');
       } else {
         console.log('Project created successfully, navigating to dashboard');
@@ -193,9 +193,9 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex flex-col lg:flex-row h-screen">
+      <div className="flex flex-col lg:flex-row min-h-screen">
         <motion.div 
-          className="w-full flex items-center justify-center p-6 lg:p-8 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm"
+          className="w-full flex items-start justify-center p-6 lg:p-8 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm overflow-y-auto"
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}

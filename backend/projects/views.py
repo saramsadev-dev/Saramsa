@@ -1,9 +1,9 @@
 from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from http import HTTPStatus
 from aiCore.cosmos_service import cosmos_service
 from integrations.service import integrations_service
+from apis.response import StandardResponse
  
 from datetime import datetime
 import uuid
@@ -22,9 +22,13 @@ class ProjectCreateView(APIView):
             integration_account_id = request.data.get('integration_account_id')
 
             if not user_id or not project_name:
-                return Response(
-                    {'error': 'user_id (auth) and project_name are required'},
-                    status=HTTPStatus.BAD_REQUEST,
+                return StandardResponse.validation_error(
+                    detail="user_id (auth) and project_name are required",
+                    errors=[
+                        {"field": "user_id", "message": "Authentication required."} if not user_id else None,
+                        {"field": "project_name", "message": "This field is required."} if not project_name else None
+                    ],
+                    instance=request.path
                 )
 
             # Check if external project already imported
@@ -32,11 +36,13 @@ class ProjectCreateView(APIView):
                 provider = 'azure' if platform == 'azure_devops' else 'jira'
                 existing = integrations_service.check_external_project_exists(provider, external_project_id, user_id)
                 if existing:
-                    return Response({
-                        'success': False,
-                        'error': f'Project "{existing["name"]}" is already imported',
-                        'existing_project': existing
-                    }, status=HTTPStatus.CONFLICT)
+                    return StandardResponse.error(
+                        title="Conflict",
+                        detail=f'Project "{existing["name"]}" is already imported',
+                        status_code=409,
+                        error_type="duplicate-project",
+                        instance=request.path
+                    )
 
             # Create external links if importing from external platform
             external_links = []
@@ -64,10 +70,17 @@ class ProjectCreateView(APIView):
                 external_links=external_links
             )
             
-            return Response({'success': True, 'project': project}, status=HTTPStatus.CREATED)
+            return StandardResponse.created(
+                data=project,
+                message="Project created successfully",
+                instance=f"/api/projects/{project.get('id')}"
+            )
         except Exception as e:
             # Return error message to help diagnose 500s from the client
-            return Response({'error': f'Project create failed: {str(e)}'}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f'Project create failed: {str(e)}',
+                instance=request.path
+            )
 
 
 class ProjectListView(APIView):
@@ -76,11 +89,17 @@ class ProjectListView(APIView):
     def get(self, request):
         user_id = getattr(request.user, 'id', None)
         if not user_id:
-            return Response({'error': 'Unauthorized'}, status=HTTPStatus.UNAUTHORIZED)
+            return StandardResponse.unauthorized(
+                detail="Authentication required",
+                instance=request.path
+            )
         
         # Use integrations service to get projects
         projects = integrations_service.get_projects_by_user(user_id)
-        return Response({'projects': projects, 'count': len(projects)})
+        return StandardResponse.success(
+            data={'projects': projects, 'count': len(projects)},
+            message="Projects retrieved successfully"
+        )
 
 
 class ProjectDetailView(APIView):
@@ -89,40 +108,52 @@ class ProjectDetailView(APIView):
     def get(self, request, project_id: str):
         user_id = getattr(request.user, 'id', None)
         if not user_id:
-            return Response({'error': 'Unauthorized'}, status=HTTPStatus.UNAUTHORIZED)
+            return StandardResponse.unauthorized(
+                detail="Authentication required",
+                instance=request.path
+            )
         
         # Use integrations service to get project
         project = integrations_service.get_project(project_id, user_id)
         if not project:
-            return Response({'error': 'Not found'}, status=HTTPStatus.NOT_FOUND)
-        return Response(project)
+            return StandardResponse.not_found(
+                detail=f"Project with ID '{project_id}' was not found",
+                instance=request.path
+            )
+        return StandardResponse.success(
+            data=project,
+            message="Project retrieved successfully"
+        )
 
     def delete(self, request, project_id: str):
         """Delete a project."""
         user_id = getattr(request.user, 'id', None)
         if not user_id:
-            return Response({'error': 'Unauthorized'}, status=HTTPStatus.UNAUTHORIZED)
+            return StandardResponse.unauthorized(
+                detail="Authentication required",
+                instance=request.path
+            )
         
         try:
             # Delete the project using the integrations service
             success = integrations_service.delete_project(project_id, user_id)
             
             if success:
-                return Response({
-                    'success': True,
-                    'message': 'Project deleted successfully'
-                })
+                return StandardResponse.success(
+                    data={},
+                    message='Project deleted successfully'
+                )
             else:
-                return Response({
-                    'success': False,
-                    'error': 'Project not found or you do not have permission to delete it'
-                }, status=HTTPStatus.NOT_FOUND)
+                return StandardResponse.not_found(
+                    detail='Project not found or you do not have permission to delete it',
+                    instance=request.path
+                )
                 
         except Exception as e:
-            return Response({
-                'success': False,
-                'error': f'Failed to delete project: {str(e)}'
-            }, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f'Failed to delete project: {str(e)}',
+                instance=request.path
+            )
 
 
 class LatestAnalysisView(APIView):
@@ -143,7 +174,10 @@ class LatestAnalysisView(APIView):
             print(f"User story records: {[record.get('id') for record in latest_user_stories]}")
         
         if not latest_analysis:
-            return Response({'exists': False}, status=HTTPStatus.OK)
+            return StandardResponse.success(
+                data={'exists': False},
+                message="No analysis found for this project"
+            )
         
         # Get user ID for submission status lookup
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
@@ -197,7 +231,10 @@ class LatestAnalysisView(APIView):
                 print(f"Error fetching comments: {e}")
                 response_data['analysis']['comments'] = None
             
-        return Response(response_data, status=HTTPStatus.OK)
+        return StandardResponse.success(
+            data=response_data,
+            message="Latest analysis retrieved successfully"
+        )
     
     def _group_work_items_by_feature(self, work_items: list) -> dict:
         """

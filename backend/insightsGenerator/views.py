@@ -1,14 +1,10 @@
 from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .prompts import (
     getSentAnalysisPrompt,
-    getWorkItemsFromAnalysisPrompt,
     WORK_ITEM_TYPES_BY_TEMPLATE,
-    getJiraDeepAnalysisPrompt,
-    getDynamicJiraDeepAnalysisPrompt,
     getDeepAnalysisPrompt,
 )
 import json
@@ -19,6 +15,7 @@ from datetime import datetime
 import uuid
 from authapp.permissions import IsAdmin, IsAdminOrUser
 from apis.usage_logging import log_token_usage
+from apis.response import StandardResponse
 import logging
 
 app_logger = logging.getLogger("apis.app")
@@ -39,15 +36,26 @@ class AnalyzeCommentsView(APIView):
 
         if not comments or not isinstance(comments, list):
             print("❌ Invalid comments data")
-            return Response(
-                {"error": "A list of comments is required."},
-                status=status.HTTP_400_BAD_REQUEST
+            return StandardResponse.validation_error(
+                detail="A list of comments is required.",
+                errors=[{"field": "comments", "message": "This field must be a list."}],
+                instance=request.path
             )
 
         # Get file name and user info for later use
         file_name = request.data.get("file_name", "uploaded_file")
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
+        
+        # Get company name from user profile for company-specific prompts
+        company_name = None
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            try:
+                user_data = cosmos_service.get_user_by_username(request.user.username)
+                if user_data:
+                    company_name = user_data.get('company_name')
+            except Exception as e:
+                print(f"Warning: Could not get company_name for user: {e}")
 
         project_id, project_document, is_draft_project = cosmos_service.ensure_project_context(
             incoming_project_id,
@@ -59,7 +67,7 @@ class AnalyzeCommentsView(APIView):
         project_config_state = project_document.get("config_state", "unconfigured" if is_personal_analysis else "complete")
         
         try:
-            prompt = getSentAnalysisPrompt()
+            prompt = getSentAnalysisPrompt(company_name=company_name)
             feedback_block = "\n".join([str(c) for c in comments])
             prompt_filled = prompt.replace("<feedback_data>", feedback_block)
             result = await generate_completions(prompt_filled)
@@ -272,11 +280,7 @@ class AnalyzeCommentsView(APIView):
                 }
             }
             
-            return Response(
-                formatted,
-                status=status.HTTP_200_OK,
-                content_type='application/json'
-            )
+            return StandardResponse.success(data=formatted, message="Operation completed successfully")
         except Exception as e:
             print (str(e))
             error_response = {
@@ -284,11 +288,7 @@ class AnalyzeCommentsView(APIView):
                 "details": "Failed to analyze comments",
                 "code": "analysis_error"
             }
-            return Response(
-                error_response,
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content_type='application/json'
-            )
+            return StandardResponse.internal_server_error(detail=error_response.get("error", "Internal server error"), instance=request.path)
 
 class InsightsListView(APIView):
     """Get all insights from Cosmos DB"""
@@ -299,14 +299,15 @@ class InsightsListView(APIView):
             # Get all insights from Cosmos DB
             insights = cosmos_service.query_items("insights", "SELECT * FROM c WHERE c.type = 'insight' ORDER BY c.analysis_date DESC")
             
-            return Response({
+            return StandardResponse.success(data={
                 "insights": insights,
                 "count": len(insights)
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch insights: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch insights: {str(e)}",
+                instance=request.path
+            )
 
 class InsightDetailView(APIView):
     """Get specific insight by ID from Cosmos DB"""
@@ -316,15 +317,15 @@ class InsightDetailView(APIView):
         try:
             insight_data = cosmos_service.get_insight(insight_id)
             if not insight_data:
-                return Response({
-                    "error": "Insight not found"
-                }, status=status.HTTP_404_NOT_FOUND)
+                return StandardResponse.not_found(detail="Insight not found"
+                , instance=request.path)
             
-            return Response(insight_data, status=status.HTTP_200_OK)
+            return StandardResponse.success(data=insight_data, message="Operation completed successfully")
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch insight: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch insight: {str(e)}",
+                instance=request.path
+            )
 
 class InsightsByTypeView(APIView):
     """Get insights by analysis type"""
@@ -339,15 +340,16 @@ class InsightsByTypeView(APIView):
                 [{"name": "@analysis_type", "value": analysis_type}]
             )
             
-            return Response({
+            return StandardResponse.success(data={
                 "insights": insights,
                 "count": len(insights),
                 "analysis_type": analysis_type
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch insights: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch insights: {str(e)}",
+                instance=request.path
+            )
 
 
 class GetWorkItemsView(APIView):
@@ -361,10 +363,7 @@ class GetWorkItemsView(APIView):
         project_id = request.query_params.get("project_id")
         
         if not project_id:
-            return Response(
-                {"error": "Project ID is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
         
         try:
             # Get work items from Cosmos DB - check both work_items and deep_analysis types
@@ -379,9 +378,9 @@ class GetWorkItemsView(APIView):
                 all_data.extend(deep_analysis_data)
             
             if not all_data:
-                return Response({
-                    "success": True,
-                    "work_items": [],
+                return StandardResponse.success(
+                    data={
+                        "work_items": [],
                     "work_items_by_feature": {},
                     "summary": {},
                     "message": "No work items found for this project"
@@ -393,7 +392,7 @@ class GetWorkItemsView(APIView):
             work_items = latest_data.get('work_items', [])
             summary = latest_data.get('summary', {})
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "work_items": work_items,
                 "work_items_by_feature": groupWorkItemsByFeature(work_items),
@@ -401,14 +400,11 @@ class GetWorkItemsView(APIView):
                 "process_template": latest_data.get('process_template', 'Agile'),
                 "generated_at": latest_data.get('generated_at'),
                 "message": "Work items retrieved successfully"
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error retrieving work items: {e}")
-            return Response(
-                {"error": "Failed to retrieve work items."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to retrieve work items.", instance=request.path)
 
 
 class WorkItemsGenerationView(APIView):
@@ -441,10 +437,7 @@ class WorkItemsGenerationView(APIView):
 
         if not analysis_data:
             print("❌ No analysis data provided")
-            return Response(
-                {"error": "Analysis data is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Analysis data is required.", instance=request.path)
 
         try:
             # Create prompt for work item generation based on platform
@@ -553,11 +546,7 @@ IMPORTANT: This is for Jira integration. Please ensure:
                 }
             }
             
-            return Response(
-                formatted,
-                status=status.HTTP_200_OK,
-                content_type='application/json'
-            )
+            return StandardResponse.success(data=formatted, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error generating work items: {e}")
@@ -566,10 +555,7 @@ IMPORTANT: This is for Jira integration. Please ensure:
                 "details": "Failed to generate work items",
                 "code": "work_items_generation_error"
             }
-            return Response(
-                error_response,
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail=error_response.get("error", "Internal server error"), instance=request.path)
 
 
 def createFallbackWorkItems(analysis_data: dict, process_template: str) -> list:
@@ -690,10 +676,7 @@ class UpdateKeywordsView(APIView):
         user_id_str = str(user_id)
 
         if not updated_keywords or not comments:
-            return Response(
-                {"error": "Updated keywords and comments are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Updated keywords and comments are required.", instance=request.path)
 
         project_id, project_doc, is_draft = cosmos_service.ensure_project_context(
             incoming_project_id,
@@ -706,9 +689,19 @@ class UpdateKeywordsView(APIView):
             'is_draft': is_draft,
         }
 
+        # Get company name from user profile for company-specific prompts
+        company_name = None
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            try:
+                user_data = cosmos_service.get_user_by_username(request.user.username)
+                if user_data:
+                    company_name = user_data.get('company_name')
+            except Exception as e:
+                print(f"Warning: Could not get company_name for user: {e}")
+        
         try:
             # Create a modified prompt that includes the updated keywords
-            prompt = getSentAnalysisPrompt()
+            prompt = getSentAnalysisPrompt(company_name=company_name)
             
             # Add keyword context to the prompt
             keyword_context = "UPDATED KEYWORDS:\n"
@@ -821,11 +814,7 @@ class UpdateKeywordsView(APIView):
                 'context': project_context
             }
             
-            return Response(
-                formatted,
-                status=status.HTTP_200_OK,
-                content_type='application/json'
-            )
+            return StandardResponse.success(data=formatted, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error updating keywords and regenerating analysis: {e}")
@@ -834,10 +823,7 @@ class UpdateKeywordsView(APIView):
                 "details": "Failed to update keywords and regenerate analysis",
                 "code": "keywords_update_error"
             }
-            return Response(
-                error_response,
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail=error_response.get("error", "Internal server error"), instance=request.path)
 
 
 class GetUserCommentsView(APIView):
@@ -855,10 +841,7 @@ class GetUserCommentsView(APIView):
         # Get user ID from request
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
-            return Response(
-                {"error": "User authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
         user_id_str = str(user_id)
         
         try:
@@ -866,7 +849,7 @@ class GetUserCommentsView(APIView):
                 # Fall back to personal data when project not supplied
                 personal_data = cosmos_service.get_latest_personal_user_data(user_id_str)
                 if not personal_data:
-                    return Response({
+                    return StandardResponse.success(data={
                         "success": True,
                         "comments": [],
                         "comments_count": 0,
@@ -874,9 +857,9 @@ class GetUserCommentsView(APIView):
                         "upload_date": None,
                         "message": "No comments found for personal analysis",
                         "is_personal": True,
-                    }, status=status.HTTP_200_OK)
+                    }, message="Operation completed successfully")
 
-                return Response({
+                return StandardResponse.success(data={
                     "success": True,
                     "comments": personal_data.get('feedback', []),
                     "comments_count": len(personal_data.get('feedback', [])),
@@ -884,13 +867,13 @@ class GetUserCommentsView(APIView):
                     "upload_date": personal_data.get('uploaded_date'),
                     "is_personal": True,
                     "project_id": personal_data.get('project_id'),
-                }, status=status.HTTP_200_OK)
+                }, message="Operation completed successfully")
 
             # Project-specific data path
             user_data = cosmos_service.get_user_data_by_project(user_id_str, project_id)
             
             if not user_data:
-                return Response({
+                return StandardResponse.success(data={
                     "success": True,
                     "comments": [],
                     "comments_count": 0,
@@ -898,9 +881,9 @@ class GetUserCommentsView(APIView):
                     "upload_date": None,
                     "message": "No comments found for this project",
                     "is_personal": False,
-                }, status=status.HTTP_200_OK)
+                }, message="Operation completed successfully")
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "comments": user_data.get('feedback', []),
                 "comments_count": len(user_data.get('feedback', [])),
@@ -908,14 +891,11 @@ class GetUserCommentsView(APIView):
                 "upload_date": user_data.get('uploaded_date'),
                 "is_personal": bool(user_data.get('is_personal')),
                 "project_id": project_id,
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error retrieving user comments: {e}")
-            return Response(
-                {"error": "Failed to retrieve user comments."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to retrieve user comments.", instance=request.path)
 
 
 class GetUserStoriesView(APIView):
@@ -932,10 +912,7 @@ class GetUserStoriesView(APIView):
         project_id = request.query_params.get('project_id')
         
         if not project_id:
-            return Response(
-                {"error": "Project ID is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
         
         # Get user ID from request or use authenticated user
         user_id = request.query_params.get('user_id')
@@ -943,29 +920,23 @@ class GetUserStoriesView(APIView):
             user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
             
         if not user_id:
-            return Response(
-                {"error": "User authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
         
         try:
             # Get user stories for the specific user and project
             user_stories = cosmos_service.get_user_stories_by_user_and_project(str(user_id), project_id)
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "user_stories": user_stories,
                 "count": len(user_stories),
                 "user_id": str(user_id),
                 "project_id": project_id
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error retrieving user stories: {e}")
-            return Response(
-                {"error": "Failed to retrieve user stories."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to retrieve user stories.", instance=request.path)
 
 
 class GetAllUserStoriesView(APIView):
@@ -984,28 +955,22 @@ class GetAllUserStoriesView(APIView):
             user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
             
         if not user_id:
-            return Response(
-                {"error": "User authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
         
         try:
             # Get all user stories for the user
             user_stories = cosmos_service.get_user_stories_by_user(str(user_id))
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "user_stories": user_stories,
                 "count": len(user_stories),
                 "user_id": str(user_id)
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error retrieving user stories: {e}")
-            return Response(
-                {"error": "Failed to retrieve user stories."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to retrieve user stories.", instance=request.path)
 
 
 class GetUserWorkItemsView(APIView):
@@ -1018,10 +983,7 @@ class GetUserWorkItemsView(APIView):
             user_id = request.user.id if request.user.is_authenticated else None
             
             if not project_id:
-                return Response(
-                    {"error": "Project ID is required."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
             
             # Query user work items from Cosmos DB
             query = "SELECT * FROM c WHERE c.projectId = @project_id AND c.type = 'user_story'"
@@ -1035,16 +997,13 @@ class GetUserWorkItemsView(APIView):
             
             work_items = cosmos_service.query_items('user_stories', query, parameters)
             
-            return Response({
+            return StandardResponse.success(data={
                 "work_items": work_items,
                 "count": len(work_items)
-            })
+            }, message="Operation completed successfully")
             
         except Exception as e:
-            return Response(
-                {"error": "Failed to retrieve user work items."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to retrieve user work items.", instance=request.path)
 
 
 class UserStoryCreationView(APIView):
@@ -1063,6 +1022,16 @@ class UserStoryCreationView(APIView):
         platform = request.data.get("platform", "azure")  # Default to Azure DevOps
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
+        
+        # Get company name from user profile for company-specific prompts
+        company_name = None
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            try:
+                user_data = cosmos_service.get_user_by_username(request.user.username)
+                if user_data:
+                    company_name = user_data.get('company_name')
+            except Exception as e:
+                print(f"Warning: Could not get company_name for user: {e}")
 
         resolved_project_id, project_doc, is_draft = cosmos_service.ensure_project_context(
             incoming_project_id,
@@ -1083,19 +1052,14 @@ class UserStoryCreationView(APIView):
         print(f"🆔 Project ID (resolved): {project_id}")
         print(f"📊 Analysis data provided: {analysis_data is not None}")
         print(f"💬 Comments count: {len(comments) if comments else 0}")
+        print(f"🏢 Company name: {company_name}")
 
         # Validate input - need both analysis_data and comments
         if not analysis_data:
-            return Response(
-                {"error": "analysis_data is required. Please run sentiment analysis first using /analyze endpoint."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="analysis_data is required. Please run sentiment analysis first using /analyze endpoint.", instance=request.path)
         
         if not comments or not isinstance(comments, list):
-            return Response(
-                {"error": "comments are required along with analysis_data for work item generation."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="comments are required along with analysis_data for work item generation.", instance=request.path)
 
         try:
             work_items = []
@@ -1109,16 +1073,10 @@ class UserStoryCreationView(APIView):
                 actual_analysis_data = analysis_data['analysisData']
             
             # Create work item generation prompt based on platform
-            if platform.lower() == "jira":
-                # For Jira, use Jira-specific prompt
-                prompt = getJiraDeepAnalysisPrompt()
-                feedback_block = "\n".join([str(c) for c in comments]) if comments else "Analysis data provided"
-                prompt_filled = prompt.replace("<feedback_data>", feedback_block)
-            else:
-                # For Azure DevOps, use the existing prompt
-                prompt = getDeepAnalysisPrompt()
-                feedback_block = "\n".join([str(c) for c in comments]) if comments else "Analysis data provided"
-                prompt_filled = prompt.replace("<feedback_data>", feedback_block)
+            project_metadata = request.data.get("project_metadata")
+            prompt = getDeepAnalysisPrompt(platform=platform, project_metadata=project_metadata, company_name=company_name)
+            feedback_block = "\n".join([str(c) for c in comments]) if comments else "Analysis data provided"
+            prompt_filled = prompt.replace("<feedback_data>", feedback_block)
             
             print(f"Work item generation prompt length: {len(prompt_filled)} characters")
             
@@ -1291,11 +1249,7 @@ class UserStoryCreationView(APIView):
             print(f"🔍 Final work_items count: {len(work_items)}")
             print(f"🔍 Final work_items_by_feature keys: {list(groupWorkItemsByFeature(work_items).keys())}")
                 
-            return Response(
-                formatted,
-                status=status.HTTP_200_OK,
-                content_type='application/json'
-            )
+            return StandardResponse.success(data=formatted, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error generating user stories: {e}")
@@ -1304,10 +1258,7 @@ class UserStoryCreationView(APIView):
                 "details": "Failed to generate user stories",
                 "code": "user_story_creation_error"
             }
-            return Response(
-                error_response,
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail=error_response.get("error", "Internal server error"), instance=request.path)
 
 
 class UpdateWorkItemView(APIView):
@@ -1321,10 +1272,7 @@ class UpdateWorkItemView(APIView):
         # Get user ID from request
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
-            return Response(
-                {"error": "User authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
         
         try:
             # Get the updated work item data
@@ -1333,10 +1281,7 @@ class UpdateWorkItemView(APIView):
             
             # Validate required fields
             if not updated_data.get('title'):
-                return Response(
-                    {"error": "Title is required."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return StandardResponse.validation_error(detail="Title is required.", instance=request.path)
             
             # Use the new method that handles embedded work items in insights container
             updated_work_item = cosmos_service.update_embedded_work_item(
@@ -1346,23 +1291,17 @@ class UpdateWorkItemView(APIView):
             )
             
             if not updated_work_item:
-                return Response(
-                    {"error": "Work item not found or update failed."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return StandardResponse.not_found(detail="Work item not found or update failed.", instance=request.path)
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "work_item": updated_work_item,
                 "message": "Work item updated successfully"
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
             print(f"Error updating work item: {e}")
-            return Response(
-                {"error": "Failed to update work item."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to update work item.", instance=request.path)
 
 
 class JiraDeepAnalysisView(APIView):
@@ -1373,20 +1312,26 @@ class JiraDeepAnalysisView(APIView):
         comments = request.data.get("comments")
         project_id = request.data.get("project_id")
         project_metadata = request.data.get("project_metadata")
+        
+        # Get company name from user profile for company-specific prompts
+        company_name = None
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            try:
+                user_data = cosmos_service.get_user_by_username(request.user.username)
+                if user_data:
+                    company_name = user_data.get('company_name')
+            except Exception as e:
+                app_logger.warning(f"Could not get company_name for user: {e}")
 
         if not comments or not isinstance(comments, list):
-            return Response(
-                {"error": "A list of comments is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="A list of comments is required.", instance=request.path)
 
         try:
-            # Use dynamic prompt if project metadata is provided, otherwise fallback to static prompt
+            # Use unified prompt with Jira platform and optional project metadata
+            prompt = getDeepAnalysisPrompt(platform='jira', project_metadata=project_metadata, company_name=company_name)
             if project_metadata:
-                prompt = getDynamicJiraDeepAnalysisPrompt(project_metadata)
                 app_logger.info(f"Using dynamic prompt for project: {project_metadata.get('project', {}).get('name', 'Unknown')}")
             else:
-                prompt = getJiraDeepAnalysisPrompt()
                 app_logger.info("Using static Jira prompt (no project metadata provided)")
             
             feedback_block = "\n".join([str(c) for c in comments])
@@ -1463,13 +1408,13 @@ class JiraDeepAnalysisView(APIView):
                 'project_metadata': project_metadata
             }
             
-            return Response(formatted)
+            return StandardResponse.success(data=formatted, message="Operation completed successfully")
 
         except Exception as e:
             app_logger.error(f"Error in Jira deep analysis: {e}")
-            return Response(
-                {"error": f"Analysis failed: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            return StandardResponse.internal_server_error(
+                detail=f"Analysis failed: {str(e)}",
+                instance=request.path
             )
 
 
@@ -1482,27 +1427,25 @@ class AnalysisHistoryView(APIView):
         project_id = request.query_params.get('project_id')
         
         if not project_id:
-            return Response(
-                {"error": "Project ID is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
         
         try:
             # Get analysis history
             history = cosmos_service.get_analysis_history_for_project(project_id)
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "project_id": project_id,
                 "total_analyses": len(history),
                 "analyses": history,
                 "quarters": list(set(a.get('quarter', '') for a in history if a.get('quarter')))
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch analysis history: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch analysis history: {str(e)}",
+                instance=request.path
+            )
 
 
 class AnalysisByQuarterView(APIView):
@@ -1515,30 +1458,29 @@ class AnalysisByQuarterView(APIView):
         quarter = request.query_params.get('quarter')
         
         if not project_id or not quarter:
-            return Response(
-                {"error": "Project ID and quarter are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Project ID and quarter are required.", instance=request.path)
         
         try:
             analysis = cosmos_service.get_analysis_by_quarter(project_id, quarter)
             
             if not analysis:
-                return Response({
-                    "error": f"No analysis found for project {project_id} in quarter {quarter}"
-                }, status=status.HTTP_404_NOT_FOUND)
+                return StandardResponse.not_found(
+                    detail=f"No analysis found for project {project_id} in quarter {quarter}",
+                    instance=request.path
+                )
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "project_id": project_id,
                 "quarter": quarter,
                 "analysis": analysis
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch analysis: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch analysis: {str(e)}",
+                instance=request.path
+            )
 
 
 class CumulativeAnalysisView(APIView):
@@ -1550,29 +1492,28 @@ class CumulativeAnalysisView(APIView):
         project_id = request.query_params.get('project_id')
         
         if not project_id:
-            return Response(
-                {"error": "Project ID is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
         
         try:
             cumulative = cosmos_service.get_cumulative_analysis_for_project(project_id)
             
             if not cumulative:
-                return Response({
-                    "error": f"No data found for project {project_id}"
-                }, status=status.HTTP_404_NOT_FOUND)
+                return StandardResponse.not_found(
+                    detail=f"No data found for project {project_id}",
+                    instance=request.path
+                )
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "project_id": project_id,
                 "cumulative_analysis": cumulative
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch cumulative analysis: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch cumulative analysis: {str(e)}",
+                instance=request.path
+            )
 
 
 class GetUserStoriesView(APIView):
@@ -1585,10 +1526,7 @@ class GetUserStoriesView(APIView):
         user_id = request.query_params.get("user_id")
 
         if not project_id:
-            return Response(
-                {"error": "Project ID is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
 
         try:
             if user_id:
@@ -1598,19 +1536,16 @@ class GetUserStoriesView(APIView):
                 # Get all user stories for the project (backend will infer user from token)
                 user_stories = cosmos_service.get_user_stories_by_project(project_id)
 
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "user_stories": user_stories,
                 "project_id": project_id,
                 "count": len(user_stories)
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
 
         except Exception as e:
             print(f"Error getting user stories: {e}")
-            return Response(
-                {"error": "Failed to retrieve user stories."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to retrieve user stories.", instance=request.path)
 
 
 class GetAllUserStoriesView(APIView):
@@ -1630,18 +1565,15 @@ class GetAllUserStoriesView(APIView):
                 # For now, return empty list if no user_id provided
                 user_stories = []
 
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "user_stories": user_stories,
                 "count": len(user_stories)
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
 
         except Exception as e:
             print(f"Error getting all user stories: {e}")
-            return Response(
-                {"error": "Failed to retrieve user stories."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to retrieve user stories.", instance=request.path)
 
 
 class AnalysisComparisonView(APIView):
@@ -1655,24 +1587,23 @@ class AnalysisComparisonView(APIView):
         quarter2 = request.query_params.get('quarter2')
         
         if not all([project_id, quarter1, quarter2]):
-            return Response(
-                {"error": "Project ID, quarter1, and quarter2 are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="Project ID, quarter1, and quarter2 are required.", instance=request.path)
         
         try:
             analysis1 = cosmos_service.get_analysis_by_quarter(project_id, quarter1)
             analysis2 = cosmos_service.get_analysis_by_quarter(project_id, quarter2)
             
             if not analysis1:
-                return Response({
-                    "error": f"No analysis found for quarter {quarter1}"
-                }, status=status.HTTP_404_NOT_FOUND)
+                return StandardResponse.not_found(
+                    detail=f"No analysis found for quarter {quarter1}",
+                    instance=request.path
+                )
             
             if not analysis2:
-                return Response({
-                    "error": f"No analysis found for quarter {quarter2}"
-                }, status=status.HTTP_404_NOT_FOUND)
+                return StandardResponse.not_found(
+                    detail=f"No analysis found for quarter {quarter2}",
+                    instance=request.path
+                )
             
             # Create comparison data
             comparison = {
@@ -1701,15 +1632,16 @@ class AnalysisComparisonView(APIView):
                 }
             }
             
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "comparison": comparison
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
             
         except Exception as e:
-            return Response({
-                "error": f"Failed to compare analyses: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to compare analyses: {str(e)}",
+                instance=request.path
+            )
     
     def _calculate_sentiment_change(self, sentiment1, sentiment2):
         """Calculate sentiment change between two analyses"""
@@ -1729,10 +1661,7 @@ class UpdateUserStoryView(APIView):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
 
         if not user_id:
-            return Response(
-                {"error": "Authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
 
         try:
             # Get the updated data from request body
@@ -1747,23 +1676,17 @@ class UpdateUserStoryView(APIView):
             )
 
             if not updated_work_item:
-                return Response(
-                    {"error": "Work item not found or update failed."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return StandardResponse.not_found(detail="Work item not found or update failed.", instance=request.path)
 
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "work_item": updated_work_item,
                 "message": "Work item updated successfully"
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
 
         except Exception as e:
             print(f"Error updating work item: {e}")
-            return Response(
-                {"error": "Failed to update work item."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to update work item.", instance=request.path)
 
 
 class DeleteUserStoryView(APIView):
@@ -1775,19 +1698,13 @@ class DeleteUserStoryView(APIView):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
 
         if not user_id:
-            return Response(
-                {"error": "Authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
 
         try:
             # Get the user story first to verify ownership
             user_story = cosmos_service.get_user_story(user_story_id, str(user_id))
             if not user_story:
-                return Response(
-                    {"error": "User story not found."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return StandardResponse.not_found(detail="User story not found.", instance=request.path)
 
             # Delete the user story from Cosmos DB
             success = cosmos_service.delete_item(
@@ -1797,22 +1714,16 @@ class DeleteUserStoryView(APIView):
             )
 
             if not success:
-                return Response(
-                    {"error": "Failed to delete user story."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+                return StandardResponse.internal_server_error(detail="Failed to delete user story.", instance=request.path)
 
-            return Response({
+            return StandardResponse.success(data={
                 "success": True,
                 "message": "User story deleted successfully"
-            }, status=status.HTTP_200_OK)
+            }, message="Operation completed successfully")
 
         except Exception as e:
             print(f"Error deleting user story: {e}")
-            return Response(
-                {"error": "Failed to delete user story."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return StandardResponse.internal_server_error(detail="Failed to delete user story.", instance=request.path)
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -1845,11 +1756,11 @@ class DeleteUserStoryItemsView(APIView):
     def get(self, request):
         """Debug GET method to test if view is accessible"""
         print("🔍 GET method called in DeleteUserStoryItemsView!")
-        return Response({
+        return StandardResponse.success(data={
             "message": "DeleteUserStoryItemsView is accessible",
             "methods": ["GET", "POST", "PUT"],
             "endpoint": "/api/insights/user-stories/delete-items/"
-        }, status=status.HTTP_200_OK)
+        }, message="Operation completed successfully")
     
     def _handle_remove_work_items(self, request):
         """Remove work items from user story using UPDATE approach"""
@@ -1859,25 +1770,16 @@ class DeleteUserStoryItemsView(APIView):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
 
         if not user_id:
-            return Response(
-                {"error": "Authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
 
         work_item_ids = request.data.get('ids', [])
         user_story_id = request.data.get('user_story_id')
         
         if not isinstance(work_item_ids, list) or len(work_item_ids) == 0:
-            return Response(
-                {"error": "A non-empty 'ids' array is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="A non-empty 'ids' array is required.", instance=request.path)
 
         if not user_story_id:
-            return Response(
-                {"error": "user_story_id is required for work item removal."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return StandardResponse.validation_error(detail="user_story_id is required for work item removal.", instance=request.path)
 
         try:
             # Handle consolidated user story IDs (created by frontend)
@@ -1891,9 +1793,10 @@ class DeleteUserStoryItemsView(APIView):
                 user_stories = cosmos_service.get_user_stories_by_user_and_project(str(user_id), project_id)
                 if not user_stories:
                     print(f"❌ No user stories found for project: {project_id} and user: {user_id}")
-                    return Response({
-                        "error": f"No user stories found for project '{project_id}'"
-                    }, status=status.HTTP_404_NOT_FOUND)
+                    return StandardResponse.not_found(
+                        detail=f"No user stories found for project '{project_id}'",
+                        instance=request.path
+                    )
                 
                 # Use the first (most recent) user story
                 actual_user_story_id = user_stories[0]['id']
@@ -1906,25 +1809,25 @@ class DeleteUserStoryItemsView(APIView):
             
             if result["success"]:
                 print(f"✅ Successfully removed {result['deleted_count']} work items from {user_story_id}")
-                return Response({
-                    "success": True,
-                    "deleted": result["deleted_count"],
-                    "remaining": result["remaining_count"],
-                    "user_story_id": result["user_story_id"],
-                    "type": "work_items",
-                    "message": f"Removed {result['deleted_count']} work items from user story"
-                }, status=status.HTTP_200_OK)
+                return StandardResponse.success(
+                    data={
+                        "deleted": result["deleted_count"],
+                        "remaining": result["remaining_count"],
+                        "user_story_id": result["user_story_id"],
+                        "type": "work_items"
+                    },
+                    message=f"Removed {result['deleted_count']} work items from user story"
+                )
             else:
                 print(f"❌ Failed to remove work items: {result['error']}")
-                return Response({
-                    "error": result["error"]
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return StandardResponse.validation_error(detail=result["error"]
+                , instance=request.path)
                 
         except Exception as e:
             print(f"💥 Error removing work items: {e}")
-            return Response(
-                {"error": f"Failed to remove work items: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to remove work items: {str(e)}",
+                instance=request.path
             )
 
 
@@ -1935,13 +1838,13 @@ class WorkItemRemovalView(APIView):
     def get(self, request):
         """Debug GET method to test if view is accessible"""
         print("🔍 WorkItemRemovalView GET called!")
-        return Response({
+        return StandardResponse.success(data={
             "message": "WorkItemRemovalView is accessible",
             "methods": ["GET", "PUT"],
             "endpoint": "/api/insights/user-stories/remove-work-items/",
             "status": "working",
             "note": "Use PUT method for updating user story (removing work items)"
-        }, status=status.HTTP_200_OK)
+        }, message="Operation completed successfully")
     
     def put(self, request):
         """Remove work items from user story (UPDATE operation)"""
@@ -1950,7 +1853,7 @@ class WorkItemRemovalView(APIView):
         
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
-            return Response({"error": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
 
         work_item_ids = request.data.get('ids', [])
         user_story_id = request.data.get('user_story_id')
@@ -1960,9 +1863,8 @@ class WorkItemRemovalView(APIView):
         print(f"🔍 For user: {user_id}")
         
         if not work_item_ids or not user_story_id:
-            return Response({
-                "error": "Both 'ids' and 'user_story_id' are required."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return StandardResponse.validation_error(detail="Both 'ids' and 'user_story_id' are required."
+            , instance=request.path)
 
         try:
             # Handle consolidated user story IDs (created by frontend)
@@ -1976,21 +1878,26 @@ class WorkItemRemovalView(APIView):
                 user_stories = cosmos_service.get_user_stories_by_user_and_project(str(user_id), project_id)
                 if not user_stories:
                     print(f"❌ No user stories found for project: {project_id} and user: {user_id}")
-                    return Response({
-                        "error": f"No user stories found for project '{project_id}'"
-                    }, status=status.HTTP_404_NOT_FOUND)
+                    return StandardResponse.not_found(
+                        detail=f"No user stories found for project '{project_id}'",
+                        instance=request.path
+                    )
                 
                 # Use the first (most recent) user story
                 actual_user_story_id = user_stories[0]['id']
                 print(f"✅ Found user story: {actual_user_story_id}")
+            else:
+                # user_story_id was provided directly
+                actual_user_story_id = f"user_story_{user_story_id}"
             
             # Get the user story (cross-partition safe)
             user_story = cosmos_service.get_user_story_by_id(actual_user_story_id)
             if not user_story:
                 print(f"❌ User story not found: {actual_user_story_id} for user: {user_id}")
-                return Response({
-                    "error": f"User story '{actual_user_story_id}' not found for user '{user_id}'"
-                }, status=status.HTTP_404_NOT_FOUND)
+                return StandardResponse.not_found(
+                    detail=f"User story '{actual_user_story_id}' not found for user '{user_id}'",
+                    instance=request.path
+                )
             
             print(f"✅ Found user story: {user_story.get('id', 'unknown')}")
             print(f"📊 Current work items count: {len(user_story.get('work_items', []))}")
@@ -2003,25 +1910,25 @@ class WorkItemRemovalView(APIView):
             print(f"🔄 Cosmos service result: {result}")
             
             if result["success"]:
-                return Response({
-                    "success": True,
-                    "deleted": result["deleted_count"],
+                return StandardResponse.success(
+                    data={
+                        "deleted": result["deleted_count"],
                     "remaining": result["remaining_count"],
                     "user_story_id": result["user_story_id"],
                     "message": f"Successfully removed {result['deleted_count']} work items"
                 }, status=status.HTTP_200_OK)
             else:
-                return Response({
-                    "error": result["error"]
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return StandardResponse.validation_error(detail=result["error"]
+                , instance=request.path)
                 
         except Exception as e:
             print(f"💥 Error in WorkItemRemovalView: {e}")
             import traceback
             traceback.print_exc()
-            return Response({
-                "error": f"Failed to remove work items: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to remove work items: {str(e)}",
+                instance=request.path
+            )
 
 
 class TestDeleteView(APIView):
@@ -2029,17 +1936,17 @@ class TestDeleteView(APIView):
     permission_classes = [IsAdminOrUser]
     
     def get(self, request):
-        return Response({"message": "GET works", "method": "GET"}, status=status.HTTP_200_OK)
+        return StandardResponse.success(data={"message": "GET works", "method": "GET"}, message="Operation completed successfully")
     
     def post(self, request):
         print("🧪 TestDeleteView POST called!")
-        return Response({"message": "POST works", "method": "POST", "data": request.data}, status=status.HTTP_200_OK)
+        return StandardResponse.success(data={"message": "POST works", "method": "POST", "data": request.data}, message="Operation completed successfully")
     
     def put(self, request):
-        return Response({"message": "PUT works", "method": "PUT", "data": request.data}, status=status.HTTP_200_OK)
+        return StandardResponse.success(data={"message": "PUT works", "method": "PUT", "data": request.data}, message="Operation completed successfully")
     
     def delete(self, request):
-        return Response({"message": "DELETE works", "method": "DELETE", "data": request.data}, status=status.HTTP_200_OK)
+        return StandardResponse.success(data={"message": "DELETE works", "method": "DELETE", "data": request.data}, message="Operation completed successfully")
 
 
 class DeleteSingleUserStoryItemView(APIView):
@@ -2049,18 +1956,15 @@ class DeleteSingleUserStoryItemView(APIView):
     def delete(self, request, work_item_id: str):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
-            return Response(
-                {"error": "Authentication required."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
         try:
             deleted = cosmos_service.delete_embedded_work_items([work_item_id], str(user_id))
             if deleted == 0:
-                return Response({"error": "User story item not found."}, status=status.HTTP_404_NOT_FOUND)
-            return Response({"success": True, "deleted": 1}, status=status.HTTP_200_OK)
+                return StandardResponse.not_found(detail="User story item not found.", instance=request.path)
+            return StandardResponse.success(data={"success": True, "deleted": 1}, message="Operation completed successfully")
         except Exception as e:
             print(f"Error deleting user story item: {e}")
-            return Response({"error": "Failed to delete user story item."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(detail="Failed to delete user story item.", instance=request.path)
 
 def aggregate_analysis_data(existing_analysis, new_analysis, new_comments_count):
     """
@@ -2234,22 +2138,13 @@ class UserStorySubmissionView(APIView):
             
             # Validate required fields
             if not user_id or not project_id or not user_stories:
-                return Response({
-                    "success": False,
-                    "error": "user_id, project_id, and user_stories are required"
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return StandardResponse.validation_error(detail="user_id, project_id, and user_stories are required", instance=request.path)
             
             if platform not in ['azure', 'jira']:
-                return Response({
-                    "success": False,
-                    "error": "platform must be either 'azure' or 'jira'"
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return StandardResponse.validation_error(detail="platform must be either 'azure' or 'jira'", instance=request.path)
             
             if not isinstance(user_stories, list) or len(user_stories) == 0:
-                return Response({
-                    "success": False,
-                    "error": "user_stories must be a non-empty array"
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return StandardResponse.validation_error(detail="user_stories must be a non-empty array", instance=request.path)
             
             # Get project configuration from Cosmos DB
             try:
@@ -2272,10 +2167,10 @@ class UserStorySubmissionView(APIView):
                     print(f"🔍 All projects in database: {[(p.get('id'), p.get('name')) for p in all_projects[:5]]}")
                 
                 if not project_data:
-                    return Response({
-                        "success": False,
-                        "error": f"Project {project_id} not found"
-                    }, status=status.HTTP_404_NOT_FOUND)
+                    return StandardResponse.not_found(
+                        detail=f"Project {project_id} not found",
+                        instance=request.path
+                    )
                 
                 project_config = project_data[0]
                 print(f"📋 Found project: {project_config.get('name')}")
@@ -2286,10 +2181,10 @@ class UserStorySubmissionView(APIView):
                 
             except Exception as e:
                 print(f"❌ Error fetching project: {e}")
-                return Response({
-                    "success": False,
-                    "error": f"Failed to fetch project configuration: {str(e)}"
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return StandardResponse.internal_server_error(
+                    detail=f"Failed to fetch project configuration: {str(e)}",
+                    instance=request.path
+                )
             
             # Transform user stories for the target platform
             transformed_items = []
@@ -2390,15 +2285,25 @@ class UserStorySubmissionView(APIView):
             }
             
             print(f"✅ User story submission completed: {response_data['summary']}")
-            return Response(response_data, status=status.HTTP_200_OK)
+            return StandardResponse.success(data=response_data, message="Operation completed successfully")
             
         except Exception as e:
             print(f"❌ Error in user story submission: {e}")
-            return Response({
-                "success": False,
-                "error": str(e),
-                "details": "Failed to submit user stories"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
+        
+        # This code should not be reached, but just in case
+        return StandardResponse.internal_server_error(
+            detail="Unexpected error in user story submission",
+            instance=request.path
+        )
+
+
+# Dummy placeholder to close the function properly
+class DummyPlaceholder:
+    pass
     
     def _map_priority_for_azure(self, priority):
         """Map generic priority to Azure DevOps priority"""

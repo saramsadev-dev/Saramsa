@@ -14,23 +14,21 @@ def create_integration_account(user_id: str, provider: str, credentials: Dict[st
                              metadata: Dict[str, Any], display_name: str = None) -> Dict[str, Any]:
     """Create a new integration account document for Cosmos DB."""
     account_id = f"ia_{uuid.uuid4().hex[:12]}"
-    tenant_id = user_id  # Using user_id as tenant_id for now
     
     return {
         "id": account_id,
         "type": "integrationAccount",
-        "tenantId": tenant_id,
-        "userId": user_id,
+        "userId": user_id,  # This is the partition key for integrations container
         "provider": provider,
         "displayName": display_name or f"{metadata.get('organization', metadata.get('domain', 'Unknown'))} ({provider.title()})",
         "status": "active",
         "credentials": credentials,
         "metadata": metadata,
         "scopes": get_default_scopes(provider),
-        "savedAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
         "expiresAt": None,
-        "schemaVersion": 1,
-        "partitionKey": tenant_id
+        "schemaVersion": 1
     }
 
 
@@ -85,27 +83,20 @@ def create_jira_integration_account(user_id: str, domain: str, email: str, encry
 def create_project(user_id: str, name: str, description: str = None, 
                   external_links: List[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create a new project document for Cosmos DB."""
-    project_id = f"proj_{uuid.uuid4().hex[:12]}"
-    tenant_id = user_id  # Using user_id as tenant_id for now
+    project_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     
     return {
         "id": project_id,
         "type": "project",
-        "tenantId": tenant_id,
+        "userId": user_id,  # This is the partition key for projects container
         "name": name,
         "description": description,
-        "createdBy": user_id,
+        "status": "active",
         "createdAt": now,
         "updatedAt": now,
-        "links": external_links or [],
-        "metadata": {
-            "totalComments": 0,
-            "analysisStatus": "pending",
-            "lastAnalysisAt": None
-        },
-        "schemaVersion": 1,
-        "partitionKey": tenant_id
+        "externalLinks": external_links or [],
+        "schemaVersion": 1
     }
 
 

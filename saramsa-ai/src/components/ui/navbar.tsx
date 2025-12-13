@@ -88,11 +88,11 @@ export function Navbar() {
                   >
                     <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-full flex items-center justify-center">
                       <span className="text-white font-bold text-sm">
-                        {currentUser.username.charAt(0).toUpperCase()}
+                        {currentUser.username?.charAt(0).toUpperCase() || currentUser.email?.charAt(0).toUpperCase() || 'U'}
                       </span>
                     </div>
                     <span className="hidden sm:block font-medium">
-                      {currentUser.username}
+                      {currentUser.username || currentUser.email || 'User'}
                     </span>
                     <ChevronDown
                       className={`w-4 h-4 transition-transform ${
@@ -104,7 +104,7 @@ export function Navbar() {
                     <div className="absolute z-50 right-0 mt-2 w-56 bg-popover border border-border rounded-lg shadow-xl animate-in slide-in-from-top-2 duration-200">
                       <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-saramsa-gradient-from/5 to-saramsa-gradient-to/5">
                         <div className="text-sm font-medium text-popover-foreground">
-                          {currentUser.username}
+                          {currentUser.username || currentUser.email || 'User'}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {currentUser.email || "No email"}

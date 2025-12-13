@@ -170,17 +170,23 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
     throw new Error(message);
   }
 
-  const data = (await res.json()) as {
-    user_id?: string;
-    username: string;
-    email?: string;
-    role?: string;
-    first_name?: string;
-    last_name?: string;
+  const response = (await res.json()) as {
+    success: boolean;
+    data: {
+      user_id?: string;
+      username: string;
+      email?: string;
+      role?: string;
+      first_name?: string;
+      last_name?: string;
+    };
+    message?: string;
   };
 
+  const data = response.data;
+
   // Debug logging
-  console.log('🔍 getCurrentUser - API response data:', data);
+  console.log('🔍 getCurrentUser - API response:', response);
   console.log('🔍 getCurrentUser - data.user_id:', data.user_id);
   console.log('🔍 getCurrentUser - data.username:', data.username);
 
@@ -256,7 +262,12 @@ export async function login(params: LoginParams): Promise<{ user: User } & Token
     throw err;
   }
 
-  const tokenData = (await res.json()) as Tokens;
+  const response = (await res.json()) as {
+    success: boolean;
+    data: Tokens;
+    message?: string;
+  };
+  const tokenData = response.data;
   setTokens(tokenData);
 
   const user = await getCurrentUser(tokenData.access);
@@ -283,16 +294,19 @@ export async function register(
     throw err;
   }
 
-  const data = (await res.json()) as {
-    success?: boolean;
-    access: string;
-    refresh: string;
-    username?: string;
-    email?: string;
-    user_id?: string;
+  const response = (await res.json()) as {
+    success: boolean;
+    data: {
+      access: string;
+      refresh: string;
+      username?: string;
+      email?: string;
+      user_id?: string;
+    };
+    message?: string;
   };
 
-  const tokens: Tokens = { access: data.access, refresh: data.refresh };
+  const tokens: Tokens = { access: response.data.access, refresh: response.data.refresh };
   setTokens(tokens);
 
   const user = await getCurrentUser(tokens.access);
@@ -307,8 +321,12 @@ export async function checkUsername(
   if (!res.ok) {
     return { available: false, message: 'Unable to verify username' };
   }
-  const data = (await res.json()) as { available: boolean; message?: string };
-  return data;
+  const response = (await res.json()) as { 
+    success: boolean; 
+    data: { available: boolean; message?: string };
+    message?: string;
+  };
+  return response.data;
 }
 
 export function logout(): void {

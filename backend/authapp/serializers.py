@@ -15,6 +15,7 @@ class CosmosDBUserSerializer(serializers.Serializer):
     confirmPassword = serializers.CharField(write_only=True, min_length=6)
     first_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
     last_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    role = serializers.CharField(max_length=50, required=False, default='user')
     
     def validate_username(self, value):
         """Check that username is unique in Cosmos DB"""

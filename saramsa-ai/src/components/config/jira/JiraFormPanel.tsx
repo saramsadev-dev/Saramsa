@@ -86,7 +86,7 @@ export const JiraFormPanel = ({
   ];
 
   return (
-    <div className="w-full max-w-md space-y-8">
+    <div className="w-full max-w-md space-y-8 py-8 pb-16">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -311,7 +311,7 @@ export const JiraFormPanel = ({
 
           {/* Success Message & Project Selection */}
           <AnimatePresence>
-            {projects.length > 0 && (
+            {projects && projects.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -322,7 +322,7 @@ export const JiraFormPanel = ({
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                      Successfully connected! Found {projects.length} projects
+                      Successfully connected! Found {projects?.length || 0} projects
                     </p>
                   </div>
                 </div>
@@ -332,8 +332,9 @@ export const JiraFormPanel = ({
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Select Jira Project
                   </label>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {projects.map((project) => (
+                  <div className="max-h-48 overflow-y-auto scrollbar-thin">
+                    <div className="space-y-2 p-1">
+                      {projects?.map((project) => (
                       <div
                         key={project.id}
                         className={`p-3 border rounded-lg cursor-pointer transition-all ${
@@ -371,8 +372,9 @@ export const JiraFormPanel = ({
                             )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     This project will be used to create issues from analyzed feedback
@@ -383,7 +385,7 @@ export const JiraFormPanel = ({
           </AnimatePresence>
 
           {/* Action Buttons */}
-          {projects.length === 0 ? (
+          {!projects || projects.length === 0 ? (
             /* Validate Configuration Button */
             <button
               onClick={onValidateConfiguration}
@@ -417,7 +419,7 @@ export const JiraFormPanel = ({
           )}
 
           {/* Project selection hint */}
-          {projects.length > 0 && !selectedProject && (
+          {projects && projects.length > 0 && !selectedProject && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

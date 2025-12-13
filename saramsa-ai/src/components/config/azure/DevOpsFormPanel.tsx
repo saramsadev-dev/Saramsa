@@ -101,7 +101,7 @@ export const DevOpsFormPanel = ({
   ];
 
   return (
-    <div className="relative w-full max-w-2xl space-y-8 mx-auto">
+    <div className="relative w-full max-w-2xl space-y-8 mx-auto pb-16">
       {/* Header */}
       {/* <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -314,7 +314,7 @@ export const DevOpsFormPanel = ({
 
           {/* Success Message & Project Selection */}
           <AnimatePresence>
-            {projects.length > 0 && (
+            {projects && projects.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -325,7 +325,7 @@ export const DevOpsFormPanel = ({
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                      Successfully connected! Found {projects.length} projects
+                      Successfully connected! Found {projects?.length || 0} projects
                     </p>
                   </div>
                 </div>
@@ -346,23 +346,24 @@ export const DevOpsFormPanel = ({
                     </div>
                   )}
                   
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {projects.map((project) => {
-                      const linkedProject = linkedProjects[project.id];
-                      const isAlreadyLinked = !!linkedProject;
-                      
-                      return (
-                        <div
-                          key={project.id}
-                          className={`p-3 border rounded-lg transition-all ${
-                            isAlreadyLinked
-                              ? "cursor-pointer border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700"
-                              : selectedProject === project.id
-                              ? "border-[#E603EB] bg-[#E603EB]/10 dark:bg-[#E603EB]/20 cursor-pointer"
-                              : "border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/50 cursor-pointer"
-                          }`}
-                          onClick={() => isAlreadyLinked ? handleLinkedProjectClick(linkedProject.id) : onProjectSelect(project.id)}
-                        >
+                  <div className="max-h-48 overflow-y-auto scrollbar-thin">
+                    <div className="space-y-2 p-1">
+                      {projects?.map((project) => {
+                        const linkedProject = linkedProjects[project.id];
+                        const isAlreadyLinked = !!linkedProject;
+                        
+                        return (
+                          <div
+                            key={project.id}
+                            className={`p-3 border rounded-lg transition-all ${
+                              isAlreadyLinked
+                                ? "cursor-pointer border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700"
+                                : selectedProject === project.id
+                                ? "border-[#E603EB] bg-[#E603EB]/10 dark:bg-[#E603EB]/20 cursor-pointer"
+                                : "border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/50 cursor-pointer"
+                            }`}
+                            onClick={() => isAlreadyLinked ? handleLinkedProjectClick(linkedProject.id) : onProjectSelect(project.id)}
+                          >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 flex-1">
                               <div className="flex-shrink-0">
@@ -396,9 +397,10 @@ export const DevOpsFormPanel = ({
                               )}
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     This project will be used to create work items from analyzed
@@ -410,7 +412,7 @@ export const DevOpsFormPanel = ({
           </AnimatePresence>
 
           {/* Action Buttons */}
-          {projects.length === 0 ? (
+          {!projects || projects.length === 0 ? (
             /* Fetch Projects Button */
             <button
               onClick={onFetchProjects}
@@ -455,7 +457,7 @@ export const DevOpsFormPanel = ({
           )}
 
           {/* Project selection hint */}
-          {projects.length > 0 && !selectedProject && (
+          {projects && projects.length > 0 && !selectedProject && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

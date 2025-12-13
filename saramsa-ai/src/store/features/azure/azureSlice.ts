@@ -67,13 +67,13 @@ const configureAzure = createAsyncThunk<
 >('azure/configure', async (credentials, { rejectWithValue }) => {
   try {
     const response = await apiRequest('post', '/workitems/azure/config', credentials, true, false);
-    return response.data;
+    return response.data.data; // StandardResponse format: response.data.data
   } catch (err: any) {
     let errorMessage = 'Failed to configure Azure DevOps connection.';
     if (err.response?.status === 401) {
       errorMessage = 'Invalid Azure DevOps credentials. Please check your organization and PAT token.';
     } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.error || 'Invalid configuration data.';
+      errorMessage = err.response?.data?.detail || err.response?.data?.title || 'Invalid configuration data.';
     } else if (err.response?.status >= 500) {
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {
@@ -91,7 +91,7 @@ const fetchAzureProjects = createAsyncThunk<
 >('azure/fetchProjects', async (_, { rejectWithValue }) => {
   try {
     const response = await apiRequest('get', '/workitems/azure/projects', {}, true, false);
-    return response.data.projects || [];
+    return response.data.data.projects || []; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to fetch Azure DevOps projects.';
     if (err.response?.status === 401) {
@@ -113,7 +113,7 @@ const fetchAzureWorkItemTypes = createAsyncThunk<
 >('azure/fetchWorkItemTypes', async (projectId, { rejectWithValue }) => {
   try {
     const response = await apiRequest('get', `/workitems/azure/work-item-types?projectId=${projectId}`, {}, true, false);
-    return response.data.work_item_types || [];
+    return response.data.data.work_item_types || []; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to fetch Azure DevOps work item types.';
     if (err.response?.status === 401) {
@@ -135,7 +135,7 @@ const fetchAzureProjectMetadata = createAsyncThunk<
 >('azure/fetchProjectMetadata', async (projectId, { rejectWithValue }) => {
   try {
     const response = await apiRequest('get', `/workitems/azure/project-metadata?projectId=${projectId}`, {}, true, false);
-    return response.data.metadata;
+    return response.data.data.metadata; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to fetch Azure DevOps project metadata.';
     if (err.response?.status === 401) {
@@ -165,13 +165,13 @@ const createAzureWorkItems = createAsyncThunk<
     }
     
     const response = await apiRequest('post', '/workitems/azure/create', payload, true, false);
-    return response.data;
+    return response.data.data; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to create Azure DevOps work items.';
     if (err.response?.status === 401) {
       errorMessage = 'Authentication required. Please login again.';
     } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.detail || 'Invalid work item data.';
+      errorMessage = err.response?.data?.detail || err.response?.data?.title || 'Invalid work item data.';
     } else if (err.response?.status >= 500) {
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {
@@ -196,13 +196,13 @@ const createAzureProject = createAsyncThunk<
 >('azure/createProject', async (data, { rejectWithValue }) => {
   try {
     const response = await apiRequest('post', '/workitems/azure/project/create', data, true, false);
-    return response.data;
+    return response.data.data; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to create Azure DevOps project.';
     if (err.response?.status === 401) {
       errorMessage = 'Authentication required. Please login again.';
     } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.error || 'Invalid project data.';
+      errorMessage = err.response?.data?.detail || err.response?.data?.title || 'Invalid project data.';
     } else if (err.response?.status >= 500) {
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {
@@ -264,13 +264,13 @@ const pushWorkItemsToAzure = createAsyncThunk<
     }
     
     const response = await apiRequest('post', '/workitems/azure/create', payload, true);
-    return response.data;
+    return response.data.data; // StandardResponse format
   } catch (err: any) {
     let errorMessage = 'Failed to push work items to Azure DevOps.';
     if (err.response?.status === 401) {
       errorMessage = 'Authentication required. Please login again.';
     } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.error || 'Invalid work item data.';
+      errorMessage = err.response?.data?.detail || err.response?.data?.title || 'Invalid work item data.';
     } else if (err.response?.status >= 500) {
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {

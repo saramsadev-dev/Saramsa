@@ -1,15 +1,16 @@
 from datetime import datetime
-from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from http import HTTPStatus
 import json
 import csv
+import uuid
 from asgiref.sync import async_to_sync
 from insightsGenerator.processor import process_uploaded_data_async
 from authapp.permissions import IsAdminOrUser
 from aiCore.cosmos_service import cosmos_service
+from apis.response import StandardResponse
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AsyncFileUploadView(APIView):
@@ -63,16 +64,17 @@ class AsyncFileUploadView(APIView):
         incoming_project_id = request.POST.get('project_id') or request.query_params.get('project_id')
         
         if not file:
-            return Response(
-                {'error': 'No file provided'},
-                status=HTTPStatus.BAD_REQUEST
+            return StandardResponse.validation_error(
+                detail='No file provided',
+                errors=[{"field": "file", "message": "This field is required."}],
+                instance=request.path
             )
         # Get user ID from request
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
-            return Response(
-                {'error': 'User authentication required'},
-                status=HTTPStatus.UNAUTHORIZED
+            return StandardResponse.unauthorized(
+                detail='User authentication required',
+                instance=request.path
             )
         
         # Convert user_id to string for consistency
@@ -181,15 +183,15 @@ class AsyncFileUploadView(APIView):
                     except Exception as e:
                         print(f"Error saving to Cosmos DB: {e}")
                     
-                    return Response(
-                        formatted,
-                        status=HTTPStatus.OK,
-                        content_type='application/json'
+                    return StandardResponse.success(
+                        data=formatted,
+                        message='File uploaded and analyzed successfully'
                     )
                 except json.JSONDecodeError:
-                    return Response(
-                        {'error': 'Invalid JSON file'},
-                        status=HTTPStatus.BAD_REQUEST
+                    return StandardResponse.validation_error(
+                        detail='Invalid JSON file',
+                        errors=[{"field": "file", "message": "The uploaded file is not valid JSON."}],
+                        instance=request.path
                     )
             
             elif file_type in ['text/csv', 'application/vnd.ms-excel']:
@@ -259,21 +261,28 @@ class AsyncFileUploadView(APIView):
                         "context": project_context,
                     }
                     
-                    return Response(formatted, status=HTTPStatus.OK, content_type='application/json')
+                    return StandardResponse.success(
+                        data=formatted,
+                        message='CSV file uploaded and analyzed successfully'
+                    )
                 except Exception as e:
-                    return Response(
-                        {'error': f'Error processing CSV file: {str(e)}'},
-                        status=HTTPStatus.BAD_REQUEST
+                    return StandardResponse.error(
+                        title='CSV Processing Error',
+                        detail=f'Error processing CSV file: {str(e)}',
+                        status_code=400,
+                        error_type='csv-processing-error',
+                        instance=request.path
                     )
             
             else:
-                return Response(
-                    {'error': 'Unsupported file type. Please upload a JSON or CSV file.'},
-                    status=HTTPStatus.BAD_REQUEST
+                return StandardResponse.validation_error(
+                    detail='Unsupported file type. Please upload a JSON or CSV file.',
+                    errors=[{"field": "file", "message": "Only JSON and CSV files are supported."}],
+                    instance=request.path
                 )
         
         except Exception as e:
-            return Response(
-                {'error': f'Server error: {str(e)}'},
-                status=HTTPStatus.INTERNAL_SERVER_ERROR
+            return StandardResponse.internal_server_error(
+                detail=f'Server error: {str(e)}',
+                instance=request.path
             )

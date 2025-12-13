@@ -177,10 +177,13 @@ export const UserStoryList = ({
   // Set user stories or deep analysis data when component mounts or data changes
   useEffect(() => {
     console.log('🔍 UserStoryList useEffect - userStories:', userStories);
+    console.log('🔍 UserStoryList useEffect - currentProjectUserStories:', currentProjectUserStories);
     
-    // Use userStories work items
+    // Use userStories work items (prioritize prop over Redux state)
     const workItemsToProcess = userStories && userStories.length > 0 
-      ? userStories[0]?.work_items // Use the first (most recent) user story
+      ? userStories[0]?.work_items // Use the first (most recent) user story from props
+      : currentProjectUserStories && currentProjectUserStories.length > 0
+      ? currentProjectUserStories[0]?.work_items // Fallback to Redux state
       : [];
     
     console.log('🔍 UserStoryList useEffect - work_items:', workItemsToProcess);
@@ -211,7 +214,7 @@ export const UserStoryList = ({
         dispatch(addActionItem(actionItem));
       });
     }
-  }, [userStories, dispatch, platform]);
+  }, [userStories, currentProjectUserStories, dispatch, platform]);
 
   const handleActionSelect = (actionId: string) => {
     // Check if this work item has already been submitted
@@ -659,10 +662,17 @@ export const UserStoryList = ({
   };
 
   console.log('🔍 UserStoryList render - features.length:', features.length, 'actionItems.length:', actionItems.length);
+  console.log('🔍 UserStoryList render - userStories:', userStories);
+  console.log('🔍 UserStoryList render - currentProjectUserStories:', currentProjectUserStories);
   console.log('🔍 UserStoryList render - features:', features);
   console.log('🔍 UserStoryList render - actionItems:', actionItems);
   
-  if (features.length === 0 && actionItems.length === 0) {
+  // Check if there are any user stories available (from props, Redux state, features, or action items)
+  const hasUserStories = (userStories && userStories.length > 0) || 
+                        (currentProjectUserStories && currentProjectUserStories.length > 0);
+  const hasWorkItems = features.length > 0 || actionItems.length > 0;
+  
+  if (!hasUserStories && !hasWorkItems) {
     return (
       <div className="text-center py-8">
         <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">

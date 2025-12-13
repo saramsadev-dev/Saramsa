@@ -51,7 +51,7 @@ export const fetchProjects = createAsyncThunk(
   async () => {
     const response = await apiRequest('get', '/integrations/projects/', undefined, true);
     if (response.data.success) {
-      return response.data.projects;
+      return response.data.data.projects;
     } else {
       throw new Error(response.data.error || 'Failed to fetch projects');
     }
@@ -100,7 +100,7 @@ export const createProject = createAsyncThunk(
         return rejectWithValue(response.data.error || 'Failed to create project');
       }
       
-      return response.data.project;
+      return response.data.data.project;
     } catch (error: any) {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create project';
       return rejectWithValue(errorMessage);
@@ -125,7 +125,7 @@ export const importProjectFromExternal = createAsyncThunk(
     // First check if project already exists with this external link
     const checkResponse = await apiRequest('get', `/integrations/projects/check-external/?provider=${data.provider}&externalId=${data.externalProject.id}`, undefined, true);
     
-    if (checkResponse.data.exists) {
+    if (checkResponse.data.data.exists) {
       throw new Error(`Project "${data.externalProject.name}" is already imported`);
     }
     
@@ -157,7 +157,7 @@ export const importProjectFromExternal = createAsyncThunk(
     }
     
     const response = await apiRequest('post', '/integrations/projects/create/', createData, true);
-    return response.data.project;
+    return response.data.data.project;
   }
 );
 
@@ -170,7 +170,7 @@ export const updateProject = createAsyncThunk(
     }, true);
     
     if (response.data.success) {
-      return response.data.project;
+      return response.data.data.project;
     } else {
       throw new Error(response.data.error || 'Failed to update project');
     }
@@ -212,7 +212,7 @@ export const createProjectLegacy = createAsyncThunk(
       ...data.metadata,
     }, true);
     
-    const project = response.data.project;
+    const project = response.data.data.project;
     
     // Transform to our Project interface
     return {

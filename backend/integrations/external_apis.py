@@ -12,17 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_jira_domain(domain: str) -> str:
-    """Normalize Jira domain to remove duplicate .atlassian.net suffixes."""
-    # Remove any existing .atlassian.net suffix
+    """Normalize Jira domain to ensure it has the correct format."""
+    # Remove https:// if present
+    domain = domain.replace('https://', '').replace('http://', '')
+    
+    # If domain already ends with .atlassian.net, return as is
     if domain.endswith('.atlassian.net'):
-        return domain.replace('.atlassian.net', '')
-    return domain
+        return domain
+    
+    # If it's just the subdomain, add .atlassian.net
+    return f"{domain}.atlassian.net"
 
 
 def build_jira_url(domain: str, path: str) -> str:
     """Build a proper Jira URL."""
     normalized_domain = normalize_jira_domain(domain)
-    return f"https://{normalized_domain}.atlassian.net{path}"
+    return f"https://{normalized_domain}{path}"
 
 
 def test_azure_connection(organization: str, pat_token: str) -> Dict[str, Any]:
@@ -198,11 +203,18 @@ def fetch_jira_projects(domain: str, email: str, api_token: str) -> List[Dict[st
         
         # Get projects
         url = build_jira_url(domain, "/rest/api/3/project")
+        logger.info(f"Fetching Jira projects from: {url}")
         
         response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
+        logger.info(f"Jira API response status: {response.status_code}")
+        
+        if response.status_code != 200:
+            logger.error(f"Jira API error: {response.status_code} - {response.text[:500]}")
+            response.raise_for_status()
         
         data = response.json()
+        logger.info(f"Received {len(data)} projects from Jira")
+        
         projects = []
         
         for project in data:
@@ -217,6 +229,9 @@ def fetch_jira_projects(domain: str, email: str, api_token: str) -> List[Dict[st
         
         return projects
         
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error fetching Jira projects: {e}")
+        raise Exception(f"Failed to connect to Jira: {str(e)}")
     except Exception as e:
         logger.error(f"Error fetching Jira projects: {e}")
-        raise
+        raise Exception(f"Failed to fetch Jira projects: {str(e)}")

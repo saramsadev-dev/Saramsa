@@ -11,6 +11,7 @@ from django.conf import settings
 from authapp.permissions import IsAdminOrUser, NoAuthentication
 from aiCore.cosmos_service import cosmos_service
 from integrations.service import integrations_service
+from apis.response import StandardResponse
 
 # Get Azure DevOps settings from environment
 org = settings.AZURE_DEVOPS_ORGANIZATION
@@ -31,28 +32,33 @@ class AzureDevOpsConfigView(APIView):
         try:
             user_id = getattr(request.user, 'id', None)
             if not user_id:
-                return Response(
-                    {"success": False, "error": "Unauthorized"}, status=401
+                return StandardResponse.unauthorized(
+                    detail="Authentication required",
+                    instance=request.path
                 )
 
             # Get Azure integration account
             account = integrations_service.get_integration_account_by_provider(user_id, 'azure')
             
             if account:
-                payload = {
-                    "success": True,
-                    "organization": account['metadata']['organization'],
-                    "has_token": True,  # Don't expose actual token
-                    "saved_at": account.get('savedAt'),
-                }
-                return Response(payload, status=200)
+                return StandardResponse.success(
+                    data={
+                        "organization": account['metadata']['organization'],
+                        "has_token": True,  # Don't expose actual token
+                        "saved_at": account.get('savedAt'),
+                    },
+                    message="Azure DevOps configuration retrieved successfully"
+                )
 
-            return Response({
-                "success": False,
-                "error": "No Azure DevOps integration found",
-            }, status=404)
+            return StandardResponse.not_found(
+                detail="No Azure DevOps integration found",
+                instance=request.path
+            )
         except Exception as e:  # noqa: BLE001
-            return Response({"success": False, "error": str(e)}, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 
     def post(self, request):
@@ -68,9 +74,14 @@ class AzureDevOpsConfigView(APIView):
               f"{pat_token[:10]}..." if pat_token else "No PAT token")
 
         if not organization or not pat_token:
-            return Response({
-                "error": "Both organization and pat_token are required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="Both organization and pat_token are required",
+                errors=[
+                    {"field": "organization", "message": "This field is required."} if not organization else None,
+                    {"field": "pat_token", "message": "This field is required."} if not pat_token else None
+                ],
+                instance=request.path
+            )
 
         # Create basic auth header
         auth_token = base64.b64encode(
@@ -149,11 +160,13 @@ class AzureDevOpsConfigView(APIView):
                                 print(f"Azure integration already exists for user {user_id}")
                     except Exception as e:
                         print(f"Warning: failed to create integration account: {e}")
-                    return Response({
-                        "success": True,
-                        "projects": transformed_projects,
-                        "organization": organization
-                    })
+                    return StandardResponse.success(
+                        data={
+                            "projects": transformed_projects,
+                            "organization": organization
+                        },
+                        message="Azure DevOps projects retrieved successfully"
+                    )
                 else:
                     error_message = "Failed to connect to Azure DevOps"
                     try:
@@ -163,16 +176,18 @@ class AzureDevOpsConfigView(APIView):
                     except Exception:
                         pass
                     
-                    return Response({
-                        "success": False,
-                        "error": error_message
-                    }, status=response.status_code)
+                    return StandardResponse.error(
+                        title="Azure DevOps Connection Failed",
+                        detail=error_message,
+                        status_code=response.status_code,
+                        instance=request.path
+                    )
                     
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": f"Connection error: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Connection error: {str(e)}",
+                instance=request.path
+            )
 
 
 class CreateAzureWorkItemView(APIView):
@@ -192,9 +207,11 @@ class CreateAzureWorkItemView(APIView):
 
         work_items = request.data.get("items", [])
         if not isinstance(work_items, list) or not work_items:
-            return Response({
-                "error": "Payload must contain a non-empty list under 'items'"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="Payload must contain a non-empty list under 'items'",
+                errors=[{"field": "items", "message": "This field must be a non-empty list."}],
+                instance=request.path
+            )
 
         # Get Azure DevOps configuration from request, project config, or use defaults
         organization = request.data.get("organization", org)
@@ -217,11 +234,15 @@ class CreateAzureWorkItemView(APIView):
 
         # Validate required configuration
         if not organization or not project_name or not pat_token:
-            return Response({
-                "error": ("Azure DevOps configuration is incomplete. "
-                          "Please provide organization, project, and "
-                          "pat_token.")
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="Azure DevOps configuration is incomplete. Please provide organization, project, and pat_token.",
+                errors=[
+                    {"field": "organization", "message": "This field is required."} if not organization else None,
+                    {"field": "project", "message": "This field is required."} if not project_name else None,
+                    {"field": "pat_token", "message": "This field is required."} if not pat_token else None
+                ],
+                instance=request.path
+            )
 
         # Encode PAT token for authentication
         auth_token = base64.b64encode(f":{pat_token}".encode()).decode()
@@ -354,15 +375,19 @@ class CreateAzureWorkItemView(APIView):
         except Exception as e:
             print(f"Error saving work item to Cosmos DB: {e}")
 
-        return Response({
-            "results": results,
-            "work_item_batch_id": work_item_id,
-            "summary": {
-                "total_requested": len(work_items),
-                "successful": len([r for r in results if r.get('success')]),
-                "failed": len([r for r in results if not r.get('success')])
-            }
-        }, status=207)
+        return StandardResponse.success(
+            data={
+                "results": results,
+                "work_item_batch_id": work_item_id,
+                "summary": {
+                    "total_requested": len(work_items),
+                    "successful": len([r for r in results if r.get('success')]),
+                    "failed": len([r for r in results if not r.get('success')])
+                }
+            },
+            message="Work items creation completed",
+            status_code=207
+        )
 
 
 class ListAzureWorkItemTypes(APIView):
@@ -376,10 +401,15 @@ class ListAzureWorkItemTypes(APIView):
         pat_token = request.GET.get("pat_token", pat)
         
         if not organization or not project_name or not pat_token:
-            return Response({
-                "error": "Azure DevOps configuration is incomplete. "
-                         "Please provide organization, project, and pat_token."
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="Azure DevOps configuration is incomplete. Please provide organization, project, and pat_token.",
+                errors=[
+                    {"field": "organization", "message": "This field is required."} if not organization else None,
+                    {"field": "project", "message": "This field is required."} if not project_name else None,
+                    {"field": "pat_token", "message": "This field is required."} if not pat_token else None
+                ],
+                instance=request.path
+            )
         
         print(f"Project: {project_name}, Org: {organization}")
         url = (f"https://dev.azure.com/{organization}/{project_name}/"
@@ -399,13 +429,22 @@ class ListAzureWorkItemTypes(APIView):
             print(f"Response text: {response.text}")
             
             if response.status_code in [200, 201]:
-                return Response(response.json(), status=response.status_code)
+                return StandardResponse.success(
+                    data=response.json(),
+                    message="Work item types retrieved successfully"
+                )
             else:
-                return Response({
-                    "error": response.text
-                }, status=response.status_code)
+                return StandardResponse.error(
+                    title="Failed to fetch work item types",
+                    detail=response.text,
+                    status_code=response.status_code,
+                    instance=request.path
+                )
         except Exception as e:
-            return Response({"error": str(e)}, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 class WorkItemsListView(APIView):
     """Get all work items from Cosmos DB"""
@@ -416,14 +455,18 @@ class WorkItemsListView(APIView):
             # Get all work items from Cosmos DB
             work_items = cosmos_service.query_items("work_items", "SELECT * FROM c WHERE c.type = 'work_item' ORDER BY c.creation_date DESC")
             
-            return Response({
-                "work_items": work_items,
-                "count": len(work_items)
-            }, status=200)
+            return StandardResponse.success(
+                data={
+                    "work_items": work_items,
+                    "count": len(work_items)
+                },
+                message="Work items retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch work items: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch work items: {str(e)}",
+                instance=request.path
+            )
 
 class WorkItemDetailView(APIView):
     """Get specific work item by ID from Cosmos DB"""
@@ -433,15 +476,20 @@ class WorkItemDetailView(APIView):
         try:
             work_item_data = cosmos_service.get_work_item(work_item_id)
             if not work_item_data:
-                return Response({
-                    "error": "Work item not found"
-                }, status=404)
+                return StandardResponse.not_found(
+                    detail="Work item not found",
+                    instance=request.path
+                )
             
-            return Response(work_item_data, status=200)
+            return StandardResponse.success(
+                data=work_item_data,
+                message="Work item retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch work item: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch work item: {str(e)}",
+                instance=request.path
+            )
 
 class WorkItemsByPlatformView(APIView):
     """Get work items by platform (azure_devops, jira)"""
@@ -456,15 +504,19 @@ class WorkItemsByPlatformView(APIView):
                 [{"name": "@platform", "value": platform}]
             )
             
-            return Response({
-                "work_items": work_items,
-                "count": len(work_items),
-                "platform": platform
-            }, status=200)
+            return StandardResponse.success(
+                data={
+                    "work_items": work_items,
+                    "count": len(work_items),
+                    "platform": platform
+                },
+                message="Work items retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch work items: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch work items: {str(e)}",
+                instance=request.path
+            )
 
 
 class AzureDevOpsProjectsView(APIView):
@@ -497,10 +549,14 @@ class AzureDevOpsProjectsView(APIView):
         print(f"Azure DevOps Config - PAT Token: {pat_token[:10] + '...' if pat_token else 'None'}")
         
         if not organization or not pat_token:
-            return Response({
-                "success": False,
-                "error": "Organization and pat_token are required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="Organization and pat_token are required",
+                errors=[
+                    {"field": "organization", "message": "This field is required."} if not organization else None,
+                    {"field": "pat_token", "message": "This field is required."} if not pat_token else None
+                ],
+                instance=request.path
+            )
         
         return await self._fetch_projects(request, organization, pat_token)
     
@@ -577,11 +633,13 @@ class AzureDevOpsProjectsView(APIView):
                             "templateName": id_to_template.get(project.get("id"))
                         })
                     
-                    return Response({
-                        "success": True,
-                        "projects": transformed_projects,
-                        "organization": organization
-                    })
+                    return StandardResponse.success(
+                        data={
+                            "projects": transformed_projects,
+                            "organization": organization
+                        },
+                        message="Azure DevOps projects retrieved successfully"
+                    )
                 else:
                     error_message = "Failed to connect to Azure DevOps"
                     try:
@@ -593,15 +651,17 @@ class AzureDevOpsProjectsView(APIView):
                     except Exception:
                         pass
                     
-                    return Response({
-                        "success": False,
-                        "error": error_message
-                    }, status=resp.status_code)
+                    return StandardResponse.error(
+                        title="Azure DevOps Connection Failed",
+                        detail=error_message,
+                        status_code=resp.status_code,
+                        instance=request.path
+                    )
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": str(e)
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 
 class AzureDevOpsProjectCreationView(APIView):
@@ -614,7 +674,10 @@ class AzureDevOpsProjectCreationView(APIView):
             # Get user from request
             user = request.user
             if not user or not user.is_authenticated:
-                return Response({'error': 'User not found'}, status=status.HTTP_401_UNAUTHORIZED)
+                return StandardResponse.unauthorized(
+                    detail="Authentication required",
+                    instance=request.path
+                )
             
             # Extract project data from request
             project_name = request.data.get('project_name')
@@ -625,9 +688,10 @@ class AzureDevOpsProjectCreationView(APIView):
             azure_process_template = request.data.get('azure_process_template')
             
             if not all([project_name, azure_project_id, azure_project_name, azure_organization, azure_pat_token]):
-                return Response({
-                    'error': 'Missing required fields: project_name, azure_project_id, azure_project_name, azure_organization, azure_pat_token'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return StandardResponse.validation_error(
+                    detail='Missing required fields: project_name, azure_project_id, azure_project_name, azure_organization, azure_pat_token',
+                    instance=request.path
+                )
             
             # Create project data structure
             project_id = str(uuid.uuid4())
@@ -658,23 +722,30 @@ class AzureDevOpsProjectCreationView(APIView):
             # Save project to Cosmos DB
             saved_project = cosmos_service.save_project(project_data)
             if not saved_project:
-                return Response({'error': 'Failed to save project'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return StandardResponse.internal_server_error(
+                    detail='Failed to save project',
+                    instance=request.path
+                )
             
-            return Response({
-                'success': True,
-                'project': {
+            return StandardResponse.created(
+                data={
                     'id': project_id,
                     'name': project_name,
                     'platform': 'azure_devops',
                     'azure_project_id': azure_project_id,
                     'azure_project_name': azure_project_name,
                     'created_at': project_data['created_at']
-                }
-            }, status=status.HTTP_201_CREATED)
+                },
+                message='Azure DevOps project created successfully',
+                instance=f"/api/projects/{project_id}"
+            )
             
         except Exception as e:
             print(f"Error creating Azure DevOps project: {e}")
-            return Response({'error': f'Project creation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f'Project creation failed: {str(e)}',
+                instance=request.path
+            )
 
 
 class AzureDevOpsWorkItemTypesView(APIView):
@@ -687,9 +758,11 @@ class AzureDevOpsWorkItemTypesView(APIView):
     async def handle_get(self, request):
         project_id = request.query_params.get('projectId')
         if not project_id:
-            return Response({
-                "error": "projectId parameter is required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="projectId parameter is required",
+                errors=[{"field": "projectId", "message": "This parameter is required."}],
+                instance=request.path
+            )
 
         # Prefer project-scoped Azure config if present
         organization = org
@@ -734,21 +807,22 @@ class AzureDevOpsWorkItemTypesView(APIView):
                         }
                         enhanced_work_item_types.append(enhanced_wit)
                     
-                    return Response({
-                        "success": True,
-                        "work_item_types": enhanced_work_item_types
-                    })
+                    return StandardResponse.success(
+                        data={"work_item_types": enhanced_work_item_types},
+                        message="Work item types retrieved successfully"
+                    )
                 else:
-                    return Response({
-                        "success": False,
-                        "error": f"Failed to fetch work item types: {resp.status_code}",
-                        "details": await resp.aread()
-                    }, status=resp.status_code)
+                    return StandardResponse.error(
+                        title="Failed to fetch work item types",
+                        detail=f"Failed to fetch work item types: {resp.status_code}",
+                        status_code=resp.status_code,
+                        instance=request.path
+                    )
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": str(e)
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 
 class AzureDevOpsProjectMetadataView(APIView):
@@ -761,9 +835,11 @@ class AzureDevOpsProjectMetadataView(APIView):
     async def handle_get(self, request):
         project_id = request.query_params.get('projectId')
         if not project_id:
-            return Response({
-                "error": "projectId parameter is required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="projectId parameter is required",
+                errors=[{"field": "projectId", "message": "This parameter is required."}],
+                instance=request.path
+            )
 
         # Prefer project-scoped Azure config if present
         organization = org
@@ -838,22 +914,22 @@ class AzureDevOpsProjectMetadataView(APIView):
                         'available_work_item_type_names': [wit['name'] for wit in valid_work_item_types]
                     }
                     
-                    return Response({
-                        "success": True,
-                        "metadata": metadata
-                    })
+                    return StandardResponse.success(
+                        data={"metadata": metadata},
+                        message="Project metadata retrieved successfully"
+                    )
                 else:
-                    return Response({
-                        "success": False,
-                        "error": f"Failed to fetch project metadata",
-                        "project_status": project_resp.status_code,
-                        "work_item_types_status": work_item_types_resp.status_code
-                    }, status=400)
+                    return StandardResponse.error(
+                        title="Failed to fetch project metadata",
+                        detail=f"Failed to fetch project metadata. Project status: {project_resp.status_code}, Work item types status: {work_item_types_resp.status_code}",
+                        status_code=400,
+                        instance=request.path
+                    )
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": str(e)
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 
 class AzureDevOpsProjectsListView(APIView):
@@ -865,14 +941,18 @@ class AzureDevOpsProjectsListView(APIView):
             # Get all Azure DevOps projects from Cosmos DB
             projects = cosmos_service.query_items("projects", "SELECT * FROM c WHERE c.type = 'project' AND c.platform = 'azure_devops' ORDER BY c.created_at DESC")
             
-            return Response({
-                "projects": projects,
-                "count": len(projects)
-            }, status=200)
+            return StandardResponse.success(
+                data={
+                    "projects": projects,
+                    "count": len(projects)
+                },
+                message="Azure DevOps projects retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Azure DevOps projects: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Azure DevOps projects: {str(e)}",
+                instance=request.path
+            )
 
 
 class AzureDevOpsProjectDetailView(APIView):
@@ -891,15 +971,20 @@ class AzureDevOpsProjectDetailView(APIView):
             )
             
             if not project_data:
-                return Response({
-                    "error": "Azure DevOps project not found"
-                }, status=404)
+                return StandardResponse.not_found(
+                    detail="Azure DevOps project not found",
+                    instance=request.path
+                )
             
-            return Response(project_data[0], status=200)
+            return StandardResponse.success(
+                data=project_data[0],
+                message="Azure DevOps project retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Azure DevOps project: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Azure DevOps project: {str(e)}",
+                instance=request.path
+            )
 
 
 class AzureDevOpsWorkItemsListView(APIView):
@@ -911,14 +996,18 @@ class AzureDevOpsWorkItemsListView(APIView):
             # Get all Azure DevOps work items from Cosmos DB
             work_items = cosmos_service.query_items("work_items", "SELECT * FROM c WHERE c.type = 'work_item' AND c.platform = 'azure_devops' ORDER BY c.creation_date DESC")
             
-            return Response({
-                "work_items": work_items,
-                "count": len(work_items)
-            }, status=200)
+            return StandardResponse.success(
+                data={
+                    "work_items": work_items,
+                    "count": len(work_items)
+                },
+                message="Azure DevOps work items retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Azure DevOps work items: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Azure DevOps work items: {str(e)}",
+                instance=request.path
+            )
 
 
 class AzureDevOpsWorkItemDetailView(APIView):
@@ -929,12 +1018,17 @@ class AzureDevOpsWorkItemDetailView(APIView):
         try:
             work_item_data = cosmos_service.get_work_item(work_item_id)
             if not work_item_data or work_item_data.get('platform') != 'azure_devops':
-                return Response({
-                    "error": "Azure DevOps work item not found"
-                }, status=404)
+                return StandardResponse.not_found(
+                    detail="Azure DevOps work item not found",
+                    instance=request.path
+                )
             
-            return Response(work_item_data, status=200)
+            return StandardResponse.success(
+                data=work_item_data,
+                message="Azure DevOps work item retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Azure DevOps work item: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Azure DevOps work item: {str(e)}",
+                instance=request.path
+            )

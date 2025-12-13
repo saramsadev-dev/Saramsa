@@ -77,7 +77,8 @@ export const getLatestAnalysis = createAsyncThunk<
 >('analysis/getLatestAnalysis', async (projectId, { rejectWithValue }) => {
   try {
     const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, undefined, true);
-    return response.data;
+    // StandardResponse format: response.data.data contains the actual data
+    return response.data.data;
   } catch (err: any) {
     let errorMessage = 'Failed to load latest analysis.';
     if (err.response?.status === 401) {
@@ -102,7 +103,7 @@ export const getConsolidatedDashboardData = createAsyncThunk<
   try {
     // This single call now returns: analysis + user stories + comments + submission status
     const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, undefined, true);
-    return response.data;
+    return response.data.data;
   } catch (err: any) {
     let errorMessage = 'Failed to load dashboard data.';
     if (err.response?.status === 401) {
@@ -312,10 +313,6 @@ const analysisSlice = createSlice({
           state.loadedComments = null;
           state.projectContext = null;
         } else {
-          // Extract and set analysis data if available
-          state.analysisData = action.payload.analysis;
-          
-          // Extract and set comments if available
           if (action.payload.analysis.comments) {
             state.loadedComments = action.payload.analysis.comments.comments || [];
           }

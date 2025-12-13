@@ -11,6 +11,7 @@ from aiCore.cosmos_service import cosmos_service
 from integrations.service import integrations_service
 from rest_framework.permissions import IsAuthenticated
 from authapp.permissions import NoAuthentication, IsAdminOrUser
+from apis.response import StandardResponse
 
 
 
@@ -41,29 +42,34 @@ class JiraConfigView(APIView):
         try:
             user_id = getattr(request.user, 'id', None)
             if not user_id:
-                return Response(
-                    {"success": False, "error": "Unauthorized"}, status=401
+                return StandardResponse.unauthorized(
+                    detail="Authentication required",
+                    instance=request.path
                 )
 
             # Get Jira integration account
             account = integrations_service.get_integration_account_by_provider(user_id, 'jira')
             
             if account:
-                payload = {
-                    "success": True,
-                    "domain": account['metadata']['domain'],
-                    "email": account['metadata']['email'],
-                    "has_token": True,  # Don't expose actual token
-                    "saved_at": account.get('savedAt'),
-                }
-                return Response(payload, status=200)
+                return StandardResponse.success(
+                    data={
+                        "domain": account['metadata']['domain'],
+                        "email": account['metadata']['email'],
+                        "has_token": True,  # Don't expose actual token
+                        "saved_at": account.get('savedAt'),
+                    },
+                    message="Jira configuration retrieved successfully"
+                )
 
-            return Response({
-                "success": False,
-                "error": "No Jira integration found",
-            }, status=404)
+            return StandardResponse.not_found(
+                detail="No Jira integration found",
+                instance=request.path
+            )
         except Exception as e:
-            return Response({"success": False, "error": str(e)}, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
     def post(self, request):
         return asyncio.run(self.handle_post(request))
@@ -80,9 +86,15 @@ class JiraConfigView(APIView):
               f"{api_token[:10]}..." if api_token else "No API token")
 
         if not domain or not email or not api_token:
-            return Response({
-                "error": "Domain, email, and api_token are all required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="Domain, email, and api_token are all required",
+                errors=[
+                    {"field": "domain", "message": "This field is required."} if not domain else None,
+                    {"field": "email", "message": "This field is required."} if not email else None,
+                    {"field": "api_token", "message": "This field is required."} if not api_token else None
+                ],
+                instance=request.path
+            )
 
         # Create basic auth header
         auth_token = base64.b64encode(
@@ -139,11 +151,13 @@ class JiraConfigView(APIView):
                     except Exception as e:
                         print(f"Warning: failed to create integration account: {e}")
                     
-                    return Response({
-                        "success": True,
-                        "projects": transformed_projects,
-                        "domain": domain
-                    })
+                    return StandardResponse.success(
+                        data={
+                            "projects": transformed_projects,
+                            "domain": domain
+                        },
+                        message="Jira projects retrieved successfully"
+                    )
                 else:
                     error_message = "Failed to connect to Jira"
                     try:
@@ -155,16 +169,18 @@ class JiraConfigView(APIView):
                     except Exception:
                         pass
                     
-                    return Response({
-                        "success": False,
-                        "error": error_message
-                    }, status=response.status_code)
+                    return StandardResponse.error(
+                        title="Jira Connection Failed",
+                        detail=error_message,
+                        status_code=response.status_code,
+                        instance=request.path
+                    )
                     
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": f"Connection error: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Connection error: {str(e)}",
+                instance=request.path
+            )
 
 
 class JiraProjectCreationView(APIView):
@@ -176,7 +192,10 @@ class JiraProjectCreationView(APIView):
             # Get user from request
             user = request.user
             if not user or not user.is_authenticated:
-                return Response({'error': 'User not found'}, status=status.HTTP_401_UNAUTHORIZED)
+                return StandardResponse.unauthorized(
+                    detail="Authentication required",
+                    instance=request.path
+                )
             
             # Extract project data from request
             project_name = request.data.get('project_name')
@@ -188,9 +207,10 @@ class JiraProjectCreationView(APIView):
             jira_api_token = request.data.get('jira_api_token')
             
             if not all([project_name, jira_project_id, jira_project_key, jira_domain, jira_email, jira_api_token]):
-                return Response({
-                    'error': 'Missing required fields: project_name, jira_project_id, jira_project_key, jira_domain, jira_email, jira_api_token'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                return StandardResponse.validation_error(
+                    detail='Missing required fields: project_name, jira_project_id, jira_project_key, jira_domain, jira_email, jira_api_token',
+                    instance=request.path
+                )
             
             # Create project data structure
             project_id = str(uuid.uuid4())
@@ -223,23 +243,30 @@ class JiraProjectCreationView(APIView):
             # Save project to Cosmos DB
             saved_project = cosmos_service.save_project(project_data)
             if not saved_project:
-                return Response({'error': 'Failed to save project'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return StandardResponse.internal_server_error(
+                    detail='Failed to save project',
+                    instance=request.path
+                )
             
-            return Response({
-                'success': True,
-                'project': {
+            return StandardResponse.created(
+                data={
                     'id': project_id,
                     'name': project_name,
                     'platform': 'jira',
                     'jira_project_key': jira_project_key,
                     'jira_project_name': jira_project_name,
                     'created_at': project_data['created_at']
-                }
-            }, status=status.HTTP_201_CREATED)
+                },
+                message='Jira project created successfully',
+                instance=f"/api/projects/{project_id}"
+            )
             
         except Exception as e:
             print(f"Error creating Jira project: {e}")
-            return Response({'error': f'Project creation failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return StandardResponse.internal_server_error(
+                detail=f'Project creation failed: {str(e)}',
+                instance=request.path
+            )
 
 
 class JiraProjectsView(APIView):
@@ -295,21 +322,22 @@ class JiraProjectsView(APIView):
                         }
                         enhanced_projects.append(enhanced_project)
                     
-                    return Response({
-                        "success": True,
-                        "projects": enhanced_projects
-                    })
+                    return StandardResponse.success(
+                        data={"projects": enhanced_projects},
+                        message="Jira projects retrieved successfully"
+                    )
                 else:
-                    return Response({
-                        "success": False,
-                        "error": f"Failed to fetch projects: {resp.status_code}",
-                        "details": await resp.aread()
-                    }, status=resp.status_code)
+                    return StandardResponse.error(
+                        title="Failed to fetch projects",
+                        detail=f"Failed to fetch projects: {resp.status_code}",
+                        status_code=resp.status_code,
+                        instance=request.path
+                    )
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": str(e)
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 
 class JiraIssueTypesView(APIView):
@@ -321,9 +349,11 @@ class JiraIssueTypesView(APIView):
     async def handle_get(self, request):
         project_id = request.query_params.get('projectId')
         if not project_id:
-            return Response({
-                "error": "projectId parameter is required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="projectId parameter is required",
+                errors=[{"field": "projectId", "message": "This parameter is required."}],
+                instance=request.path
+            )
 
         # Prefer project-scoped Jira config if present
         email = settings.JIRA_EMAIL
@@ -368,21 +398,22 @@ class JiraIssueTypesView(APIView):
                             }
                             enhanced_issue_types.append(enhanced_issue_type)
                     
-                    return Response({
-                        "success": True,
-                        "issue_types": enhanced_issue_types
-                    })
+                    return StandardResponse.success(
+                        data={"issue_types": enhanced_issue_types},
+                        message="Issue types retrieved successfully"
+                    )
                 else:
-                    return Response({
-                        "success": False,
-                        "error": f"Failed to fetch issue types: {resp.status_code}",
-                        "details": await resp.aread()
-                    }, status=resp.status_code)
+                    return StandardResponse.error(
+                        title="Failed to fetch issue types",
+                        detail=f"Failed to fetch issue types: {resp.status_code}",
+                        status_code=resp.status_code,
+                        instance=request.path
+                    )
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": str(e)
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 
 class JiraProjectMetadataView(APIView):
@@ -394,9 +425,11 @@ class JiraProjectMetadataView(APIView):
     async def handle_get(self, request):
         project_id = request.query_params.get('projectId')
         if not project_id:
-            return Response({
-                "error": "projectId parameter is required"
-            }, status=400)
+            return StandardResponse.validation_error(
+                detail="projectId parameter is required",
+                errors=[{"field": "projectId", "message": "This parameter is required."}],
+                instance=request.path
+            )
 
         # Prefer project-scoped Jira config if present
         email = settings.JIRA_EMAIL
@@ -461,22 +494,22 @@ class JiraProjectMetadataView(APIView):
                         'available_issue_type_names': [it['name'] for it in valid_issue_types]
                     }
                     
-                    return Response({
-                        "success": True,
-                        "metadata": metadata
-                    })
+                    return StandardResponse.success(
+                        data={"metadata": metadata},
+                        message="Project metadata retrieved successfully"
+                    )
                 else:
-                    return Response({
-                        "success": False,
-                        "error": f"Failed to fetch project metadata",
-                        "project_status": project_resp.status_code,
-                        "issue_types_status": issue_types_resp.status_code
-                    }, status=400)
+                    return StandardResponse.error(
+                        title="Failed to fetch project metadata",
+                        detail=f"Failed to fetch project metadata. Project status: {project_resp.status_code}, Issue types status: {issue_types_resp.status_code}",
+                        status_code=400,
+                        instance=request.path
+                    )
         except Exception as e:
-            return Response({
-                "success": False,
-                "error": str(e)
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=str(e),
+                instance=request.path
+            )
 
 
 class CreateJiraIssuesView(APIView):
@@ -495,10 +528,21 @@ class CreateJiraIssuesView(APIView):
         project_key = request.data.get("project_key")
         
         if not isinstance(issues, list) or not issues:
-            return Response({"error": "Payload must contain a non-empty list under 'items'"}, status=400)
+            return StandardResponse.validation_error(
+                detail="Payload must contain a non-empty list under 'items'",
+                errors=[{"field": "items", "message": "This field must be a non-empty list."}],
+                instance=request.path
+            )
 
         if not project_id and not project_key:
-            return Response({"error": "Either project_id or project_key is required"}, status=400)
+            return StandardResponse.validation_error(
+                detail="Either project_id or project_key is required",
+                errors=[
+                    {"field": "project_id", "message": "Either project_id or project_key is required."},
+                    {"field": "project_key", "message": "Either project_id or project_key is required."}
+                ],
+                instance=request.path
+            )
 
         # Prefer project-scoped Jira config if present
         email = settings.JIRA_EMAIL
@@ -634,15 +678,19 @@ class CreateJiraIssuesView(APIView):
         except Exception as e:
             print(f"Error saving work item to Cosmos DB: {e}")
 
-        return Response({
-            "results": results,
-            "work_item_batch_id": work_item_id,
-            "summary": {
-                "total_requested": len(issues),
-                "successful": len([r for r in results if r.get('success')]),
-                "failed": len([r for r in results if not r.get('success')])
-            }
-        }, status=207)
+        return StandardResponse.success(
+            data={
+                "results": results,
+                "work_item_batch_id": work_item_id,
+                "summary": {
+                    "total_requested": len(issues),
+                    "successful": len([r for r in results if r.get('success')]),
+                    "failed": len([r for r in results if not r.get('success')])
+                }
+            },
+            message="Issues creation completed",
+            status_code=207
+        )
 
 
 class JiraWorkItemsListView(APIView):
@@ -654,14 +702,18 @@ class JiraWorkItemsListView(APIView):
             # Get all Jira work items from Cosmos DB
             work_items = cosmos_service.query_items("work_items", "SELECT * FROM c WHERE c.type = 'work_item' AND c.platform = 'jira' ORDER BY c.creation_date DESC")
             
-            return Response({
-                "work_items": work_items,
-                "count": len(work_items)
-            }, status=200)
+            return StandardResponse.success(
+                data={
+                    "work_items": work_items,
+                    "count": len(work_items)
+                },
+                message="Jira work items retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Jira work items: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Jira work items: {str(e)}",
+                instance=request.path
+            )
 
 
 class JiraWorkItemDetailView(APIView):
@@ -672,15 +724,20 @@ class JiraWorkItemDetailView(APIView):
         try:
             work_item_data = cosmos_service.get_work_item(work_item_id)
             if not work_item_data or work_item_data.get('platform') != 'jira':
-                return Response({
-                    "error": "Jira work item not found"
-                }, status=404)
+                return StandardResponse.not_found(
+                    detail="Jira work item not found",
+                    instance=request.path
+                )
             
-            return Response(work_item_data, status=200)
+            return StandardResponse.success(
+                data=work_item_data,
+                message="Jira work item retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Jira work item: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Jira work item: {str(e)}",
+                instance=request.path
+            )
 
 
 class JiraProjectsListView(APIView):
@@ -692,14 +749,18 @@ class JiraProjectsListView(APIView):
             # Get all Jira projects from Cosmos DB
             projects = cosmos_service.query_items("projects", "SELECT * FROM c WHERE c.type = 'project' AND c.platform = 'jira' ORDER BY c.created_at DESC")
             
-            return Response({
-                "projects": projects,
-                "count": len(projects)
-            }, status=200)
+            return StandardResponse.success(
+                data={
+                    "projects": projects,
+                    "count": len(projects)
+                },
+                message="Jira projects retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Jira projects: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Jira projects: {str(e)}",
+                instance=request.path
+            )
 
 
 class JiraProjectDetailView(APIView):
@@ -718,13 +779,18 @@ class JiraProjectDetailView(APIView):
             )
             
             if not project_data:
-                return Response({
-                    "error": "Jira project not found"
-                }, status=404)
+                return StandardResponse.not_found(
+                    detail="Jira project not found",
+                    instance=request.path
+                )
             
-            return Response(project_data[0], status=200)
+            return StandardResponse.success(
+                data=project_data[0],
+                message="Jira project retrieved successfully"
+            )
         except Exception as e:
-            return Response({
-                "error": f"Failed to fetch Jira project: {str(e)}"
-            }, status=500)
+            return StandardResponse.internal_server_error(
+                detail=f"Failed to fetch Jira project: {str(e)}",
+                instance=request.path
+            )
 

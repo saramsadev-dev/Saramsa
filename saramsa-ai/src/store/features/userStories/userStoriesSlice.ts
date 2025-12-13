@@ -76,11 +76,19 @@ export const fetchUserStoriesByProject = createAsyncThunk<
       queryParams.user_id = params.userId;
     }
     
+    console.log('🔍 fetchUserStoriesByProject params:', params);
+    console.log('🔍 fetchUserStoriesByProject queryParams:', queryParams);
+    
     const response = await apiRequest('get', '/insights/user-stories/', queryParams, true);
+    console.log('🔍 fetchUserStoriesByProject response:', response);
+    console.log('🔍 fetchUserStoriesByProject response.data:', response.data);
+    console.log('🔍 fetchUserStoriesByProject response.data.data:', response.data.data);
+    console.log('🔍 fetchUserStoriesByProject user_stories:', response.data.data?.user_stories);
+    
     return {
-      userStories: response.data.user_stories || [],
+      userStories: response.data.data.user_stories || [],
       projectId: params.projectId,
-      userId: params.userId || response.data.user_id
+      userId: params.userId || response.data.data.user_id
     };
   } catch (err: any) {
     let errorMessage = 'Failed to load user stories.';
@@ -104,7 +112,7 @@ export const updateUserStory = createAsyncThunk<
   try {
     const response = await apiRequest('put', `/insights/user-stories/${params.userStoryId}/`, params.updatedData, true);
     return {
-      userStory: response.data.user_story,
+      userStory: response.data.data.user_story,
       userStoryId: params.userStoryId
     };
   } catch (err: any) {
@@ -165,8 +173,8 @@ export const fetchAllUserStories = createAsyncThunk<
 
     const response = await apiRequest('get', '/insights/user-stories/all/', queryParams, true);
     return {
-      userStories: response.data.user_stories || [],
-      userId: params.userId || response.data.user_id
+      userStories: response.data.data.user_stories || [],
+      userId: params.userId || response.data.data.user_id
     };
   } catch (err: any) {
     let errorMessage = 'Failed to load user stories.';
@@ -205,12 +213,12 @@ export const deleteUserStories = createAsyncThunk<
     }, true);
     
     const deletedIds = params.userStoryIds.filter((id) => 
-      !response.data.failed || !response.data.failed.some((f: any) => f.id === id)
+      !response.data.data.failed || !response.data.data.failed.some((f: any) => f.id === id)
     );
     
     return {
       deletedIds,
-      failedDeletions: response.data.failed || []
+      failedDeletions: response.data.data.failed || []
     };
   } catch (err: any) {
     let errorMessage = 'Failed to delete user stories.';
@@ -243,7 +251,7 @@ export const deleteWorkItems = createAsyncThunk<
     }, true);
     
     return {
-      deletedCount: response.data.deleted || 0,
+      deletedCount: response.data.data.deleted || 0,
       userStoryId: params.userStoryId
     };
   } catch (err: any) {

@@ -37,7 +37,7 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
 
   // Build a map of external project IDs to Saramsa projects
   const linkedProjects: { [key: string]: { id: string; name: string } } = {};
-  saramsaProjects.forEach(project => {
+  saramsaProjects?.forEach(project => {
     project.externalLinks?.forEach(link => {
       if (link.provider === 'azure') {
         linkedProjects[link.externalId] = { id: project.id, name: project.name };
@@ -111,7 +111,7 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
       }
       
       if (projectsResponse.data.success) {
-        setProjects(projectsResponse.data.projects);
+        setProjects(projectsResponse.data.data.projects || []);
         setError('');
       } else {
         setError(projectsResponse.data.error || 'Failed to fetch projects');
@@ -169,12 +169,12 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
         throw new Error(res.data.error || 'Failed to create project');
       }
       
-      const project = res.data.project;
+      const project = res.data.data.project;
       localStorage.setItem('project_id', project.id);
       localStorage.setItem('selected_project_name', selectedProjectData?.name || '');
       
       // Handle both new project creation and existing project navigation
-      if (res.data.already_exists) {
+      if (res.data.data.already_exists) {
         console.log('Project already exists, navigating to existing project');
       } else {
         console.log('Project created successfully, navigating to dashboard');

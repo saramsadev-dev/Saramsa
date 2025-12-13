@@ -49,7 +49,7 @@ export const fetchIntegrationAccounts = createAsyncThunk(
   'integrations/fetchAccounts',
   async () => {
     const response = await apiRequest('get', '/integrations/', undefined, true);
-    return response.data.accounts;
+    return response.data.data.accounts; // StandardResponse format
   }
 );
 
@@ -64,7 +64,7 @@ export const createIntegrationAccount = createAsyncThunk(
       credentials: data.credentials,
       metadata: data.metadata,
     }, true);
-    return response.data.account;
+    return response.data.data.account; // StandardResponse format
   }
 );
 
@@ -79,7 +79,7 @@ export const updateIntegrationAccount = createAsyncThunk(
       credentials: data.credentials,
       metadata: data.metadata,
     }, true);
-    return response.data.account;
+    return response.data.data.account; // StandardResponse format
   }
 );
 
@@ -95,7 +95,7 @@ export const testIntegrationConnection = createAsyncThunk(
   'integrations/testConnection',
   async (accountId: string) => {
     const response = await apiRequest('post', `/integrations/${accountId}/test`, undefined, true);
-    return { accountId, result: response.data };
+    return { accountId, result: response.data.data }; // StandardResponse format
   }
 );
 
@@ -103,8 +103,9 @@ export const fetchExternalProjects = createAsyncThunk(
   'integrations/fetchExternalProjects',
   async (data: { provider: 'azure' | 'jira'; accountId: string }) => {
     const response = await apiRequest('get', `/integrations/external/projects/?provider=${data.provider}&accountId=${data.accountId}`, undefined, true);
+    // StandardResponse format: response.data.data
     // Add provider information to each project for the UI
-    const projectsWithProvider = response.data.projects.map((project: any) => ({
+    const projectsWithProvider = response.data.data.projects.map((project: any) => ({
       ...project,
       provider: data.provider
     }));
@@ -122,9 +123,10 @@ export const createAzureIntegration = createAsyncThunk(
       pat_token: data.pat_token
     }, true);
     
+    // StandardResponse format: response.data.data
     if (response.data.success) {
       return {
-        id: response.data.account.id,
+        id: response.data.data.account.id,
         provider: 'azure' as const,
         displayName: `${data.organization} (Azure DevOps)`,
         status: 'active' as const,
@@ -136,7 +138,7 @@ export const createAzureIntegration = createAsyncThunk(
         savedAt: new Date().toISOString(),
       };
     } else {
-      throw new Error(response.data.error || 'Failed to connect to Azure DevOps');
+      throw new Error(response.data.detail || response.data.title || 'Failed to connect to Azure DevOps');
     }
   }
 );
@@ -151,9 +153,10 @@ export const createJiraIntegration = createAsyncThunk(
       api_token: data.api_token
     }, true);
     
+    // StandardResponse format: response.data.data
     if (response.data.success) {
       return {
-        id: response.data.account.id,
+        id: response.data.data.account.id,
         provider: 'jira' as const,
         displayName: `${data.domain} (Jira)`,
         status: 'active' as const,
@@ -166,7 +169,7 @@ export const createJiraIntegration = createAsyncThunk(
         savedAt: new Date().toISOString(),
       };
     } else {
-      throw new Error(response.data.error || 'Failed to connect to Jira');
+      throw new Error(response.data.detail || response.data.title || 'Failed to connect to Jira');
     }
   }
 );
@@ -176,10 +179,11 @@ export const fetchAzureProjects = createAsyncThunk(
   async (credentials: { organization: string; pat_token: string }) => {
     const response = await apiRequest('get', `/integrations/azure/projects/?organization=${encodeURIComponent(credentials.organization)}&pat_token=${encodeURIComponent(credentials.pat_token)}`, undefined, true);
     
+    // StandardResponse format: response.data.data
     if (response.data.success) {
-      return response.data.projects;
+      return response.data.data.projects;
     } else {
-      throw new Error(response.data.error || 'Failed to fetch Azure projects');
+      throw new Error(response.data.detail || response.data.title || 'Failed to fetch Azure projects');
     }
   }
 );
@@ -189,10 +193,11 @@ export const fetchJiraProjects = createAsyncThunk(
   async (credentials: { domain: string; email: string; api_token: string }) => {
     const response = await apiRequest('get', `/integrations/jira/projects/?domain=${encodeURIComponent(credentials.domain)}&email=${encodeURIComponent(credentials.email)}&api_token=${encodeURIComponent(credentials.api_token)}`, undefined, true);
     
+    // StandardResponse format: response.data.data
     if (response.data.success) {
-      return response.data.projects;
+      return response.data.data.projects;
     } else {
-      throw new Error(response.data.error || 'Failed to fetch Jira projects');
+      throw new Error(response.data.detail || response.data.title || 'Failed to fetch Jira projects');
     }
   }
 );

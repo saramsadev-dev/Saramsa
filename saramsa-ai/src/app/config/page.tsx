@@ -50,8 +50,8 @@ export default function ConfigPage() {
   };
 
   const handleSkipConfig = () => {
-    console.log('Skipping configuration, redirecting to dashboard...');
-    router.push('/dashboard');
+    console.log('Skipping configuration, redirecting to home...');
+    router.push('/');
   };
 
   // Show platform selection first
