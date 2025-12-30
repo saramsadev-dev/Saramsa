@@ -17,37 +17,31 @@ from authapp.permissions import IsAdmin, IsAdminOrUser
 from apis.usage_logging import log_token_usage
 from apis.response import StandardResponse
 import logging
+from .tasks import process_feedback_task
+from celery.result import AsyncResult
 
 app_logger = logging.getLogger("apis.app")
 
 class AnalyzeCommentsView(APIView):
     permission_classes = [IsAdminOrUser]
     
-    @async_to_sync
-    async def post(self, request):
-        print("📈 AnalyzeCommentsView called")
-        print("📦 Request data:", request.data)
+    def post(self, request):
+        print("📈 AnalyzeCommentsView called (Background Mode)")
         
         comments = request.data.get("comments")
         incoming_project_id = request.data.get("project_id")
 
-        print(f"💬 Comments count: {len(comments) if comments else 0}")
-        print(f"🆔 Project ID (incoming): {incoming_project_id}")
-
         if not comments or not isinstance(comments, list):
-            print("❌ Invalid comments data")
             return StandardResponse.validation_error(
                 detail="A list of comments is required.",
                 errors=[{"field": "comments", "message": "This field must be a list."}],
                 instance=request.path
             )
 
-        # Get file name and user info for later use
-        file_name = request.data.get("file_name", "uploaded_file")
+        # Get user info and project context
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
         
-        # Get company name from user profile for company-specific prompts
         company_name = None
         if hasattr(request, 'user') and request.user.is_authenticated:
             try:
@@ -57,238 +51,23 @@ class AnalyzeCommentsView(APIView):
             except Exception as e:
                 print(f"Warning: Could not get company_name for user: {e}")
 
-        project_id, project_document, is_draft_project = cosmos_service.ensure_project_context(
+        project_id, _, _ = cosmos_service.ensure_project_context(
             incoming_project_id,
             user_id_str,
         )
-        storage_project_id = project_id
-        is_personal_analysis = is_draft_project
-        project_status = project_document.get("status", "draft" if is_personal_analysis else "active")
-        project_config_state = project_document.get("config_state", "unconfigured" if is_personal_analysis else "complete")
         
-        try:
-            prompt = getSentAnalysisPrompt(company_name=company_name)
-            feedback_block = "\n".join([str(c) for c in comments])
-            prompt_filled = prompt.replace("<feedback_data>", feedback_block)
-            result = await generate_completions(prompt_filled)
+        # Trigger background task
+        task = process_feedback_task.delay(comments, company_name, user_id_str, project_id)
+        
+        return StandardResponse.success(
+            data={
+                "task_id": task.id,
+                "message": "Analysis started in background.",
+                "status": "processing"
+            },
+            status=status.HTTP_202_ACCEPTED
+        )
 
-            # Normalize the LLM output into the expected schema
-            try:
-                parsed = json.loads(result) if isinstance(result, str) else (result or {})
-            except Exception:
-                parsed = {}
-
-            sentiments = parsed.get('sentimentsummary') or parsed.get('sentiment_summary') or {}
-            counts = parsed.get('counts') or {}
-            features_input = parsed.get('feature_asba') or parsed.get('featureasba') or []
-            pos_keys = parsed.get('positive_keywords') or parsed.get('positivekeywords') or []
-            neg_keys = parsed.get('negative_keywords') or parsed.get('negativekeywords') or []
-
-            def to_num(v):
-                try:
-                    return float(v)
-                except Exception:
-                    try:
-                        return int(v)
-                    except Exception:
-                        return 0
-
-            features_norm = []
-            for f in features_input:
-                if not isinstance(f, dict):
-                    continue
-                name = f.get('feature') or f.get('name')
-                if not name:
-                    continue
-                sent = f.get('sentiment') or {}
-                features_norm.append({
-                    'name': name,
-                    'description': f.get('description') or '',
-                    'sentiment': {
-                        'positive': to_num(sent.get('positive')),
-                        'negative': to_num(sent.get('negative')),
-                        'neutral': to_num(sent.get('neutral')),
-                    },
-                    'keywords': f.get('keywords') or [],
-                    'comment_count': to_num(f.get('comment_count') or f.get('commentcount') or 0)
-                })
-
-            normalized = {
-                'overall': {
-                    'positive': to_num(sentiments.get('positive')),
-                    'negative': to_num(sentiments.get('negative')),
-                    'neutral': to_num(sentiments.get('neutral')),
-                },
-                'counts': {
-                    'total': to_num(counts.get('total')),
-                    'positive': to_num(counts.get('positive')),
-                    'negative': to_num(counts.get('negative')),
-                    'neutral': to_num(counts.get('neutral')),
-                },
-                'features': features_norm,
-                'positive_keywords': pos_keys,
-                'negative_keywords': neg_keys,
-            }
-            # If token usage was captured by the LLM layer, a token_usage event will exist.
-            # Log a high-level custom event for this API.
-            try:
-                app_logger.info(
-                    "analysis_generated",
-                    extra={
-                        "event": "analysis_generated",
-                        "analysis_type": "sentiment_analysis",
-                        "comments_count": len(comments),
-                    },
-                )
-            except Exception:
-                pass
-            
-            # Create insight data for Cosmos DB
-            insight_id = str(uuid.uuid4())
-            insight_data = {
-                'id': f'insight_{insight_id}',
-                'type': 'insight',
-                'analysis_type': 'sentiment_analysis',
-                'comments_count': len(comments),
-                'analysis_date': datetime.now().isoformat(),
-                # Save normalized for fast retrieval
-                **normalized,
-                # Keep raw for traceability
-                'raw_llm': {
-                    'comment': result,
-                },
-                'metadata': {
-                    'source': 'api_request',
-                    'user_id': request.user.id if request.user.is_authenticated else None,
-                    'request_timestamp': datetime.now().isoformat(),
-                    'is_personal': is_personal_analysis,
-                },
-                'projectId': storage_project_id,
-                'is_personal': is_personal_analysis,
-                'userId': user_id_str,
-            }
-            
-            # Save to analysis container
-            try:
-                saved_analysis = cosmos_service.save_analysis_data(insight_data)
-                if saved_analysis:
-                    insight_data['cosmos_id'] = saved_analysis.get('id')
-            except Exception as e:
-                print(f"Error saving analysis to Cosmos DB: {e}")
-            
-            # Store user feedback data in user_data container after successful analysis
-            if comments:
-                user_data_record = {
-                    "id": str(uuid.uuid4()),
-                    "user_id": user_id_str,
-                    "project_id": storage_project_id,
-                    "feedback": comments,
-                    "uploaded_date": datetime.now().isoformat(),
-                    "file_name": file_name,
-                    "is_personal": is_personal_analysis,
-                    "tenant_id": project_document.get("tenant_id", "default"),
-                }
-                
-                try:
-                    saved_user_data = cosmos_service.save_user_data(user_data_record)
-                    if saved_user_data:
-                        print(f"✅ Successfully saved user data: {len(comments)} comments for user {user_id_str}, project {storage_project_id}")
-                    else:
-                        print("⚠️ Failed to save user data to Cosmos DB")
-                except Exception as e:
-                    print(f"❌ Error saving user data: {e}")
-                    # Don't fail the analysis if user data storage fails
-            
-            # If project_id is provided, also save to analysis container
-            if storage_project_id:
-                try:
-                    # Get existing analysis data to aggregate with new data
-                    existing_analysis = None
-                    try:
-                        existing_analysis = cosmos_service.get_latest_analysis_for_project(storage_project_id)
-                        if existing_analysis:
-                            print(f"📊 Found existing analysis for project {storage_project_id}")
-                    except Exception as e:
-                        print(f"⚠️ No existing analysis found for project {storage_project_id}: {e}")
-                    
-                    # Aggregate data if existing analysis exists
-                    if existing_analysis:
-                        print("🔄 Aggregating with existing analysis data...")
-                        aggregated_data = aggregate_analysis_data(existing_analysis, normalized, len(comments))
-                    else:
-                        print("🆕 Creating new analysis data...")
-                        aggregated_data = normalized
-                        # Add total comments count to the new data
-                        aggregated_data['total_comments_analyzed'] = len(comments)
-                    
-                    analysis_id = str(uuid.uuid4())
-                    analysis_data = {
-                        'id': f'analysis_{analysis_id}',
-                        'projectId': storage_project_id,
-                        'userId': user_id_str,
-                        'createdAt': datetime.now().isoformat(),
-                        'analysisType': 'commentSentiment',
-                        'rawLlm': result,
-                        'analysisData': {
-                            'overall': aggregated_data['overall'],
-                            'counts': aggregated_data['counts'],
-                            'features': aggregated_data['features'],
-                            'positive_keywords': aggregated_data['positive_keywords'],
-                            'negative_keywords': aggregated_data['negative_keywords']
-                        },
-                        'metadata': {
-                            'is_personal': is_personal_analysis,
-                            'source_project_id': incoming_project_id,
-                            'owner_user_id': user_id_str,
-                        }
-                    }
-                    
-                    saved_analysis = cosmos_service.save_analysis_data(analysis_data)
-                    if saved_analysis:
-                        # Update project's last_analysis_id
-                        if project_id:
-                            cosmos_service.update_project_last_analysis(project_id, saved_analysis['id'])
-                except Exception as e:
-                    print(f"Error saving analysis to Cosmos DB: {e}")
-            
-            # Use aggregated data if available, otherwise use normalized data
-            response_data = aggregated_data if storage_project_id and 'aggregated_data' in locals() else normalized
-            
-            # Format response in the new structure only
-            formatted = {
-                'success': True,
-                'id': f'analysis_{insight_id}',
-                'projectId': storage_project_id,
-                'userId': user_id_str,
-                'createdAt': datetime.now().isoformat(),
-                'analysisType': 'commentSentiment',
-                'rawLlm': result,
-                'analysisData': {
-                    'overall': response_data['overall'],
-                    'counts': response_data['counts'],
-                    'features': response_data['features'],
-                    'positive_keywords': response_data['positive_keywords'],
-                    'negative_keywords': response_data['negative_keywords']
-                },
-                'isPersonal': is_personal_analysis,
-                'sourceProjectId': incoming_project_id,
-                'context': {
-                    'project_id': storage_project_id,
-                    'project_status': project_status,
-                    'config_state': project_config_state,
-                    'is_draft': is_personal_analysis,
-                }
-            }
-            
-            return StandardResponse.success(data=formatted, message="Operation completed successfully")
-        except Exception as e:
-            print (str(e))
-            error_response = {
-                "error": str(e),
-                "details": "Failed to analyze comments",
-                "code": "analysis_error"
-            }
-            return StandardResponse.internal_server_error(detail=error_response.get("error", "Internal server error"), instance=request.path)
 
 class InsightsListView(APIView):
     """Get all insights from Cosmos DB"""
@@ -350,6 +129,27 @@ class InsightsByTypeView(APIView):
                 detail=f"Failed to fetch insights: {str(e)}",
                 instance=request.path
             )
+
+
+class TaskStatusView(APIView):
+    """View to check the status of a Celery task"""
+    permission_classes = [IsAdminOrUser]
+    
+    def get(self, request, task_id):
+        res = AsyncResult(task_id)
+        response_data = {
+            "task_id": task_id,
+            "status": res.status, # PENDING, STARTED, SUCCESS, FAILURE
+            "ready": res.ready(),
+        }
+        
+        if res.ready():
+            if res.successful():
+                response_data["result"] = res.result
+            else:
+                response_data["error"] = str(res.result)
+                
+        return StandardResponse.success(data=response_data)
 
 
 class GetWorkItemsView(APIView):

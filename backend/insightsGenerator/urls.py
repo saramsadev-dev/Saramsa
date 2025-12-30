@@ -14,10 +14,12 @@ from .views import (
     DeleteUserStoryItemsView,
     WorkItemRemovalView,
     TestDeleteView,
-    DeleteSingleUserStoryItemView
+    DeleteSingleUserStoryItemView,
+    TaskStatusView
 )
 
 urlpatterns = [
+    path('task-status/<str:task_id>/', TaskStatusView.as_view(), name='task_status'),
     path('user-story-creation/', UserStoryCreationView.as_view(), name='user_story_creation'),
     path('user-story-submission/', UserStorySubmissionView.as_view(), name='user_story_submission'),
     
