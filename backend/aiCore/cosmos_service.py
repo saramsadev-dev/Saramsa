@@ -105,7 +105,8 @@ class CosmosDBService:
             'analysis': '/projectId', 
             'uploads': '/projectId',
             'user_stories': '/projectId',
-            'user_data': '/projectId'
+            'user_data': '/projectId',
+            'credit_transactions': '/user_id'
         }
         
         for container_type, partition_key in containers_config.items():
@@ -245,6 +246,263 @@ class CosmosDBService:
             print(f"Error marking reset token as used: {e}")
             return False
     
+    # ==================== Credit Management Methods ====================
+    
+    def get_user_credits(self, user_id: str) -> Optional[Dict[str, int]]:
+        """Get user's credit balance and totals"""
+        try:
+            container = self.get_container('users')
+            user_data = None
+            
+            # Try both formats: with prefix and without prefix
+            if user_id.startswith('user_'):
+                try:
+                    user_data = container.read_item(
+                        item=user_id,
+                        partition_key=user_id
+                    )
+                except Exception:
+                    pass
+            
+            # Second try: both without prefix
+            if not user_data:
+                clean_id = user_id[5:] if user_id.startswith('user_') else user_id
+                try:
+                    user_data = container.read_item(
+                        item=clean_id,
+                        partition_key=clean_id
+                    )
+                except Exception:
+                    pass
+            
+            if not user_data:
+                return None
+            
+            # Check if user has credit fields, if not initialize them
+            if 'balance' not in user_data or 'total_earned' not in user_data or 'total_spent' not in user_data:
+                initial_credits = getattr(settings, 'INITIAL_USER_CREDITS', 100)
+                
+                user_data['balance'] = user_data.get('balance', initial_credits)
+                user_data['total_earned'] = user_data.get('total_earned', initial_credits)
+                user_data['total_spent'] = user_data.get('total_spent', 0)
+                
+                # Save updated user
+                self.save_user(user_data)
+            
+            credits = {
+                'balance': user_data.get('balance', 0),
+                'total_earned': user_data.get('total_earned', 0),
+                'total_spent': user_data.get('total_spent', 0)
+            }
+            
+            return credits
+            
+        except Exception as e:
+            print(f"Error getting user credits: {e}")
+            return None
+    
+    def has_sufficient_credits(self, user_id: str, required_amount: int) -> bool:
+        """Check if user has enough credits for an operation"""
+        try:
+            credits = self.get_user_credits(user_id)
+            if not credits:
+                return False
+            return credits['balance'] >= required_amount
+        except Exception as e:
+            print(f"Error checking sufficient credits: {e}")
+            return False
+    
+    def deduct_credits(
+        self,
+        user_id: str,
+        amount: int,
+        operation_type: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Deduct credits from user and create transaction record"""
+        try:
+            # Get user data
+            user_data = self.get_user_by_id(user_id)
+            if not user_data:
+                print(f"User not found: {user_id}")
+                return None
+            
+            current_balance = user_data.get('balance', 0)
+            
+            # Check sufficient credits
+            if current_balance < amount:
+                print(f"Insufficient credits: {current_balance} < {amount}")
+                return None
+            
+            # Update user credits
+            user_data['balance'] = current_balance - amount
+            user_data['total_spent'] = user_data.get('total_spent', 0) + amount
+            
+            # Save updated user
+            self.save_user(user_data)
+            
+            # Create transaction record
+            transaction = self._create_credit_transaction(
+                user_id=user_id,
+                amount=amount,
+                transaction_type='debit',
+                operation_type=operation_type,
+                metadata=metadata
+            )
+            
+            return {
+                'success': True,
+                'new_balance': user_data['balance'],
+                'transaction_id': transaction['id'] if transaction else None
+            }
+        except Exception as e:
+            print(f"Error deducting credits: {e}")
+            return None
+    
+    def add_credits(
+        self,
+        user_id: str,
+        amount: int,
+        reason: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Add credits to user and create transaction record"""
+        try:
+            # Get user data
+            user_data = self.get_user_by_id(user_id)
+            if not user_data:
+                print(f"User not found: {user_id}")
+                return None
+            
+            # Update user credits
+            user_data['balance'] = user_data.get('balance', 0) + amount
+            user_data['total_earned'] = user_data.get('total_earned', 0) + amount
+            
+            # Save updated user
+            self.save_user(user_data)
+            
+            # Create transaction record
+            transaction = self._create_credit_transaction(
+                user_id=user_id,
+                amount=amount,
+                transaction_type='credit',
+                operation_type=reason,
+                metadata=metadata
+            )
+            
+            return {
+                'success': True,
+                'new_balance': user_data['balance'],
+                'transaction_id': transaction['id'] if transaction else None
+            }
+        except Exception as e:
+            print(f"Error adding credits: {e}")
+            return None
+    
+    def _create_credit_transaction(
+        self,
+        user_id: str,
+        amount: int,
+        transaction_type: str,  # 'debit' or 'credit'
+        operation_type: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Create a credit transaction record"""
+        try:
+            # Ensure container exists
+            self.create_container_if_not_exists('credit_transactions', '/user_id')
+            container = self.get_container('credit_transactions')
+            
+            transaction_data = {
+                'id': f'txn_{uuid.uuid4()}',
+                'type': 'credit_transaction',
+                'user_id': user_id,
+                'amount': amount,
+                'transaction_type': transaction_type,
+                'operation_type': operation_type,
+                'metadata': metadata or {},
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            
+            container.upsert_item(transaction_data)
+            return transaction_data
+        except Exception as e:
+            print(f"Error creating credit transaction: {e}")
+            return None
+    
+    def get_credit_transactions(
+        self,
+        user_id: str,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get paginated credit transaction history for a user"""
+        try:
+            self.create_container_if_not_exists('credit_transactions', '/user_id')
+            container = self.get_container('credit_transactions')
+            
+            query = (
+                "SELECT * FROM c WHERE c.type = 'credit_transaction' "
+                "AND c.user_id = @user_id "
+                "ORDER BY c.created_at DESC "
+                f"OFFSET {offset} LIMIT {limit}"
+            )
+            parameters = [{"name": "@user_id", "value": user_id}]
+            
+            items = list(container.query_items(
+                query=query,
+                parameters=parameters,
+                enable_cross_partition_query=True
+            ))
+            
+            return items
+        except Exception as e:
+            print(f"Error getting credit transactions: {e}")
+            return []
+    
+    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by ID (handles both user_xxx and plain ID formats)"""
+        try:
+            self.create_container_if_not_exists('users', '/id')
+            container = self.get_container('users')
+            
+            original_id = user_id
+            
+            # Based on analysis: document ID has prefix, partition key is without prefix
+            if user_id.startswith('user_'):
+                document_id = user_id  # Keep the prefix for document ID
+                partition_key = user_id[5:]  # Remove prefix for partition key
+            else:
+                document_id = f'user_{user_id}'  # Add prefix for document ID
+                partition_key = user_id  # Keep original for partition key
+            
+            try:
+                item = container.read_item(
+                    item=document_id,
+                    partition_key=partition_key
+                )
+                return item
+            except Exception:
+                # Fallback: try the reverse (in case partition scheme is different)
+                try:
+                    item = container.read_item(
+                        item=partition_key,
+                        partition_key=document_id
+                    )
+                    return item
+                except Exception:
+                    pass
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error getting user by ID: {e}")
+            return None
+            return None
+    
+    # ==================== End Credit Management Methods ====================
+    
+
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save analysis data to analysis container with versioning support"""
         if not analysis_data.get('id'):

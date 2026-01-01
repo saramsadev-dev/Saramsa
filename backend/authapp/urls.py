@@ -11,6 +11,11 @@ from .views import (
     ForgotPasswordView,
     ResetPasswordView
 )
+from .credit_views import (
+    CreditBalanceView,
+    CreditTransactionsView,
+    AdminAddCreditsView
+)
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'), #verified
@@ -24,4 +29,8 @@ urlpatterns = [
     path('refresh/', CosmosDBTokenRefreshView.as_view(), name='refresh'),  # Frontend expects this endpoint
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
+    # Credit management endpoints
+    path('credits/balance/', CreditBalanceView.as_view(), name='credit-balance'),
+    path('credits/transactions/', CreditTransactionsView.as_view(), name='credit-transactions'),
+    path('credits/admin/add/', AdminAddCreditsView.as_view(), name='admin-add-credits'),
 ]

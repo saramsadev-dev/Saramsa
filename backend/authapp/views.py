@@ -62,7 +62,11 @@ class RegisterView(generics.CreateAPIView):
                 'date_joined': datetime.now().isoformat(),
                 'profile': {
                     'role': serializer.validated_data.get('role', 'user')
-                }
+                },
+                # Credit system fields (industry-standard naming)
+                'balance': settings.INITIAL_USER_CREDITS,
+                'total_earned': settings.INITIAL_USER_CREDITS,
+                'total_spent': 0
             }
 
             # Ensure users container exists and save

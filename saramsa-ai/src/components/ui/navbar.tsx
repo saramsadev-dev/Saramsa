@@ -15,6 +15,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { BrandLogo } from "./brand-logo";
 import { shouldShowNavbar } from "@/lib/auth-pages";
+import { CreditBadge } from "@/components/credits";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -78,64 +79,68 @@ export function Navbar() {
               </Link>
             </div>
 
-            {/* Right side - Theme Toggle and Profile */}
+            {/* Right side - Credits, Theme Toggle and Profile */}
             <div className="flex items-center space-x-4">
               {isAuthenticated && currentUser && (
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    onClick={() => setOpen((v) => !v)}
-                    className="flex items-center space-x-2 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-                  >
-                    <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">
-                        {currentUser.username?.charAt(0).toUpperCase() || currentUser.email?.charAt(0).toUpperCase() || 'U'}
+                <>
+                  {/* Credit Badge - visible on desktop */}
+                  <Link href="/credits" className="hidden sm:block">
+                    <CreditBadge />
+                  </Link>
+
+                  <div className="relative" ref={dropdownRef}>
+                    <button
+                      onClick={() => setOpen((v) => !v)}
+                      className="flex items-center space-x-2 px-3 py-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">
+                          {currentUser.username?.charAt(0).toUpperCase() || currentUser.email?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                      <span className="hidden sm:block font-medium">
+                        {currentUser.username || currentUser.email || 'User'}
                       </span>
-                    </div>
-                    <span className="hidden sm:block font-medium">
-                      {currentUser.username || currentUser.email || 'User'}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 transition-transform ${
-                        open ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                  {open && (
-                    <div className="absolute z-50 right-0 mt-2 w-56 bg-popover border border-border rounded-lg shadow-xl animate-in slide-in-from-top-2 duration-200">
-                      <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-saramsa-gradient-from/5 to-saramsa-gradient-to/5">
-                        <div className="text-sm font-medium text-popover-foreground">
-                          {currentUser.username || currentUser.email || 'User'}
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""
+                          }`}
+                      />
+                    </button>
+                    {open && (
+                      <div className="absolute z-50 right-0 mt-2 w-56 bg-popover border border-border rounded-lg shadow-xl animate-in slide-in-from-top-2 duration-200">
+                        <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-saramsa-gradient-from/5 to-saramsa-gradient-to/5">
+                          <div className="text-sm font-medium text-popover-foreground">
+                            {currentUser.username || currentUser.email || 'User'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {currentUser.email || "No email"}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {currentUser.email || "No email"}
+                        <div className="py-1">
+                          <button
+                            onClick={() => {
+                              setOpen(false);
+                              window.location.href = "/settings";
+                            }}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-popover-foreground hover:bg-accent transition-all duration-300 group"
+                          >
+                            <Settings className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+                            Settings
+                          </button>
+                          <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-all duration-300 group"
+                          >
+                            <LogOut className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                            Logout
+                          </button>
                         </div>
                       </div>
-                      <div className="py-1">
-                        <button
-                          onClick={() => {
-                            setOpen(false);
-                            window.location.href = "/settings";
-                          }}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-popover-foreground hover:bg-accent transition-all duration-300 group"
-                        >
-                          <Settings className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
-                          Settings
-                        </button>
-                        <button
-                          onClick={handleLogout}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-all duration-300 group"
-                        >
-                          <LogOut className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                          Logout
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </>
               )}
               <ThemeToggle />
-
-          
             </div>
           </div>
         </div>

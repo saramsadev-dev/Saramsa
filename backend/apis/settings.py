@@ -194,7 +194,18 @@ COSMOS_DB_CONFIG = {
         'projects': os.getenv('COSMOS_DB_PROJECTS_CONTAINER', 'projects'),
         'user_data': os.getenv('COSMOS_DB_USER_DATA_CONTAINER', 'user_data'),
         'integrations': os.getenv('COSMOS_DB_INTEGRATIONS_CONTAINER', 'integrations'),
+        'credit_transactions': os.getenv('COSMOS_DB_CREDIT_TRANSACTIONS_CONTAINER', 'credit_transactions'),
     }
+}
+
+# Credit System Configuration
+INITIAL_USER_CREDITS = int(os.getenv('INITIAL_USER_CREDITS', '1000'))
+
+# Credit costs for different operations (industry-standard naming)
+CREDIT_COSTS = {
+    'analysis': int(os.getenv('CREDIT_COST_ANALYSIS', '1')),
+    'user_story': int(os.getenv('CREDIT_COST_USER_STORY', '1')),
+    'work_item': int(os.getenv('CREDIT_COST_WORK_ITEM', '1')),
 }
 
 # Celery Configuration

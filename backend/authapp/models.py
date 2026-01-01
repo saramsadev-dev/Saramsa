@@ -15,7 +15,7 @@
 #         return f"{self.user.username} - {self.role}"
 
 # Note: User data is now stored in Cosmos DB users container
-# with the following structure:
+# with the following structure (industry-standard credit fields):
 # {
 #   "id": "user_uuid",
 #   "type": "user",
@@ -29,5 +29,8 @@
 #   "date_joined": "2024-01-01T00:00:00Z",
 #   "profile": {
 #     "role": "user"
-#   }
+#   },
+#   "balance": 1000,
+#   "total_earned": 1000,
+#   "total_spent": 0
 # }
