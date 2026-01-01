@@ -163,6 +163,17 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # Suppress verbose Azure SDK HTTP logging in console
+        'azure': {
+            'handlers': ['app_file', 'azure_logs'],  # Skip console
+            'level': 'ERROR',  # Only show errors
+            'propagate': False,
+        },
+        'azure.core.pipeline.policies.http_logging_policy': {
+            'handlers': ['app_file', 'azure_logs'],  # Skip console
+            'level': 'ERROR',  # Hide all HTTP request/response logs
+            'propagate': False,
+        },
     },
     'root': {
         'handlers': ['console', 'app_file'],
