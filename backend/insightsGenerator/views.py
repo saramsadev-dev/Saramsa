@@ -59,14 +59,15 @@ class AnalyzeCommentsView(APIView):
         # Trigger background task
         task = process_feedback_task.delay(comments, company_name, user_id_str, project_id)
         
-        return StandardResponse.success(
+        response = StandardResponse.success(
             data={
                 "task_id": task.id,
                 "message": "Analysis started in background.",
                 "status": "processing"
-            },
-            status=status.HTTP_202_ACCEPTED
+            }
         )
+        response.status_code = status.HTTP_202_ACCEPTED
+        return response
 
 
 class InsightsListView(APIView):

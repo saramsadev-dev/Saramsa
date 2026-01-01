@@ -20,6 +20,10 @@ interface AnalysisState {
   latestLoading: boolean;
   latestError: string | null;
   projectContext: ProjectContext | null;
+  // Async task tracking for Celery
+  taskId: string | null;
+  analysisStatus: 'idle' | 'pending' | 'processing' | 'success' | 'failure';
+  pollingInterval: number | null;
 }
 
 const initialState: AnalysisState = {
@@ -33,16 +37,43 @@ const initialState: AnalysisState = {
   latestLoading: false,
   latestError: null,
   projectContext: null,
+  // Async task tracking
+  taskId: null,
+  analysisStatus: 'idle',
+  pollingInterval: null,
 };
 
-// Async thunk for analyzing comments (sentiment analysis only)
+
+// Async thunk for polling task status
+export const pollTaskStatus = createAsyncThunk<
+  any,
+  string,
+  { rejectValue: string }
+>('analysis/pollTaskStatus', async (taskId, { rejectWithValue }) => {
+  try {
+    const response = await apiRequest('get', `/insights/task-status/${taskId}/`, undefined, true);
+    return response.data.data; // Returns { status, result, error }
+  } catch (err: any) {
+    let errorMessage = 'Failed to check task status.';
+    if (err.response?.status === 401) {
+      errorMessage = 'Authentication required. Please login again.';
+    } else if (err.response?.status === 404) {
+      errorMessage = 'Task not found.';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Async thunk for analyzing comments (sentiment analysis with Celery)
 export const analyzeComments = createAsyncThunk<
   any,
   { comments: string[]; projectId?: string; fileName?: string },
   { rejectValue: string }
->('analysis/analyzeComments', async (data, { rejectWithValue }) => {
+>('analysis/analyzeComments', async (data, { dispatch, rejectWithValue }) => {
   try {
-    const payload: any = { 
+    const payload: any = {
       comments: data.comments
     };
     if (data.projectId) {
@@ -51,9 +82,52 @@ export const analyzeComments = createAsyncThunk<
     if (data.fileName) {
       payload.file_name = data.fileName;
     }
-    
+
+    // Call the async endpoint - returns task_id immediately
     const response = await apiRequest('post', '/insights/analyze/', payload, true, false);
-    return response.data;
+    const taskId = response.data.data.task_id;
+
+    if (!taskId) {
+      throw new Error('No task ID received from server');
+    }
+
+    // Start polling for task status
+    return new Promise((resolve, reject) => {
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResult = await dispatch(pollTaskStatus(taskId)).unwrap();
+
+          if (statusResult.status === 'SUCCESS') {
+            clearInterval(pollInterval);
+            // Extract the actual analysis data from nested result
+            // Backend returns: { result: { insight_id, result: { actual data } } }
+            const rawData = statusResult.result?.result || statusResult.result;
+
+            // Wrap in the format expected by Dashboard
+            // Dashboard expects: { analysisData: { overall, counts, features, ... } }
+            const wrappedData = {
+              id: statusResult.result?.insight_id || `analysis_${Date.now()}`,
+              analysisData: rawData
+            };
+
+            resolve(wrappedData);
+          } else if (statusResult.status === 'FAILURE') {
+            clearInterval(pollInterval);
+            reject(statusResult.error || 'Analysis failed');
+          }
+          // Continue polling if status is PENDING or STARTED
+        } catch (error) {
+          clearInterval(pollInterval);
+          reject(error);
+        }
+      }, 2000); // Poll every 2 seconds
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        reject('Analysis timeout - task took too long');
+      }, 300000);
+    });
   } catch (err: any) {
     let errorMessage = 'Sentiment analysis failed. Please try again.';
     if (err.response?.status === 401) {
@@ -122,12 +196,12 @@ export const getConsolidatedDashboardData = createAsyncThunk<
 // Async thunk for generating user stories/work items from analysis data
 export const generateUserStories = createAsyncThunk<
   any,
-  { 
-    analysisData: any; 
-    comments: string[]; 
+  {
+    analysisData: any;
+    comments: string[];
     platform: 'azure' | 'jira';
-    processTemplate?: string; 
-    projectId?: string; 
+    processTemplate?: string;
+    projectId?: string;
     projectMetadata?: any;
   },
   { rejectValue: string }
@@ -139,30 +213,34 @@ export const generateUserStories = createAsyncThunk<
       platform: data.platform, // Correctly pass the platform parameter
       process_template: data.processTemplate || 'Agile'
     };
-    
+
     if (data.projectId) {
       payload.project_id = data.projectId;
     }
-    
+
     if (data.projectMetadata) {
       payload.project_metadata = data.projectMetadata;
     }
-    
+
     console.log(`🔧 generateUserStories payload for ${data.platform}:`, payload);
-    
+
     // User story generation involves LLM calls which can take longer - increase timeout to 3 minutes
     const response = await apiRequest(
-      'post', 
-      '/insights/user-story-creation/', 
-      payload, 
-      true, 
+      'post',
+      '/insights/user-story-creation/',
+      payload,
+      true,
       false,
       { timeout: 180000 } // 3 minutes timeout for LLM calls
     );
-    return response.data;
+
+    // Fix: Extract user stories from nested response structure
+    // Backend returns: { data: { data: { user_stories: [{ work_items: [...] }] } } }
+    const userStoriesData = response.data.data?.user_stories?.[0];
+    return userStoriesData || response.data;
   } catch (err: any) {
     let errorMessage = `${data.platform === 'jira' ? 'Jira' : 'Azure'} work items generation failed. Please try again.`;
-    
+
     // Handle timeout errors specifically
     if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
       errorMessage = 'Work item generation is taking longer than expected. This may happen with large datasets. Please try again or reduce the number of comments.';
@@ -201,9 +279,9 @@ export const submitUserStories = createAsyncThunk<
       process_template: data.processTemplate || 'Agile',
       time: data.time || new Date().toISOString()
     };
-    
+
     console.log(`🔧 submitUserStories payload for ${data.platform}:`, payload);
-    
+
     const response = await apiRequest('post', '/insights/user-story-submission/', payload, true, false);
     return response.data;
   } catch (err: any) {
@@ -258,11 +336,14 @@ const analysisSlice = createSlice({
         state.loading = true;
         state.error = null;
         state.isAnalyzing = true;
+        state.analysisStatus = 'pending';
       })
       .addCase(analyzeComments.fulfilled, (state, action) => {
         state.loading = false;
         state.error = null;
         state.isAnalyzing = false;
+        state.analysisStatus = 'success';
+        state.taskId = null;
         // Store the comments that were analyzed
         if (action.meta.arg.comments) {
           state.loadedComments = action.meta.arg.comments;
@@ -274,6 +355,22 @@ const analysisSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Analysis failed.';
         state.isAnalyzing = false;
+        state.analysisStatus = 'failure';
+        state.taskId = null;
+      })
+      .addCase(pollTaskStatus.pending, (state) => {
+        state.analysisStatus = 'processing';
+      })
+      .addCase(pollTaskStatus.fulfilled, (state, action) => {
+        // Status is updated by analyzeComments thunk based on result
+        if (action.payload.status === 'SUCCESS') {
+          state.analysisStatus = 'success';
+        } else if (action.payload.status === 'FAILURE') {
+          state.analysisStatus = 'failure';
+        }
+      })
+      .addCase(pollTaskStatus.rejected, (state) => {
+        state.analysisStatus = 'failure';
       })
       .addCase(getLatestAnalysis.pending, (state) => {
         state.loading = true;
@@ -282,7 +379,7 @@ const analysisSlice = createSlice({
       .addCase(getLatestAnalysis.fulfilled, (state, action) => {
         state.loading = false;
         state.error = null;
-        
+
         // Check if analysis exists - if not, clear all analysis data
         if (!action.payload?.exists || !action.payload?.analysis) {
           state.analysisData = null;
@@ -305,7 +402,7 @@ const analysisSlice = createSlice({
         state.latestLoading = false;
         state.latestError = null;
         state.latestAnalysis = action.payload;
-        
+
         // Check if analysis exists - if not, clear all analysis data
         if (!action.payload?.exists || !action.payload?.analysis) {
           state.analysisData = null;
