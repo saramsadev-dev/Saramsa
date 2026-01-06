@@ -13,6 +13,7 @@ from .views import (
     AnalysisByQuarterView,
     CumulativeAnalysisView,
     AnalysisComparisonView,
+    UserStoriesView,
     # File upload views
     FeedbackFileUploadView,
 )
@@ -28,6 +29,8 @@ urlpatterns = [
     path('insights/', InsightsListView.as_view(), name='insights_list'),
     path('insights/<str:insight_id>/', InsightDetailView.as_view(), name='insight_detail'),
     path('insights/type/<str:analysis_type>/', InsightsByTypeView.as_view(), name='insights_by_type'),
+    path('insights/user-stories/', UserStoriesView.as_view(), name='user_stories'),
+    path('insights/user-stories/all/', UserStoriesView.as_view(), name='user_stories_all'),
     
     # Analysis history endpoints
     path('history/', AnalysisHistoryView.as_view(), name='analysis_history'),

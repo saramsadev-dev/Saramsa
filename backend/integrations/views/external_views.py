@@ -129,9 +129,17 @@ def get_dashboard_jira_projects(request):
 @permission_classes([IsAuthenticated])
 @handle_service_errors
 def get_external_projects(request):
-    """Get external projects from various providers."""
+    """Get external projects from various providers.
+    
+    Can be called in two ways:
+    1. With accountId: Fetches credentials from stored integration account
+    2. With credentials directly: Uses provided credentials (for initial setup)
+    """
     provider = request.GET.get('provider')
+    account_id = request.GET.get('accountId')
     user_id = request.user.id
+    
+    logger.info(f"get_external_projects called - provider: {provider}, accountId: {account_id}, user_id: {user_id} (type: {type(user_id)})")
     
     if not provider:
         return StandardResponse.validation_error(
@@ -143,7 +151,13 @@ def get_external_projects(request):
     try:
         integration_service = get_integration_service()
         
-        if provider == 'azure':
+        # If accountId is provided, fetch projects using stored credentials
+        if account_id:
+            projects = integration_service.get_external_projects(
+                user_id, provider, accountId=account_id
+            )
+        # Otherwise, use provided credentials directly (for initial setup)
+        elif provider == 'azure':
             organization = request.GET.get('organization')
             pat_token = request.GET.get('pat_token')
             projects = integration_service.get_external_projects(

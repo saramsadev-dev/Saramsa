@@ -5,6 +5,7 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 from .views import health_check, performance_metrics, reset_performance_stats
+from feedback_analysis.views import UserStoriesView
 
 urlpatterns = [
     # Health and monitoring endpoints
@@ -18,6 +19,9 @@ urlpatterns = [
     path('api/auth/', include('authentication.urls')), 
     path('api/projects/', include('integrations.urls')),  # Projects now handled by integrations
     path('api/integrations/', include('integrations.urls')),
+    # Insights endpoints (aliased from feedback_analysis for frontend compatibility)
+    path('api/insights/user-stories/', UserStoriesView.as_view(), name='insights_user_stories'),
+    path('api/insights/user-stories/all/', UserStoriesView.as_view(), name='insights_user_stories_all'),
     
     # Swagger/OpenAPI URLs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

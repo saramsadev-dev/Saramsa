@@ -5,7 +5,11 @@ Centralized work item generation prompts. This module provides direct access to
 work item generation prompts without depending on the aiCore prompt system to avoid circular imports.
 """
 
+import logging
+
 from .constants import get_prompt
+
+logger = logging.getLogger(__name__)
 
 
 def getDeepAnalysisPrompt(
@@ -35,6 +39,9 @@ def getDeepAnalysisPrompt(
     """
     # Get the prompt template
     prompt_template = get_prompt(company_name, "deep_analysis")
+
+    # Log original template before substitution
+    logger.debug("Deep analysis prompt template (before substitution): %s", prompt_template)
     
     # Simple variable substitution
     if feedback_data:
@@ -58,6 +65,9 @@ def getDeepAnalysisPrompt(
         if 'available_issue_type_names' in project_metadata:
             issue_types = ", ".join(project_metadata['available_issue_type_names'])
             prompt_template = prompt_template.replace("$issue_type_list", issue_types)
+
+    # Log final template after all substitutions
+    logger.debug("Deep analysis prompt template (after substitution): %s", prompt_template)
     
     return prompt_template
 

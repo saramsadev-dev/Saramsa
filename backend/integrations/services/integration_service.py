@@ -267,12 +267,19 @@ class IntegrationService:
         Args:
             user_id: User ID
             provider: 'azure' or 'jira'
-            **kwargs: Provider-specific parameters
+            **kwargs: Provider-specific parameters (organization, pat_token for Azure; domain, email, api_token for Jira)
+                      OR accountId to fetch from stored integration account
             
         Returns:
             List of external projects
         """
         try:
+            # Check if accountId is provided - if so, fetch credentials from database
+            account_id = kwargs.get('accountId')
+            if account_id:
+                return self.get_external_projects_by_account(user_id, account_id)
+            
+            # Otherwise, use provided credentials directly
             if provider == 'azure':
                 organization = kwargs.get('organization')
                 pat_token = kwargs.get('pat_token')
@@ -293,6 +300,84 @@ class IntegrationService:
             raise
         except Exception as e:
             logger.error(f"Error fetching external projects for {provider}: {e}")
+            raise
+    
+    def get_external_projects_by_account(self, user_id: str, account_id: str) -> List[Dict[str, Any]]:
+        """
+        Get projects from external platform API using stored integration account.
+        
+        Args:
+            user_id: User ID
+            account_id: Integration account ID
+            
+        Returns:
+            List of external projects
+        """
+        try:
+            # Get the integration account
+            account = self.integrations_repo.get_integration_account(user_id, account_id)
+            if not account:
+                logger.error(f"Integration account {account_id} not found for user {user_id}")
+                raise ValueError("Integration account not found")
+            
+            provider = account.get('provider')
+            credentials = account.get('credentials', {})
+            metadata = account.get('metadata', {})
+            
+            logger.info(f"Fetching projects for account {account_id}, provider: {provider}")
+            logger.debug(f"Account metadata keys: {list(metadata.keys())}")
+            logger.debug(f"Account credentials keys: {list(credentials.keys())}")
+            
+            # Decrypt credentials
+            from .encryption_service import get_encryption_service
+            encryption_service = get_encryption_service()
+            
+            if provider == 'azure':
+                organization = metadata.get('organization')
+                encrypted_pat = credentials.get('tokenEncrypted')
+                if not organization or not encrypted_pat:
+                    missing = []
+                    if not organization:
+                        missing.append('organization')
+                    if not encrypted_pat:
+                        missing.append('tokenEncrypted')
+                    error_msg = f"Invalid Azure integration account: missing {', '.join(missing)}"
+                    logger.error(f"{error_msg}. Metadata: {metadata}, Credentials keys: {list(credentials.keys())}")
+                    raise ValueError(error_msg)
+                pat_token = encryption_service.decrypt_token(encrypted_pat)
+                return self.external_api_service.fetch_azure_projects(organization, pat_token)
+            elif provider == 'jira':
+                # Try multiple ways to get domain and email
+                domain = metadata.get('domain') or account.get('domain')
+                email = metadata.get('email') or credentials.get('email') or account.get('email')
+                encrypted_token = credentials.get('tokenEncrypted') or credentials.get('token')
+                
+                # Log what we found for debugging
+                logger.debug(f"Jira account check - domain: {domain}, email: {email}, has_token: {bool(encrypted_token)}")
+                logger.debug(f"Full account structure - keys: {list(account.keys())}")
+                
+                if not domain or not email or not encrypted_token:
+                    missing = []
+                    if not domain:
+                        missing.append('domain')
+                    if not email:
+                        missing.append('email')
+                    if not encrypted_token:
+                        missing.append('tokenEncrypted')
+                    error_msg = f"Invalid Jira integration account: missing {', '.join(missing)}. Please reconfigure your Jira integration."
+                    logger.error(f"{error_msg}. Account ID: {account_id}, Metadata keys: {list(metadata.keys())}, Credentials keys: {list(credentials.keys())}")
+                    logger.error(f"Full account data: {account}")
+                    raise ValueError(error_msg)
+                
+                api_token = encryption_service.decrypt_token(encrypted_token)
+                return self.external_api_service.fetch_jira_projects(domain, email, api_token)
+            else:
+                raise ValueError(f"Unsupported provider: {provider}")
+                
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error fetching external projects for account {account_id}: {e}", exc_info=True)
             raise
     
     def check_external_project_exists(self, provider: str, external_id: str, user_id: str) -> Optional[Dict[str, Any]]:

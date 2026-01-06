@@ -9,6 +9,7 @@ Contains views for insights and reporting:
 - AnalysisByQuarterView: Get analysis by quarter
 - CumulativeAnalysisView: Get cumulative analysis
 - AnalysisComparisonView: Compare analyses
+- UserStoriesView: Get user stories by project and user
 """
 
 from rest_framework.views import APIView
@@ -226,3 +227,37 @@ class AnalysisComparisonView(APIView):
             "negative_change": sentiment2.get('negative', 0) - sentiment1.get('negative', 0),
             "neutral_change": sentiment2.get('neutral', 0) - sentiment1.get('neutral', 0)
         }
+
+
+class UserStoriesView(APIView):
+    """Get user stories by project and user"""
+    permission_classes = [IsAdminOrUser]
+    
+    @handle_service_errors
+    def get(self, request):
+        """Get user stories for a specific project and optionally filtered by user"""
+        project_id = request.query_params.get('project_id')
+        user_id = request.query_params.get('user_id')
+        
+        if not project_id:
+            return StandardResponse.validation_error(
+                detail="Project ID is required.", 
+                instance=request.path
+            )
+        
+        # Get user stories from Cosmos DB
+        from apis.infrastructure.cosmos_service import cosmos_service
+        
+        if user_id:
+            # Get user stories for specific user and project
+            user_stories = cosmos_service.get_user_stories_by_user_and_project(user_id, project_id)
+        else:
+            # Get all user stories for the project
+            user_stories = cosmos_service.get_user_stories_by_project(project_id)
+        
+        return StandardResponse.success(data={
+            "user_stories": user_stories,
+            "project_id": project_id,
+            "user_id": user_id,
+            "count": len(user_stories)
+        }, message="User stories retrieved successfully")

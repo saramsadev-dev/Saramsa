@@ -26,6 +26,39 @@ class IntegrationsRepository:
             logger.error(f"Error creating integration account: {e}")
             raise
     
+    def create_or_update_integration_account(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create or update integration account document.
+        
+        If an account with the same userId and provider exists, update it.
+        Otherwise, create a new one.
+        """
+        try:
+            user_id = data.get('userId')
+            provider = data.get('provider')
+            
+            if user_id and provider:
+                # Check if account already exists
+                existing = self.get_by_user_and_provider(user_id, provider)
+                if existing:
+                    # Update existing account
+                    account_id = existing['id']
+                    # Merge existing data with new data, preserving id, type, and createdAt
+                    updated_data = {**existing, **data}
+                    updated_data['id'] = account_id
+                    updated_data['type'] = self.entity_type  # Ensure type is correct
+                    if 'createdAt' in existing:
+                        updated_data['createdAt'] = existing['createdAt']
+                    # Update updatedAt timestamp
+                    from datetime import datetime, timezone
+                    updated_data['updatedAt'] = datetime.now(timezone.utc).isoformat()
+                    return self.update(account_id, updated_data)
+            
+            # Create new account
+            return self.create_integration_account(data)
+        except Exception as e:
+            logger.error(f"Error creating or updating integration account: {e}")
+            raise
+    
     def get_by_id(self, account_id: str) -> Optional[Dict[str, Any]]:
         """Get integration account by ID."""
         try:
@@ -38,6 +71,54 @@ class IntegrationsRepository:
             logger.error(f"Error getting integration account {account_id}: {e}")
             return None
     
+    def get_integration_account(self, user_id: str, account_id: str) -> Optional[Dict[str, Any]]:
+        """Get integration account by user ID and account ID.
+        
+        Note: The integrations container uses userId as the partition key,
+        so we need to use userId when querying by ID.
+        """
+        try:
+            # The integrations container uses userId as partition key, not id
+            # So we need to query using userId as partition key
+            user_id_str = str(user_id)
+            
+            # Try to get the document using userId as partition key
+            try:
+                account = self.cosmos_service.get_document(
+                    self.container_name,
+                    account_id,
+                    user_id_str  # Use userId as partition key, not account_id
+                )
+            except Exception as doc_error:
+                logger.warning(f"Could not get account {account_id} with partition key {user_id_str}: {doc_error}")
+                # Fallback: query by id and userId
+                query = "SELECT * FROM c WHERE c.id = @account_id AND c.userId = @user_id"
+                parameters = [
+                    {"name": "@account_id", "value": account_id},
+                    {"name": "@user_id", "value": user_id_str}
+                ]
+                results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+                account = results[0] if results else None
+            
+            if not account:
+                logger.warning(f"Account {account_id} not found for user {user_id_str}")
+                return None
+            
+            account_user_id = account.get('userId')
+            account_user_id_str = str(account_user_id) if account_user_id else None
+            
+            logger.debug(f"Found account {account_id} - comparing user IDs: request '{user_id_str}' vs account '{account_user_id_str}'")
+            
+            # Verify the account belongs to the user
+            if account_user_id_str == user_id_str:
+                return account
+            else:
+                logger.warning(f"User ID mismatch for account {account_id}. Request user: '{user_id_str}', Account user: '{account_user_id_str}'")
+                return None
+        except Exception as e:
+            logger.error(f"Error getting integration account {account_id} for user {user_id}: {e}", exc_info=True)
+            return None
+    
     def get_by_user(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all integration accounts for a user."""
         query = "SELECT * FROM c WHERE c.userId = @user_id AND c.type = @type ORDER BY c.createdAt DESC"
@@ -46,6 +127,10 @@ class IntegrationsRepository:
             {"name": "@type", "value": self.entity_type}
         ]
         return self.cosmos_service.query_documents(self.container_name, query, parameters)
+    
+    def get_integration_accounts_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all integration accounts for a user (alias for get_by_user)."""
+        return self.get_by_user(user_id)
     
     def get_by_user_and_provider(self, user_id: str, provider: str) -> Optional[Dict[str, Any]]:
         """Get integration account by user and provider."""
@@ -81,6 +166,18 @@ class IntegrationsRepository:
             )
         except Exception as e:
             logger.error(f"Error deleting integration account {account_id}: {e}")
+            return False
+    
+    def delete_integration_account(self, user_id: str, account_id: str) -> bool:
+        """Delete integration account by user ID and account ID."""
+        try:
+            # Verify the account belongs to the user
+            account = self.get_integration_account(user_id, account_id)
+            if not account:
+                return False
+            return self.delete(account_id)
+        except Exception as e:
+            logger.error(f"Error deleting integration account {account_id} for user {user_id}: {e}")
             return False
     
     # Project-related methods (these might need to be moved to projects repository)

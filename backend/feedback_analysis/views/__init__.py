@@ -22,6 +22,7 @@ from .insights_views import (
     AnalysisByQuarterView,
     CumulativeAnalysisView,
     AnalysisComparisonView,
+    UserStoriesView,
 )
 from .file_upload_views import (
     FeedbackFileUploadView,
@@ -41,6 +42,7 @@ __all__ = [
     'AnalysisByQuarterView',
     'CumulativeAnalysisView',
     'AnalysisComparisonView',
+    'UserStoriesView',
     # File upload views
     'FeedbackFileUploadView',
 ]

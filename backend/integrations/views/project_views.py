@@ -22,6 +22,25 @@ class ProjectCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     @handle_service_errors
+    def get(self, request):
+        """Get all projects for the authenticated user."""
+        user_id = getattr(request.user, 'id', None)
+        if not user_id:
+            return StandardResponse.unauthorized(
+                detail="Authentication required",
+                instance=request.path
+            )
+        
+        # Use project service to get projects
+        project_service = get_project_service()
+        projects = project_service.get_projects_by_user(user_id)
+        
+        return StandardResponse.success(
+            data={'projects': projects, 'count': len(projects)},
+            message="Projects retrieved successfully"
+        )
+
+    @handle_service_errors
     def post(self, request):
         user_id = getattr(request.user, 'id', None)
         project_name = request.data.get('project_name')

@@ -25,13 +25,7 @@ from .views import (
 )
 
 urlpatterns = [
-    # Project CRUD operations
-    path('projects/', ProjectCreateView.as_view(), name='project_create'),
-    path('projects/list/', ProjectListView.as_view(), name='project_list'),
-    path('projects/<str:project_id>/', ProjectDetailView.as_view(), name='project_detail'),
-    path('projects/<str:project_id>/analysis/latest/', LatestAnalysisView.as_view(), name='project_latest_analysis'),
-    
-    # External provider project fetching (for configuration)
+    # External provider project fetching (for configuration) - most specific first
     path('azure/projects/', get_azure_projects, name='get_azure_projects'),
     path('jira/projects/', get_jira_projects, name='get_jira_projects'),
     
@@ -40,10 +34,25 @@ urlpatterns = [
     path('dashboard/jira/projects/', get_dashboard_jira_projects, name='get_dashboard_jira_projects'),
     
     # External project utilities
-    path('external/projects/', get_external_projects, name='get_external_projects'),
     path('external/projects/check/', check_external_project, name='check_external_project'),
+    path('external/projects/', get_external_projects, name='get_external_projects'),
     
-    # Integration account management
+    # Project CRUD operations (nested paths for /api/integrations/projects/...)
+    path('projects/<str:project_id>/analysis/latest/', LatestAnalysisView.as_view(), name='project_latest_analysis'),
+    path('projects/<str:project_id>/', ProjectDetailView.as_view(), name='project_detail'),
+    path('projects/create/', ProjectCreateView.as_view(), name='project_create_with_path'),
+    path('projects/list/', ProjectListView.as_view(), name='project_list'),
+    path('projects/', ProjectCreateView.as_view(), name='project_create'),
+    
+    # Project CRUD operations (direct paths for /api/projects/...)
+    # These must come after 'projects/' routes to avoid conflicts
+    path('<str:project_id>/analysis/latest/', LatestAnalysisView.as_view(), name='project_latest_analysis_direct'),
+    path('<str:project_id>/', ProjectDetailView.as_view(), name='project_detail_direct'),
+    
+    # List endpoint (support /api/projects/list/)
+    path('list/', ProjectListView.as_view(), name='project_list_short'),
+    
+    # Integration account management - specific routes first
     path('azure/', create_azure_integration, name='create_azure_integration'),
     path('jira/', create_jira_integration, name='create_jira_integration'),
     path('<str:account_id>/test/', test_integration_connection, name='test_integration_connection'),
