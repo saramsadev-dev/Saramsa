@@ -205,12 +205,24 @@ class IntegrationsRepository:
             return None
     
     def get_project(self, project_id: str, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get project by ID and verify user ownership."""
+        """
+        Get project by ID and user ID (verifies ownership).
+        
+        Args:
+            project_id: Project ID
+            user_id: User ID to verify ownership
+            
+        Returns:
+            Project data if found and owned by user, None otherwise
+        """
         try:
-            project = self.get_project_by_id(project_id)
-            if project and project.get('userId') == user_id:
-                return project
-            return None
+            query = "SELECT * FROM c WHERE c.id = @project_id AND c.userId = @user_id AND c.type = 'project'"
+            parameters = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@user_id", "value": user_id}
+            ]
+            results = self.cosmos_service.query_documents('projects', query, parameters)
+            return results[0] if results else None
         except Exception as e:
             logger.error(f"Error getting project {project_id} for user {user_id}: {e}")
             return None

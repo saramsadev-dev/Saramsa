@@ -6,7 +6,7 @@ Contains shared utility functions used across different view modules.
 
 from rest_framework.response import Response
 from rest_framework import status
-from aiCore.completion_service import generate_completions 
+from aiCore.services.completion_service import generate_completions 
 from apis.prompts import getSentAnalysisPrompt, getDeepAnalysisPrompt
 from datetime import datetime
 import json
