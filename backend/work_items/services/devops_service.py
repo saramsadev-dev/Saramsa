@@ -33,7 +33,7 @@ class DevOpsService:
                                               project_metadata: Dict[str, Any] = None) -> Dict[str, Any]:
         """Generate work items from analysis data using AI."""
         try:
-            from aiCore.completion_service import generate_completions
+            from aiCore.services.completion_service import generate_completions
             
             # Convert analysis_data to feedback string for prompt
             feedback_block = json.dumps(analysis_data, indent=2) if isinstance(analysis_data, dict) else str(analysis_data)

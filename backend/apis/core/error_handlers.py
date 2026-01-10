@@ -29,13 +29,15 @@ def handle_service_errors(func: Callable) -> Callable:
             return func(*args, **kwargs)
         except ValueError as e:
             # Business logic validation errors
-            logger.warning(f"Validation error in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Validation error in {func_name}: {e}")
             return StandardResponse.validation_error(
                 detail=str(e)
             )
         except PermissionError as e:
             # Permission/authorization errors
-            logger.warning(f"Permission error in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Permission error in {func_name}: {e}")
             return StandardResponse.error(
                 title="Permission denied",
                 detail=str(e),
@@ -44,7 +46,8 @@ def handle_service_errors(func: Callable) -> Callable:
             )
         except FileNotFoundError as e:
             # Resource not found errors
-            logger.warning(f"Resource not found in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Resource not found in {func_name}: {e}")
             return StandardResponse.error(
                 title="Resource not found",
                 detail=str(e),
@@ -53,7 +56,8 @@ def handle_service_errors(func: Callable) -> Callable:
             )
         except ConnectionError as e:
             # External service connection errors
-            logger.error(f"Connection error in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.error(f"Connection error in {func_name}: {e}")
             return StandardResponse.error(
                 title="Service unavailable",
                 detail="Unable to connect to external service. Please try again later.",
@@ -62,7 +66,8 @@ def handle_service_errors(func: Callable) -> Callable:
             )
         except Exception as e:
             # Unexpected errors
-            logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.error(f"Unexpected error in {func_name}: {e}", exc_info=True)
             return StandardResponse.internal_server_error(
                 detail="An unexpected error occurred. Please try again later."
             )
@@ -86,13 +91,15 @@ def handle_async_service_errors(func: Callable) -> Callable:
             return await func(*args, **kwargs)
         except ValueError as e:
             # Business logic validation errors
-            logger.warning(f"Validation error in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Validation error in {func_name}: {e}")
             return StandardResponse.validation_error(
                 detail=str(e)
             )
         except PermissionError as e:
             # Permission/authorization errors
-            logger.warning(f"Permission error in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Permission error in {func_name}: {e}")
             return StandardResponse.error(
                 title="Permission denied",
                 detail=str(e),
@@ -101,7 +108,8 @@ def handle_async_service_errors(func: Callable) -> Callable:
             )
         except FileNotFoundError as e:
             # Resource not found errors
-            logger.warning(f"Resource not found in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Resource not found in {func_name}: {e}")
             return StandardResponse.error(
                 title="Resource not found",
                 detail=str(e),
@@ -110,7 +118,8 @@ def handle_async_service_errors(func: Callable) -> Callable:
             )
         except ConnectionError as e:
             # External service connection errors
-            logger.error(f"Connection error in {func.__name__}: {e}")
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.error(f"Connection error in {func_name}: {e}")
             return StandardResponse.error(
                 title="Service unavailable",
                 detail="Unable to connect to external service. Please try again later.",
@@ -119,7 +128,8 @@ def handle_async_service_errors(func: Callable) -> Callable:
             )
         except Exception as e:
             # Unexpected errors
-            logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.error(f"Unexpected error in {func_name}: {e}", exc_info=True)
             return StandardResponse.internal_server_error(
                 detail="An unexpected error occurred. Please try again later."
             )

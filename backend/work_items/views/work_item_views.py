@@ -37,7 +37,7 @@ class WorkItemGenerationView(APIView):
         """
         Generate work items based on analysis data and template (Azure DevOps or Jira)
         """
-        logger.info("🔧 WorkItemGenerationView called")
+        logger.info("WorkItemGenerationView called")
         
         analysis_data = request.data.get("analysis_data")
         process_template = request.data.get("process_template", "Agile")

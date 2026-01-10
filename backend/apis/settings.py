@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import ssl
 from datetime import timedelta
 from dotenv import load_dotenv
 load_dotenv()
@@ -112,6 +113,19 @@ COSMOS_DB_CONFIG = {
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+
+# SSL configuration for Redis (if using rediss://)
+if CELERY_BROKER_URL.startswith('rediss://'):
+    CELERY_BROKER_TRANSPORT_OPTIONS = {
+        'ssl_cert_reqs': ssl.CERT_REQUIRED,
+    }
+    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+        'ssl_cert_reqs': ssl.CERT_REQUIRED,
+    }
+else:
+    CELERY_BROKER_TRANSPORT_OPTIONS = {}
+    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {}
+
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
