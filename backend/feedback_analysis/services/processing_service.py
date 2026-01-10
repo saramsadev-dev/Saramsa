@@ -12,6 +12,7 @@ from collections import defaultdict
 from datetime import datetime
 from .chunking_service import get_chunking_service
 from apis.prompts import getSentAnalysisPrompt, getDeepAnalysisPrompt
+from aiCore.services.completion_service import generate_completions
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,17 +24,18 @@ class ProcessingService:
     def __init__(self):
         self.chunking_service = get_chunking_service()
     
-    async def process_chunks(self, text: str, prompt: str, analysis_type: int):
+    async def process_chunks(self, text: str, prompt_template: str = None, analysis_type: int = 0, company_name: str = None):
         """
         Process text chunks with AI analysis.
         
         Args:
             text: Input text to analyze
-            prompt: AI prompt to use
+            prompt_template: Base prompt template (deprecated, prompts are created per chunk) - kept for backward compatibility
             analysis_type: 0 for sentiment, 1 for deep analysis
+            company_name: Optional company name for prompt customization
             
         Returns:
-            Analysis results
+            Analysis results from AI service
         """
         # Choose chunking strategy based on analysis type
         if analysis_type == 0:  # Sentiment analysis
@@ -43,34 +45,54 @@ class ProcessingService:
         
         logger.info(f"Processing {len(chunks)} chunks for analysis type {analysis_type}")
         
-        # TODO: Integrate with AI completion service
-        # This is where you would call the AI service with each chunk
         results = []
         for i, chunk in enumerate(chunks):
-            logger.debug(f"Processing chunk {i+1}/{len(chunks)}")
-            # Placeholder result - replace with actual AI call
-            result = {"chunk_index": i, "chunk_length": len(chunk), "processed": True}
-            results.append(result)
+            logger.debug(f"Processing chunk {i+1}/{len(chunks)} (length: {len(chunk)} chars)")
+            
+            try:
+                # Create prompt for this specific chunk
+                if analysis_type == 0:  # Sentiment analysis
+                    chunk_prompt = getSentAnalysisPrompt(company_name=company_name, feedback_data=chunk)
+                else:  # Deep analysis
+                    chunk_prompt = getDeepAnalysisPrompt(company_name=company_name, feedback_data=chunk)
+                
+                # Call AI completion service with the chunk-specific prompt
+                result = await generate_completions(chunk_prompt)
+                logger.debug(f"Chunk {i+1} analysis completed successfully")
+                
+                # Store the result (should be JSON string that can be parsed)
+                results.append(result)
+                
+            except Exception as e:
+                logger.error(f"Error processing chunk {i+1}: {e}", exc_info=True)
+                # Add error result but continue with other chunks
+                results.append({
+                    "chunk_index": i,
+                    "error": str(e),
+                    "processed": False
+                })
         
+        successful_count = sum(1 for r in results if not (isinstance(r, dict) and r.get('error') is not None))
+        logger.info(f"Completed processing {len(results)} chunks, {successful_count} successful")
         return results
 
-    async def process_feedback(self, text):
+    async def process_feedback(self, text, company_name: str = None):
         """
         Process feedback text through complete analysis pipeline.
         
         Args:
             text: Feedback text to analyze
+            company_name: Optional company name for prompt customization
             
         Returns:
             Normalized analysis results
         """
-        # Build prompts using structured system with feedback data
-        prompt = getSentAnalysisPrompt(feedback_data=text)
-        comments_analysis = await self.process_chunks(text, prompt, 0)
+        # Process chunks with sentiment analysis (prompts are created per chunk inside process_chunks)
+        comments_analysis = await self.process_chunks(text, None, 0, company_name=company_name)
         logger.debug("Comment analysis completed", extra={"result": comments_analysis})
 
-        prompt = getDeepAnalysisPrompt(feedback_data=text)
-        deep_analysis = await self.process_chunks(text, prompt, 1)
+        # Process chunks with deep analysis (prompts are created per chunk inside process_chunks)
+        deep_analysis = await self.process_chunks(text, None, 1, company_name=company_name)
         logger.debug("Deep analysis completed", extra={"result": deep_analysis})
 
         # Ensure lists
@@ -114,7 +136,9 @@ class ProcessingService:
             logger.info("Processing JSON data")
 
             if doc_type == 0:  # Feedback processing
-                result = await self.process_feedback(str(data))
+                # Extract comments from JSON data before processing
+                extracted_text = self._extract_text_from_data(data, file_type)
+                result = await self.process_feedback(extracted_text)
                 return result
             
             # User Stories
@@ -123,7 +147,12 @@ class ProcessingService:
 
         elif file_type == 'csv':
             logger.info("Processing CSV data")
-            # Simulate async processing
+            # Extract comments from CSV data before processing
+            if doc_type == 0:  # Feedback processing
+                extracted_text = self._extract_text_from_data(data, file_type)
+                result = await self.process_feedback(extracted_text)
+                return result
+            # Simulate async processing for other doc types
             await asyncio.sleep(1)
             return {
                 'status': 'success', 
@@ -131,6 +160,77 @@ class ProcessingService:
             }
         
         return {'status': 'error', 'details': 'Unknown file type'}
+    
+    def _extract_text_from_data(self, data, file_type):
+        """
+        Extract text/comments from uploaded data structure.
+        
+        Args:
+            data: The uploaded data (dict, list, or list of dicts)
+            file_type: 'json' or 'csv'
+            
+        Returns:
+            String of extracted text/comments joined together
+        """
+        comments = []
+        
+        if file_type == 'json':
+            if isinstance(data, list):
+                # If data is a list of strings, treat as comments
+                comments = [str(item) for item in data if item]
+            elif isinstance(data, dict):
+                # If data has a comments field
+                if 'comments' in data and isinstance(data['comments'], list):
+                    comments = [str(comment) for comment in data['comments'] if comment]
+                # If data has feedback field
+                elif 'feedback' in data and isinstance(data['feedback'], list):
+                    comments = [str(feedback) for feedback in data['feedback'] if feedback]
+                # If data has reviews field
+                elif 'reviews' in data and isinstance(data['reviews'], list):
+                    comments = [str(review) for review in data['reviews'] if review]
+                # If it's a single comment object with text field
+                elif 'text' in data:
+                    comments = [str(data['text'])]
+                else:
+                    # Fallback: try to extract any string values
+                    logger.warning(f"Unknown JSON structure, attempting to extract text fields. Keys: {list(data.keys())}")
+                    for key, value in data.items():
+                        if isinstance(value, str) and len(value) > 10:
+                            comments.append(value)
+                        elif isinstance(value, list):
+                            comments.extend([str(item) for item in value if item])
+        
+        elif file_type == 'csv':
+            if isinstance(data, list) and len(data) > 0:
+                # Look for common comment column names
+                comment_columns = ['comment', 'comments', 'feedback', 'review', 'reviews', 'text', 'content', 'message']
+                first_row = data[0] if isinstance(data[0], dict) else None
+                
+                if first_row:
+                    # Find the comment column
+                    comment_column = None
+                    for col in comment_columns:
+                        if col in first_row:
+                            comment_column = col
+                            break
+                    
+                    if comment_column:
+                        comments = [str(row[comment_column]) for row in data if isinstance(row, dict) and row.get(comment_column)]
+                    else:
+                        # Fallback: use the first column
+                        first_col = list(first_row.keys())[0] if first_row else None
+                        if first_col:
+                            comments = [str(row[first_col]) for row in data if isinstance(row, dict) and row.get(first_col)]
+        
+        # Join comments into a single text string
+        if comments:
+            extracted_text = "\n".join(comments)
+            logger.info(f"Extracted {len(comments)} comments/text items from {file_type} data")
+            return extracted_text
+        else:
+            # Fallback: convert entire data to string if no comments found
+            logger.warning(f"No comments extracted from {file_type} data, using full data as string")
+            return str(data)
 
     def _normalize_analysis_results(self, comments_analysis):
         """
