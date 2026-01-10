@@ -247,7 +247,7 @@ class GetUserCommentsView(APIView):
     @handle_service_errors
     def get(self, request):
         """
-        Get user comments for a specific project
+        Get user comments for a specific project - Updated to get from analysis data
         """
         analysis_service = get_analysis_service()
         
@@ -261,6 +261,91 @@ class GetUserCommentsView(APIView):
             return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
         user_id_str = str(user_id)
         
+        # Try to get comments from analysis data first
+        if project_id and not explicit_personal:
+            logger.error(f"DEBUG: Starting analysis data lookup for project {project_id} - NEW CODE VERSION 2.0")  # This should always show
+            
+            # Check if there's a recent analysis ID in the request or session
+            recent_analysis_id = request.query_params.get('analysis_id')
+            
+            try:
+                logger.info(f"Attempting to get analysis data for project: {project_id}, user: {user_id_str}")
+                
+                # If we have a specific analysis ID, try to get that first
+                if recent_analysis_id:
+                    logger.info(f"Looking for specific analysis ID: {recent_analysis_id}")
+                    try:
+                        specific_analysis = analysis_service.get_analysis_by_id(recent_analysis_id, user_id_str)
+                        if specific_analysis:
+                            analysis_data = specific_analysis
+                            logger.info("Found specific analysis by ID")
+                        else:
+                            logger.info("Specific analysis ID not found, falling back to latest")
+                            analysis_data = analysis_service.get_latest_analysis_by_project(project_id, user_id_str)
+                    except Exception as e:
+                        logger.warning(f"Error getting specific analysis: {e}")
+                        analysis_data = analysis_service.get_latest_analysis_by_project(project_id, user_id_str)
+                else:
+                    # Get latest analysis for the project
+                    analysis_data = analysis_service.get_latest_analysis_by_project(project_id, user_id_str)
+                
+                logger.info(f"Analysis data result: {analysis_data is not None}")
+                
+                if analysis_data:
+                    logger.info(f"Analysis data keys: {list(analysis_data.keys()) if isinstance(analysis_data, dict) else 'Not a dict'}")
+                    logger.info(f"Analysis ID: {analysis_data.get('id')}, Created: {analysis_data.get('createdAt')}")
+                    
+                    # Extract comments from analysis data with comprehensive search
+                    comments = []
+                    source_field = None
+                    
+                    # Check all possible locations for comments
+                    comment_sources = [
+                        ('original_comments', analysis_data.get('original_comments')),
+                        ('feedback', analysis_data.get('feedback')),
+                        ('analysisData.original_comments', analysis_data.get('analysisData', {}).get('original_comments')),
+                        ('analysisData.feedback', analysis_data.get('analysisData', {}).get('feedback')),
+                        ('result.original_comments', analysis_data.get('result', {}).get('original_comments')),
+                        ('result.feedback', analysis_data.get('result', {}).get('feedback'))
+                    ]
+                    
+                    for field_name, field_value in comment_sources:
+                        if field_value and isinstance(field_value, list) and len(field_value) > 0:
+                            # Filter out empty strings and clean the data
+                            cleaned_comments = [str(comment).strip().strip('"') for comment in field_value if comment and str(comment).strip() and str(comment).strip() != '""']
+                            if cleaned_comments:
+                                comments = cleaned_comments
+                                source_field = field_name
+                                logger.info(f"Found {len(comments)} valid comments in '{field_name}' (after cleaning)")
+                                break
+                    
+                    if comments:
+                        return StandardResponse.success(data={
+                            "success": True,
+                            "comments": comments,
+                            "comments_count": len(comments),
+                            "file_name": analysis_data.get('file_name'),
+                            "upload_date": analysis_data.get('createdAt') or analysis_data.get('analysis_date'),
+                            "is_personal": False,
+                            "project_id": project_id,
+                            "source": "analysis_data",
+                            "source_field": source_field,
+                            "analysis_id": analysis_data.get('id')
+                        }, message="Comments retrieved from analysis data")
+                    else:
+                        logger.warning("Analysis data found but no valid comments in any expected field")
+                        logger.info(f"Available fields: {list(analysis_data.keys())}")
+                        # Log a sample of the data structure for debugging
+                        if 'analysisData' in analysis_data:
+                            logger.info(f"analysisData keys: {list(analysis_data['analysisData'].keys())}")
+                        if 'result' in analysis_data:
+                            logger.info(f"result keys: {list(analysis_data['result'].keys())}")
+                else:
+                    logger.info("No analysis data found")
+            except Exception as e:
+                logger.error(f"Error getting comments from analysis data: {e}", exc_info=True)
+        
+        # Fallback to original logic for user data
         if not project_id or explicit_personal:
             # Fall back to personal data when project not supplied
             personal_data = analysis_service.get_latest_personal_user_data(user_id_str)
@@ -283,9 +368,10 @@ class GetUserCommentsView(APIView):
                 "upload_date": personal_data.get('uploaded_date'),
                 "is_personal": True,
                 "project_id": personal_data.get('project_id'),
+                "source": "personal_data"
             }, message="Operation completed successfully")
 
-        # Project-specific data path
+        # Project-specific user data path (original logic)
         user_data = analysis_service.get_user_data_by_project(user_id_str, project_id)
         
         if not user_data:
@@ -297,6 +383,8 @@ class GetUserCommentsView(APIView):
                 "upload_date": None,
                 "message": "No comments found for this project",
                 "is_personal": False,
+                "project_id": project_id,
+                "source": "user_data"
             }, message="Operation completed successfully")
         
         return StandardResponse.success(data={
@@ -307,6 +395,7 @@ class GetUserCommentsView(APIView):
             "upload_date": user_data.get('uploaded_date'),
             "is_personal": bool(user_data.get('is_personal')),
             "project_id": project_id,
+            "source": "user_data"
         }, message="Operation completed successfully")
 
 

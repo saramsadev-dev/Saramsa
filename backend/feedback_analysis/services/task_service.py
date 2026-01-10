@@ -37,23 +37,29 @@ class TaskService:
             # 3. Normalize the results
             normalized = self._normalize_analysis_result(result)
 
-            # 4. Save to database
+            # 4. Save to database with original comments included
             insight_id = str(uuid.uuid4())
             insight_data = {
                 'id': f'insight_{insight_id}',
                 'type': 'insight',
-                'project_id': project_id,
-                'user_id': user_id_str,
+                'projectId': project_id,  # Use projectId for consistency
+                'userId': user_id_str,    # Use userId for consistency
                 'analysis_type': 'sentiment_analysis',
                 'analysis_date': datetime.now().isoformat(),
+                'createdAt': datetime.now().isoformat(),
                 'result': normalized,
-                'status': 'complete'
+                'status': 'complete',
+                # Store original comments for retrieval
+                'original_comments': comments,
+                'feedback': comments,  # Alternative field name
+                'company_name': company_name,
+                'comments_count': len(comments)
             }
             
             # Save using analysis service
             analysis_service = get_analysis_service()
             analysis_service.save_analysis_data(insight_data)
-            logger.info(f"Analysis saved to Cosmos DB for background task")
+            logger.info(f"Analysis saved to Cosmos DB for background task with {len(comments)} comments")
             
             return {"insight_id": insight_id, "result": normalized}
 

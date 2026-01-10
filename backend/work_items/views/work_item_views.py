@@ -37,7 +37,7 @@ class WorkItemGenerationView(APIView):
         """
         Generate work items based on analysis data and template (Azure DevOps or Jira)
         """
-        logger.info("🔧 WorkItemGenerationView called")
+        logger.info("WorkItemGenerationView called")
         
         analysis_data = request.data.get("analysis_data")
         process_template = request.data.get("process_template", "Agile")
@@ -55,9 +55,17 @@ class WorkItemGenerationView(APIView):
         # Get project context
         from feedback_analysis.services import get_analysis_service
         analysis_service = get_analysis_service()
-        resolved_project_id, project_doc, is_draft = analysis_service.ensure_project_context(
-            incoming_project_id, user_id_str
-        )
+        
+        try:
+            resolved_project_id, project_doc, is_draft = analysis_service.ensure_project_context(
+                incoming_project_id, user_id_str
+            )
+        except Exception as e:
+            logger.error(f"Failed to ensure project context: {e}")
+            return StandardResponse.error(
+                detail=f"Failed to access or create project: {str(e)}", 
+                instance=request.path
+            )
 
         # Generate work items using DevOps service
         devops_service = get_devops_service()

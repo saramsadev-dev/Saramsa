@@ -275,6 +275,22 @@ class AnalysisService:
             logger.error(f"Error getting user data by project: {e}")
             return None
     
+    def get_latest_analysis_by_project(self, project_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get latest analysis data for a project."""
+        try:
+            return self.analysis_repo.get_latest_analysis_by_project(project_id, user_id)
+        except Exception as e:
+            logger.error(f"Error getting latest analysis by project: {e}")
+            return None
+    
+    def get_analysis_by_id(self, analysis_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get specific analysis by ID."""
+        try:
+            return self.analysis_repo.get_analysis_by_id(analysis_id, user_id)
+        except Exception as e:
+            logger.error(f"Error getting analysis by ID: {e}")
+            return None
+    
     # Analysis History Methods
     def get_analysis_history_for_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get analysis history for project."""

@@ -168,6 +168,155 @@ class AnalysisRepository:
         """Get user data by project."""
         return self.cosmos_service.get_user_data_by_project(user_id, project_id)
     
+    def get_latest_analysis_by_project(self, project_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get latest analysis data for a project with comprehensive search."""
+        try:
+            # Primary containers to search (in order of preference)
+            containers_to_try = ['analysis', 'user_data', 'uploads']
+            
+            for container in containers_to_try:
+                try:
+                    logger.info(f"Searching container: {container}")
+                    
+                    # Strategy 1: Exact project and user match
+                    queries_to_try = [
+                        # Modern field names - single field ordering
+                        {
+                            "query": """
+                            SELECT * FROM c 
+                            WHERE c.projectId = @project_id 
+                            AND c.userId = @user_id 
+                            AND (c.original_comments != null OR c.feedback != null)
+                            ORDER BY c.createdAt DESC
+                            """,
+                            "params": [
+                                {"name": "@project_id", "value": project_id},
+                                {"name": "@user_id", "value": user_id}
+                            ],
+                            "description": "Exact match with modern field names"
+                        },
+                        # Legacy field names - single field ordering
+                        {
+                            "query": """
+                            SELECT * FROM c 
+                            WHERE c.project_id = @project_id 
+                            AND c.user_id = @user_id 
+                            AND (c.original_comments != null OR c.feedback != null)
+                            ORDER BY c.analysis_date DESC
+                            """,
+                            "params": [
+                                {"name": "@project_id", "value": project_id},
+                                {"name": "@user_id", "value": user_id}
+                            ],
+                            "description": "Exact match with legacy field names"
+                        },
+                        # Any recent analysis for user with comments - no ORDER BY to avoid index issues
+                        {
+                            "query": """
+                            SELECT * FROM c 
+                            WHERE c.userId = @user_id 
+                            AND (c.original_comments != null OR c.feedback != null)
+                            AND (c.type = 'insight' OR c.analysis_type != null)
+                            """,
+                            "params": [{"name": "@user_id", "value": user_id}],
+                            "description": "Any analysis with comments (modern fields)"
+                        },
+                        # Fallback with legacy fields - no ORDER BY
+                        {
+                            "query": """
+                            SELECT * FROM c 
+                            WHERE c.user_id = @user_id 
+                            AND (c.original_comments != null OR c.feedback != null)
+                            """,
+                            "params": [{"name": "@user_id", "value": user_id}],
+                            "description": "Any analysis with comments (legacy fields)"
+                        },
+                        # Last resort - just find any data for this user
+                        {
+                            "query": """
+                            SELECT * FROM c 
+                            WHERE c.userId = @user_id
+                            """,
+                            "params": [{"name": "@user_id", "value": user_id}],
+                            "description": "Any data for user (modern fields)"
+                        }
+                    ]
+                    
+                    for query_info in queries_to_try:
+                        try:
+                            logger.info(f"Trying query: {query_info['description']}")
+                            results = self.cosmos_service.query_documents(
+                                container, 
+                                query_info["query"], 
+                                query_info["params"]
+                            )
+                            
+                            if results:
+                                logger.info(f"Found {len(results)} results with: {query_info['description']}")
+                                
+                                # Sort results by date if no ORDER BY was used
+                                if "ORDER BY" not in query_info["query"]:
+                                    try:
+                                        # Sort by createdAt or analysis_date, most recent first
+                                        results.sort(key=lambda x: x.get('createdAt') or x.get('analysis_date') or '1900-01-01', reverse=True)
+                                        logger.info("Results sorted by date (client-side)")
+                                    except Exception as sort_error:
+                                        logger.warning(f"Could not sort results: {sort_error}")
+                                
+                                result = results[0]
+                                
+                                # Verify the result has comments
+                                has_comments = (
+                                    result.get('original_comments') or 
+                                    result.get('feedback') or
+                                    (result.get('analysisData', {}).get('original_comments')) or
+                                    (result.get('analysisData', {}).get('feedback'))
+                                )
+                                
+                                if has_comments:
+                                    logger.info(f"Successfully found analysis data with comments in {container}")
+                                    return result
+                                else:
+                                    logger.info("Result found but no comments detected, trying next query")
+                                    
+                        except Exception as query_error:
+                            logger.warning(f"Query failed: {query_error}")
+                            continue
+                    
+                except Exception as container_error:
+                    logger.warning(f"Container {container} search failed: {container_error}")
+                    continue
+            
+            logger.warning(f"No analysis data with comments found for project {project_id}, user {user_id}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error in get_latest_analysis_by_project: {e}")
+            return None
+    
+    def get_analysis_by_id(self, analysis_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get specific analysis by ID and verify user ownership."""
+        try:
+            containers_to_try = ['analysis', 'user_data', 'uploads']
+            
+            for container in containers_to_try:
+                try:
+                    # Try to get the specific analysis by ID
+                    result = self.cosmos_service.get_document(container, analysis_id, user_id)
+                    if result and result.get('userId') == user_id:
+                        logger.info(f"Found analysis {analysis_id} in container {container}")
+                        return result
+                except Exception as e:
+                    logger.debug(f"Analysis {analysis_id} not found in container {container}: {e}")
+                    continue
+            
+            logger.warning(f"Analysis {analysis_id} not found for user {user_id}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting analysis by ID: {e}")
+            return None
+    
     # User Stories Methods
     def get_user_stories_by_user_and_project(self, user_id: str, project_id: str) -> List[Dict[str, Any]]:
         """Get user stories by user and project."""

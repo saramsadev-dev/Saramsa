@@ -204,6 +204,17 @@ class IntegrationsRepository:
             logger.error(f"Error getting project {project_id}: {e}")
             return None
     
+    def get_project(self, project_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get project by ID and verify user ownership."""
+        try:
+            project = self.get_project_by_id(project_id)
+            if project and project.get('userId') == user_id:
+                return project
+            return None
+        except Exception as e:
+            logger.error(f"Error getting project {project_id} for user {user_id}: {e}")
+            return None
+    
     def update_project(self, project_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update project document."""
         try:
