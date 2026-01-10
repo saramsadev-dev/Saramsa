@@ -51,6 +51,14 @@ class AnalyzeCommentsView(APIView):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
         
+        # Validate project ID is provided
+        if not incoming_project_id:
+            return StandardResponse.validation_error(
+                detail="Project ID is required. Please select or create a project first.",
+                errors=[{"field": "project_id", "message": "This field is required."}],
+                instance=request.path
+            )
+        
         analysis_service = get_analysis_service()
         
         company_name = None
@@ -62,10 +70,17 @@ class AnalyzeCommentsView(APIView):
             except Exception as e:
                 logger.warning(f"Could not get company_name for user: {e}")
 
-        project_id, _, _ = analysis_service.ensure_project_context(
-            incoming_project_id,
-            user_id_str,
-        )
+        try:
+            project_id, _, _ = analysis_service.ensure_project_context(
+                incoming_project_id,
+                user_id_str,
+            )
+        except ValueError as e:
+            return StandardResponse.validation_error(
+                detail=str(e),
+                errors=[{"field": "project_id", "message": str(e)}],
+                instance=request.path
+            )
         
         # Trigger background task
         task = process_feedback_task.delay(comments, company_name, user_id_str, project_id)
@@ -263,13 +278,50 @@ class GetUserCommentsView(APIView):
         
         # Try to get comments from analysis data first
         if project_id and not explicit_personal:
-            logger.error(f"DEBUG: Starting analysis data lookup for project {project_id} - NEW CODE VERSION 2.0")  # This should always show
+            logger.info(f"DEBUG: Starting analysis data lookup for project {project_id}, user {user_id_str}")
             
             # Check if there's a recent analysis ID in the request or session
             recent_analysis_id = request.query_params.get('analysis_id')
             
             try:
-                logger.info(f"Attempting to get analysis data for project: {project_id}, user: {user_id_str}")
+                # COMPREHENSIVE DEBUG: Check what analysis documents exist
+                logger.info("STEP 1: Checking all analysis documents for this user...")
+                try:
+                    analysis_service = get_analysis_service()
+                    
+                    # Use the existing analysis service to check documents
+                    debug_results = analysis_service.analysis_repo.cosmos_service.query_documents(
+                        'analysis', 
+                        "SELECT * FROM c WHERE c.userId = @user_id ORDER BY c.createdAt DESC",
+                        [{"name": "@user_id", "value": user_id_str}]
+                    )
+                    logger.info(f"Found {len(debug_results)} total analysis documents for user {user_id_str}")
+                    
+                    # Log details of each document
+                    for i, doc in enumerate(debug_results[:5]):  # Log first 5 documents
+                        logger.info(f"Document {i+1}: id={doc.get('id')}, projectId={doc.get('projectId')}, type={doc.get('type')}, createdAt={doc.get('createdAt')}")
+                        logger.info(f"  - Has original_comments: {bool(doc.get('original_comments'))}")
+                        logger.info(f"  - Has feedback: {bool(doc.get('feedback'))}")
+                        if doc.get('original_comments'):
+                            logger.info(f"  - original_comments count: {len(doc.get('original_comments', []))}")
+                        if doc.get('feedback'):
+                            logger.info(f"  - feedback count: {len(doc.get('feedback', []))}")
+                    
+                    # Check specifically for this project
+                    project_results = analysis_service.analysis_repo.cosmos_service.query_documents(
+                        'analysis',
+                        "SELECT * FROM c WHERE c.userId = @user_id AND c.projectId = @project_id ORDER BY c.createdAt DESC",
+                        [
+                            {"name": "@user_id", "value": user_id_str},
+                            {"name": "@project_id", "value": project_id}
+                        ]
+                    )
+                    logger.info(f"Found {len(project_results)} analysis documents for project {project_id}")
+                    
+                except Exception as debug_e:
+                    logger.error(f"DEBUG query failed: {debug_e}")
+                
+                logger.info("STEP 2: Attempting to get analysis data using service method...")
                 
                 # If we have a specific analysis ID, try to get that first
                 if recent_analysis_id:
@@ -340,8 +392,36 @@ class GetUserCommentsView(APIView):
                             logger.info(f"analysisData keys: {list(analysis_data['analysisData'].keys())}")
                         if 'result' in analysis_data:
                             logger.info(f"result keys: {list(analysis_data['result'].keys())}")
+                        
+                        # Return empty result with helpful message
+                        return StandardResponse.success(data={
+                            "success": True,
+                            "comments": [],
+                            "comments_count": 0,
+                            "file_name": analysis_data.get('file_name'),
+                            "upload_date": analysis_data.get('createdAt') or analysis_data.get('analysis_date'),
+                            "is_personal": False,
+                            "project_id": project_id,
+                            "source": "analysis_data",
+                            "message": "Analysis found but no comments available. Please upload a feedback file first.",
+                            "error_type": "no_comments_in_analysis",
+                            "analysis_id": analysis_data.get('id')
+                        }, message="Analysis found but no comments available")
                 else:
                     logger.info("No analysis data found")
+                    # Return helpful message when no analysis is found
+                    return StandardResponse.success(data={
+                        "success": True,
+                        "comments": [],
+                        "comments_count": 0,
+                        "file_name": None,
+                        "upload_date": None,
+                        "is_personal": False,
+                        "project_id": project_id,
+                        "source": "analysis_data",
+                        "message": "No analysis found for this project. Please upload a feedback file or run an analysis first.",
+                        "error_type": "no_analysis_found"
+                    }, message="No analysis found for this project")
             except Exception as e:
                 logger.error(f"Error getting comments from analysis data: {e}", exc_info=True)
         
@@ -356,9 +436,10 @@ class GetUserCommentsView(APIView):
                     "comments_count": 0,
                     "file_name": None,
                     "upload_date": None,
-                    "message": "No comments found for personal analysis",
+                    "message": "No comments found. Please upload a feedback file or run an analysis first.",
                     "is_personal": True,
-                }, message="Operation completed successfully")
+                    "error_type": "no_data_available"
+                }, message="No comments available - please upload data first")
 
             return StandardResponse.success(data={
                 "success": True,
@@ -381,11 +462,12 @@ class GetUserCommentsView(APIView):
                 "comments_count": 0,
                 "file_name": None,
                 "upload_date": None,
-                "message": "No comments found for this project",
+                "message": "No comments found for this project. Please upload a feedback file or run an analysis first.",
                 "is_personal": False,
                 "project_id": project_id,
-                "source": "user_data"
-            }, message="Operation completed successfully")
+                "source": "user_data",
+                "error_type": "no_project_data"
+            }, message="No comments available for this project - please upload data first")
         
         return StandardResponse.success(data={
             "success": True,

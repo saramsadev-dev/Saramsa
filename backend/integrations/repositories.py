@@ -194,7 +194,18 @@ class IntegrationsRepository:
         """Get all projects for a user."""
         query = "SELECT * FROM c WHERE c.userId = @user_id AND c.type = 'project' ORDER BY c.createdAt DESC"
         parameters = [{"name": "@user_id", "value": user_id}]
-        return self.cosmos_service.query_documents('projects', query, parameters)
+        projects = self.cosmos_service.query_documents('projects', query, parameters)
+        
+        # Ensure all projects have required properties for frontend compatibility
+        for project in projects:
+            if 'externalLinks' not in project:
+                project['externalLinks'] = []
+            if 'description' not in project:
+                project['description'] = ""
+            if 'status' not in project:
+                project['status'] = "active"
+        
+        return projects
     
     def get_project_by_id(self, project_id: str) -> Optional[Dict[str, Any]]:
         """Get project by ID."""
@@ -216,13 +227,29 @@ class IntegrationsRepository:
             Project data if found and owned by user, None otherwise
         """
         try:
+            logger.info(f"Searching for project {project_id} with user {user_id}")
             query = "SELECT * FROM c WHERE c.id = @project_id AND c.userId = @user_id AND c.type = 'project'"
             parameters = [
                 {"name": "@project_id", "value": project_id},
                 {"name": "@user_id", "value": user_id}
             ]
             results = self.cosmos_service.query_documents('projects', query, parameters)
-            return results[0] if results else None
+            if results:
+                project = results[0]
+                logger.info(f"Found project {project_id}: {project.get('name', 'Unknown')}")
+                
+                # Ensure project has required properties for frontend compatibility
+                if 'externalLinks' not in project:
+                    project['externalLinks'] = []
+                if 'description' not in project:
+                    project['description'] = ""
+                if 'status' not in project:
+                    project['status'] = "active"
+                
+                return project
+            else:
+                logger.warning(f"No project found with id={project_id}, userId={user_id}, type='project'")
+                return None
         except Exception as e:
             logger.error(f"Error getting project {project_id} for user {user_id}: {e}")
             return None

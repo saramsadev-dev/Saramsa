@@ -245,9 +245,31 @@ class AnalysisService:
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Save analysis data."""
         try:
-            return self.analysis_repo.save_analysis_data(analysis_data)
+            logger.info(f"🔍 DEBUG: AnalysisService.save_analysis_data called")
+            logger.info(f"🔍 DEBUG: Input data keys: {list(analysis_data.keys())}")
+            logger.info(f"🔍 DEBUG: Input data id: {analysis_data.get('id')}")
+            logger.info(f"🔍 DEBUG: Input data projectId: {analysis_data.get('projectId')}")
+            logger.info(f"🔍 DEBUG: Input data userId: {analysis_data.get('userId')}")
+            logger.info(f"🔍 DEBUG: Input data has original_comments: {'original_comments' in analysis_data}")
+            logger.info(f"🔍 DEBUG: Input data has feedback: {'feedback' in analysis_data}")
+            
+            if 'original_comments' in analysis_data:
+                logger.info(f"🔍 DEBUG: original_comments count: {len(analysis_data['original_comments'])}")
+            if 'feedback' in analysis_data:
+                logger.info(f"🔍 DEBUG: feedback count: {len(analysis_data['feedback'])}")
+            
+            result = self.analysis_repo.save_analysis_data(analysis_data)
+            
+            if result:
+                logger.info(f"✅ AnalysisService.save_analysis_data SUCCESS")
+                logger.info(f"🔍 DEBUG: Returned result keys: {list(result.keys())}")
+                logger.info(f"🔍 DEBUG: Returned result id: {result.get('id')}")
+            else:
+                logger.error(f"❌ AnalysisService.save_analysis_data FAILED - returned None")
+            
+            return result
         except Exception as e:
-            logger.error(f"Error saving analysis data: {e}")
+            logger.error(f"Error saving analysis data: {e}", exc_info=True)
             return None
     
     def update_project_last_analysis(self, project_id: str, analysis_id: str) -> bool:

@@ -91,14 +91,31 @@ class FeedbackFileUploadView(APIView):
         
         # Convert user_id to string for consistency
         user_id = str(user_id)
+        
+        # Validate project ID is provided
+        if not incoming_project_id:
+            return StandardResponse.validation_error(
+                detail="Project ID is required. Please select or create a project first.",
+                errors=[{"field": "project_id", "message": "This field is required."}],
+                instance=request.path
+            )
 
         # Get project context using analysis service
         from ..services import get_analysis_service
         analysis_service = get_analysis_service()
-        resolved_project_id, project_doc, is_draft = analysis_service.ensure_project_context(
-            incoming_project_id,
-            user_id,
-        )
+        
+        try:
+            resolved_project_id, project_doc, is_draft = analysis_service.ensure_project_context(
+                incoming_project_id,
+                user_id,
+            )
+        except ValueError as e:
+            return StandardResponse.validation_error(
+                detail=str(e),
+                errors=[{"field": "project_id", "message": str(e)}],
+                instance=request.path
+            )
+            
         project_id = resolved_project_id
         project_context = {
             "project_id": project_id,
@@ -133,6 +150,7 @@ class FeedbackFileUploadView(APIView):
             
             # Extract original comments before processing
             original_comments = self.extract_comments_from_data(data, 'json')
+            logger.info(f"📊 JSON Upload: Extracted {len(original_comments)} comments from file")
             
             processing_service = get_processing_service()
             result = await processing_service.process_uploaded_data_async(data, 'json', 0)
@@ -195,6 +213,7 @@ class FeedbackFileUploadView(APIView):
             
             # Extract original comments before processing
             original_comments = self.extract_comments_from_data(csv_data, 'csv')
+            logger.info(f"📊 CSV Upload: Extracted {len(original_comments)} comments from file")
             
             processing_service = get_processing_service()
             result = await processing_service.process_uploaded_data_async(csv_data, 'csv', 1)
@@ -252,7 +271,7 @@ class FeedbackFileUploadView(APIView):
             else:
                 logger.warning(f"Failed to save user data for user {user_id}, project {project_id}")
             
-            # Save canonical analysis entity linked to project
+            # Save canonical analysis entity linked to project WITH original comments
             analysis_id = str(uuid.uuid4())
             analysis_record = {
                 "id": f"analysis_{analysis_id}",
@@ -261,7 +280,13 @@ class FeedbackFileUploadView(APIView):
                 "createdAt": datetime.now().isoformat(),
                 "analysisType": "commentSentiment",
                 "rawLlm": formatted_result.get("rawLlm", {}),
-                "analysisData": formatted_result.get("analysisData", {})
+                "analysisData": formatted_result.get("analysisData", {}),
+                # Store original comments for retrieval (same as task service)
+                "original_comments": original_comments,
+                "feedback": original_comments,  # Alternative field name
+                "file_name": file_name,
+                "file_type": file_type,
+                "comments_count": len(original_comments)
             }
             saved = analysis_service.save_analysis_data(analysis_record)
             try:

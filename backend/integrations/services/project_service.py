@@ -32,7 +32,7 @@ class ProjectService:
             "type": "project",
             "userId": user_id,  # This is the partition key for projects container
             "name": name,
-            "description": description,
+            "description": description or "",
             "status": "active",
             "createdAt": now,
             "updatedAt": now,
@@ -224,33 +224,31 @@ class ProjectService:
     
     def ensure_project_context(self, project_id: Optional[str], user_id: str) -> tuple[str, Dict[str, Any], bool]:
         """
-        Ensure project context exists, creating a draft project if needed.
+        Ensure project context exists. Requires valid project ID - no auto-creation.
         
         Args:
-            project_id: Optional project ID
+            project_id: Required project ID
             user_id: User ID
             
         Returns:
             Tuple of (project_id, project_doc, is_draft)
+            
+        Raises:
+            ValueError: If project_id is None or project not found
         """
         try:
-            if project_id:
-                # Try to get existing project
-                project_doc = self.integrations_repo.get_project(project_id, user_id)
-                if project_doc:
-                    return project_id, project_doc, False
+            if not project_id:
+                raise ValueError("Project ID is required. Please select or create a project first.")
             
-            # Create a draft project
-            draft_project_data = {
-                'userId': user_id,
-                'name': f'Draft Project {datetime.now().strftime("%Y-%m-%d %H:%M")}',
-                'description': 'Auto-generated draft project',
-                'status': 'draft',
-                'externalLinks': []
-            }
-            
-            created_project = self.create_project(draft_project_data)
-            return created_project['id'], created_project, True
+            logger.info(f"Looking for existing project: {project_id} for user: {user_id}")
+            # Try to get existing project
+            project_doc = self.integrations_repo.get_project(project_id, user_id)
+            if project_doc:
+                logger.info(f"Found existing project: {project_id}")
+                return project_id, project_doc, False
+            else:
+                logger.error(f"Project {project_id} not found for user {user_id}")
+                raise ValueError(f"Project with ID '{project_id}' not found or access denied. Please select a valid project.")
             
         except Exception as e:
             logger.error(f"Error ensuring project context: {e}")

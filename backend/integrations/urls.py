@@ -37,20 +37,18 @@ urlpatterns = [
     path('external/projects/check/', check_external_project, name='check_external_project'),
     path('external/projects/', get_external_projects, name='get_external_projects'),
     
-    # Project CRUD operations (nested paths for /api/integrations/projects/...)
-    path('projects/<str:project_id>/analysis/latest/', LatestAnalysisView.as_view(), name='project_latest_analysis'),
-    path('projects/<str:project_id>/', ProjectDetailView.as_view(), name='project_detail'),
+    # Project CRUD operations - MOST SPECIFIC FIRST
     path('projects/create/', ProjectCreateView.as_view(), name='project_create_with_path'),
     path('projects/list/', ProjectListView.as_view(), name='project_list'),
-    path('projects/', ProjectCreateView.as_view(), name='project_create'),
+    path('projects/<str:project_id>/analysis/latest/', LatestAnalysisView.as_view(), name='project_latest_analysis'),
+    path('projects/<str:project_id>/', ProjectDetailView.as_view(), name='project_detail'),
+    path('projects/', ProjectListView.as_view(), name='project_list_root'),  # Changed to list for GET requests
     
     # Project CRUD operations (direct paths for /api/projects/...)
-    # These must come after 'projects/' routes to avoid conflicts
+    # Specific routes must come before parameterized routes
+    path('list/', ProjectListView.as_view(), name='project_list_short'),
     path('<str:project_id>/analysis/latest/', LatestAnalysisView.as_view(), name='project_latest_analysis_direct'),
     path('<str:project_id>/', ProjectDetailView.as_view(), name='project_detail_direct'),
-    
-    # List endpoint (support /api/projects/list/)
-    path('list/', ProjectListView.as_view(), name='project_list_short'),
     
     # Integration account management - specific routes first
     path('azure/', create_azure_integration, name='create_azure_integration'),

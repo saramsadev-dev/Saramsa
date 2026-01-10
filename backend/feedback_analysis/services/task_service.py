@@ -25,6 +25,8 @@ class TaskService:
         This is the main business logic for background feedback processing.
         """
         logger.info(f"📈 Background task started: feedback analysis for project {project_id}")
+        logger.info(f"🔍 DEBUG: Input parameters - comments count: {len(comments)}, user: {user_id_str}, project: {project_id}")
+        logger.info(f"🔍 DEBUG: First few comments: {comments[:3] if len(comments) > 3 else comments}")
         
         try:
             # 1. Prepare Prompt using structured system
@@ -35,7 +37,7 @@ class TaskService:
             result = async_to_sync(generate_completions)(prompt)
 
             # 3. Normalize the results
-            normalized = self._normalize_analysis_result(result)
+            normalized = self._normalize_analysis_result(result, comments)
 
             # 4. Save to database with original comments included
             insight_id = str(uuid.uuid4())
@@ -56,18 +58,32 @@ class TaskService:
                 'comments_count': len(comments)
             }
             
+            logger.info(f"🔍 DEBUG: About to save insight_data with keys: {list(insight_data.keys())}")
+            logger.info(f"🔍 DEBUG: insight_data id: {insight_data['id']}")
+            logger.info(f"🔍 DEBUG: insight_data projectId: {insight_data['projectId']}")
+            logger.info(f"🔍 DEBUG: insight_data userId: {insight_data['userId']}")
+            logger.info(f"🔍 DEBUG: insight_data original_comments count: {len(insight_data['original_comments'])}")
+            logger.info(f"🔍 DEBUG: insight_data feedback count: {len(insight_data['feedback'])}")
+            
             # Save using analysis service
             analysis_service = get_analysis_service()
-            analysis_service.save_analysis_data(insight_data)
+            saved_result = analysis_service.save_analysis_data(insight_data)
+            
+            if saved_result:
+                logger.info(f"✅ Analysis saved to Cosmos DB successfully with ID: {saved_result.get('id')}")
+                logger.info(f"🔍 DEBUG: Saved result keys: {list(saved_result.keys()) if saved_result else 'None'}")
+            else:
+                logger.error(f"❌ Failed to save analysis data to Cosmos DB")
+            
             logger.info(f"Analysis saved to Cosmos DB for background task with {len(comments)} comments")
             
             return {"insight_id": insight_id, "result": normalized}
 
         except Exception as e:
-            logger.error(f"Error in feedback analysis task: {str(e)}")
+            logger.error(f"Error in feedback analysis task: {str(e)}", exc_info=True)
             raise
     
-    def _normalize_analysis_result(self, result):
+    def _normalize_analysis_result(self, result, comments):
         """Normalize LLM analysis result to standard format."""
         try:
             parsed = json.loads(result) if isinstance(result, str) else (result or {})
@@ -116,7 +132,7 @@ class TaskService:
                 'neutral': to_num(sentiments.get('neutral')),
             },
             'counts': {
-                'total': to_num(counts.get('total')),
+                'total': len(comments),  # Use actual comments count instead of LLM reported count
                 'positive': to_num(counts.get('positive')),
                 'negative': to_num(counts.get('negative')),
                 'neutral': to_num(counts.get('neutral')),

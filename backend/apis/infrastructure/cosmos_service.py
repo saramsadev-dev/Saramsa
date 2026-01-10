@@ -422,12 +422,18 @@ class CosmosDBService:
     
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save analysis data to analysis container with versioning support"""
+        logger.info(f"🔍 DEBUG: CosmosService.save_analysis_data called")
+        logger.info(f"🔍 DEBUG: Input analysis_data keys: {list(analysis_data.keys())}")
+        
         if not analysis_data.get('id'):
             import uuid as _uuid
             analysis_data['id'] = f'analysis_{_uuid.uuid4()}'
+            logger.info(f"🔍 DEBUG: Generated new ID: {analysis_data['id']}")
         
         # Add versioning and temporal fields
         project_id = analysis_data.get('projectId')  # Updated to use projectId
+        logger.info(f"🔍 DEBUG: Project ID from data: {project_id}")
+        
         if project_id:
             # Get next version number for this project
             next_version = self._get_next_analysis_version(project_id)
@@ -435,15 +441,35 @@ class CosmosDBService:
             analysis_data['quarter'] = self._determine_quarter(analysis_data.get('createdAt'))
             analysis_data['is_latest'] = True
             
+            logger.info(f"🔍 DEBUG: Added version: {next_version}, is_latest: True")
+            
             # Mark previous analyses as not latest
             self._mark_previous_analyses_not_latest(project_id)
         
+        logger.info(f"🔍 DEBUG: Final analysis_data before save:")
+        logger.info(f"🔍 DEBUG: - id: {analysis_data.get('id')}")
+        logger.info(f"🔍 DEBUG: - projectId: {analysis_data.get('projectId')}")
+        logger.info(f"🔍 DEBUG: - userId: {analysis_data.get('userId')}")
+        logger.info(f"🔍 DEBUG: - type: {analysis_data.get('type')}")
+        logger.info(f"🔍 DEBUG: - has original_comments: {'original_comments' in analysis_data}")
+        logger.info(f"🔍 DEBUG: - has feedback: {'feedback' in analysis_data}")
+        
+        if 'original_comments' in analysis_data:
+            logger.info(f"🔍 DEBUG: - original_comments count: {len(analysis_data['original_comments'])}")
+        if 'feedback' in analysis_data:
+            logger.info(f"🔍 DEBUG: - feedback count: {len(analysis_data['feedback'])}")
+        
         try:
             container = self.get_container('analysis')
-            container.upsert_item(analysis_data)
+            logger.info(f"🔍 DEBUG: Got analysis container, about to upsert")
+            
+            upsert_result = container.upsert_item(analysis_data)
+            logger.info(f"✅ CosmosService.save_analysis_data SUCCESS - upserted to analysis container")
+            logger.info(f"🔍 DEBUG: Upsert result type: {type(upsert_result)}")
+            
             return analysis_data
         except Exception as e:
-            logger.error(f"Error saving analysis data: {e}")
+            logger.error(f"❌ Error saving analysis data to Cosmos: {e}", exc_info=True)
             return None
 
     def get_latest_analysis_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:

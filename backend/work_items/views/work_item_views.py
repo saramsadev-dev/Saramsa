@@ -51,6 +51,14 @@ class WorkItemGenerationView(APIView):
 
         if not analysis_data:
             return StandardResponse.validation_error(detail="Analysis data is required.", instance=request.path)
+        
+        # Validate project ID is provided
+        if not incoming_project_id:
+            return StandardResponse.validation_error(
+                detail="Project ID is required. Please select or create a project first.",
+                errors=[{"field": "project_id", "message": "This field is required."}],
+                instance=request.path
+            )
 
         # Get project context
         from feedback_analysis.services import get_analysis_service
@@ -60,10 +68,9 @@ class WorkItemGenerationView(APIView):
             resolved_project_id, project_doc, is_draft = analysis_service.ensure_project_context(
                 incoming_project_id, user_id_str
             )
-        except Exception as e:
-            logger.error(f"Failed to ensure project context: {e}")
+        except ValueError as e:
             return StandardResponse.error(
-                detail=f"Failed to access or create project: {str(e)}", 
+                detail=str(e), 
                 instance=request.path
             )
 

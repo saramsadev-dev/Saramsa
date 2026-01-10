@@ -153,7 +153,17 @@ class AnalysisRepository:
     # Analysis Data Methods
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Save analysis data."""
-        return self.cosmos_service.save_analysis_data(analysis_data)
+        logger.info(f"🔍 DEBUG: FeedbackAnalysisRepository.save_analysis_data called")
+        logger.info(f"🔍 DEBUG: About to call cosmos_service.save_analysis_data")
+        
+        result = self.cosmos_service.save_analysis_data(analysis_data)
+        
+        if result:
+            logger.info(f"✅ FeedbackAnalysisRepository.save_analysis_data SUCCESS")
+        else:
+            logger.error(f"❌ FeedbackAnalysisRepository.save_analysis_data FAILED")
+            
+        return result
     
     def update_project_last_analysis(self, project_id: str, analysis_id: str) -> bool:
         """Update project's last analysis."""
