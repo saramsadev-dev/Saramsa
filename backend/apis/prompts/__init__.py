@@ -12,7 +12,10 @@ Structure:
 
 from .sentiment import getSentAnalysisPrompt
 from .work_items import getDeepAnalysisPrompt, WORK_ITEM_TYPES_BY_TEMPLATE
-from .constants import PROMPTS, get_prompt, add_company_prompts
+from .constants import (
+    PROMPTS, get_prompt, add_company_prompts, get_enhanced_prompt, 
+    validate_prompt_variables, get_prompt_performance_metrics, INDUSTRY_CONTEXTS
+)
 
 __all__ = [
     'getSentAnalysisPrompt',
@@ -20,5 +23,9 @@ __all__ = [
     'WORK_ITEM_TYPES_BY_TEMPLATE',
     'PROMPTS',
     'get_prompt',
-    'add_company_prompts'
+    'add_company_prompts',
+    'get_enhanced_prompt',
+    'validate_prompt_variables', 
+    'get_prompt_performance_metrics',
+    'INDUSTRY_CONTEXTS'
 ]

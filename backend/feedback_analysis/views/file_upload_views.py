@@ -152,8 +152,23 @@ class FeedbackFileUploadView(APIView):
             original_comments = self.extract_comments_from_data(data, 'json')
             logger.info(f"📊 JSON Upload: Extracted {len(original_comments)} comments from file")
             
+            # Step 2: Generate aspect suggestions (one-time pass)
+            from ..services import get_aspect_suggestion_service
+            aspect_service = get_aspect_suggestion_service()
+            aspect_suggestions = await aspect_service.suggest_aspects(original_comments)
+            logger.info(
+                f"✅ Aspect suggestions generated: domain='{aspect_suggestions['identified_domain']}', "
+                f"aspects={len(aspect_suggestions['suggested_aspects'])}"
+            )
+            
+            # Extract frozen aspect list for prompt
+            frozen_aspects = aspect_suggestions.get('suggested_aspects', [])
+            logger.info(f"🔒 Using frozen aspect list: {frozen_aspects}")
+            
             processing_service = get_processing_service()
-            result = await processing_service.process_uploaded_data_async(data, 'json', 0)
+            result = await processing_service.process_uploaded_data_async(
+                data, 'json', 0, suggested_aspects=frozen_aspects
+            )
 
             # Format response in the new structure
             if isinstance(result, dict) and (result.get('overall') is not None or result.get('features') is not None):
@@ -172,6 +187,7 @@ class FeedbackFileUploadView(APIView):
                         "positive_keywords": result.get("positive_keywords", []),
                         "negative_keywords": result.get("negative_keywords", [])
                     },
+                    "aspectSuggestions": aspect_suggestions,  # Include aspect suggestions
                     "context": project_context,
                 }
             else:
@@ -185,11 +201,15 @@ class FeedbackFileUploadView(APIView):
                     "analysisType": "commentSentiment",
                     "rawLlm": result,
                     "analysisData": result.get("analysisData", {}),
+                    "aspectSuggestions": aspect_suggestions,  # Include aspect suggestions
                     "context": project_context,
                 }
             
-            # Save analysis data to Cosmos DB
-            await self._save_analysis_data(user_id, project_id, file.name, 'json', original_comments, formatted)
+            # Save analysis data to Cosmos DB (includes aspect suggestions)
+            await self._save_analysis_data(
+                user_id, project_id, file.name, 'json', 
+                original_comments, formatted, aspect_suggestions
+            )
             
             return StandardResponse.success(
                 data=formatted,
@@ -215,8 +235,23 @@ class FeedbackFileUploadView(APIView):
             original_comments = self.extract_comments_from_data(csv_data, 'csv')
             logger.info(f"📊 CSV Upload: Extracted {len(original_comments)} comments from file")
             
+            # Step 2: Generate aspect suggestions (one-time pass)
+            from ..services import get_aspect_suggestion_service
+            aspect_service = get_aspect_suggestion_service()
+            aspect_suggestions = await aspect_service.suggest_aspects(original_comments)
+            logger.info(
+                f"✅ Aspect suggestions generated: domain='{aspect_suggestions['identified_domain']}', "
+                f"aspects={len(aspect_suggestions['suggested_aspects'])}"
+            )
+            
+            # Extract frozen aspect list for prompt
+            frozen_aspects = aspect_suggestions.get('suggested_aspects', [])
+            logger.info(f"🔒 Using frozen aspect list: {frozen_aspects}")
+            
             processing_service = get_processing_service()
-            result = await processing_service.process_uploaded_data_async(csv_data, 'csv', 1)
+            result = await processing_service.process_uploaded_data_async(
+                csv_data, 'csv', 0, suggested_aspects=frozen_aspects  # Use 0 for sentiment analysis (not 1)
+            )
             
             # Format CSV response in the new structure
             formatted = {
@@ -228,11 +263,15 @@ class FeedbackFileUploadView(APIView):
                 "analysisType": "commentSentiment",
                 "rawLlm": result,
                 "analysisData": result.get("analysisData", {}),
+                "aspectSuggestions": aspect_suggestions,  # Include aspect suggestions
                 "context": project_context,
             }
             
-            # Save CSV analysis data to Cosmos DB
-            await self._save_analysis_data(user_id, project_id, file.name, 'csv', original_comments, formatted)
+            # Save CSV analysis data to Cosmos DB (includes aspect suggestions)
+            await self._save_analysis_data(
+                user_id, project_id, file.name, 'csv', 
+                original_comments, formatted, aspect_suggestions
+            )
             
             return StandardResponse.success(
                 data=formatted,
@@ -248,7 +287,8 @@ class FeedbackFileUploadView(APIView):
                 instance=request.path
             )
     
-    async def _save_analysis_data(self, user_id, project_id, file_name, file_type, original_comments, formatted_result):
+    async def _save_analysis_data(self, user_id, project_id, file_name, file_type, 
+                                  original_comments, formatted_result, aspect_suggestions=None):
         """Save analysis data using service layer."""
         try:
             from ..services import get_analysis_service
@@ -271,7 +311,7 @@ class FeedbackFileUploadView(APIView):
             else:
                 logger.warning(f"Failed to save user data for user {user_id}, project {project_id}")
             
-            # Save canonical analysis entity linked to project WITH original comments
+            # Save canonical analysis entity linked to project WITH original comments and aspect suggestions
             analysis_id = str(uuid.uuid4())
             analysis_record = {
                 "id": f"analysis_{analysis_id}",
@@ -286,7 +326,9 @@ class FeedbackFileUploadView(APIView):
                 "feedback": original_comments,  # Alternative field name
                 "file_name": file_name,
                 "file_type": file_type,
-                "comments_count": len(original_comments)
+                "comments_count": len(original_comments),
+                # Store aspect suggestions for Step 3
+                "aspect_suggestions": aspect_suggestions if aspect_suggestions else None
             }
             saved = analysis_service.save_analysis_data(analysis_record)
             try:

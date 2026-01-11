@@ -74,6 +74,38 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # Logging for feedback analysis services (detailed debugging)
+        'apis.app': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'apis.prompts': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Celery logging
+        'celery': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery.task': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         # Suppress verbose Azure SDK logging
         'azure': {
             'handlers': ['file'],
@@ -107,6 +139,7 @@ COSMOS_DB_CONFIG = {
         'integrations': os.getenv('COSMOS_DB_INTEGRATIONS_CONTAINER', 'integrations'),
         'password_resets': os.getenv('COSMOS_DB_PASSWORD_RESETS_CONTAINER', 'password_resets'),
         'insights': os.getenv('COSMOS_DB_INSIGHTS_CONTAINER', 'insights'),
+        'comment_extractions': os.getenv('COSMOS_DB_COMMENT_EXTRACTIONS_CONTAINER', 'comment_extractions'),
     }
 }
 

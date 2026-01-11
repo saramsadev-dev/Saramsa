@@ -80,8 +80,23 @@ class CosmosDBService:
         if container_name in self.containers:
             return self.containers[container_name]
 
-        # Lazily create the container if it doesn't exist yet
-        created = self.create_container_if_not_exists(container_type, '/id')
+        # Get the correct partition key for this container type
+        partition_keys = {
+            'users': '/id',
+            'integrations': '/userId',
+            'projects': '/userId',
+            'analysis': '/projectId', 
+            'uploads': '/projectId',
+            'user_stories': '/projectId',
+            'user_data': '/projectId',
+            'password_resets': '/id',
+            'insights': '/id',
+            'comment_extractions': '/project_id'  # Partition by project_id for efficient queries
+        }
+        partition_key = partition_keys.get(container_type, '/id')  # Default to '/id' if not specified
+
+        # Lazily create the container if it doesn't exist yet (with correct partition key)
+        created = self.create_container_if_not_exists(container_type, partition_key)
         if created is not None:
             return created
 
@@ -129,7 +144,8 @@ class CosmosDBService:
             'user_stories': '/projectId',
             'user_data': '/projectId',
             'password_resets': '/id',
-            'insights': '/id'
+            'insights': '/id',
+            'comment_extractions': '/project_id'  # Partition by project_id for efficient queries
         }
         
         for container_type, partition_key in containers_config.items():
@@ -1347,6 +1363,118 @@ class CosmosDBService:
         except Exception as e:
             logger.error(f"Error getting cumulative analysis: {e}")
             return None
+    
+    def save_comment_extraction(self, extraction_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Save a single comment extraction document.
+        
+        CRITICAL: Each extraction is stored separately. Never overwrites previous runs.
+        Each run_id creates new documents.
+        
+        Args:
+            extraction_data: Extraction document with run_id, comment_id, schema_version, etc.
+            
+        Returns:
+            Saved document or None if failed
+        """
+        try:
+            container = self.get_container('comment_extractions')
+            container.create_item(extraction_data)  # Use create_item to prevent overwrites
+            logger.debug(f"Saved comment extraction: {extraction_data.get('id')}")
+            return extraction_data
+        except Exception as e:
+            logger.error(f"Error saving comment extraction: {e}", exc_info=True)
+            return None
+    
+    def get_comment_extractions_by_run(self, run_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all comment extractions for a specific run_id.
+        
+        This is what aggregation services read from.
+        
+        Args:
+            run_id: Run ID to query
+            
+        Returns:
+            List of extraction documents
+        """
+        try:
+            container = self.get_container('comment_extractions')
+            query = (
+                "SELECT * FROM c WHERE c.type = 'comment_extraction' "
+                "AND c.run_id = @run_id "
+                "ORDER BY c.comment_id ASC"
+            )
+            params = [{"name": "@run_id", "value": run_id}]
+            items = list(container.query_items(
+                query=query,
+                parameters=params,
+                enable_cross_partition_query=True
+            ))
+            return items
+        except Exception as e:
+            logger.error(f"Error getting comment extractions by run: {e}")
+            return []
+    
+    def get_comment_extractions_by_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all comment extractions for a project.
+        
+        Args:
+            project_id: Project ID to query
+            
+        Returns:
+            List of extraction documents
+        """
+        try:
+            container = self.get_container('comment_extractions')
+            query = (
+                "SELECT * FROM c WHERE c.type = 'comment_extraction' "
+                "AND c.project_id = @project_id "
+                "ORDER BY c.run_id DESC, c.comment_id ASC"
+            )
+            params = [{"name": "@project_id", "value": project_id}]
+            items = list(container.query_items(
+                query=query,
+                parameters=params,
+                enable_cross_partition_query=False  # Partition by project_id, so no cross-partition needed
+            ))
+            return items
+        except Exception as e:
+            logger.error(f"Error getting comment extractions by project: {e}")
+            return []
+    
+    def get_comment_extractions_by_project_and_run(self, project_id: str, run_id: str) -> List[Dict[str, Any]]:
+        """
+        Get comment extractions for a project and run_id.
+        
+        Args:
+            project_id: Project ID
+            run_id: Run ID
+            
+        Returns:
+            List of extraction documents
+        """
+        try:
+            container = self.get_container('comment_extractions')
+            query = (
+                "SELECT * FROM c WHERE c.type = 'comment_extraction' "
+                "AND c.project_id = @project_id AND c.run_id = @run_id "
+                "ORDER BY c.comment_id ASC"
+            )
+            params = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@run_id", "value": run_id}
+            ]
+            items = list(container.query_items(
+                query=query,
+                parameters=params,
+                enable_cross_partition_query=False  # Partition by project_id
+            ))
+            return items
+        except Exception as e:
+            logger.error(f"Error getting comment extractions by project and run: {e}")
+            return []
 
 # Global instance
 cosmos_service = CosmosDBService()

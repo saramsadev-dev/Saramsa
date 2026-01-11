@@ -210,7 +210,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     if (!activeAnalysisData?.analysisData?.features) return [];
     
     return activeAnalysisData.analysisData.features.map((feature: any) => ({
-      name: feature.name,
+      name: feature.name || feature.feature,  // Backend uses "feature" field, fallback to "name"
       description: feature.description || '',
       sentiment: {
         positive: feature.positive || feature.sentiment?.positive || 0,
@@ -219,7 +219,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       },
       keywords: feature.keywords || [],
       comment_count: feature.comment_count,
-      isEdited: editedKeywords[feature.name] !== undefined
+      isEdited: editedKeywords[feature.name || feature.feature] !== undefined
     })) as LocalFeatureSentiment[];
   }, [activeAnalysisData?.analysisData?.features, editedKeywords]);
 

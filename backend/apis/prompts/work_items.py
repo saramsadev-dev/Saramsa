@@ -16,16 +16,18 @@ def getDeepAnalysisPrompt(
     platform='azure',
     project_metadata=None,
     company_name: str = None,
-    feedback_data: str = None
+    feedback_data: str = None,
+    industry: str = None
 ):
     """
-    Get deep analysis prompt using the centralized prompt system.
+    Get deep analysis prompt using the enhanced centralized prompt system.
     
     Args:
         platform: 'azure' or 'jira' (default: 'azure')
         project_metadata: Optional dict with project info (for Jira dynamic prompts)
         company_name: Optional company name to get company-specific prompt
         feedback_data: Feedback comments/data to inject into prompt
+        industry: Optional industry context for better work item generation
     
     Returns:
         Rendered deep analysis prompt string with variables substituted
@@ -34,14 +36,19 @@ def getDeepAnalysisPrompt(
         prompt = getDeepAnalysisPrompt(
             platform='jira',
             project_metadata={'project': {'name': 'MyProject'}},
-            feedback_data="User feedback here..."
+            feedback_data="User feedback here...",
+            industry="saas"
         )
     """
-    # Get the prompt template
-    prompt_template = get_prompt(company_name, "deep_analysis")
+    # Get the enhanced prompt template
+    prompt_template = get_prompt(
+        company_name=company_name, 
+        prompt_type="deep_analysis",
+        industry=industry
+    )
 
     # Log original template before substitution
-    logger.debug("Deep analysis prompt template (before substitution): %s", prompt_template)
+    logger.debug("Deep analysis prompt template (before substitution): %s", prompt_template[:200] + "...")
     
     # Simple variable substitution
     if feedback_data:
@@ -67,7 +74,7 @@ def getDeepAnalysisPrompt(
             prompt_template = prompt_template.replace("$issue_type_list", issue_types)
 
     # Log final template after all substitutions
-    logger.debug("Deep analysis prompt template (after substitution): %s", prompt_template)
+    logger.debug("Deep analysis prompt template (after substitution): %s", prompt_template[:200] + "...")
     
     return prompt_template
 

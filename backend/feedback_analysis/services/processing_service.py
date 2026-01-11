@@ -3,6 +3,9 @@ Processing service for feedback analysis business logic.
 
 This service handles the core business logic for processing feedback chunks,
 AI analysis, normalization, and data aggregation.
+
+CRITICAL: Implements batch integrity validation - validates output length,
+comment_id uniqueness, and schema compliance before accepting results.
 """
 
 import asyncio
@@ -11,6 +14,8 @@ import json
 from collections import defaultdict
 from datetime import datetime
 from .chunking_service import get_chunking_service
+from .retry_service import get_retry_service
+from .schema_validator import get_validation_service
 from apis.prompts import getSentAnalysisPrompt, getDeepAnalysisPrompt
 from aiCore.services.completion_service import generate_completions
 import logging
@@ -23,19 +28,30 @@ class ProcessingService:
     
     def __init__(self):
         self.chunking_service = get_chunking_service()
+        self.retry_service = get_retry_service()
+        self.validation_service = get_validation_service()
     
-    async def process_chunks(self, text: str, prompt_template: str = None, analysis_type: int = 0, company_name: str = None):
+    async def process_chunks(self, text: str, prompt_template: str = None, analysis_type: int = 0, 
+                            company_name: str = None, suggested_aspects: list = None):
         """
-        Process text chunks with AI analysis.
+        Process text chunks with AI analysis with automatic retry and batch integrity validation.
+        
+        CRITICAL: Each batch is validated for integrity before acceptance:
+        - Output is valid JSON
+        - Output length == input comment count
+        - Every comment_id exists exactly once
+        - All enum fields contain allowed values
+        - If validation fails: retry the batch (do NOT partially store)
         
         Args:
             text: Input text to analyze
             prompt_template: Base prompt template (deprecated, prompts are created per chunk) - kept for backward compatibility
             analysis_type: 0 for sentiment, 1 for deep analysis
             company_name: Optional company name for prompt customization
+            suggested_aspects: Optional list of approved aspects (frozen aspect list) - LLM MUST use only these
             
         Returns:
-            Analysis results from AI service
+            Analysis results from AI service (only validated batches included)
         """
         # Choose chunking strategy based on analysis type
         if analysis_type == 0:  # Sentiment analysis
@@ -45,50 +61,187 @@ class ProcessingService:
         
         logger.info(f"Processing {len(chunks)} chunks for analysis type {analysis_type}")
         
+        # Calculate expected comment count per chunk
+        chunk_comment_counts = [self._count_comments_in_chunk(chunk) for chunk in chunks]
+        logger.debug(f"Expected comment counts per chunk: {chunk_comment_counts}")
+        
+        # Calculate starting indices for each batch (for global comment_id mapping)
+        # Batch 0: starts at 0, Batch 1: starts at count of batch 0, etc.
+        batch_start_indices = []
+        cumulative_index = 0
+        for count in chunk_comment_counts:
+            batch_start_indices.append(cumulative_index)
+            cumulative_index += count
+        
         results = []
+        successful_batches = 0
+        failed_batches = 0
+        
         for i, chunk in enumerate(chunks):
-            logger.debug(f"Processing chunk {i+1}/{len(chunks)} (length: {len(chunk)} chars)")
+            expected_count = chunk_comment_counts[i]
+            comment_start_index = batch_start_indices[i]
+            logger.debug(f"Processing chunk {i+1}/{len(chunks)} (expected {expected_count} comments, starting at global index {comment_start_index}, length: {len(chunk)} chars)")
             
-            try:
-                # Create prompt for this specific chunk
+            # Capture loop variables in closure to avoid late binding issues
+            current_chunk = chunk
+            current_start_index = comment_start_index
+            current_batch_index = i
+            current_expected_count = expected_count
+            
+            # Define the operation for this batch with validation
+            async def process_single_chunk_with_validation():
+                # Create prompt for this specific chunk with correct starting index
                 if analysis_type == 0:  # Sentiment analysis
-                    chunk_prompt = getSentAnalysisPrompt(company_name=company_name, feedback_data=chunk)
+                    chunk_prompt = getSentAnalysisPrompt(
+                        company_name=company_name, 
+                        feedback_data=current_chunk,
+                        suggested_aspects=suggested_aspects,
+                        comment_start_index=current_start_index  # Pass global starting index
+                    )
                 else:  # Deep analysis
                     chunk_prompt = getDeepAnalysisPrompt(company_name=company_name, feedback_data=chunk)
                 
                 # Call AI completion service with the chunk-specific prompt
-                result = await generate_completions(chunk_prompt)
-                logger.debug(f"Chunk {i+1} analysis completed successfully")
+                # Calculate required max_tokens: ~150 tokens per comment extraction object
+                # For safety, use 200 tokens per comment + 500 buffer
+                estimated_tokens_needed = (current_expected_count * 200) + 500
+                # Ensure minimum of 4000 tokens for batch processing
+                max_tokens = max(estimated_tokens_needed, 4000)
+                logger.info(f"📡 [Batch {current_batch_index}] Calling LLM API with max_tokens={max_tokens} (for {current_expected_count} comments)...")
+                result = await generate_completions(chunk_prompt, max_tokens=max_tokens)
+                logger.info(f"📡 [Batch {current_batch_index}] LLM API response received (type: {type(result).__name__})")
                 
-                # Store the result (should be JSON string that can be parsed)
-                results.append(result)
+                # CRITICAL: Validate batch integrity immediately after LLM response
+                logger.info(f"🔍 [Batch {current_batch_index}] Starting validation...")
+                valid_extractions, errors, is_valid = self.validation_service.validate_batch_output(
+                    result,
+                    batch_index=current_batch_index,
+                    expected_count=current_expected_count,
+                    batch_start_index=current_start_index  # Pass global starting index for correct comment_id fallback
+                )
+                logger.info(f"🔍 [Batch {current_batch_index}] Validation complete: is_valid={is_valid}, valid_count={len(valid_extractions)}, errors={len(errors)}")
                 
-            except Exception as e:
-                logger.error(f"Error processing chunk {i+1}: {e}", exc_info=True)
-                # Add error result but continue with other chunks
-                results.append({
-                    "chunk_index": i,
-                    "error": str(e),
-                    "processed": False
-                })
+                if not is_valid:
+                    # Validation failed - raise exception to trigger retry
+                    error_summary = f"Batch {current_batch_index} validation failed: {len(errors)} errors. First error: {errors[0] if errors else 'Unknown'}"
+                    logger.error(error_summary)
+                    raise ValueError(error_summary)
+                
+                logger.debug(f"Chunk {current_batch_index+1} analysis and validation completed successfully")
+                return result
+            
+            # Process batch with async retry mechanism (since we're already in async context)
+            # Directly await the async function - no need for sync wrapper since process_chunks is async
+            max_retries = 3
+            result = None
+            success = False
+            last_error = None
+            validation_errors = []
+            
+            for attempt in range(max_retries + 1):  # +1 for initial attempt
+                try:
+                    logger.info(f"🔄 [Batch {i+1}] Attempt {attempt + 1}/{max_retries + 1}...")
+                    result = await process_single_chunk_with_validation()
+                    
+                    # Final validation check before accepting (already done in process_single_chunk_with_validation, but double-check)
+                    valid_extractions, errors, is_valid = self.validation_service.validate_batch_output(
+                        result,
+                        batch_index=i,
+                        expected_count=expected_count,
+                        batch_start_index=comment_start_index  # Pass global starting index for correct comment_id fallback
+                    )
+                    validation_errors = errors  # Store for potential error reporting
+                    
+                    if is_valid:
+                        results.append(result)
+                        successful_batches += 1
+                        success = True
+                        if attempt > 0:
+                            logger.info(f"✅ Batch {i+1} succeeded after {attempt} retries ({expected_count} comments)")
+                        else:
+                            logger.info(f"✅ Batch {i+1} processed and validated successfully ({expected_count} comments)")
+                        break
+                    else:
+                        # Validation failed - raise to trigger retry
+                        raise ValueError(f"Validation failed: {errors[0] if errors else 'Unknown error'}")
+                        
+                except Exception as e:
+                    last_error = e
+                    error_msg = str(e)
+                    
+                    # Check if we've exhausted retries
+                    if attempt >= max_retries:
+                        failed_batches += 1
+                        logger.error(f"❌ Batch {i+1} failed after {max_retries + 1} attempts: {error_msg}")
+                        results.append({
+                            "chunk_index": i,
+                            "error": error_msg,
+                            "validation_errors": validation_errors,
+                            "processed": False,
+                            "attempts": attempt + 1
+                        })
+                        break
+                    else:
+                        # Calculate delay for next retry (exponential backoff)
+                        delay = min(2 ** attempt, 8)  # 1s, 2s, 4s, max 8s
+                        logger.warning(
+                            f"⚠️ Batch {i+1} attempt {attempt + 1} failed: {error_msg}. "
+                            f"Retrying in {delay}s... ({max_retries - attempt} retries left)"
+                        )
+                        await asyncio.sleep(delay)
         
-        successful_count = sum(1 for r in results if not (isinstance(r, dict) and r.get('error') is not None))
-        logger.info(f"Completed processing {len(results)} chunks, {successful_count} successful")
+        # Log summary
+        logger.info(
+            f"Completed processing {len(chunks)} chunks: "
+            f"{successful_batches} successful, {failed_batches} failed"
+        )
+        
+        # If too many batches failed, log warning
+        failure_rate = failed_batches / len(chunks) if chunks else 0
+        if failure_rate > 0.1:  # More than 10% failure rate
+            logger.warning(
+                f"High batch failure rate: {failed_batches}/{len(chunks)} batches failed ({failure_rate:.1%})"
+            )
+        
         return results
-
-    async def process_feedback(self, text, company_name: str = None):
+    
+    def _count_comments_in_chunk(self, chunk: str) -> int:
+        """
+        Count comments in a chunk string.
+        
+        Since chunks are created by joining comments with '\n', we count
+        non-empty lines as comments.
+        
+        Args:
+            chunk: Chunk string (newline-separated comments)
+            
+        Returns:
+            Number of comments in the chunk
+        """
+        if not chunk:
+            return 0
+        
+        # Count non-empty lines (comments)
+        lines = chunk.split('\n')
+        comment_count = len([line for line in lines if line.strip()])
+        return comment_count
+    
+    async def process_feedback(self, text, company_name: str = None, suggested_aspects: list = None):
         """
         Process feedback text through complete analysis pipeline.
         
         Args:
             text: Feedback text to analyze
             company_name: Optional company name for prompt customization
+            suggested_aspects: Optional list of approved aspects (frozen aspect list)
             
         Returns:
             Normalized analysis results
         """
         # Process chunks with sentiment analysis (prompts are created per chunk inside process_chunks)
-        comments_analysis = await self.process_chunks(text, None, 0, company_name=company_name)
+        comments_analysis = await self.process_chunks(
+            text, None, 0, company_name=company_name, suggested_aspects=suggested_aspects
+        )
         logger.debug("Comment analysis completed", extra={"result": comments_analysis})
 
         # Process chunks with deep analysis (prompts are created per chunk inside process_chunks)
@@ -101,8 +254,18 @@ class ProcessingService:
         if isinstance(deep_analysis, str):
             deep_analysis = [deep_analysis]
 
-        # Normalize and aggregate results
-        normalized_results = self._normalize_analysis_results(comments_analysis)
+        # Parse LLM extractions and aggregate using aggregation service
+        extracted_comments = self._parse_llm_extractions(comments_analysis)
+        
+        if extracted_comments is None:
+            # Legacy format: use old normalization (backward compatibility)
+            logger.warning("Using legacy normalization due to old LLM format")
+            normalized_results = self._normalize_analysis_results_legacy(comments_analysis)
+        else:
+            # New format: use aggregation service
+            from .aggregation_service import get_aggregation_service
+            aggregation_service = get_aggregation_service()
+            normalized_results = aggregation_service.aggregate_comment_extractions(extracted_comments)
         
         # Save insights to database
         insight_data = self._prepare_insight_data(text, normalized_results, comments_analysis, deep_analysis)
@@ -120,7 +283,7 @@ class ProcessingService:
             }
         }
 
-    async def process_uploaded_data_async(self, data, file_type, doc_type):
+    async def process_uploaded_data_async(self, data, file_type, doc_type, suggested_aspects: list = None):
         """
         Process uploaded data asynchronously based on file type and document type.
         
@@ -128,6 +291,7 @@ class ProcessingService:
             data: The uploaded data
             file_type: 'json' or 'csv'
             doc_type: 0 for feedback, 1 for user stories
+            suggested_aspects: Optional list of approved aspects (frozen aspect list)
             
         Returns:
             Processing results
@@ -138,7 +302,7 @@ class ProcessingService:
             if doc_type == 0:  # Feedback processing
                 # Extract comments from JSON data before processing
                 extracted_text = self._extract_text_from_data(data, file_type)
-                result = await self.process_feedback(extracted_text)
+                result = await self.process_feedback(extracted_text, suggested_aspects=suggested_aspects)
                 return result
             
             # User Stories
@@ -150,7 +314,7 @@ class ProcessingService:
             # Extract comments from CSV data before processing
             if doc_type == 0:  # Feedback processing
                 extracted_text = self._extract_text_from_data(data, file_type)
-                result = await self.process_feedback(extracted_text)
+                result = await self.process_feedback(extracted_text, suggested_aspects=suggested_aspects)
                 return result
             # Simulate async processing for other doc types
             await asyncio.sleep(1)
@@ -232,15 +396,64 @@ class ProcessingService:
             logger.warning(f"No comments extracted from {file_type} data, using full data as string")
             return str(data)
 
-    def _normalize_analysis_results(self, comments_analysis):
+    def _parse_llm_extractions(self, comments_analysis):
         """
-        Normalize comment analysis across chunks.
+        Parse LLM extraction results into a unified list of comment extractions.
+        
+        The new LLM format returns an array of comment extractions per chunk.
+        This method combines all chunks and returns a flat list.
+        Only processes validated batches (skips error results).
         
         Args:
-            comments_analysis: List of analysis results from chunks
-            
+            comments_analysis: List of LLM responses (one per chunk), each containing
+                              an array of comment extractions or error dict
+                              
         Returns:
-            Normalized analysis dictionary
+            Flat list of all comment extractions across all chunks, or None if legacy format detected
+        """
+        all_extractions = []
+        
+        def safe_parse(item):
+            """Safely parse JSON string or return dict as-is."""
+            if isinstance(item, dict):
+                return item
+            try:
+                return json.loads(item)
+            except Exception:
+                return {}
+        
+        for chunk_result in comments_analysis:
+            parsed = safe_parse(chunk_result)
+            
+            # Skip error results (they're already in dict format with error field)
+            if isinstance(parsed, dict) and parsed.get('error'):
+                logger.warning(f"Skipping chunk with error: {parsed.get('error')}")
+                continue
+            
+            # Handle new format: array of comment extractions
+            if isinstance(parsed, list):
+                all_extractions.extend(parsed)
+            # Handle legacy format: object with counts/summaries (backward compatibility)
+            elif isinstance(parsed, dict):
+                # Try to extract comments if in legacy format
+                # This maintains backward compatibility
+                if 'counts' in parsed or 'sentiment_summary' in parsed:
+                    # Legacy format detected - return None to trigger fallback
+                    logger.warning("Legacy LLM format detected. LLM should return array of extractions. Falling back to legacy normalization.")
+                    return None
+                else:
+                    # Maybe it's a single extraction object wrapped
+                    all_extractions.append(parsed)
+        
+        return all_extractions if all_extractions else None
+
+    def _normalize_analysis_results_legacy(self, comments_analysis):
+        """
+        Legacy normalization method for backward compatibility.
+        Used when LLM returns old format with counts/summaries.
+        
+        This method should eventually be deprecated once all LLM responses
+        are migrated to the new extraction format.
         """
         total_count = 0
         total_pos = 0
@@ -263,6 +476,10 @@ class ProcessingService:
                 return {}
 
         for item in comments_analysis:
+            # Skip error results
+            if isinstance(item, dict) and item.get('error'):
+                continue
+                
             data = safe_parse(item)
             counts = data.get('counts') or {}
             
@@ -291,10 +508,10 @@ class ProcessingService:
             total_neu += t_neu
 
             # Process features
-            self._process_features(data, feature_map)
+            self._process_features_legacy(data, feature_map)
             
             # Process keywords
-            self._process_keywords(data, pos_kw_scores, pos_kw_counts, neg_kw_scores, neg_kw_counts)
+            self._process_keywords_legacy(data, pos_kw_scores, pos_kw_counts, neg_kw_scores, neg_kw_counts)
 
         # Build overall sentiment percentages
         overall = self._calculate_overall_sentiment(total_count, total_pos, total_neg, total_neu)
@@ -317,8 +534,8 @@ class ProcessingService:
             'negative_keywords': negative_keywords,
         }
 
-    def _process_features(self, data, feature_map):
-        """Process and merge features from analysis data."""
+    def _process_features_legacy(self, data, feature_map):
+        """Process and merge features from analysis data (legacy method)."""
         features_list = data.get('feature_asba') or data.get('featureasba') or []
         for feat in features_list:
             name = (feat.get('feature') or '').strip()
@@ -368,8 +585,8 @@ class ProcessingService:
                         existing['keywords'].append(kw)
                         kw_set.add(kw)
 
-    def _process_keywords(self, data, pos_kw_scores, pos_kw_counts, neg_kw_scores, neg_kw_counts):
-        """Process and aggregate keywords from analysis data."""
+    def _process_keywords_legacy(self, data, pos_kw_scores, pos_kw_counts, neg_kw_scores, neg_kw_counts):
+        """Process and aggregate keywords from analysis data (legacy method)."""
         # Process positive keywords
         for kw in (data.get('positive_keywords') or data.get('positivekeywords') or []):
             word = kw.get('keyword') if isinstance(kw, dict) else None

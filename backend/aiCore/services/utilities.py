@@ -30,12 +30,13 @@ def flatten_feedback(data: List[Dict[str, Any]]) -> List[str]:
 def fix_json_string(faulty_json: str) -> str:
     """
     Clean and fix malformed JSON strings from LLM responses.
+    Enhanced to handle control characters, arrays, and objects.
     
     Args:
-        faulty_json: Potentially malformed JSON string
+        faulty_json: Potentially malformed JSON string (can be array [] or object {})
         
     Returns:
-        Cleaned JSON string
+        Cleaned JSON string (original format preserved - array or object)
         
     Raises:
         ValueError: If input is empty or None
@@ -43,41 +44,170 @@ def fix_json_string(faulty_json: str) -> str:
     if not faulty_json:
         raise ValueError("Input JSON string cannot be empty")
     
+    # Step 0: Try direct parsing first - if it works, return as-is (no aggressive cleaning needed)
     try:
-        # Step 1: Replace escaped newlines and quotes
-        cleaned_json = faulty_json.replace(r'\\n', '\n')  # Unescape newlines
-        cleaned_json = cleaned_json.replace(r'\\"', '"')   # Unescape quotes
-        cleaned_json = cleaned_json.replace(r'json', '')   # Remove stray 'json' text
-        
-        # Step 2: Clean additional escape characters
-        cleaned_json = re.sub(r'\\\\"', '"', cleaned_json)
-        
-        # Step 3: Remove unwanted stray characters (non-alphanumeric, non-structural)
-        cleaned_json = re.sub(r'[^a-zA-Z0-9\s\[\]\{\}\:,\.\-\"\\n]', '', cleaned_json)
-        
-        # Step 4: Normalize whitespace - convert newlines/carriage returns to spaces
-        cleaned_json = re.sub(r'[\n\r]+', ' ', cleaned_json)
+        json.loads(faulty_json)
+        logger.info("JSON successfully validated without cleaning")
+        return faulty_json
+    except json.JSONDecodeError:
+        pass  # Continue with cleaning
+    
+    try:
+        # Step 1: Remove markdown code blocks if present (do this early to preserve structure)
+        cleaned_json = faulty_json.strip()
+        if cleaned_json.startswith("```json"):
+            cleaned_json = cleaned_json[7:]
+        elif cleaned_json.startswith("```"):
+            cleaned_json = cleaned_json[3:]
+        if cleaned_json.endswith("```"):
+            cleaned_json = cleaned_json[:-3]
         cleaned_json = cleaned_json.strip()
         
-        # Step 5: Ensure the string has opening and closing braces for valid JSON structure
-        if not cleaned_json.startswith("{"):
-            cleaned_json = "{" + cleaned_json
-        if not cleaned_json.endswith("}"):
-            cleaned_json = cleaned_json + "}"
+        # Step 2: Remove or escape control characters that break JSON parsing
+        # Remove control characters (0x00-0x1F) except allowed ones (tab, newline, carriage return)
+        cleaned_json = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', cleaned_json)
         
-        # Step 6: Validate the JSON is parseable
+        # Step 3: Extract JSON array or object from text if embedded
+        # Try to find JSON structure (array [] or object {})
+        json_start = -1
+        json_end = -1
+        
+        # Check for array first (our use case)
+        array_start = cleaned_json.find('[')
+        object_start = cleaned_json.find('{')
+        
+        if array_start != -1 and (object_start == -1 or array_start < object_start):
+            # Array found, extract it
+            json_start = array_start
+            # Find matching closing bracket
+            bracket_count = 0
+            for i in range(json_start, len(cleaned_json)):
+                if cleaned_json[i] == '[':
+                    bracket_count += 1
+                elif cleaned_json[i] == ']':
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        json_end = i + 1
+                        break
+            if json_end > json_start:
+                cleaned_json = cleaned_json[json_start:json_end]
+        elif object_start != -1:
+            # Object found, extract it
+            json_start = object_start
+            # Find matching closing brace
+            brace_count = 0
+            for i in range(json_start, len(cleaned_json)):
+                if cleaned_json[i] == '{':
+                    brace_count += 1
+                elif cleaned_json[i] == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_end = i + 1
+                        break
+            if json_end > json_start:
+                cleaned_json = cleaned_json[json_start:json_end]
+        
+        # Step 4: Fix common escape sequence issues (but preserve structure)
+        # Only fix actual escape sequences, don't break valid JSON
+        cleaned_json = cleaned_json.replace(r'\\n', '\n')  # Unescape newlines in strings
+        cleaned_json = re.sub(r'(?<!\\)\\"', '"', cleaned_json)  # Fix unescaped quotes in strings
+        
+        # Step 5: Fix unterminated strings by finding and closing them
+        cleaned_json = fix_unterminated_strings(cleaned_json)
+        
+        # Step 6: Validate and fix common JSON issues
+        cleaned_json = fix_common_json_issues(cleaned_json)
+        
+        # Step 7: Final validation
         try:
-            json.loads(cleaned_json)
+            parsed = json.loads(cleaned_json)
+            logger.info("JSON successfully cleaned and validated")
+            # Return the cleaned JSON string
+            return cleaned_json
         except json.JSONDecodeError as e:
+            # Last resort: try to extract JSON using extract_json_from_text
             logger.warning(f"JSON validation failed after cleaning: {e}")
-            # Return a minimal valid JSON structure
-            return '{"error": "Failed to parse LLM response", "raw_content": "' + faulty_json[:100] + '"}'
-        
-        return cleaned_json
+            extracted = extract_json_from_text(faulty_json)
+            if extracted:
+                try:
+                    json.loads(extracted)
+                    logger.info("JSON successfully extracted from text")
+                    return extracted
+                except json.JSONDecodeError:
+                    pass
+            
+            # If all else fails, log the raw content but still return the cleaned version
+            # This allows the validator to see the raw content and handle it
+            logger.error(f"Failed to parse JSON after all cleaning attempts. Raw content (first 500 chars): {faulty_json[:500]}")
+            # Don't return an error dict - return the cleaned JSON so validator can handle it
+            return cleaned_json
         
     except Exception as e:
         logger.error(f"Error fixing JSON string: {e}")
-        return '{"error": "JSON processing failed", "raw_content": "' + str(faulty_json)[:100] + '"}'
+        # Return original on exception - let validator handle it
+        return faulty_json
+
+def fix_unterminated_strings(json_str: str) -> str:
+    """
+    Fix unterminated strings in JSON by properly closing them.
+    
+    Args:
+        json_str: JSON string with potential unterminated strings
+        
+    Returns:
+        JSON string with fixed string termination
+    """
+    try:
+        # Simple approach: ensure all quotes are properly paired
+        # This is a basic implementation - more sophisticated parsing could be added
+        
+        # Count quotes and fix obvious issues
+        quote_count = json_str.count('"')
+        if quote_count % 2 != 0:
+            # Odd number of quotes - likely unterminated string
+            # Find the last quote and see if it needs closing
+            last_quote_pos = json_str.rfind('"')
+            if last_quote_pos != -1:
+                # Check if this quote is properly closed
+                remaining = json_str[last_quote_pos + 1:]
+                if not any(c in remaining for c in ['"', '}', ']', ',']):
+                    # Likely unterminated - add closing quote
+                    json_str = json_str[:last_quote_pos + 1] + '"' + remaining
+        
+        return json_str
+    except Exception as e:
+        logger.warning(f"Error fixing unterminated strings: {e}")
+        return json_str
+
+def fix_common_json_issues(json_str: str) -> str:
+    """
+    Fix common JSON formatting issues.
+    
+    Args:
+        json_str: JSON string to fix
+        
+    Returns:
+        Fixed JSON string
+    """
+    try:
+        # Fix trailing commas
+        json_str = re.sub(r',\s*}', '}', json_str)
+        json_str = re.sub(r',\s*]', ']', json_str)
+        
+        # Fix missing commas between objects/arrays
+        json_str = re.sub(r'}\s*{', '},{', json_str)
+        json_str = re.sub(r']\s*\[', '],[', json_str)
+        
+        # Fix unquoted keys (basic cases)
+        json_str = re.sub(r'(\w+):', r'"\1":', json_str)
+        
+        # Fix single quotes to double quotes
+        json_str = re.sub(r"'([^']*)'", r'"\1"', json_str)
+        
+        return json_str
+    except Exception as e:
+        logger.warning(f"Error fixing common JSON issues: {e}")
+        return json_str
 
 def validate_json_structure(cleaned_json: str, validation_type: int = 0) -> Optional[Dict[str, Any]]:
     """
@@ -190,6 +320,7 @@ def sanitize_llm_output(output: str, max_length: int = 10000) -> str:
 def extract_json_from_text(text: str) -> Optional[str]:
     """
     Extract JSON content from mixed text that might contain JSON.
+    Handles both arrays [] and objects {}.
     
     Args:
         text: Text that might contain JSON
@@ -200,8 +331,42 @@ def extract_json_from_text(text: str) -> Optional[str]:
     if not text:
         return None
     
-    # Try to find JSON-like content between braces
-    json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+    # Try to find JSON arrays first (our primary use case)
+    bracket_count = 0
+    array_start = text.find('[')
+    if array_start != -1:
+        for i in range(array_start, len(text)):
+            if text[i] == '[':
+                bracket_count += 1
+            elif text[i] == ']':
+                bracket_count -= 1
+                if bracket_count == 0:
+                    array_json = text[array_start:i+1]
+                    try:
+                        json.loads(array_json)
+                        return array_json
+                    except json.JSONDecodeError:
+                        break
+    
+    # Try to find JSON objects
+    brace_count = 0
+    object_start = text.find('{')
+    if object_start != -1:
+        for i in range(object_start, len(text)):
+            if text[i] == '{':
+                brace_count += 1
+            elif text[i] == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    object_json = text[object_start:i+1]
+                    try:
+                        json.loads(object_json)
+                        return object_json
+                    except json.JSONDecodeError:
+                        break
+    
+    # Fallback: try regex pattern (less reliable)
+    json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]'
     matches = re.findall(json_pattern, text, re.DOTALL)
     
     for match in matches:
