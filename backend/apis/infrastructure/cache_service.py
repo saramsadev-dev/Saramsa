@@ -1,11 +1,13 @@
 """
 Caching service for performance optimization.
 Provides Redis-based caching with fallback to in-memory caching.
+Supports both local Redis and Azure Redis Cache with SSL.
 """
 
 import json
 import logging
 import hashlib
+import ssl
 from typing import Any, Optional, Dict, List
 from datetime import datetime, timedelta
 from functools import wraps
@@ -24,6 +26,7 @@ except ImportError:
 class CacheService:
     """
     Unified caching service with Redis backend and in-memory fallback.
+    Supports both local Redis and Azure Redis Cache with SSL.
     """
     
     def __init__(self):
@@ -36,16 +39,34 @@ class CacheService:
             'deletes': 0
         }
         
-        # Initialize Redis if available
         if REDIS_AVAILABLE:
             try:
-                redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+                redis_url = os.getenv('REDIS_URL')
+                
+                if not redis_url:
+                    logger.warning("REDIS_URL environment variable not set. Using in-memory cache.")
+                    return
+                
+                # Azure Redis requires SSL connections (rediss://)
+                if not redis_url.startswith('rediss://'):
+                    logger.warning(f"REDIS_URL should use rediss:// for Azure Redis. Got: {redis_url[:20]}... Using in-memory cache.")
+                    return
+                
+                # Azure Redis typically requires SSL with certificate validation disabled
+                self.redis_client = redis.from_url(
+                    redis_url,
+                    decode_responses=True,
+                    ssl_cert_reqs=ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
+                    ssl_ca_certs=None,
+                    ssl_certfile=None,
+                    ssl_keyfile=None
+                )
+                
                 # Test connection
                 self.redis_client.ping()
-                logger.info("Redis cache initialized successfully")
+                logger.info("Azure Redis cache initialized successfully")
             except Exception as e:
-                logger.warning(f"Redis connection failed, using in-memory cache: {e}")
+                logger.warning(f"Azure Redis connection failed, using in-memory cache: {e}")
                 self.redis_client = None
     
     def _generate_key(self, key: str, prefix: str = "saramsa") -> str:

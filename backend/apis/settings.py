@@ -5,23 +5,17 @@ from datetime import timedelta
 from dotenv import load_dotenv
 load_dotenv()
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-# Ensure the logs directory exists before LOGGING handlers try to write files
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here-change-in-production')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-# Allow all Azure Web App hostnames and localhost
 ALLOWED_HOSTS = os.environ.get(
     'ALLOWED_HOSTS',
     '.azurewebsites.net,127.0.0.1,localhost'
 ).split(',')
-# Ensure .azurewebsites.net is always included for Azure deployments
 if '.azurewebsites.net' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('.azurewebsites.net')
 
@@ -143,20 +137,38 @@ COSMOS_DB_CONFIG = {
     }
 }
 
-# Celery Configuration
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 
-# SSL configuration for Redis (if using rediss://)
-if CELERY_BROKER_URL.startswith('rediss://'):
+# Celery Configuration - Azure Redis
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')  # Required for Azure Redis Cache
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND')  # Required for Azure Redis Cache
+
+# Add SSL certificate requirements to Redis URLs for Azure Redis
+if CELERY_BROKER_URL and CELERY_BROKER_URL.startswith('rediss://'):
+    # Append ssl_cert_reqs parameter to URL if not already present
+    if 'ssl_cert_reqs' not in CELERY_BROKER_URL:
+        separator = '&' if '?' in CELERY_BROKER_URL else '?'
+        # Use CERT_NONE as the value (required by Celery Redis backend)
+        CELERY_BROKER_URL = f"{CELERY_BROKER_URL}{separator}ssl_cert_reqs=CERT_NONE"
+        # Update environment variable for celery.py
+        os.environ['CELERY_BROKER_URL'] = CELERY_BROKER_URL
     CELERY_BROKER_TRANSPORT_OPTIONS = {
-        'ssl_cert_reqs': ssl.CERT_REQUIRED,
-    }
-    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
-        'ssl_cert_reqs': ssl.CERT_REQUIRED,
+        'ssl_cert_reqs': ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
     }
 else:
     CELERY_BROKER_TRANSPORT_OPTIONS = {}
+
+if CELERY_RESULT_BACKEND and CELERY_RESULT_BACKEND.startswith('rediss://'):
+    # Append ssl_cert_reqs parameter to URL if not already present
+    if 'ssl_cert_reqs' not in CELERY_RESULT_BACKEND:
+        separator = '&' if '?' in CELERY_RESULT_BACKEND else '?'
+        # Use CERT_NONE as the value (required by Celery Redis backend)
+        CELERY_RESULT_BACKEND = f"{CELERY_RESULT_BACKEND}{separator}ssl_cert_reqs=CERT_NONE"
+        # Update environment variable for celery.py
+        os.environ['CELERY_RESULT_BACKEND'] = CELERY_RESULT_BACKEND
+    CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+        'ssl_cert_reqs': ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
+    }
+else:
     CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {}
 
 CELERY_ACCEPT_CONTENT = ['json']
@@ -164,12 +176,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
-# Cosmos DB Only - No traditional SQL database needed
-# Django apps that require database models are disabled
-# All data storage is handled through Cosmos DB service
 DATABASES = {}
-
-# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
@@ -323,8 +330,7 @@ SIMPLE_JWT = {
 SLOW_REQUEST_THRESHOLD = float(os.getenv('SLOW_REQUEST_THRESHOLD', '2.0'))  # seconds
 VERY_SLOW_REQUEST_THRESHOLD = float(os.getenv('VERY_SLOW_REQUEST_THRESHOLD', '5.0'))  # seconds
 
-# Redis Configuration for Caching
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+REDIS_URL = os.getenv('REDIS_URL')  
 
 # Cosmos DB Performance Configuration
 COSMOS_CONNECTION_POOL_SIZE = int(os.getenv('COSMOS_CONNECTION_POOL_SIZE', '10'))
