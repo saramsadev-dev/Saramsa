@@ -1,0 +1,22 @@
+"""
+Integrations Services
+
+This package contains all business logic services for the integrations app.
+Following Django best practices with organized service modules.
+"""
+
+from .integration_service import IntegrationService, get_integration_service
+from .project_service import ProjectService, get_project_service
+from .external_api_service import ExternalApiService, get_external_api_service
+from .encryption_service import EncryptionService, get_encryption_service
+
+__all__ = [
+    'IntegrationService',
+    'get_integration_service',
+    'ProjectService',
+    'get_project_service',
+    'ExternalApiService',
+    'get_external_api_service',
+    'EncryptionService',
+    'get_encryption_service',
+]

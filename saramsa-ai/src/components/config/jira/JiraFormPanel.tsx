@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Eye, 
@@ -46,6 +47,7 @@ interface JiraFormPanelProps {
   onBack: () => void;
   validationStatus: 'idle' | 'loading' | 'success' | 'error';
   isExistingIntegration?: boolean;
+  linkedProjects?: { [key: string]: { id: string; name: string } };
 }
 
 export const JiraFormPanel = ({
@@ -61,11 +63,25 @@ export const JiraFormPanel = ({
   onBack,
   validationStatus,
   isExistingIntegration = false,
+  linkedProjects = {},
 }: JiraFormPanelProps) => {
+  const router = useRouter();
   const [showApiToken, setShowApiToken] = useState(false);
   const [isTokenGuideOpen, setIsTokenGuideOpen] = useState(false);
 
   const toggleApiTokenVisibility = () => setShowApiToken(!showApiToken);
+
+  const handleLinkedProjectClick = async (projectId: string) => {
+    try {
+      const { encryptProjectId } = await import('@/lib/encryption');
+      const encryptedId = encryptProjectId(projectId);
+      router.push(`/projects/${encryptedId}/dashboard`);
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback to unencrypted ID if encryption fails
+      router.push(`/projects/${projectId}/dashboard`);
+    }
+  };
 
   const tokenSteps = [
     {
@@ -332,48 +348,78 @@ export const JiraFormPanel = ({
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Select Jira Project
                   </label>
+                  
+                  {Object.keys(linkedProjects).length > 0 && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        <strong>{Object.keys(linkedProjects).length}</strong> project(s) already linked. 
+                        Click on a linked project to go to its dashboard.
+                      </p>
+                    </div>
+                  )}
+                  
                   <div className="max-h-48 overflow-y-auto scrollbar-thin">
                     <div className="space-y-2 p-1">
-                      {projects?.map((project) => (
-                      <div
-                        key={project.id}
-                        className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                          selectedProject === project.id
-                            ? 'border-[#E603EB] bg-[#E603EB]/10 dark:bg-[#E603EB]/20'
-                            : 'border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/50'
-                        }`}
-                        onClick={() => onProjectSelect(project.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0">
-                              <Folder className="w-5 h-5 text-[#E603EB]" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900 dark:text-white">{project.name}</div>
-                              <div className="text-sm text-gray-500">
-                                Key: {project.key}
+                      {projects?.map((project) => {
+                        const linkedProject = linkedProjects[project.id];
+                        const isAlreadyLinked = !!linkedProject;
+                        
+                        return (
+                          <div
+                            key={project.id}
+                            className={`p-3 border rounded-lg transition-all ${
+                              isAlreadyLinked
+                                ? "cursor-pointer border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700"
+                                : selectedProject === project.id
+                                ? "border-[#E603EB] bg-[#E603EB]/10 dark:bg-[#E603EB]/20 cursor-pointer"
+                                : "border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/50 cursor-pointer"
+                            }`}
+                            onClick={() => isAlreadyLinked ? handleLinkedProjectClick(linkedProject.id) : onProjectSelect(project.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="flex-shrink-0">
+                                  <Folder className="w-5 h-5 text-[#E603EB]" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-gray-900 dark:text-white">
+                                    {project.name}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    Key: {project.key}
+                                  </div>
+                                  {isAlreadyLinked && (
+                                    <div className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center gap-1">
+                                      Already linked to "{linkedProject.name}"
+                                      <ArrowRight className="w-3 h-3" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {project.isCompanyManaged && (
+                                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded">
+                                    Company
+                                  </span>
+                                )}
+                                {project.isTeamManaged && (
+                                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">
+                                    Team
+                                  </span>
+                                )}
+                                {selectedProject === project.id && !isAlreadyLinked && (
+                                  <CheckCircle className="w-4 h-4 text-[#E603EB]" />
+                                )}
+                                {isAlreadyLinked && (
+                                  <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded whitespace-nowrap">
+                                    Linked
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {project.isCompanyManaged && (
-                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded">
-                                Company
-                              </span>
-                            )}
-                            {project.isTeamManaged && (
-                              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">
-                                Team
-                              </span>
-                            )}
-                            {selectedProject === project.id && (
-                              <CheckCircle className="w-4 h-4 text-[#E603EB]" />
-                            )}
-                          </div>
-                        </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
