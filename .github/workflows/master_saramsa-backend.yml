@@ -86,6 +86,14 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1532B4EEFA0A4F7F9278B1BD86DEC6CC }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B53E7A385C7D420A8E26E930039D9008 }}
 
+      - name: Stop Azure Web App (Backend)
+        run: |
+          # Get resource group from app
+          RG=$(az webapp show --name saramsa-backend --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
+          echo "Resource Group: $RG"
+          az webapp stop --name saramsa-backend --resource-group "$RG" || echo "App may already be stopped or not found"
+          sleep 10
+
       - name: Deploy to Azure Web App (Backend)
         uses: azure/webapps-deploy@v3
         with:
@@ -100,6 +108,12 @@ jobs:
           AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+
+      - name: Start Azure Web App (Backend)
+        run: |
+          # Get resource group from app
+          RG=$(az webapp show --name saramsa-backend --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
+          az webapp start --name saramsa-backend --resource-group "$RG"
 
       # Note: Startup command for backend should be set in Azure App Service:
       # gunicorn apis.wsgi:application --bind 0.0.0.0:8000
@@ -125,6 +139,14 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_533065BCACC943CFB6DC6E490DE766D1 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_62218F3CF0C84559AB8D5FF7DC281D84 }}
 
+      - name: Stop Azure Web App (Celery Worker)
+        run: |
+          # Get resource group from app
+          RG=$(az webapp show --name saramsa-celery --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
+          echo "Resource Group: $RG"
+          az webapp stop --name saramsa-celery --resource-group "$RG" || echo "App may already be stopped or not found"
+          sleep 10
+
       - name: Deploy to Azure Web App (Celery Worker)
         uses: azure/webapps-deploy@v3
         with:
@@ -139,6 +161,12 @@ jobs:
           AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+
+      - name: Start Azure Web App (Celery Worker)
+        run: |
+          # Get resource group from app
+          RG=$(az webapp show --name saramsa-celery --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
+          az webapp start --name saramsa-celery --resource-group "$RG"
 
       # Note: Startup command for worker should be set in Azure App Service:
       # celery -A apis worker --loglevel=info --concurrency=1
