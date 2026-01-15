@@ -1,4 +1,4 @@
-name: Saramsa Unified (master)
+name: Saramsa-backend (master)
 
 on:
   push:
@@ -20,8 +20,7 @@ jobs:
         working-directory: backend
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,39 +32,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Note: Migrations are NOT run here - they should run on deploy or manually
-      # This prevents version skew and database connection issues in CI
-
-      - name: Collect static files
+      - name: Run Django migrations & collectstatic
         env:
           DJANGO_SETTINGS_MODULE: apis.settings
-          # Minimal env vars needed for collectstatic (no DB connection required)
+          API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
+          DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+          API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
+          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
-          python manage.py collectstatic --noinput || echo "Collectstatic failed (non-critical)"
+          python manage.py migrate --noinput
+          python manage.py collectstatic --noinput
 
-      - name: Create deployment artifact
+      # If you want to run tests, add a step here
+
+      - name: Create deployment bundle
         run: |
           mkdir -p ../artifact
-          rm -f ../artifact/app.zip
-          # Create a single artifact from backend directory
-          # Exclude virtual environments, cache, and local files
-          zip -r ../artifact/app.zip . \
-            -x 'venv/*' \
-            -x '*/venv/*' \
-            -x '*__pycache__/*' \
-            -x '*.pyc' \
-            -x 'db.sqlite3*' \
-            -x '.git/*' \
-            -x '*.log'
+          rm -f ../artifact/backend.zip
+          zip -r ../artifact/backend.zip . -x 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc' 'db.sqlite3*'
 
-      - name: Upload unified artifact
+      - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-build
-          path: artifact/app.zip
-          retention-days: 1
+          name: backend-build
+          path: artifact/backend.zip
 
-  deploy-backend:
+  deploy:
     runs-on: ubuntu-latest
     needs: build
     permissions:
@@ -76,7 +71,7 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: app-build
+          name: backend-build
           path: artifact
 
       - name: Login to Azure
@@ -86,20 +81,13 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1532B4EEFA0A4F7F9278B1BD86DEC6CC }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B53E7A385C7D420A8E26E930039D9008 }}
 
-      - name: Stop Azure Web App (Backend)
-        run: |
-          # Get resource group from app
-          RG=$(az webapp show --name saramsa-backend --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
-          echo "Resource Group: $RG"
-          az webapp stop --name saramsa-backend --resource-group "$RG" || echo "App may already be stopped or not found"
-          sleep 10
-
-      - name: Deploy to Azure Web App (Backend)
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
+        id: deploy-to-webapp
         with:
           app-name: 'saramsa-backend'
           slot-name: 'Production'
-          package: artifact/app.zip
+          package: artifact/backend.zip
         env:
           API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
@@ -108,65 +96,3 @@ jobs:
           AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-
-      - name: Start Azure Web App (Backend)
-        run: |
-          # Get resource group from app
-          RG=$(az webapp show --name saramsa-backend --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
-          az webapp start --name saramsa-backend --resource-group "$RG"
-
-      # Note: Startup command for backend should be set in Azure App Service:
-      # gunicorn apis.wsgi:application --bind 0.0.0.0:8000
-
-  deploy-worker:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-build
-          path: artifact
-
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_9B704E7288154F10948493E64600C219 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_533065BCACC943CFB6DC6E490DE766D1 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_62218F3CF0C84559AB8D5FF7DC281D84 }}
-
-      - name: Stop Azure Web App (Celery Worker)
-        run: |
-          # Get resource group from app
-          RG=$(az webapp show --name saramsa-celery --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
-          echo "Resource Group: $RG"
-          az webapp stop --name saramsa-celery --resource-group "$RG" || echo "App may already be stopped or not found"
-          sleep 10
-
-      - name: Deploy to Azure Web App (Celery Worker)
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'saramsa-celery'
-          slot-name: 'Production'
-          package: artifact/app.zip
-        env:
-          API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
-          DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
-          API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
-          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
-          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
-          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-
-      - name: Start Azure Web App (Celery Worker)
-        run: |
-          # Get resource group from app
-          RG=$(az webapp show --name saramsa-celery --query resourceGroup -o tsv 2>/dev/null || echo "saramsa")
-          az webapp start --name saramsa-celery --resource-group "$RG"
-
-      # Note: Startup command for worker should be set in Azure App Service:
-      # celery -A apis worker --loglevel=info --concurrency=1
