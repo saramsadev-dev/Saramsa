@@ -12,12 +12,21 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here-change-in-production')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get(
+# Parse ALLOWED_HOSTS from environment variable
+allowed_hosts_str = os.environ.get(
     'ALLOWED_HOSTS',
     '.azurewebsites.net,127.0.0.1,localhost'
-).split(',')
+)
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_str.split(',') if host.strip()]
+
+# Ensure .azurewebsites.net is always included for Azure App Service
 if '.azurewebsites.net' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('.azurewebsites.net')
+
+# On Azure App Service, use X-Forwarded-Host header for host validation
+# This allows Azure's internal health checks to work properly
+USE_X_FORWARDED_HOST = os.environ.get('WEBSITE_INSTANCE_ID') is not None
+USE_X_FORWARDED_PORT = os.environ.get('WEBSITE_INSTANCE_ID') is not None
 
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv(
     'APPLICATIONINSIGHTS_CONNECTION_STRING',
@@ -198,6 +207,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 MIDDLEWARE = [
+    # Azure host validation must run first to fix internal health check IPs
+    'apis.infrastructure.middleware.AzureHostValidationMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.middleware.common.CommonMiddleware',

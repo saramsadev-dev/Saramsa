@@ -2,11 +2,66 @@ import os
 import uuid
 import time
 import logging
+import ipaddress
 from django.utils.deprecation import MiddlewareMixin
 from opentelemetry import trace
 from ..core.request_context import request_id_var, token_usage_var
 
 logger = logging.getLogger(__name__)
+
+class AzureHostValidationMiddleware(MiddlewareMixin):
+    """
+    Middleware to handle Azure App Service internal health check IPs.
+    
+    Azure health checks come from internal IPs (169.254.x.x) which aren't in ALLOWED_HOSTS.
+    This middleware fixes the HTTP_HOST header for Azure internal requests by using
+    the X-Forwarded-Host header or the WEBSITE_HOSTNAME environment variable.
+    """
+    
+    def __init__(self, get_response):
+        super().__init__(get_response)
+        self.get_response = get_response
+        self.is_azure = bool(os.environ.get('WEBSITE_INSTANCE_ID'))
+        self.website_hostname = os.environ.get('WEBSITE_HOSTNAME', '')
+    
+    def process_request(self, request):
+        """Fix host header for Azure internal health checks"""
+        if not self.is_azure:
+            return None
+        
+        # Get the raw host from the request
+        raw_host = request.META.get('HTTP_HOST', '')
+        if not raw_host:
+            return None
+        
+        host = raw_host.split(':')[0]  # Remove port if present
+        
+        # Check if host is an Azure internal IP (169.254.0.0/16)
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_private and str(ip).startswith('169.254.'):
+                # This is an Azure internal health check
+                # Try to use X-Forwarded-Host first
+                forwarded_host = request.META.get('HTTP_X_FORWARDED_HOST', '')
+                if forwarded_host:
+                    # Extract hostname from forwarded host (may include port)
+                    forwarded_hostname = forwarded_host.split(':')[0].split(',')[0].strip()
+                    request.META['HTTP_HOST'] = forwarded_hostname
+                    logger.debug(f"Fixed Azure health check host using X-Forwarded-Host: {host} -> {forwarded_hostname}")
+                elif self.website_hostname:
+                    # Use the site's actual hostname from environment
+                    request.META['HTTP_HOST'] = self.website_hostname
+                    logger.debug(f"Fixed Azure health check host using WEBSITE_HOSTNAME: {host} -> {self.website_hostname}")
+                else:
+                    # Fallback to .azurewebsites.net pattern
+                    request.META['HTTP_HOST'] = '.azurewebsites.net'
+                    logger.debug(f"Fixed Azure health check host using fallback: {host} -> .azurewebsites.net")
+        except (ValueError, ipaddress.AddressValueError):
+            # Not an IP address, let Django handle it normally
+            pass
+        
+        return None
+
 
 class RequestResponseLoggingMiddleware(MiddlewareMixin):
     """
