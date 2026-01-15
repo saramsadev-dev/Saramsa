@@ -11,10 +11,22 @@ DEFAULT_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '1300'))
 DEFAULT_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', '0.7'))
 DEFAULT_TOP_P = float(os.getenv('OPENAI_TOP_P', '0.95'))
 
-# Get the singleton client
-azure_client = get_azure_client().get_client()
-
+# Initialize logger BEFORE using it
 logger = logging.getLogger("apis.app")
+
+def get_azure_client_instance():
+    """
+    Lazy initialization of Azure OpenAI Client.
+    Called only when needed, not at import time.
+    """
+    try:
+        azure_client = get_azure_client().get_client()
+        if not azure_client:
+            raise RuntimeError("Azure OpenAI client is not initialized")
+        return azure_client
+    except Exception as e:
+        logger.error(f"Failed to get Azure OpenAI client: {e}")
+        raise ConnectionError(f"Azure OpenAI service unavailable: {str(e)}")
 
 @handle_service_errors
 async def generate_completions(prompt_instruction, max_tokens=None):
@@ -52,6 +64,7 @@ async def generate_completions(prompt_instruction, max_tokens=None):
     logger.info("Analysing Sentiments...")
     
     try:
+        azure_client = get_azure_client_instance()
         # Generate the completion using the singleton client
         completion = azure_client.chat.completions.create(
             model=DEFAULT_MODEL,

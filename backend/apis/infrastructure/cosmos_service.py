@@ -1476,5 +1476,36 @@ class CosmosDBService:
             logger.error(f"Error getting comment extractions by project and run: {e}")
             return []
 
-# Global instance
-cosmos_service = CosmosDBService()
+# Lazy initialization pattern to avoid import-time side effects
+_cosmos_service = None
+
+def get_cosmos_service() -> CosmosDBService:
+    """
+    Get the global Cosmos DB service instance (lazy initialization).
+    Initializes only when first accessed, not at import time.
+    """
+    global _cosmos_service
+    if _cosmos_service is None:
+        _cosmos_service = CosmosDBService()
+    return _cosmos_service
+
+# Proxy object for backward compatibility with existing imports
+class _CosmosServiceProxy:
+    """
+    Proxy that lazily initializes CosmosDBService on first attribute access.
+    This allows existing code that imports 'cosmos_service' to continue working
+    without changes, while avoiding import-time initialization.
+    """
+    def __getattr__(self, name):
+        """Delegate attribute access to the actual service instance."""
+        return getattr(get_cosmos_service(), name)
+    
+    def __call__(self, *args, **kwargs):
+        """Allow calling the proxy as if it were the service (if service is callable)."""
+        service = get_cosmos_service()
+        if callable(service):
+            return service(*args, **kwargs)
+        return service
+
+# Create proxy instance for backward compatibility
+cosmos_service = _CosmosServiceProxy()

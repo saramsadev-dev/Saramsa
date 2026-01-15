@@ -3,7 +3,7 @@ Core API views for system monitoring and health checks.
 """
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from apis.core.response import StandardResponse
 from apis.infrastructure.performance_middleware import get_performance_summary
 from apis.infrastructure.cache_service import get_cache_service
@@ -14,10 +14,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def health_check(request):
     """
     System health check endpoint.
+    
+    Public endpoint for monitoring systems, load balancers, and health probes.
+    No authentication required.
     
     Returns:
         System health status and component availability
