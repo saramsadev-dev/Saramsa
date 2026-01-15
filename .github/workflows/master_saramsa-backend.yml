@@ -43,7 +43,6 @@ jobs:
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
-          python manage.py migrate --noinput
           python manage.py collectstatic --noinput
 
       # If you want to run tests, add a step here
@@ -52,7 +51,7 @@ jobs:
         run: |
           mkdir -p ../artifact
           rm -f ../artifact/backend.zip
-          zip -r ../artifact/backend.zip . -x 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc' 'db.sqlite3*'
+          zip -r ../artifact/backend.zip . -x 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
