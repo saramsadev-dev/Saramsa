@@ -19,6 +19,8 @@ interface PlatformSelectionScreenProps {
   onSkipConfig?: () => void;
 }
 
+//deployment check for frontend
+
 export function PlatformSelectionScreen({
   onPlatformSelect,
   onSkipConfig,
