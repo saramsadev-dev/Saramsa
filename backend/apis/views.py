@@ -60,6 +60,7 @@ def health_check(request):
             'is_enabled': cosmos_service.is_enabled,
             'has_client': cosmos_service.client is not None,
             'has_database': cosmos_service.database is not None,
+            'init_error': getattr(cosmos_service, '_init_error', None),
         }
     }
     

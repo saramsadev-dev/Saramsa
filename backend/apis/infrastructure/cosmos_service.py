@@ -18,6 +18,7 @@ class CosmosDBService:
         self.database = None
         self.containers = {}
         self.is_enabled = True
+        self._init_error = None  # Store initialization error for debugging
         self._personal_prefix = "personal::"
         self._connection_pool_size = int(os.getenv('COSMOS_CONNECTION_POOL_SIZE', '10'))
         self._request_timeout = int(os.getenv('COSMOS_REQUEST_TIMEOUT', '30'))
@@ -60,7 +61,8 @@ class CosmosDBService:
             
         except Exception as e:
             # Gracefully disable Cosmos in development/migrations if credentials invalid
-            logger.error(f"CosmosDB initialization failed: {e}")
+            self._init_error = str(e)
+            logger.error(f"CosmosDB initialization failed: {e}", exc_info=True)
             self.is_enabled = False
     
     def _initialize_containers(self):
