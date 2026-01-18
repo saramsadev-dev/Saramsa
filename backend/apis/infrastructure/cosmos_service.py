@@ -70,8 +70,18 @@ class CosmosDBService:
     
     def get_container(self, container_type: str):
         """Get container client by type"""
-        if not self.is_enabled or not self.database:
+        if not self.is_enabled or not self.client:
             raise RuntimeError("Cosmos DB is not configured/enabled. Set valid COSMOS_DB_* environment variables.")
+        
+        # Ensure database exists (lazy creation - safe to call multiple times)
+        try:
+            self.database = self.client.create_database_if_not_exists(
+                settings.COSMOS_DB_CONFIG['database_name']
+            )
+        except Exception as e:
+            logger.error(f"Error ensuring database exists: {e}")
+            raise RuntimeError(f"Failed to access/create database: {e}")
+        
         container_name = settings.COSMOS_DB_CONFIG['containers'].get(container_type)
         if not container_name:
             raise ValueError(f"Unknown container type: {container_type}")
