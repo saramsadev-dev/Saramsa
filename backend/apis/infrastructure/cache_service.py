@@ -11,6 +11,7 @@ import ssl
 from typing import Any, Optional, Dict, List
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse, parse_qs, unquote
 import os
 
 logger = logging.getLogger(__name__)
@@ -47,26 +48,50 @@ class CacheService:
                     logger.warning("REDIS_URL environment variable not set. Using in-memory cache.")
                     return
                 
-                # Azure Redis requires SSL connections (rediss://)
-                if not redis_url.startswith('rediss://'):
-                    logger.warning(f"REDIS_URL should use rediss:// for Azure Redis. Got: {redis_url[:20]}... Using in-memory cache.")
-                    return
+                # Support both local Redis (redis://) and Azure Redis (rediss://)
+                is_ssl = redis_url.startswith('rediss://')
                 
-                # Azure Redis typically requires SSL with certificate validation disabled
-                self.redis_client = redis.from_url(
-                    redis_url,
-                    decode_responses=True,
-                    ssl_cert_reqs=ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
-                    ssl_ca_certs=None,
-                    ssl_certfile=None,
-                    ssl_keyfile=None
-                )
+                if is_ssl:
+                    # Parse URL for Azure Redis with SSL
+                    parsed = urlparse(redis_url)
+                    host = parsed.hostname
+                    port = parsed.port or 6380  # Default SSL port for Azure Redis
+                    # Handle password (may be URL encoded)
+                    password = parsed.password
+                    if password:
+                        password = unquote(password)
+                    
+                    # Azure Redis requires SSL with certificate validation disabled
+                    # Use Redis() constructor directly as from_url() doesn't handle ssl_cert_reqs properly
+                    self.redis_client = redis.Redis(
+                        host=host,
+                        port=port,
+                        password=password,
+                        decode_responses=True,
+                        ssl=True,
+                        ssl_cert_reqs=ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
+                        ssl_ca_certs=None,
+                        ssl_certfile=None,
+                        ssl_keyfile=None
+                    )
+                    logger.info("Connecting to Azure Redis (SSL)...")
+                else:
+                    # Local Redis without SSL
+                    if not redis_url.startswith('redis://'):
+                        logger.warning(f"REDIS_URL should start with redis:// or rediss://. Got: {redis_url[:20]}... Using in-memory cache.")
+                        return
+                    
+                    self.redis_client = redis.from_url(
+                        redis_url,
+                        decode_responses=True
+                    )
+                    logger.info("Connecting to local Redis (non-SSL)...")
                 
                 # Test connection
                 self.redis_client.ping()
-                logger.info("Azure Redis cache initialized successfully")
+                logger.info(f"Redis cache initialized successfully ({'SSL' if is_ssl else 'non-SSL'})")
             except Exception as e:
-                logger.warning(f"Azure Redis connection failed, using in-memory cache: {e}")
+                logger.warning(f"Redis connection failed, using in-memory cache: {e}")
                 self.redis_client = None
     
     def _generate_key(self, key: str, prefix: str = "saramsa") -> str:

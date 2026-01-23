@@ -227,6 +227,36 @@ class DevOpsService:
             logger.error(f"Error updating work item {work_item_id}: {e}")
             return None
     
+    def remove_work_items(self, work_item_ids: List[str], user_id: str, user_story_id: str = None) -> Dict[str, Any]:
+        """Remove/delete work items by IDs."""
+        try:
+            removed_count = 0
+            failed_ids = []
+            
+            for work_item_id in work_item_ids:
+                try:
+                    # Try to remove the work item from the repository
+                    success = self.work_item_repo.remove_embedded_work_item(work_item_id, user_id)
+                    if success:
+                        removed_count += 1
+                    else:
+                        failed_ids.append(work_item_id)
+                except Exception as e:
+                    logger.error(f"Error removing work item {work_item_id}: {e}")
+                    failed_ids.append(work_item_id)
+            
+            return {
+                "success": True,
+                "removed_count": removed_count,
+                "failed_ids": failed_ids,
+                "total_requested": len(work_item_ids),
+                "user_story_id": user_story_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error removing work items: {e}")
+            raise
+    
     def submit_to_external_platform(self, user_id: str, work_items: List[Dict[str, Any]], 
                                    platform: str, project_config: Dict[str, Any]) -> Dict[str, Any]:
         """Submit work items to external platform - delegate to integrations service."""

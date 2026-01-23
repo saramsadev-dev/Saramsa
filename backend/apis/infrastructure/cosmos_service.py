@@ -757,6 +757,15 @@ class CosmosDBService:
             logger.error(f"Error updating embedded work item: {e}")
             return None
 
+    def remove_embedded_work_item(self, work_item_id: str, user_id: str) -> bool:
+        """Remove a single embedded work item from user_story documents."""
+        try:
+            result = self.delete_embedded_work_items([work_item_id], user_id)
+            return result > 0
+        except Exception as e:
+            logger.error(f"Error removing embedded work item: {e}")
+            return False
+
     def delete_embedded_work_items(self, work_item_ids: List[str], user_id: str) -> int:
         """Delete one or more embedded work items by id from user_story documents. Returns count deleted."""
         try:

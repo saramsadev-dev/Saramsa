@@ -388,6 +388,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
   // Extract user stories from consolidated data and set in Redux store
   useEffect(() => {
+    console.log('🔍 Dashboard useEffect triggered - latestAnalysis:', latestAnalysis);
+    console.log('🔍 Dashboard useEffect - latestAnalysis.analysis:', latestAnalysis?.analysis);
+    console.log('🔍 Dashboard useEffect - latestAnalysis.analysis.userStories:', latestAnalysis?.analysis?.userStories);
+    console.log('🔍 Dashboard useEffect - work_items:', latestAnalysis?.analysis?.userStories?.work_items);
+    
     if (latestAnalysis?.analysis?.userStories?.work_items) {
       const workItems = latestAnalysis.analysis.userStories.work_items;
       console.log('🔍 Dashboard: Extracting user stories from consolidated data:', workItems.length, 'items');
@@ -1751,8 +1756,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                   console.log('🔍 Final check - currentProjectUserStories:', currentProjectUserStories);
                   console.log('🔍 Final check - currentProjectUserStories length:', currentProjectUserStories?.length);
                   console.log('🔍 Final check - currentProjectUserStories[0]:', currentProjectUserStories?.[0]);
+                  console.log('🔍 Final check - Condition result:', (hasValidDeepAnalysis && hasWorkItems) || hasUserStories);
                   
-                  return (hasValidDeepAnalysis && hasWorkItems) || hasUserStories ? (
+                  // Simplified condition - show if we have ANY work items from either source
+                  const shouldShowUserStories = (hasValidDeepAnalysis && hasWorkItems) || hasUserStories;
+                  
+                  return shouldShowUserStories ? (
                     <UserStoryList 
                       key={`user-stories-${deepAnalysis?.id || currentProjectUserStories?.[0]?.id || 'default'}`} 
                       userStories={hasWorkItems ? [{

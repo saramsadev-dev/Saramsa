@@ -30,9 +30,9 @@ export function PlatformSelectionScreen({
   >(null);
 
   useEffect(() => {
-    // Fetch existing integrations to check status
-    dispatch(fetchIntegrationAccounts());
-  }, [dispatch]);
+    // Integration accounts are now fetched at the parent level
+    // This component just reads from Redux state
+  }, []);
 
   // Check if integrations already exist
   const hasAzureIntegration = accounts.some(

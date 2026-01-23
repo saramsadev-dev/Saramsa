@@ -100,7 +100,7 @@ export const createProject = createAsyncThunk(
         return rejectWithValue(response.data.error || 'Failed to create project');
       }
       
-      return response.data.data.project;
+      return response.data.data;
     } catch (error: any) {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create project';
       return rejectWithValue(errorMessage);
@@ -157,7 +157,7 @@ export const importProjectFromExternal = createAsyncThunk(
     }
     
     const response = await apiRequest('post', '/integrations/projects/create/', createData, true);
-    return response.data.data.project;
+    return response.data.data;
   }
 );
 
@@ -170,7 +170,7 @@ export const updateProject = createAsyncThunk(
     }, true);
     
     if (response.data.success) {
-      return response.data.data.project;
+      return response.data.data;
     } else {
       throw new Error(response.data.error || 'Failed to update project');
     }
@@ -212,7 +212,7 @@ export const createProjectLegacy = createAsyncThunk(
       ...data.metadata,
     }, true);
     
-    const project = response.data.data.project;
+    const project = response.data.data;
     
     // Transform to our Project interface
     return {
@@ -282,13 +282,19 @@ const projectsSlice = createSlice({
       })
       .addCase(createProject.fulfilled, (state, action) => {
         state.loading = false;
-        // Check if project already exists before adding
-        const existingIndex = state.projects.findIndex(p => p.id === action.payload.id);
-        if (existingIndex === -1) {
-          state.projects.push(action.payload);
+        // Safety check: ensure payload exists and has an id
+        if (action.payload && action.payload.id) {
+          // Check if project already exists before adding
+          const existingIndex = state.projects.findIndex(p => p.id === action.payload.id);
+          if (existingIndex === -1) {
+            state.projects.push(action.payload);
+          } else {
+            // Update existing project
+            state.projects[existingIndex] = action.payload;
+          }
         } else {
-          // Update existing project
-          state.projects[existingIndex] = action.payload;
+          console.error('createProject fulfilled but payload is invalid:', action.payload);
+          state.error = 'Project created but data is invalid';
         }
       })
       .addCase(createProject.rejected, (state, action) => {
@@ -303,13 +309,19 @@ const projectsSlice = createSlice({
       })
       .addCase(importProjectFromExternal.fulfilled, (state, action) => {
         state.importing = false;
-        // Check if project already exists before adding
-        const existingIndex = state.projects.findIndex(p => p.id === action.payload.id);
-        if (existingIndex === -1) {
-          state.projects.push(action.payload);
+        // Safety check: ensure payload exists and has an id
+        if (action.payload && action.payload.id) {
+          // Check if project already exists before adding
+          const existingIndex = state.projects.findIndex(p => p.id === action.payload.id);
+          if (existingIndex === -1) {
+            state.projects.push(action.payload);
+          } else {
+            // Update existing project
+            state.projects[existingIndex] = action.payload;
+          }
         } else {
-          // Update existing project
-          state.projects[existingIndex] = action.payload;
+          console.error('importProjectFromExternal fulfilled but payload is invalid:', action.payload);
+          state.importError = 'Project imported but data is invalid';
         }
       })
       .addCase(importProjectFromExternal.rejected, (state, action) => {
@@ -324,12 +336,18 @@ const projectsSlice = createSlice({
       })
       .addCase(updateProject.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.projects.findIndex(p => p.id === action.payload.id);
-        if (index !== -1) {
-          state.projects[index] = action.payload;
-        }
-        if (state.currentProject?.id === action.payload.id) {
-          state.currentProject = action.payload;
+        // Safety check: ensure payload exists and has an id
+        if (action.payload && action.payload.id) {
+          const index = state.projects.findIndex(p => p.id === action.payload.id);
+          if (index !== -1) {
+            state.projects[index] = action.payload;
+          }
+          if (state.currentProject?.id === action.payload.id) {
+            state.currentProject = action.payload;
+          }
+        } else {
+          console.error('updateProject fulfilled but payload is invalid:', action.payload);
+          state.error = 'Project updated but data is invalid';
         }
       })
       .addCase(updateProject.rejected, (state, action) => {
@@ -364,8 +382,14 @@ const projectsSlice = createSlice({
       })
       .addCase(createProjectLegacy.fulfilled, (state, action) => {
         state.loading = false;
-        state.projects.push(action.payload);
-        state.currentProject = action.payload;
+        // Safety check: ensure payload exists and has an id
+        if (action.payload && action.payload.id) {
+          state.projects.push(action.payload);
+          state.currentProject = action.payload;
+        } else {
+          console.error('createProjectLegacy fulfilled but payload is invalid:', action.payload);
+          state.error = 'Project created but data is invalid';
+        }
       })
       .addCase(createProjectLegacy.rejected, (state, action) => {
         state.loading = false;

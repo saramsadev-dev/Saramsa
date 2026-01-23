@@ -12,6 +12,7 @@ from .work_item_views import (
     WorkItemDetailView,
     WorkItemUpdateView,
     WorkItemsByPlatformView,
+    WorkItemRemovalView,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     'WorkItemDetailView',
     'WorkItemUpdateView',
     'WorkItemsByPlatformView',
+    'WorkItemRemovalView',
 ]

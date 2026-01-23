@@ -172,15 +172,17 @@ def normalize_comment_extraction(data: dict, comment_index: int = None) -> dict:
     if sentiment_raw in ALLOWED_SENTIMENT_VALUES:
         normalized["sentiment"] = sentiment_raw
     else:
-        # Try to map common variations
+        # Try to map common variations and common misclassifications
         sentiment_map = {
             "POS": "POSITIVE",
             "NEG": "NEGATIVE",
             "NEU": "NEUTRAL",
-            "MIX": "MIXED"
+            "MIX": "MIXED",
+            "SUGGESTION": "NEUTRAL"
         }
         if sentiment_raw in sentiment_map:
             normalized["sentiment"] = sentiment_map[sentiment_raw]
+            logger.warning(f"Mapped non-standard sentiment '{sentiment_raw}' to '{normalized['sentiment']}'")
         else:
             raise ValueError(f"Cannot normalize sentiment: '{data.get('sentiment')}'")
     

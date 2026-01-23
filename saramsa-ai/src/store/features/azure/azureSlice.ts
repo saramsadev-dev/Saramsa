@@ -66,7 +66,9 @@ const configureAzure = createAsyncThunk<
   { rejectValue: string }
 >('azure/configure', async (credentials, { rejectWithValue }) => {
   try {
-    const response = await apiRequest('post', '/workitems/azure/config', credentials, true, false);
+    // Use the new integrations endpoint to fetch Azure projects
+    const response = await apiRequest('post', '/integrations/azure/projects/', credentials, true, false);
+    // StandardResponse format: response.data.data contains { projects: [...], organization: "..." }
     return response.data.data; // StandardResponse format: response.data.data
   } catch (err: any) {
     let errorMessage = 'Failed to configure Azure DevOps connection.';

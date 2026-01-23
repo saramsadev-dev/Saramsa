@@ -91,6 +91,16 @@ class WorkItemRepository:
             logger.error(f"Error updating embedded work item {work_item_id}: {e}")
             return None
     
+    def remove_embedded_work_item(self, work_item_id: str, user_id: str) -> bool:
+        """Remove embedded work item from a user story document."""
+        try:
+            # This method handles removing individual work items from the work_items array
+            # of a user story document
+            return self.cosmos_service.remove_embedded_work_item(work_item_id, user_id)
+        except Exception as e:
+            logger.error(f"Error removing embedded work item {work_item_id}: {e}")
+            return False
+    
     def get_work_items_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
         """Get work items by project - consolidated method."""
         try:

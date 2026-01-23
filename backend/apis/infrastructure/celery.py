@@ -1,5 +1,6 @@
 import os
 import ssl
+import sys
 import logging
 from celery import Celery
 
@@ -7,6 +8,13 @@ from celery import Celery
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'apis.settings')
 
 app = Celery('saramsa')
+
+# Windows compatibility: Use 'solo' pool on Windows (single process, no forking)
+# On Unix/Linux, use default 'prefork' pool for better performance
+logger = logging.getLogger(__name__)
+if sys.platform == 'win32':
+    app.conf.worker_pool = 'solo'
+    logger.info("Running on Windows - using 'solo' worker pool")
 
 # Get URLs from environment BEFORE Django settings (Azure Redis)
 broker_url = os.getenv('CELERY_BROKER_URL')
@@ -37,6 +45,10 @@ if result_backend and result_backend.startswith('rediss://'):
 
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
+# Re-apply Windows pool setting after config loading (in case settings.py overrides it)
+if sys.platform == 'win32':
+    app.conf.worker_pool = 'solo'
+
 # Force re-set URLs and SSL options after config loading to ensure they persist
 if broker_url and broker_url.startswith('rediss://'):
     # Re-read from environment in case settings.py modified it
@@ -58,8 +70,6 @@ if result_backend and result_backend.startswith('rediss://'):
 
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
-
-logger = logging.getLogger(__name__)
 
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):

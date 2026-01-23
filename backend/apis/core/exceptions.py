@@ -7,6 +7,7 @@ from rest_framework.exceptions import (
     NotAuthenticated
 )
 from .response import StandardResponse
+from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,13 @@ def custom_exception_handler(exc, context):
     # Log unexpected errors (500s)
     logger.exception(f"Unhandled exception: {exc}")
     
+    # Include actual error details in DEBUG mode for easier debugging
+    if settings.DEBUG:
+        error_detail = f"{exc.__class__.__name__}: {str(exc)}"
+    else:
+        error_detail = "An unexpected error occurred. Please try again later."
+    
     return StandardResponse.internal_server_error(
-        detail="An unexpected error occurred. Please try again later.",
+        detail=error_detail,
         instance=request.path if request else None
     )

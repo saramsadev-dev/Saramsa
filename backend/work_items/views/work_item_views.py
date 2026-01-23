@@ -132,11 +132,16 @@ class WorkItemSubmissionView(APIView):
         user_id_str = str(user_id)
         project_id = request.data.get("project_id")
         work_items = request.data.get("work_items", [])
+        user_stories = request.data.get("user_stories", [])  # Also accept user_stories for compatibility
         platform = request.data.get("platform", "azure").lower()
+        
+        # Use work_items if provided, otherwise use user_stories for backward compatibility
+        if not work_items and user_stories:
+            work_items = user_stories
         
         if not all([project_id, work_items, platform]):
             return StandardResponse.validation_error(
-                detail="project_id, work_items, and platform are required", 
+                detail="project_id, work_items (or user_stories), and platform are required", 
                 instance=request.path
             )
         
@@ -304,6 +309,45 @@ class WorkItemUpdateView(APIView):
         except Exception as e:
             logger.error(f"Error updating work item: {e}")
             return StandardResponse.internal_server_error(detail="Failed to update work item.", instance=request.path)
+
+
+class WorkItemRemovalView(APIView):
+    """Remove/delete work items - handles bulk deletion"""
+    permission_classes = [IsAdminOrUser]
+    
+    @handle_service_errors
+    def put(self, request):
+        """Remove work items by IDs"""
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        if not user_id:
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
+        
+        try:
+            ids = request.data.get('ids', [])
+            user_story_id = request.data.get('user_story_id')
+            
+            if not ids:
+                return StandardResponse.validation_error(detail="IDs are required for removal.", instance=request.path)
+            
+            # Use devops service to remove work items
+            devops_service = get_devops_service()
+            removal_result = devops_service.remove_work_items(
+                work_item_ids=ids,
+                user_id=str(user_id),
+                user_story_id=user_story_id
+            )
+            
+            return StandardResponse.success(data={
+                "success": True,
+                "removed_ids": ids,
+                "user_story_id": user_story_id,
+                "result": removal_result,
+                "message": f"Successfully removed {len(ids)} work item(s)"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error removing work items: {e}")
+            return StandardResponse.internal_server_error(detail="Failed to remove work items.", instance=request.path)
 
 
 class WorkItemsByPlatformView(APIView):

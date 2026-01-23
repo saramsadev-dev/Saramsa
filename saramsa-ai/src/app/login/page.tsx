@@ -95,9 +95,16 @@ export default function LoginPage() {
           } else {
             // If no projects exist, still prefer home page if Azure is configured
             try {
-              const saved = await apiRequest('get', '/workitems/azure/config', undefined, true);
+              const saved = await apiRequest('get', '/integrations/', undefined, true);
               if (saved.data?.success) {
-                router.push('/');
+                // Check if there's an Azure integration account
+                const accounts = saved.data?.data?.accounts || [];
+                const hasAzureIntegration = accounts.some((acc: any) => acc.provider === 'azure');
+                if (hasAzureIntegration) {
+                  router.push('/');
+                } else {
+                  router.push('/config');
+                }
               } else {
                 router.push('/config');
               }

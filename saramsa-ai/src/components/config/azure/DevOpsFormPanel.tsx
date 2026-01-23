@@ -35,6 +35,7 @@ interface DevOpsFormPanelProps {
   onPatChange: (value: string) => void;
   onFetchProjects: () => void;
   isLoading: boolean;
+  isCreatingProject?: boolean;
   error: string;
   projects: AzureDevOpsProject[];
   selectedProject: string;
@@ -52,6 +53,7 @@ export const DevOpsFormPanel = ({
   onPatChange,
   onFetchProjects,
   isLoading,
+  isCreatingProject = false,
   error,
   projects,
   selectedProject,
@@ -446,12 +448,21 @@ export const DevOpsFormPanel = ({
             /* Continue to Dashboard Button */
             <button
               onClick={onContinue}
-              disabled={!selectedProject}
+              disabled={!selectedProject || isCreatingProject}
               className="w-full h-12 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 group rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#E603EB]"
             >
               <div className="flex items-center gap-3 justify-center">
-                <span>Continue to Dashboard</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                {isCreatingProject ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Creating Project...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Continue to Dashboard</span>
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </div>
             </button>
           )}

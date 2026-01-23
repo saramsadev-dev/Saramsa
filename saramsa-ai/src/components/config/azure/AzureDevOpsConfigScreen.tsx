@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from "@/store/store";
 import { fetchIntegrationAccounts } from "@/store/features/integrations/integrationsSlice";
-import { fetchProjects } from "@/store/features/projects/projectsSlice";
+import { fetchProjects, createProject } from "@/store/features/projects/projectsSlice";
 
 type AzureDevOpsProject = {
   id: string;
@@ -30,6 +30,7 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
   const [orgName, setOrgName] = useState("");
   const [pat, setPat] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [error, setError] = useState<string>("");
   const [projects, setProjects] = useState<AzureDevOpsProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
@@ -46,8 +47,8 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
   });
 
   useEffect(() => {
-    // Check if Azure integration already exists and fetch projects
-    dispatch(fetchIntegrationAccounts());
+    // Integration accounts are now fetched at the parent level
+    // Just fetch projects here
     dispatch(fetchProjects());
   }, [dispatch]);
 
@@ -56,9 +57,39 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
     if (azureAccount) {
       setIsExistingIntegration(true);
       setOrgName(azureAccount.metadata.organization || '');
-      handleFetchProjects();
+      // Fetch projects for existing integration
+      fetchProjectsForExistingIntegration(azureAccount);
     }
   }, [accounts]);
+
+  const fetchProjectsForExistingIntegration = async (azureAccount: any) => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const url = `/integrations/external/projects/?provider=azure&accountId=${azureAccount.id}`;
+      const projectsResponse = await apiRequest('get', url, undefined, true);
+      
+      if (projectsResponse.data.success) {
+        setProjects(projectsResponse.data.data.projects || []);
+        setError('');
+      } else {
+        const errorMsg = projectsResponse.data.error || projectsResponse.data.detail || 'Failed to fetch projects';
+        setError(errorMsg);
+      }
+    } catch (error: any) {
+      console.error('Azure DevOps config error:', error);
+      if (error.response?.data?.error) {
+        setError(error.response.data.error);
+      } else if (error.response?.data?.detail) {
+        setError(error.response.data.detail);
+      } else {
+        setError('Failed to connect to Azure DevOps. Please check your credentials.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleProjectSelect = (projectId: string) => {
     setSelectedProject(projectId);
@@ -81,12 +112,24 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
         localStorage.setItem('azure_process_template', selectedProjectData.templateName);
       }
     }
-    await handlePersistProject();
-    onContinue();
+    
+    setIsCreatingProject(true);
+    setError(""); // Clear any previous errors
+    
+    try {
+      await handlePersistProject();
+      // Only navigate if project creation succeeds
+      onContinue();
+    } catch (error) {
+      // Error is already set in handlePersistProject, don't navigate
+      console.error('Project creation failed, staying on config page');
+    } finally {
+      setIsCreatingProject(false);
+    }
   };
 
   const handleFetchProjects = async () => {
-    if (!isExistingIntegration && (!orgName.trim() || !pat.trim())) {
+    if (!orgName.trim() || !pat.trim()) {
       setError("Please provide both organization name and personal access token");
       return;
     }
@@ -95,20 +138,8 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
     setError("");
 
     try {
-      let projectsResponse;
-      
-      if (isExistingIntegration) {
-        // For existing integration, use the external projects endpoint
-        const azureAccount = accounts.find(acc => acc.provider === 'azure');
-        if (!azureAccount) {
-          throw new Error('Azure integration not found');
-        }
-        
-        projectsResponse = await apiRequest('get', `/integrations/external/projects/?provider=azure&accountId=${azureAccount.id}`, undefined, true);
-      } else {
-        // For new integration, use the direct API endpoint with user credentials
-        projectsResponse = await apiRequest('get', `/integrations/azure/projects/?organization=${encodeURIComponent(orgName)}&pat_token=${encodeURIComponent(pat)}`);
-      }
+      // For new integration, use the direct API endpoint with user credentials
+      const projectsResponse = await apiRequest('get', `/integrations/azure/projects/?organization=${encodeURIComponent(orgName)}&pat_token=${encodeURIComponent(pat)}`);
       
       if (projectsResponse.data.success) {
         setProjects(projectsResponse.data.data.projects || []);
@@ -145,46 +176,44 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
         // Create new integration account
         const integrationResponse = await apiRequest('post', '/integrations/azure/', {
           organization: orgName,
-          pat_token: pat
+          pat_token: pat,
+          create_integration: true
         }, true);
 
         if (!integrationResponse.data.success) {
           throw new Error(integrationResponse.data.error || 'Failed to create Azure integration');
         }
-        integrationAccountId = integrationResponse.data.account.id;
+        integrationAccountId = integrationResponse.data.data.account.id;
       }
 
-      // Create the project
-      const res = await apiRequest('post', '/integrations/projects/create/', {
-        project_name: selectedProjectData?.name || 'Azure DevOps Project',
+      // Create the project using Redux action
+      const projectData = {
+        name: selectedProjectData?.name || 'Azure DevOps Project',
         description: `Imported from Azure DevOps: ${orgName}`,
-        platform: 'azure_devops',
-        external_project_id: selectedProject,
-        external_url: `https://dev.azure.com/${orgName}/${selectedProjectData?.name}`,
-        integration_account_id: integrationAccountId, // Link to the integration account
-        jira_project_key: null // Not applicable for Azure
-      }, true);
+        externalLinks: [{
+          provider: 'azure',
+          integrationAccountId: integrationAccountId,
+          externalId: selectedProject,
+          url: `https://dev.azure.com/${orgName}/${selectedProjectData?.name}`,
+          status: 'ok',
+          lastSyncedAt: null,
+          syncMetadata: {}
+        }]
+      };
+
+      const result = await dispatch(createProject(projectData)).unwrap();
       
-      if (!res.data.success) {
-        throw new Error(res.data.error || 'Failed to create project');
-      }
-      
-      const project = res.data.data.project;
-      localStorage.setItem('project_id', project.id);
+      // Store project info in localStorage for compatibility
+      localStorage.setItem('project_id', result.id);
       localStorage.setItem('selected_project_name', selectedProjectData?.name || '');
       
-      // Handle both new project creation and existing project navigation
-      if (res.data.data.already_exists) {
-        console.log('Project already exists, navigating to existing project');
-      } else {
-        console.log('Project created successfully, navigating to dashboard');
-      }
+      console.log('Project created successfully:', result.id);
       
     } catch (e) {
       console.error('persist project error', e);
       setError(e instanceof Error ? e.message : 'Failed to create project');
-      // Don't navigate to dashboard on error
-      return;
+      // Throw error to prevent navigation
+      throw e;
     }
   };
 
@@ -271,6 +300,7 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
               onPatChange={setPat}
               onFetchProjects={handleFetchProjects}
               isLoading={isLoading}
+              isCreatingProject={isCreatingProject}
               error={error}
               projects={projects}
               selectedProject={selectedProject}

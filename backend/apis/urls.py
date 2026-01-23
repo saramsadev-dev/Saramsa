@@ -6,7 +6,7 @@ from drf_spectacular.views import (
 )
 from .views import health_check, performance_metrics, reset_performance_stats
 from feedback_analysis.views import UserStoriesView, AnalyzeCommentsView, TaskStatusView, GetUserCommentsView, FeedbackFileUploadView
-from work_items.views import WorkItemGenerationView, WorkItemSubmissionView
+from work_items.views import WorkItemGenerationView, WorkItemSubmissionView, WorkItemUpdateView, WorkItemRemovalView
 
 urlpatterns = [
     # Health and monitoring endpoints
@@ -29,6 +29,8 @@ urlpatterns = [
     path('api/insights/user-story-submission/', WorkItemSubmissionView.as_view(), name='insights_user_story_submission'),
     path('api/insights/user-stories/', UserStoriesView.as_view(), name='insights_user_stories'),
     path('api/insights/user-stories/all/', UserStoriesView.as_view(), name='insights_user_stories_all'),
+    path('api/insights/user-stories/remove-work-items/', WorkItemRemovalView.as_view(), name='insights_remove_work_items'),
+    path('api/insights/work-items/<str:work_item_id>/update/', WorkItemUpdateView.as_view(), name='insights_work_item_update'),
     
     # Additional aliases without /api prefix for frontend compatibility
     path('insights/comments/', GetUserCommentsView.as_view(), name='insights_comments_no_api'),

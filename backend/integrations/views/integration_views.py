@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 
-from ..services import get_integration_service
+from ..services import get_integration_service, get_external_api_service
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +36,20 @@ def get_integration_accounts(request):
     )
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 @handle_service_errors
 def create_azure_integration(request):
-    """Create Azure DevOps integration account."""
-    user_id = request.user.id
-    data = request.data
-    
-    organization = data.get('organization', '').strip()
-    pat_token = data.get('pat_token', '').strip()
+    """
+    Azure DevOps integration endpoint.
+    - GET: Fetch Azure DevOps projects (with organization and pat_token query params)
+    - POST: 
+      - If 'action=fetch_projects' query param or only credentials provided: Fetch Azure DevOps projects
+      - Otherwise: Create Azure DevOps integration account
+    """
+    # Get credentials from query params (GET) or request body (POST)
+    organization = request.GET.get('organization') or request.data.get('organization', '').strip()
+    pat_token = request.GET.get('pat_token') or request.data.get('pat_token', '').strip()
     
     if not organization or not pat_token:
         return StandardResponse.validation_error(
@@ -56,6 +60,47 @@ def create_azure_integration(request):
             ],
             instance=request.path
         )
+    
+    # Check if this is a request to fetch projects
+    # Default behavior: GET fetches projects, POST with only credentials fetches projects
+    # To create integration via POST, pass create_integration=true
+    create_integration = (
+        request.GET.get('create_integration') == 'true' or
+        request.data.get('create_integration') == 'true' or
+        request.data.get('create_integration') is True
+    )
+    
+    fetch_projects = (
+        request.method == 'GET' or 
+        request.GET.get('action') == 'fetch_projects' or
+        request.data.get('action') == 'fetch_projects' or
+        (request.method == 'POST' and not create_integration)
+    )
+    
+    # If fetching projects (GET or POST without create_integration flag)
+    if fetch_projects:
+        try:
+            external_api_service = get_external_api_service()
+            projects = external_api_service.fetch_azure_projects(organization, pat_token)
+            
+            return StandardResponse.success(
+                data={
+                    'projects': projects,
+                    'organization': organization
+                },
+                message='Azure DevOps projects retrieved successfully'
+            )
+        except Exception as e:
+            return StandardResponse.error(
+                title="Failed to fetch projects",
+                detail=str(e),
+                status_code=400,
+                error_type="project-fetch-failed",
+                instance=request.path
+            )
+    
+    # If POST request without fetch_projects flag, create integration account
+    user_id = request.user.id
     
     try:
         integration_service = get_integration_service()

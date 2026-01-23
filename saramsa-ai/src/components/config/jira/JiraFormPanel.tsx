@@ -39,6 +39,7 @@ interface JiraFormPanelProps {
   onConfigChange: (field: string, value: string) => void;
   onValidateConfiguration: () => void;
   isLoading: boolean;
+  isCreatingProject?: boolean;
   error: string;
   projects: JiraProject[];
   selectedProject: string;
@@ -55,6 +56,7 @@ export const JiraFormPanel = ({
   onConfigChange,
   onValidateConfiguration,
   isLoading,
+  isCreatingProject = false,
   error,
   projects,
   selectedProject,
@@ -102,46 +104,7 @@ export const JiraFormPanel = ({
   ];
 
   return (
-    <div className="w-full max-w-md space-y-8 py-8 pb-16">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="text-center space-y-4"
-      >
-        <div className="flex justify-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] rounded-2xl flex items-center justify-center shadow-lg">
-            <Globe className="w-8 h-8 text-white" />
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Connect Your Jira
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-            Link your Jira instance to automatically create issues from analyzed feedback.
-          </p>
-        </div>
-      </motion.div>
-
-      {/* Back Button */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-        className="flex justify-center"
-      >
-        <button
-          onClick={onBack}
-          className="w-full h-12 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300 rounded-md flex items-center justify-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Platform Selection
-        </button>
-      </motion.div>
-
+    <div className="relative w-full max-w-2xl space-y-8 mx-auto pb-16">
       {/* Form */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -149,6 +112,22 @@ export const JiraFormPanel = ({
         transition={{ duration: 0.6, delay: 0.1 }}
         className="space-y-6"
       >
+        {/* Back Button */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="flex justify-center sm:justify-start"
+        >
+          <button
+            onClick={onBack}
+            className="w-full sm:w-auto px-6 h-12 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300 rounded-md flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Platform Selection
+          </button>
+        </motion.div>
+
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-2 border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/30 transition-all duration-300 rounded-lg p-6">
           {/* Show form fields only for new integrations */}
           {!isExistingIntegration && (
@@ -454,12 +433,21 @@ export const JiraFormPanel = ({
             /* Continue to Dashboard Button */
             <button
               onClick={onContinue}
-              disabled={!selectedProject}
+              disabled={!selectedProject || isCreatingProject}
               className="w-full h-12 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 group rounded-md"
             >
               <div className="flex items-center gap-3 justify-center">
-                <span>Continue to Dashboard</span>
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                {isCreatingProject ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Creating Project...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Continue to Dashboard</span>
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </div>
             </button>
           )}

@@ -80,10 +80,13 @@ export default function ProjectDashboardPage() {
 
   // Find and set the current project
   useEffect(() => {
-    if (!projectId || !projects.length) return;
+    if (!projectId) return;
 
     // Prevent re-initialization if already initialized for this project
     if (initializedProjectRef.current === projectId) return;
+
+    // If no projects loaded yet, wait for them
+    if (projects.length === 0 && projectsLoading) return;
 
     const foundProject = projects.find((p) => p.id === projectId);
 
@@ -103,14 +106,18 @@ export default function ProjectDashboardPage() {
       dispatch(clearAnalysisData());
       dispatch(clearCurrentProjectUserStories());
 
-      // Don't fetch here - let Dashboard component handle it
-      // dispatch(getConsolidatedDashboardData(projectId));
-
       initializedProjectRef.current = projectId;
       setIsInitialized(true);
     } else if (!projectsLoading) {
       // Project not found after projects are loaded
-      setDecryptionError("Project not found");
+      // Try to refetch projects once in case it's a newly created project
+      if (!hasFetchedProjectsRef.current) {
+        console.log('Project not found, refetching projects...');
+        hasFetchedProjectsRef.current = true;
+        dispatch(fetchProjects());
+      } else {
+        setDecryptionError("Project not found");
+      }
     }
   }, [projectId, projects, dispatch, projectsLoading]);
 

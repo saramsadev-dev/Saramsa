@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
+import { useDispatch } from 'react-redux';
+import type { AppDispatch } from '@/store/store';
+import { fetchIntegrationAccounts } from '@/store/features/integrations/integrationsSlice';
 import { PlatformSelectionScreen } from '@/components/config/PlatformSelectionScreen';
 import { AzureDevOpsConfigScreen } from '@/components/config/azure/AzureDevOpsConfigScreen';
 import { JiraConfigScreen } from '@/components/config/jira/JiraConfigScreen';
@@ -11,7 +14,13 @@ import { JiraConfigScreen } from '@/components/config/jira/JiraConfigScreen';
 export default function ConfigPage() {
   const router = useRouter();
   const {} = useAuth();
+  const dispatch = useDispatch<AppDispatch>();
   const [selectedPlatform, setSelectedPlatform] = useState<'azure' | 'jira' | null>(null);
+
+  // Fetch integration accounts once at the parent level
+  useEffect(() => {
+    dispatch(fetchIntegrationAccounts());
+  }, [dispatch]);
 
   const handlePlatformSelect = (platform: 'azure' | 'jira') => {
     setSelectedPlatform(platform);

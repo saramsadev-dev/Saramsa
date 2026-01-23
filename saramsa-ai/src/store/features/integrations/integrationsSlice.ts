@@ -120,7 +120,8 @@ export const createAzureIntegration = createAsyncThunk(
     // Use new integrations API
     const response = await apiRequest('post', '/integrations/azure/', {
       organization: data.organization,
-      pat_token: data.pat_token
+      pat_token: data.pat_token,
+      create_integration: true
     }, true);
     
     // StandardResponse format: response.data.data

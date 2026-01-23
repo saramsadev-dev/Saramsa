@@ -5,7 +5,8 @@ from .views import (
     WorkItemsListView,
     WorkItemDetailView,
     WorkItemUpdateView,
-    WorkItemsByPlatformView
+    WorkItemsByPlatformView,
+    WorkItemRemovalView
 )
 
 urlpatterns = [
@@ -16,6 +17,7 @@ urlpatterns = [
     path('<str:work_item_id>/', WorkItemDetailView.as_view(), name='work_item_detail'),
     path('<str:work_item_id>/update/', WorkItemUpdateView.as_view(), name='work_item_update'),
     path('platform/<str:platform>/', WorkItemsByPlatformView.as_view(), name='work_items_by_platform'),
+    path('remove/', WorkItemRemovalView.as_view(), name='work_items_remove'),
 ]
 
 # NOTE: Platform-specific configuration endpoints (Azure DevOps, Jira) have been moved to the integrations app

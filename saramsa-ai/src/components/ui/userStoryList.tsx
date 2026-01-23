@@ -178,6 +178,8 @@ export const UserStoryList = ({
   useEffect(() => {
     console.log('🔍 UserStoryList useEffect - userStories:', userStories);
     console.log('🔍 UserStoryList useEffect - currentProjectUserStories:', currentProjectUserStories);
+    console.log('🔍 UserStoryList useEffect - features:', features);
+    console.log('🔍 UserStoryList useEffect - actionItems:', actionItems);
     
     // Use userStories work items (prioritize prop over Redux state)
     const workItemsToProcess = userStories && userStories.length > 0 
@@ -187,6 +189,7 @@ export const UserStoryList = ({
       : [];
     
     console.log('🔍 UserStoryList useEffect - work_items:', workItemsToProcess);
+    console.log('🔍 UserStoryList useEffect - work_items length:', workItemsToProcess?.length);
     
     if (workItemsToProcess && workItemsToProcess.length > 0) {
       console.log('🔍 UserStoryList - Converting work items to action items:', workItemsToProcess.length);
@@ -213,6 +216,10 @@ export const UserStoryList = ({
         console.log(`🔍 UserStoryList - Dispatching action item ${index}:`, actionItem);
         dispatch(addActionItem(actionItem));
       });
+      
+      console.log('🔍 UserStoryList - Finished converting work items to action items');
+    } else {
+      console.log('🔍 UserStoryList - No work items to process');
     }
   }, [userStories, currentProjectUserStories, dispatch, platform]);
 
@@ -672,7 +679,22 @@ export const UserStoryList = ({
                         (currentProjectUserStories && currentProjectUserStories.length > 0);
   const hasWorkItems = features.length > 0 || actionItems.length > 0;
   
-  if (!hasUserStories && !hasWorkItems) {
+  // Also check if we have work_items directly in the user stories data
+  const hasWorkItemsInData = userStories?.some(story => story.work_items && story.work_items.length > 0) ||
+                            currentProjectUserStories?.some(story => story.work_items && story.work_items.length > 0);
+  
+  console.log('🔍 UserStoryList render - hasUserStories:', hasUserStories);
+  console.log('🔍 UserStoryList render - hasWorkItems:', hasWorkItems);
+  console.log('🔍 UserStoryList render - hasWorkItemsInData:', hasWorkItemsInData);
+  console.log('🔍 UserStoryList render - userStories length:', userStories?.length);
+  console.log('🔍 UserStoryList render - currentProjectUserStories length:', currentProjectUserStories?.length);
+  console.log('🔍 UserStoryList render - features length:', features.length);
+  console.log('🔍 UserStoryList render - actionItems length:', actionItems.length);
+  
+  // Show content if we have user stories OR work items OR work items in data
+  const shouldShowContent = hasUserStories || hasWorkItems || hasWorkItemsInData;
+  
+  if (!shouldShowContent) {
     return (
       <div className="text-center py-8">
         <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
