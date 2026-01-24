@@ -345,6 +345,21 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         dispatch(setAnalysisData(a));
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
         lastProcessedAnalysisIdRef.current = a.id;
+      } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
+        // Data is nested under result field - normalize it and merge metadata
+        console.log('🔍 Dashboard: Using result field data, normalizing from consolidated fetch');
+        const normalized = normalizeAnalysis(a.result);
+        // Merge metadata from the analysis object
+        if (normalized) {
+          normalized.id = a.id || normalized.id;
+          normalized.projectId = a.projectId || normalized.projectId;
+          normalized.userId = a.userId || normalized.userId;
+          normalized.createdAt = a.createdAt || a.analysis_date || normalized.createdAt;
+          normalized.analysisType = a.analysis_type || normalized.analysisType;
+        }
+        dispatch(setAnalysisData(normalized));
+        dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
+        lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
       } else if (a.sentimentsummary && a.counts && a.featureasba !== undefined) {
         // Data is in the old format, normalize it
         console.log('🔍 Dashboard: Using old format data, normalizing from consolidated fetch');
@@ -370,7 +385,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
         lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
       } else {
-        console.log('🔍 Dashboard: No analysis data found in consolidated fetch, analysis structure:', Object.keys(a));
+        console.log('🔍 Dashboard: No analysis data found in consolidated fetch, analysis structure:', Object.keys(a), 'has result:', !!a.result);
         dispatch(setAnalysisData(null));
         dispatch(setDeepAnalysis(null));
         lastProcessedAnalysisIdRef.current = null;
@@ -607,6 +622,20 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             console.log('Using new format data directly');
             dispatch(setAnalysisData(a));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
+          } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
+            // Data is nested under result field - normalize it and merge metadata
+            console.log('Using result field data, normalizing');
+            const normalized = normalizeAnalysis(a.result);
+            // Merge metadata from the analysis object
+            if (normalized) {
+              normalized.id = a.id || normalized.id;
+              normalized.projectId = a.projectId || normalized.projectId;
+              normalized.userId = a.userId || normalized.userId;
+              normalized.createdAt = a.createdAt || a.analysis_date || normalized.createdAt;
+              normalized.analysisType = a.analysis_type || normalized.analysisType;
+            }
+            dispatch(setAnalysisData(normalized));
+            dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.sentimentsummary && a.counts && a.featureasba !== undefined) {
             // Data is in the old format, normalize it
             console.log('Using old format data, normalizing');
@@ -626,7 +655,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             dispatch(setAnalysisData(normalizeAnalysis(ca)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else {
-            console.log('No analysis data found');
+            console.log('No analysis data found, available keys:', Object.keys(a));
             dispatch(setAnalysisData(null));
             dispatch(setDeepAnalysis(null));
           }
@@ -1393,7 +1422,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               />
 
               {/* Analysis Results Section */}
-              {isAnalyzing ? (
+              {(isAnalyzing || loading) ? (
                 <LoaderForDashboard />
               ) : (
                 <>
