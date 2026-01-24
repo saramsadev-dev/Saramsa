@@ -45,6 +45,9 @@ if result_backend and result_backend.startswith('rediss://'):
 
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
+# Suppress deprecation warning about broker_connection_retry
+app.conf.broker_connection_retry_on_startup = True
+
 # Re-apply Windows pool setting after config loading (in case settings.py overrides it)
 if sys.platform == 'win32':
     app.conf.worker_pool = 'solo'
