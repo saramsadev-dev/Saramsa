@@ -9,6 +9,7 @@ comment_id uniqueness, and schema compliance before accepting results.
 """
 
 import asyncio
+import os
 import uuid
 import json
 from collections import defaultdict
@@ -73,136 +74,125 @@ class ProcessingService:
             batch_start_indices.append(cumulative_index)
             cumulative_index += count
         
-        results = []
-        successful_batches = 0
-        failed_batches = 0
+        # Bounded concurrency: cap concurrent LLM requests to avoid TPM/RPM rate limits
+        max_concurrent = int(os.getenv("LLM_MAX_CONCURRENT_REQUESTS", "8"))
+        max_concurrent = max(1, min(max_concurrent, 32))
+        semaphore = asyncio.Semaphore(max_concurrent)
+        logger.info(f"Using bounded concurrency: max {max_concurrent} concurrent LLM requests")
         
-        for i, chunk in enumerate(chunks):
-            expected_count = chunk_comment_counts[i]
-            comment_start_index = batch_start_indices[i]
-            logger.debug(f"Processing chunk {i+1}/{len(chunks)} (expected {expected_count} comments, starting at global index {comment_start_index}, length: {len(chunk)} chars)")
-            
-            # Capture loop variables in closure to avoid late binding issues
-            current_chunk = chunk
-            current_start_index = comment_start_index
-            current_batch_index = i
-            current_expected_count = expected_count
-            
-            # Define the operation for this batch with validation
-            async def process_single_chunk_with_validation():
-                # Create prompt for this specific chunk with correct starting index
-                if analysis_type == 0:  # Sentiment analysis
-                    chunk_prompt = getSentAnalysisPrompt(
-                        company_name=company_name, 
-                        feedback_data=current_chunk,
-                        suggested_aspects=suggested_aspects,
-                        comment_start_index=current_start_index  # Pass global starting index
-                    )
-                else:  # Deep analysis
-                    chunk_prompt = getDeepAnalysisPrompt(company_name=company_name, feedback_data=chunk)
-                
-                # Call AI completion service with the chunk-specific prompt
-                # Calculate required max_tokens: ~150 tokens per comment extraction object
-                # For safety, use 200 tokens per comment + 500 buffer
-                estimated_tokens_needed = (current_expected_count * 200) + 500
-                # Ensure minimum of 4000 tokens for batch processing
-                max_tokens = max(estimated_tokens_needed, 4000)
-                logger.info(f"📡 [Batch {current_batch_index}] Calling LLM API with max_tokens={max_tokens} (for {current_expected_count} comments)...")
-                result = await generate_completions(chunk_prompt, max_tokens=max_tokens)
-                logger.info(f"📡 [Batch {current_batch_index}] LLM API response received (type: {type(result).__name__})")
-                
-                # CRITICAL: Validate batch integrity immediately after LLM response
-                logger.info(f"🔍 [Batch {current_batch_index}] Starting validation...")
-                valid_extractions, errors, is_valid = self.validation_service.validate_batch_output(
-                    result,
-                    batch_index=current_batch_index,
-                    expected_count=current_expected_count,
-                    batch_start_index=current_start_index  # Pass global starting index for correct comment_id fallback
-                )
-                logger.info(f"🔍 [Batch {current_batch_index}] Validation complete: is_valid={is_valid}, valid_count={len(valid_extractions)}, errors={len(errors)}")
-                
-                if not is_valid:
-                    # Validation failed - raise exception to trigger retry
-                    error_summary = f"Batch {current_batch_index} validation failed: {len(errors)} errors. First error: {errors[0] if errors else 'Unknown'}"
-                    logger.error(error_summary)
-                    raise ValueError(error_summary)
-                
-                logger.debug(f"Chunk {current_batch_index+1} analysis and validation completed successfully")
-                return result
-            
-            # Process batch with async retry mechanism (since we're already in async context)
-            # Directly await the async function - no need for sync wrapper since process_chunks is async
+        async def _process_one_batch(
+            batch_index: int,
+            chunk: str,
+            expected_count: int,
+            comment_start_index: int,
+        ):
+            """Process a single batch with retries. Holds semaphore for the whole attempt."""
             max_retries = 3
-            result = None
-            success = False
-            last_error = None
             validation_errors = []
-            
-            for attempt in range(max_retries + 1):  # +1 for initial attempt
-                try:
-                    logger.info(f"🔄 [Batch {i+1}] Attempt {attempt + 1}/{max_retries + 1}...")
-                    result = await process_single_chunk_with_validation()
-                    
-                    # Final validation check before accepting (already done in process_single_chunk_with_validation, but double-check)
-                    valid_extractions, errors, is_valid = self.validation_service.validate_batch_output(
-                        result,
-                        batch_index=i,
-                        expected_count=expected_count,
-                        batch_start_index=comment_start_index  # Pass global starting index for correct comment_id fallback
-                    )
-                    validation_errors = errors  # Store for potential error reporting
-                    
-                    if is_valid:
-                        results.append(result)
-                        successful_batches += 1
-                        success = True
-                        if attempt > 0:
-                            logger.info(f"✅ Batch {i+1} succeeded after {attempt} retries ({expected_count} comments)")
+            async with semaphore:
+                for attempt in range(max_retries + 1):
+                    try:
+                        logger.info(f"🔄 [Batch {batch_index + 1}] Attempt {attempt + 1}/{max_retries + 1}...")
+                        if analysis_type == 0:
+                            chunk_prompt = getSentAnalysisPrompt(
+                                company_name=company_name,
+                                feedback_data=chunk,
+                                suggested_aspects=suggested_aspects,
+                                comment_start_index=comment_start_index,
+                            )
                         else:
-                            logger.info(f"✅ Batch {i+1} processed and validated successfully ({expected_count} comments)")
-                        break
-                    else:
-                        # Validation failed - raise to trigger retry
-                        raise ValueError(f"Validation failed: {errors[0] if errors else 'Unknown error'}")
-                        
-                except Exception as e:
-                    last_error = e
-                    error_msg = str(e)
-                    
-                    # Check if we've exhausted retries
-                    if attempt >= max_retries:
-                        failed_batches += 1
-                        logger.error(f"❌ Batch {i+1} failed after {max_retries + 1} attempts: {error_msg}")
-                        results.append({
-                            "chunk_index": i,
-                            "error": error_msg,
-                            "validation_errors": validation_errors,
-                            "processed": False,
-                            "attempts": attempt + 1
-                        })
-                        break
-                    else:
-                        # Calculate delay for next retry (exponential backoff)
-                        delay = min(2 ** attempt, 8)  # 1s, 2s, 4s, max 8s
+                            chunk_prompt = getDeepAnalysisPrompt(
+                                company_name=company_name, feedback_data=chunk
+                            )
+                        estimated_tokens_needed = (expected_count * 200) + 500
+                        max_tokens = max(estimated_tokens_needed, 4000)
+                        logger.info(
+                            f"📡 [Batch {batch_index + 1}] Calling LLM API with max_tokens={max_tokens} "
+                            f"(for {expected_count} comments)..."
+                        )
+                        result = await generate_completions(chunk_prompt, max_tokens=max_tokens)
+                        logger.info(
+                            f"📡 [Batch {batch_index + 1}] LLM API response received "
+                            f"(type: {type(result).__name__})"
+                        )
+                        logger.info(f"🔍 [Batch {batch_index + 1}] Starting validation...")
+                        valid_extractions, errors, is_valid = (
+                            self.validation_service.validate_batch_output(
+                                result,
+                                batch_index=batch_index,
+                                expected_count=expected_count,
+                                batch_start_index=comment_start_index,
+                            )
+                        )
+                        validation_errors = errors
+                        logger.info(
+                            f"🔍 [Batch {batch_index + 1}] Validation complete: is_valid={is_valid}, "
+                            f"valid_count={len(valid_extractions)}, errors={len(errors)}"
+                        )
+                        if not is_valid:
+                            raise ValueError(
+                                f"Validation failed: {errors[0] if errors else 'Unknown error'}"
+                            )
+                        if attempt > 0:
+                            logger.info(
+                                f"✅ Batch {batch_index + 1} succeeded after {attempt} retries "
+                                f"({expected_count} comments)"
+                            )
+                        else:
+                            logger.info(
+                                f"✅ Batch {batch_index + 1} processed and validated successfully "
+                                f"({expected_count} comments)"
+                            )
+                        return result
+                    except Exception as e:
+                        error_msg = str(e)
+                        if attempt >= max_retries:
+                            logger.error(
+                                f"❌ Batch {batch_index + 1} failed after {max_retries + 1} attempts: "
+                                f"{error_msg}"
+                            )
+                            return {
+                                "chunk_index": batch_index,
+                                "error": error_msg,
+                                "validation_errors": validation_errors,
+                                "processed": False,
+                                "attempts": attempt + 1,
+                            }
+                        delay = min(2 ** attempt, 8)
                         logger.warning(
-                            f"⚠️ Batch {i+1} attempt {attempt + 1} failed: {error_msg}. "
+                            f"⚠️ Batch {batch_index + 1} attempt {attempt + 1} failed: {error_msg}. "
                             f"Retrying in {delay}s... ({max_retries - attempt} retries left)"
                         )
                         await asyncio.sleep(delay)
         
-        # Log summary
+        tasks = [
+            _process_one_batch(
+                i,
+                chunks[i],
+                chunk_comment_counts[i],
+                batch_start_indices[i],
+            )
+            for i in range(len(chunks))
+        ]
+        results = await asyncio.gather(*tasks)
+        results = list(results)
+        
+        successful_batches = sum(
+            1 for r in results
+            if not (isinstance(r, dict) and r.get("processed") is False)
+        )
+        failed_batches = len(chunks) - successful_batches
+        
         logger.info(
             f"Completed processing {len(chunks)} chunks: "
             f"{successful_batches} successful, {failed_batches} failed"
         )
-        
-        # If too many batches failed, log warning
         failure_rate = failed_batches / len(chunks) if chunks else 0
-        if failure_rate > 0.1:  # More than 10% failure rate
+        if failure_rate > 0.1:
             logger.warning(
-                f"High batch failure rate: {failed_batches}/{len(chunks)} batches failed ({failure_rate:.1%})"
+                f"High batch failure rate: {failed_batches}/{len(chunks)} batches failed "
+                f"({failure_rate:.1%})"
             )
-        
         return results
     
     def _count_comments_in_chunk(self, chunk: str) -> int:
