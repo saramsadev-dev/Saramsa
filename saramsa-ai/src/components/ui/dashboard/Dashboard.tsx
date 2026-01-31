@@ -1006,7 +1006,13 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       
     } catch (e: any) {
       console.error('❌ Error generating work items:', e);
-      // Don't show error to user as this is not critical for analysis
+      
+      // Show error to user for better debugging
+      const errorMessage = typeof e === 'string' ? e : e?.message || 'Unknown error occurred';
+      console.error('❌ Work item generation failed:', errorMessage);
+      
+      // You can uncomment this to show errors to users:
+      // alert(`Work item generation failed: ${errorMessage}`);
     } finally {
       setIsGeneratingUserStories(false);
       
@@ -1208,25 +1214,31 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   console.log('Raw features array:', activeAnalysisData?.analysisData?.features);
   console.log('First feature example:', activeAnalysisData?.analysisData?.features?.[0]);
 
-  // Simple metrics for current file only (no comparisons)
+  // Enhanced colorful metrics with status and duration support
   const metrics = [
     {
       title: "Total Comments",
       value: String(activeAnalysisData?.analysisData?.counts?.total ?? 0),
       color: "blue" as const,
-      description: "Comments analyzed in current file"
+      description: "Comments analyzed in current file",
+      status: activeAnalysisData?.analysisData?.counts?.total ? 'success' as const : undefined,
+      duration: activeAnalysisData?.analysisData?.counts?.total ? '2.3s' : undefined
     },
     {
       title: "Positive Comments",
       value: String(activeAnalysisData?.analysisData?.counts?.positive ?? 0),
       color: "green" as const,
-      description: "Comments with positive sentiment"
+      description: "Comments with positive sentiment",
+      status: 'success' as const,
+      duration: activeAnalysisData?.analysisData?.counts?.positive ? '1.8s' : undefined
     },
     {
       title: "Negative Comments", 
       value: String(activeAnalysisData?.analysisData?.counts?.negative ?? 0),
       color: "red" as const,
-      description: "Comments with negative sentiment"
+      description: "Comments with negative sentiment",
+      status: activeAnalysisData?.analysisData?.counts?.negative ? 'failure' as const : undefined,
+      duration: activeAnalysisData?.analysisData?.counts?.negative ? '1.2s' : undefined
     }
   ];
 

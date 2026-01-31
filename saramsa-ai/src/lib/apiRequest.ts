@@ -20,7 +20,7 @@ const API_BASE: string = (
 // Create axios instance with interceptors
 const axiosInstance = axios.create({
   baseURL: API_BASE,
-  timeout: 90000,
+  timeout: 120000, // 2 minutes - reasonable for LLM operations
 });
 
 // Flag to prevent multiple refresh attempts

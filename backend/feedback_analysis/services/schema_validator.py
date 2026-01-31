@@ -51,97 +51,98 @@ class SchemaValidationService:
             - errors: List of error messages
             - is_valid: True if batch passes ALL validation rules, False otherwise
         """
-        logger.info(f"🔍 [Batch {batch_index}] Starting validation - Expected: {expected_count} items, Start index: {batch_start_index}")
-        logger.debug(f"🔍 [Batch {batch_index}] LLM output type: {type(llm_output).__name__}, Length: {len(str(llm_output)) if llm_output else 0} chars")
+        batch_label = (batch_index + 1) if batch_index is not None else "?"
+        logger.info(f"🔍 [Batch {batch_label}] Starting validation - Expected: {expected_count} items, Start index: {batch_start_index}")
+        logger.debug(f"🔍 [Batch {batch_label}] LLM output type: {type(llm_output).__name__}, Length: {len(str(llm_output)) if llm_output else 0} chars")
         
         errors = []
         valid_extractions = []
         
         # STEP 1: VALIDATE - Output is valid JSON
-        logger.info(f"🔍 [Batch {batch_index}] STEP 1: Validating JSON format...")
+        logger.info(f"🔍 [Batch {batch_label}] STEP 1: Validating JSON format...")
         try:
             if isinstance(llm_output, str):
                 # Log raw response for debugging (first 1000 chars)
-                logger.info(f"🔍 [Batch {batch_index}] LLM response is STRING, length: {len(llm_output)} chars")
-                logger.debug(f"🔍 [Batch {batch_index}] Raw response (first 1000 chars):\n{llm_output[:1000]}")
+                logger.info(f"🔍 [Batch {batch_label}] LLM response is STRING, length: {len(llm_output)} chars")
+                logger.debug(f"🔍 [Batch {batch_label}] Raw response (first 1000 chars):\n{llm_output[:1000]}")
                 parsed = json.loads(llm_output)
-                logger.info(f"✅ [Batch {batch_index}] STEP 1 PASSED: JSON parsed successfully")
+                logger.info(f"✅ [Batch {batch_label}] STEP 1 PASSED: JSON parsed successfully")
             elif isinstance(llm_output, dict):
-                logger.info(f"🔍 [Batch {batch_index}] LLM response is DICT")
+                logger.info(f"🔍 [Batch {batch_label}] LLM response is DICT")
                 # If it's an error dict, fail immediately
                 if llm_output.get("error"):
-                    error_msg = f"Batch {batch_index}: LLM returned error: {llm_output.get('error')}"
+                    error_msg = f"Batch {batch_label}: LLM returned error: {llm_output.get('error')}"
                     errors.append(error_msg)
-                    logger.error(f"❌ [Batch {batch_index}] STEP 1 FAILED: {error_msg}")
+                    logger.error(f"❌ [Batch {batch_label}] STEP 1 FAILED: {error_msg}")
                     return [], errors, False
                 parsed = llm_output
-                logger.info(f"✅ [Batch {batch_index}] STEP 1 PASSED: Dict format accepted")
+                logger.info(f"✅ [Batch {batch_label}] STEP 1 PASSED: Dict format accepted")
             elif isinstance(llm_output, list):
-                logger.info(f"🔍 [Batch {batch_index}] LLM response is LIST, length: {len(llm_output)}")
+                logger.info(f"🔍 [Batch {batch_label}] LLM response is LIST, length: {len(llm_output)}")
                 parsed = llm_output
-                logger.info(f"✅ [Batch {batch_index}] STEP 1 PASSED: List format accepted")
+                logger.info(f"✅ [Batch {batch_label}] STEP 1 PASSED: List format accepted")
             else:
-                error_msg = f"Batch {batch_index}: Invalid output type: {type(llm_output).__name__}"
+                error_msg = f"Batch {batch_label}: Invalid output type: {type(llm_output).__name__}"
                 errors.append(error_msg)
-                logger.error(f"❌ [Batch {batch_index}] STEP 1 FAILED: {error_msg}. Output preview: {str(llm_output)[:200]}")
+                logger.error(f"❌ [Batch {batch_label}] STEP 1 FAILED: {error_msg}. Output preview: {str(llm_output)[:200]}")
                 return [], errors, False
         except json.JSONDecodeError as e:
-            error_msg = f"Batch {batch_index}: JSON parse error: {str(e)}"
+            error_msg = f"Batch {batch_label}: JSON parse error: {str(e)}"
             errors.append(error_msg)
-            logger.error(f"❌ [Batch {batch_index}] STEP 1 FAILED: {error_msg}")
-            logger.error(f"🔍 [Batch {batch_index}] Raw response (first 1000 chars):\n{str(llm_output)[:1000] if isinstance(llm_output, str) else 'N/A'}")
+            logger.error(f"❌ [Batch {batch_label}] STEP 1 FAILED: {error_msg}")
+            logger.error(f"🔍 [Batch {batch_label}] Raw response (first 1000 chars):\n{str(llm_output)[:1000] if isinstance(llm_output, str) else 'N/A'}")
             return [], errors, False
         
         # STEP 2: VALIDATE - Output must be an array
-        logger.info(f"🔍 [Batch {batch_index}] STEP 2: Checking if output is array...")
+        logger.info(f"🔍 [Batch {batch_label}] STEP 2: Checking if output is array...")
         if not isinstance(parsed, list):
             # Check if it's a single object (LLM might return one object instead of array)
             if isinstance(parsed, dict) and "comment_id" in parsed:
-                logger.warning(f"⚠️ [Batch {batch_index}] LLM returned single object instead of array. Wrapping in array.")
+                logger.warning(f"⚠️ [Batch {batch_label}] LLM returned single object instead of array. Wrapping in array.")
                 # Wrap single object in array - this might indicate token limit truncation
                 parsed = [parsed]
-                logger.warning(f"⚠️ [Batch {batch_index}] Wrapped single object. This suggests LLM response was truncated (token limit?). Expected {expected_count} items, got 1.")
+                logger.warning(f"⚠️ [Batch {batch_label}] Wrapped single object. This suggests LLM response was truncated (token limit?). Expected {expected_count} items, got 1.")
             else:
-                error_msg = f"Batch {batch_index}: Expected array, got {type(parsed).__name__}"
+                error_msg = f"Batch {batch_label}: Expected array, got {type(parsed).__name__}"
                 errors.append(error_msg)
-                logger.error(f"❌ [Batch {batch_index}] STEP 2 FAILED: {error_msg}")
-                logger.error(f"🔍 [Batch {batch_index}] Parsed type: {type(parsed)}, Value preview: {str(parsed)[:200]}")
+                logger.error(f"❌ [Batch {batch_label}] STEP 2 FAILED: {error_msg}")
+                logger.error(f"🔍 [Batch {batch_label}] Parsed type: {type(parsed)}, Value preview: {str(parsed)[:200]}")
                 return [], errors, False
-        logger.info(f"✅ [Batch {batch_index}] STEP 2 PASSED: Output is array with {len(parsed)} items")
+        logger.info(f"✅ [Batch {batch_label}] STEP 2 PASSED: Output is array with {len(parsed)} items")
         
         # STEP 3: VALIDATE - Output length == input comment count
-        logger.info(f"🔍 [Batch {batch_index}] STEP 3: Checking output length ({len(parsed)}) vs expected ({expected_count})...")
+        logger.info(f"🔍 [Batch {batch_label}] STEP 3: Checking output length ({len(parsed)}) vs expected ({expected_count})...")
         if expected_count is not None:
             if len(parsed) != expected_count:
                 error_msg = (
-                    f"Batch {batch_index}: Output length ({len(parsed)}) != "
+                    f"Batch {batch_label}: Output length ({len(parsed)}) != "
                     f"expected count ({expected_count})"
                 )
                 errors.append(error_msg)
-                logger.error(f"❌ [Batch {batch_index}] STEP 3 FAILED: {error_msg}")
-                logger.error(f"🔍 [Batch {batch_index}] Missing {expected_count - len(parsed)} items")
+                logger.error(f"❌ [Batch {batch_label}] STEP 3 FAILED: {error_msg}")
+                logger.error(f"🔍 [Batch {batch_label}] Missing {expected_count - len(parsed)} items")
                 return [], errors, False
-            logger.info(f"✅ [Batch {batch_index}] STEP 3 PASSED: Length matches expected count")
+            logger.info(f"✅ [Batch {batch_label}] STEP 3 PASSED: Length matches expected count")
         else:
-            logger.warning(f"⚠️ [Batch {batch_index}] STEP 3 SKIPPED: No expected_count provided")
+            logger.warning(f"⚠️ [Batch {batch_label}] STEP 3 SKIPPED: No expected_count provided")
         
         # STEP 4: VALIDATE - Each item is valid schema and collect for uniqueness check
-        logger.info(f"🔍 [Batch {batch_index}] STEP 4: Validating each item's schema...")
+        logger.info(f"🔍 [Batch {batch_label}] STEP 4: Validating each item's schema...")
         comment_ids_seen = set()
         for i, item in enumerate(parsed):
-            logger.debug(f"🔍 [Batch {batch_index}] Validating item {i+1}/{len(parsed)}...")
+            logger.debug(f"🔍 [Batch {batch_label}] Validating item {i+1}/{len(parsed)}...")
             
             if not isinstance(item, dict):
-                error_msg = f"Batch {batch_index}, item {i}: Expected dict, got {type(item).__name__}"
+                error_msg = f"Batch {batch_label}, item {i}: Expected dict, got {type(item).__name__}"
                 errors.append(error_msg)
-                logger.error(f"❌ [Batch {batch_index}] Item {i} FAILED: {error_msg}")
-                logger.debug(f"🔍 [Batch {batch_index}] Item {i} value: {str(item)[:200]}")
+                logger.error(f"❌ [Batch {batch_label}] Item {i} FAILED: {error_msg}")
+                logger.debug(f"🔍 [Batch {batch_label}] Item {i} value: {str(item)[:200]}")
                 continue
             
             # Log item keys for debugging
             item_keys = list(item.keys()) if isinstance(item, dict) else []
-            logger.debug(f"🔍 [Batch {batch_index}] Item {i} keys: {item_keys}")
-            logger.debug(f"🔍 [Batch {batch_index}] Item {i} sample values: {json.dumps({k: str(v)[:50] for k, v in list(item.items())[:3]})}")
+            logger.debug(f"🔍 [Batch {batch_label}] Item {i} keys: {item_keys}")
+            logger.debug(f"🔍 [Batch {batch_label}] Item {i} sample values: {json.dumps({k: str(v)[:50] for k, v in list(item.items())[:3]})}")
             
             # Validate schema (includes enum validation)
             try:
@@ -150,39 +151,39 @@ class SchemaValidationService:
                 fallback_comment_id = None
                 if batch_start_index is not None:
                     fallback_comment_id = batch_start_index + i
-                    logger.debug(f"🔍 [Batch {batch_index}] Item {i} fallback comment_id: {fallback_comment_id}")
+                    logger.debug(f"🔍 [Batch {batch_label}] Item {i} fallback comment_id: {fallback_comment_id}")
                 
                 normalized = normalize_comment_extraction(item, comment_index=fallback_comment_id)
-                logger.debug(f"✅ [Batch {batch_index}] Item {i} normalized successfully, comment_id: {normalized.get('comment_id')}")
+                logger.debug(f"✅ [Batch {batch_label}] Item {i} normalized successfully, comment_id: {normalized.get('comment_id')}")
                 
                 # Check comment_id uniqueness
                 comment_id = normalized.get("comment_id")
                 if comment_id in comment_ids_seen:
-                    error_msg = f"Batch {batch_index}, item {i}: Duplicate comment_id {comment_id}"
+                    error_msg = f"Batch {batch_label}, item {i}: Duplicate comment_id {comment_id}"
                     errors.append(error_msg)
-                    logger.error(f"❌ [Batch {batch_index}] Item {i} FAILED: {error_msg}")
+                    logger.error(f"❌ [Batch {batch_label}] Item {i} FAILED: {error_msg}")
                     continue
                 comment_ids_seen.add(comment_id)
                 
                 valid_extractions.append(normalized)
-                logger.debug(f"✅ [Batch {batch_index}] Item {i} validation PASSED")
+                logger.debug(f"✅ [Batch {batch_label}] Item {i} validation PASSED")
                 
             except ValueError as e:
-                error_msg = f"Batch {batch_index}, item {i}: Schema validation failed: {str(e)}"
+                error_msg = f"Batch {batch_label}, item {i}: Schema validation failed: {str(e)}"
                 errors.append(error_msg)
-                logger.error(f"❌ [Batch {batch_index}] Item {i} FAILED: {error_msg}")
-                logger.debug(f"🔍 [Batch {batch_index}] Item {i} that failed: {json.dumps(item, indent=2)[:500]}")
+                logger.error(f"❌ [Batch {batch_label}] Item {i} FAILED: {error_msg}")
+                logger.debug(f"🔍 [Batch {batch_label}] Item {i} that failed: {json.dumps(item, indent=2)[:500]}")
         
-        logger.info(f"🔍 [Batch {batch_index}] STEP 4: Validated {len(valid_extractions)}/{len(parsed)} items successfully")
-        logger.info(f"🔍 [Batch {batch_index}] Found {len(errors)} validation errors, {len(comment_ids_seen)} unique comment_ids")
+        logger.info(f"🔍 [Batch {batch_label}] STEP 4: Validated {len(valid_extractions)}/{len(parsed)} items successfully")
+        logger.info(f"🔍 [Batch {batch_label}] Found {len(errors)} validation errors, {len(comment_ids_seen)} unique comment_ids")
         
         # STEP 5: VALIDATE - Final check: All validations passed
-        logger.info(f"🔍 [Batch {batch_index}] STEP 5: Final validation check...")
+        logger.info(f"🔍 [Batch {batch_label}] STEP 5: Final validation check...")
         if errors:
             # If ANY validation failed, reject entire batch (do not partially store)
-            error_summary = f"Batch {batch_index}: Validation failed with {len(errors)} errors. Rejecting entire batch."
-            logger.error(f"❌ [Batch {batch_index}] STEP 5 FAILED: {error_summary}")
-            logger.error(f"❌ [Batch {batch_index}] Total errors: {len(errors)}, Showing first 10:")
+            error_summary = f"Batch {batch_label}: Validation failed with {len(errors)} errors. Rejecting entire batch."
+            logger.error(f"❌ [Batch {batch_label}] STEP 5 FAILED: {error_summary}")
+            logger.error(f"❌ [Batch {batch_label}] Total errors: {len(errors)}, Showing first 10:")
             for idx, err in enumerate(errors[:10], 1):
                 logger.error(f"  {idx}. {err}")
             if len(errors) > 10:
@@ -190,15 +191,15 @@ class SchemaValidationService:
             
             # Log sample of parsed output for debugging
             if parsed and isinstance(parsed, list) and len(parsed) > 0:
-                logger.error(f"🔍 [Batch {batch_index}] Sample output (first item that failed):")
+                logger.error(f"🔍 [Batch {batch_label}] Sample output (first item that failed):")
                 sample_item = parsed[0] if isinstance(parsed[0], dict) else str(parsed[0])
                 logger.error(f"{json.dumps(sample_item, indent=2)[:1000]}")
             return [], errors, False
         
         # All validations passed
-        logger.info(f"✅ [Batch {batch_index}] STEP 5 PASSED: All validations successful!")
+        logger.info(f"✅ [Batch {batch_label}] STEP 5 PASSED: All validations successful!")
         logger.info(
-            f"✅ [Batch {batch_index}] SUMMARY: {len(valid_extractions)} extractions validated successfully "
+            f"✅ [Batch {batch_label}] SUMMARY: {len(valid_extractions)} extractions validated successfully "
             f"(length={len(valid_extractions)}, expected={expected_count}, unique IDs={len(comment_ids_seen)})"
         )
         return valid_extractions, [], True

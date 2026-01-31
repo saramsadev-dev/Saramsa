@@ -24,7 +24,8 @@ class TaskService:
         Process user feedback using LLM with proper chunking, normalize, and save.
         This is the main business logic for background feedback processing.
         
-        CRITICAL: Uses chunking (25 comments per batch) to avoid token limits and ensure all comments are processed.
+        CRITICAL: Uses token-based chunking (max input tokens per batch) to avoid token limits.
+        Comments are never split; if one would exceed the limit, it goes to the next batch.
         Uses LOCKED SEMANTIC SCHEMA - all LLM outputs are validated against exact schema.
         
         Args:
@@ -50,18 +51,13 @@ class TaskService:
             else:
                 logger.info(f"🔒 Using provided frozen aspect list: {suggested_aspects}")
             
-            # 2. Prepare feedback text for chunking
-            feedback_block = "\n".join([str(c) for c in comments])
-            
-            # 3. Process with chunking (this handles large comment sets correctly)
-            # Use processing_service which properly chunks by comment count (25 per batch)
-            logger.info(f"Processing {len(comments)} comments with chunking enabled (25 comments per batch)")
+            # 2. Process with token-based batching (pass comments list directly to avoid newline-split issues)
+            logger.info(f"Processing {len(comments)} comments with token-based batching")
             comments_analysis = async_to_sync(self.processing_service.process_chunks)(
-                text=feedback_block,
-                prompt_template=None,  # Prompts are created per chunk
                 analysis_type=0,  # Sentiment analysis
                 company_name=company_name,
-                suggested_aspects=suggested_aspects  # Pass frozen aspect list
+                suggested_aspects=suggested_aspects,  # Pass frozen aspect list
+                comments=comments,  # Pass list directly — batched by token count
             )
             
             # 4. Validate and parse LLM extractions from all chunks (uses locked schema)
@@ -70,24 +66,12 @@ class TaskService:
             logger.info(f"🔍 STEP 4: Extracted {len(extracted_comments)} total comments from all batches")
             
             if not extracted_comments:
-                # No valid extractions - log detailed error with suggestions
-                logger.error("=" * 80)
-                logger.error("❌ CRITICAL: No valid comment extractions found after validation")
-                logger.error(f"Input: {len(comments)} comments, processed in {len(comments_analysis)} batches")
-                logger.error("=" * 80)
-                logger.error("POSSIBLE CAUSES:")
-                logger.error("1. LLM returned invalid JSON format")
-                logger.error("2. LLM returned wrong number of items (not matching comment count)")
-                logger.error("3. LLM returned invalid enum values (sentiment, confidence, intent_type)")
-                logger.error("4. LLM returned duplicate comment_id values")
-                logger.error("5. LLM returned missing required fields")
-                logger.error("6. All batches failed after retries")
-                logger.error("=" * 80)
-                logger.error("Check logs above for specific validation errors per batch")
-                logger.error("=" * 80)
+                details = self._format_validation_failure_details(comments_analysis, comments)
+                err_suffix = f" First errors: {details[:500]}" if details else " Check server logs for details."
                 raise ValueError(
                     "Failed to extract valid comment data from LLM responses. "
-                    "All batches failed validation. Check server logs for detailed error messages."
+                    "All batches failed validation."
+                    + err_suffix
                 )
             
             # 5. Validate batch integrity
@@ -139,17 +123,42 @@ class TaskService:
             if saved_result:
                 logger.info(f"✅ Analysis saved to Cosmos DB successfully with ID: {saved_result.get('id')}")
                 logger.info(f"🔍 DEBUG: Saved result keys: {list(saved_result.keys()) if saved_result else 'None'}")
+                try:
+                    analysis_service.update_project_last_analysis(project_id, insight_data["id"])
+                except Exception as e:
+                    logger.warning(f"Could not update project last_analysis: {e}")
             else:
                 logger.error(f"❌ Failed to save analysis data to Cosmos DB")
             
             logger.info(f"Analysis saved to Cosmos DB for background task with {len(comments)} comments")
             
-            return {"insight_id": insight_id, "result": normalized}
+            # Return minimal payload to avoid Celery result backend serialization issues
+            # (large normalized result can cause task to be marked FAILURE after save).
+            # Frontend fetches latest analysis by project_id on SUCCESS.
+            return {
+                "insight_id": insight_data["id"],
+                "project_id": project_id,
+                "status": "complete",
+            }
 
         except Exception as e:
             logger.error(f"Error in feedback analysis task: {str(e)}", exc_info=True)
             raise
     
+    def _format_validation_failure_details(self, chunk_results, original_comments):
+        """Build a short summary of validation failures from chunk error dicts."""
+        lines = []
+        for chunk_idx, r in enumerate(chunk_results):
+            if not isinstance(r, dict):
+                continue
+            err_msg = r.get("error")
+            if not err_msg:
+                continue
+            lines.append(f"Chunk {chunk_idx}: {err_msg}")
+            for ve in (r.get("validation_errors") or [])[:5]:
+                lines.append(f"  - {ve}")
+        return "\n".join(lines) if lines else ""
+
     def _validate_and_parse_chunks(self, chunk_results, original_comments):
         """
         Parse validated LLM outputs from chunks.
@@ -166,6 +175,7 @@ class TaskService:
         """
         all_extractions = []
         error_summaries = []
+        running_total = 0
         
         def safe_parse(item):
             """Safely parse JSON string or return dict as-is."""
@@ -202,11 +212,14 @@ class TaskService:
             
             # Handle validated array of extractions
             if isinstance(parsed, list):
-                logger.info(f"✅ Chunk {chunk_idx}: Found {len(parsed)} validated extractions")
+                n = len(parsed)
+                running_total += n
+                logger.info(f"✅ Chunk {chunk_idx}: Found {n} validated extractions (running total: {running_total})")
                 all_extractions.extend(parsed)
             # Handle legacy format (should not happen if validation worked)
             elif isinstance(parsed, dict) and ('counts' not in parsed and 'sentiment_summary' not in parsed):
-                logger.info(f"✅ Chunk {chunk_idx}: Found 1 legacy format extraction")
+                running_total += 1
+                logger.info(f"✅ Chunk {chunk_idx}: Found 1 legacy format extraction (running total: {running_total})")
                 all_extractions.append(parsed)
             else:
                 logger.warning(f"⚠️ Chunk {chunk_idx}: Unexpected format (type: {type(parsed).__name__}), skipping")
@@ -222,7 +235,7 @@ class TaskService:
         
         logger.info(
             f"✅ Parsed {len(all_extractions)} validated extractions from {len(chunk_results)} batches "
-            f"({len(error_summaries)} batches had errors)"
+            f"({len(error_summaries)} batches had errors). Expected original_comments count: {len(original_comments)}"
         )
         
         return all_extractions
@@ -245,13 +258,16 @@ class TaskService:
         original_count = len(original_comments)
         
         if extracted_count != original_count:
+            diff = extracted_count - original_count
             logger.error(
                 f"BATCH INTEGRITY VIOLATION: Expected {original_count} extracted comments, "
-                f"got {extracted_count}. Missing {original_count - extracted_count} comments."
+                f"got {extracted_count}. {'Extra' if diff > 0 else 'Missing'} {abs(diff)} comments."
             )
-            # This is a critical error - consider raising an exception or triggering retry
-        else:
-            logger.info(f"✅ Batch integrity check passed: {extracted_count} comments extracted from {original_count} input comments")
+            raise ValueError(
+                f"Batch integrity failed: expected {original_count} extractions, got {extracted_count}. "
+                "Some batches may have failed validation or results were misattributed. Check logs."
+            )
+        logger.info(f"✅ Batch integrity check passed: {extracted_count} comments extracted from {original_count} input comments")
     
     def _normalize_analysis_result_legacy_from_chunks(self, chunk_results, comments):
         """

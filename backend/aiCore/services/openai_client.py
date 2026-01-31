@@ -1,4 +1,4 @@
-from openai import AzureOpenAI
+from openai import AzureOpenAI, AsyncAzureOpenAI
 from threading import Lock
 import os
 import logging
@@ -42,35 +42,42 @@ class AzureOpenAIClient:
         for key, value in AZURE_OPENAI.items():
             if not value:
                 missing_configs.append(key)
-        
+
         if missing_configs:
             logger.error(f"Missing Azure OpenAI configuration: {missing_configs}")
             raise ValueError(f"Missing required Azure OpenAI configuration: {', '.join(missing_configs)}")
-        
+
         try:
             self.client = AzureOpenAI(
                 azure_endpoint=AZURE_OPENAI["ENDPOINT_URL"],
                 api_key=AZURE_OPENAI["API_KEY"],
                 api_version=AZURE_OPENAI["API_VERSION"],
             )
-            logger.info("Azure OpenAI client initialized successfully")
+            self.async_client = AsyncAzureOpenAI(
+                azure_endpoint=AZURE_OPENAI["ENDPOINT_URL"],
+                api_key=AZURE_OPENAI["API_KEY"],
+                api_version=AZURE_OPENAI["API_VERSION"],
+            )
+            logger.info("Azure OpenAI client initialized successfully (sync + async)")
         except Exception as e:
             logger.error(f"Failed to initialize Azure OpenAI client: {e}")
             raise ConnectionError(f"Failed to initialize Azure OpenAI client: {e}")
 
     def get_client(self):
         """
-        Get the initialized Azure OpenAI client instance.
-        
-        Returns:
-            AzureOpenAI: The initialized client instance
-            
-        Raises:
-            ConnectionError: If client is not properly initialized
+        Get the initialized sync Azure OpenAI client instance.
         """
         if not hasattr(self, 'client') or self.client is None:
             raise ConnectionError("Azure OpenAI client is not initialized")
         return self.client
+
+    def get_async_client(self):
+        """
+        Get the initialized async Azure OpenAI client instance.
+        """
+        if not hasattr(self, 'async_client') or self.async_client is None:
+            raise ConnectionError("Azure OpenAI async client is not initialized")
+        return self.async_client
     
     def test_connection(self) -> bool:
         """
@@ -88,7 +95,7 @@ class AzureOpenAIClient:
             response = client.chat.completions.create(
                 model=AZURE_OPENAI["DEPLOYMENT_NAME"] or "gpt-4o-mini",
                 messages=[{"role": "user", "content": "test"}],
-                max_tokens=1
+                max_completion_tokens=1
             )
             logger.info("Azure OpenAI connection test successful")
             return True

@@ -2,44 +2,50 @@
 Feedback Chunking Service
 
 Handles intelligent text chunking for different types of AI analysis.
-Uses comment-count-based batching (25-30 comments per batch) for optimal accuracy.
+Uses token-based batching: batches are formed by max input tokens per API call.
+Comments are never split; if adding a comment would exceed the limit, it goes to the next batch.
 
 Moved from aiCore/chunker.py to follow proper Django app architecture.
 Now properly organized in the services folder.
 """
 
-import tiktoken
-from typing import List, Dict, Any
-import logging
+import os
 import re
+import logging
+from typing import List, Dict, Any
+
+import tiktoken
 
 logger = logging.getLogger(__name__)
+
+# Default max input tokens per batch (128K context minus prompt/output reserve).
+# Overridable via MAX_INPUT_TOKENS_PER_BATCH env.
+_DEFAULT_MAX_INPUT_TOKENS = 100_000
+_OVERHEAD_PER_COMMENT = 10  # "COMMENT N: " + newline when formatting for prompt
 
 
 class FeedbackChunkingService:
     """Service for chunking feedback data optimally for AI analysis."""
     
     def __init__(self):
-        self.default_model = "gpt-4o-mini"
-        # Batch size configuration (comment-count-based, not token-based)
-        self.optimal_batch_size = 25  # Best accuracy: 20-30 comments per batch
-        self.max_batch_size = 30  # Hard maximum
-        self.never_exceed_size = 50  # Safety limit
-        # Token limits as safety checks (not primary limit)
-        self.sentiment_max_tokens = 8000  # Safety limit (should not be hit with 25 comments)
-        self.deep_analysis_max_tokens = 10000  # Safety limit
-        self.overlap = 100  # Not used for comment-based chunking, kept for backward compatibility
+        self.default_model = os.getenv("DEPLOYMENT_NAME") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        raw = os.getenv("MAX_INPUT_TOKENS_PER_BATCH", str(_DEFAULT_MAX_INPUT_TOKENS))
+        try:
+            self.max_input_tokens_per_batch = max(4_000, min(128_000, int(raw)))
+        except (TypeError, ValueError):
+            self.max_input_tokens_per_batch = _DEFAULT_MAX_INPUT_TOKENS
+        self.overlap = 100  # Used only by _chunk_text_standard fallback
     
     def chunk_feedback_for_sentiment(self, feedback_data: str, model: str = None) -> List[str]:
         """
         Chunk feedback data optimally for sentiment analysis.
         
-        Uses comment-count-based batching (25 comments per batch) for optimal accuracy.
-        Tries to preserve individual comment boundaries.
+        Uses token-based batching: max input tokens per batch; comments are never split.
+        If adding a comment would exceed the limit, it goes to the next batch.
         
         Args:
             feedback_data: Raw feedback text
-            model: AI model name (defaults to gpt-4o-mini)
+            model: AI model name (defaults to gpt-5o-mini)
             
         Returns:
             List of text chunks optimized for sentiment analysis
@@ -47,30 +53,28 @@ class FeedbackChunkingService:
         model = model or self.default_model
         
         try:
-            # Try to split by comment boundaries first
             comments = self._split_into_comments(feedback_data)
-            
             if len(comments) > 1:
-                # If we have identifiable comments, chunk by comment count (not tokens)
-                return self._chunk_by_comment_count(comments, model, self.optimal_batch_size, self.sentiment_max_tokens)
-            else:
-                # Fallback to standard chunking (for unstructured text)
-                logger.warning("Could not identify comment boundaries, using token-based chunking")
-                return self._chunk_text_standard(feedback_data, model, self.sentiment_max_tokens, self.overlap)
-                
+                return self._chunk_by_token_limit(comments, model)
+            logger.warning("Could not identify comment boundaries, using standard token chunking")
+            return self._chunk_text_standard(
+                feedback_data, model, self.max_input_tokens_per_batch, self.overlap
+            )
         except Exception as e:
             logger.warning(f"Error in smart chunking, falling back to standard: {e}")
-            return self._chunk_text_standard(feedback_data, model, self.sentiment_max_tokens, self.overlap)
+            return self._chunk_text_standard(
+                feedback_data, model, self.max_input_tokens_per_batch, self.overlap
+            )
     
     def chunk_feedback_for_deep_analysis(self, feedback_data: str, model: str = None) -> List[str]:
         """
         Chunk feedback data optimally for deep analysis and work item generation.
         
-        Uses comment-count-based batching (25 comments per batch) for optimal accuracy.
+        Uses token-based batching: max input tokens per batch; comments are never split.
         
         Args:
             feedback_data: Raw feedback text
-            model: AI model name (defaults to gpt-4o-mini)
+            model: AI model name (defaults to gpt-5o-mini)
             
         Returns:
             List of text chunks optimized for deep analysis
@@ -78,20 +82,18 @@ class FeedbackChunkingService:
         model = model or self.default_model
         
         try:
-            # Try to split by comment boundaries first
             comments = self._split_into_comments(feedback_data)
-            
             if len(comments) > 1:
-                # If we have identifiable comments, chunk by comment count (not tokens)
-                return self._chunk_by_comment_count(comments, model, self.optimal_batch_size, self.deep_analysis_max_tokens)
-            else:
-                # Fallback to standard chunking
-                logger.warning("Could not identify comment boundaries, using token-based chunking")
-                return self._chunk_text_standard(feedback_data, model, self.deep_analysis_max_tokens, self.overlap * 2)
-                
+                return self._chunk_by_token_limit(comments, model)
+            logger.warning("Could not identify comment boundaries, using standard token chunking")
+            return self._chunk_text_standard(
+                feedback_data, model, self.max_input_tokens_per_batch, self.overlap * 2
+            )
         except Exception as e:
             logger.warning(f"Error in smart chunking, falling back to standard: {e}")
-            return self._chunk_text_standard(feedback_data, model, self.deep_analysis_max_tokens, self.overlap * 2)
+            return self._chunk_text_standard(
+                feedback_data, model, self.max_input_tokens_per_batch, self.overlap * 2
+            )
     
     def _split_into_comments(self, feedback_data: str) -> List[str]:
         """
@@ -135,81 +137,46 @@ class FeedbackChunkingService:
         # If no clear structure, return as single item
         return [feedback_data]
     
-    def _chunk_by_comment_count(self, comments: List[str], model: str, target_batch_size: int, max_tokens: int) -> List[str]:
+    def _chunk_by_token_limit(self, comments: List[str], model: str) -> List[str]:
         """
-        Group comments into batches by comment count (not tokens).
-        
-        This is the CORRECT approach: batch by comment count (25-30 per batch)
-        for optimal LLM accuracy, not by token count.
-        
-        Args:
-            comments: List of individual comments
-            model: AI model name for token encoding
-            target_batch_size: Target number of comments per batch (25 recommended)
-            max_tokens: Maximum tokens as safety limit (should not be hit)
-            
-        Returns:
-            List of text chunks (each chunk contains target_batch_size comments)
+        Batch comments by max input tokens per API call. Never split a comment;
+        if adding it would exceed the limit, it goes to the next batch.
         """
         try:
             encoding = tiktoken.encoding_for_model(model)
         except KeyError:
-            # Fallback to a common encoding if model not found
             encoding = tiktoken.get_encoding("cl100k_base")
         
-        chunks = []
-        current_batch = []
+        chunks: List[str] = []
+        current_batch: List[str] = []
         current_tokens = 0
+        limit = self.max_input_tokens_per_batch
         
         for i, comment in enumerate(comments):
-            comment_tokens = len(encoding.encode(comment))
+            raw_tokens = len(encoding.encode(comment))
+            effective = raw_tokens + _OVERHEAD_PER_COMMENT
             
-            # Safety check: if single comment exceeds token limit, warn but include it
-            if comment_tokens > max_tokens:
-                logger.warning(f"Comment {i} exceeds token limit ({comment_tokens} > {max_tokens}), including anyway")
-            
-            # Check if adding this comment would exceed safety token limit
-            if current_tokens + comment_tokens > max_tokens and current_batch:
-                # Start new batch before adding this comment
-                chunks.append('\n'.join(current_batch))
+            if raw_tokens > limit:
+                logger.warning(
+                    "Comment %d exceeds token limit (%d > %d); putting in its own batch",
+                    i, raw_tokens, limit,
+                )
+            if current_tokens + effective > limit and current_batch:
+                chunks.append("\n".join(current_batch))
                 current_batch = [comment]
-                current_tokens = comment_tokens
-            # Check if we've reached target batch size
-            elif len(current_batch) >= target_batch_size:
-                # Start new batch
-                chunks.append('\n'.join(current_batch))
-                current_batch = [comment]
-                current_tokens = comment_tokens
+                current_tokens = raw_tokens + _OVERHEAD_PER_COMMENT
             else:
-                # Add comment to current batch
                 current_batch.append(comment)
-                current_tokens += comment_tokens
+                current_tokens += effective
         
-        # Add the last batch if it has content
         if current_batch:
-            chunks.append('\n'.join(current_batch))
+            chunks.append("\n".join(current_batch))
         
-        logger.info(f"Chunked {len(comments)} comments into {len(chunks)} batches (target: {target_batch_size} comments per batch)")
-        
-        # Validate batch sizes
-        for i, chunk in enumerate(chunks):
-            chunk_comments = chunk.split('\n')
-            if len(chunk_comments) > self.never_exceed_size:
-                logger.error(f"Batch {i} has {len(chunk_comments)} comments, exceeds safety limit of {self.never_exceed_size}")
-            elif len(chunk_comments) > self.max_batch_size:
-                logger.warning(f"Batch {i} has {len(chunk_comments)} comments, exceeds recommended limit of {self.max_batch_size}")
-        
+        logger.info(
+            "Chunked %d comments into %d batches (max %d input tokens per batch)",
+            len(comments), len(chunks), limit,
+        )
         return chunks
-    
-    def _chunk_by_comments(self, comments: List[str], model: str, max_tokens: int) -> List[str]:
-        """
-        OLD METHOD: Group comments into chunks by token limit (DEPRECATED).
-        
-        This method is kept for backward compatibility but is NOT recommended.
-        Use _chunk_by_comment_count instead for optimal accuracy.
-        """
-        logger.warning("Using deprecated token-based chunking. Use comment-count-based chunking for better accuracy.")
-        return self._chunk_by_comment_count(comments, model, self.optimal_batch_size, max_tokens)
     
     def _chunk_text_standard(self, text: str, model: str, max_tokens: int, overlap: int) -> List[str]:
         """
@@ -255,27 +222,24 @@ class FeedbackChunkingService:
         sentiment_chunks = self.chunk_feedback_for_sentiment(feedback_data, model)
         deep_analysis_chunks = self.chunk_feedback_for_deep_analysis(feedback_data, model)
         
-        # Calculate comments per chunk
-        sentiment_chunk_sizes = [len(chunk.split('\n')) for chunk in sentiment_chunks]
-        deep_chunk_sizes = [len(chunk.split('\n')) for chunk in deep_analysis_chunks]
+        sentiment_chunk_sizes = [len(c.split("\n")) for c in sentiment_chunks]
+        deep_chunk_sizes = [len(c.split("\n")) for c in deep_analysis_chunks]
         
         return {
             "total_comments": len(comments),
             "total_tokens": total_tokens,
             "total_characters": len(feedback_data),
-            "optimal_batch_size": self.optimal_batch_size,
+            "max_input_tokens_per_batch": self.max_input_tokens_per_batch,
             "sentiment_analysis": {
                 "chunk_count": len(sentiment_chunks),
                 "comments_per_chunk": sentiment_chunk_sizes,
                 "avg_comments_per_chunk": sum(sentiment_chunk_sizes) / len(sentiment_chunk_sizes) if sentiment_chunk_sizes else 0,
-                "max_tokens_per_chunk": self.sentiment_max_tokens,
             },
             "deep_analysis": {
                 "chunk_count": len(deep_analysis_chunks),
                 "comments_per_chunk": deep_chunk_sizes,
                 "avg_comments_per_chunk": sum(deep_chunk_sizes) / len(deep_chunk_sizes) if deep_chunk_sizes else 0,
-                "max_tokens_per_chunk": self.deep_analysis_max_tokens,
-            }
+            },
         }
 
 

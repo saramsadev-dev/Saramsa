@@ -6,7 +6,8 @@ import os
 import logging
 
 # LLM Configuration Constants
-DEFAULT_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+# Use DEPLOYMENT_NAME (Azure deployment) or OPENAI_MODEL; must match an existing Azure OpenAI deployment.
+DEFAULT_MODEL = os.getenv("DEPLOYMENT_NAME") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 DEFAULT_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '1300'))
 DEFAULT_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', '0.7'))
 DEFAULT_TOP_P = float(os.getenv('OPENAI_TOP_P', '0.95'))
@@ -16,7 +17,7 @@ logger = logging.getLogger("apis.app")
 
 def get_azure_client_instance():
     """
-    Lazy initialization of Azure OpenAI Client.
+    Lazy initialization of Azure OpenAI Client (sync).
     Called only when needed, not at import time.
     """
     try:
@@ -26,6 +27,19 @@ def get_azure_client_instance():
         return azure_client
     except Exception as e:
         logger.error(f"Failed to get Azure OpenAI client: {e}")
+        raise ConnectionError(f"Azure OpenAI service unavailable: {str(e)}")
+
+def get_async_azure_client_instance():
+    """
+    Lazy initialization of Azure OpenAI Client (async).
+    """
+    try:
+        async_client = get_azure_client().get_async_client()
+        if not async_client:
+            raise RuntimeError("Azure OpenAI async client is not initialized")
+        return async_client
+    except Exception as e:
+        logger.error(f"Failed to get Azure OpenAI async client: {e}")
         raise ConnectionError(f"Azure OpenAI service unavailable: {str(e)}")
 
 @handle_service_errors
@@ -64,17 +78,12 @@ async def generate_completions(prompt_instruction, max_tokens=None):
     logger.info("Analysing Sentiments...")
     
     try:
-        azure_client = get_azure_client_instance()
-        # Generate the completion using the singleton client
-        completion = azure_client.chat.completions.create(
+        azure_client = get_async_azure_client_instance()
+        # Generate the completion using the async client (non-blocking)
+        completion = await azure_client.chat.completions.create(
             model=DEFAULT_MODEL,
             messages=chat_prompt,
-            max_tokens=effective_max_tokens,
-            temperature=DEFAULT_TEMPERATURE,
-            top_p=DEFAULT_TOP_P,
-            frequency_penalty=0,
-            presence_penalty=0,
-            stop=None,
+            max_completion_tokens=effective_max_tokens,
             stream=False,
         )
         

@@ -74,6 +74,10 @@ if result_backend and result_backend.startswith('rediss://'):
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
 
+# Ensure events are sent so Celery Ops / Flower can observe runs
+app.conf.worker_send_task_events = True
+app.conf.task_send_sent_event = True
+
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
     logger.debug(f'Request: {self.request!r}')

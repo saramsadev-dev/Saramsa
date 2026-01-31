@@ -259,11 +259,24 @@ class AnalysisService:
                 logger.info(f"🔍 DEBUG: feedback count: {len(analysis_data['feedback'])}")
             
             result = self.analysis_repo.save_analysis_data(analysis_data)
-            
+
             if result:
                 logger.info(f"✅ AnalysisService.save_analysis_data SUCCESS")
                 logger.info(f"🔍 DEBUG: Returned result keys: {list(result.keys())}")
                 logger.info(f"🔍 DEBUG: Returned result id: {result.get('id')}")
+
+                # Invalidate cached analysis data so frontend gets fresh results
+                try:
+                    cache = get_cache_service()
+                    project_id = analysis_data.get('projectId')
+                    if project_id:
+                        cache.clear_pattern(f"analysis:*{project_id}*")
+                        logger.info(f"🗑️ Invalidated analysis cache for project {project_id}")
+                    # Also clear broad analysis cache patterns
+                    cache.clear_pattern("analysis:*")
+                    logger.info("🗑️ Invalidated all analysis cache entries")
+                except Exception as cache_err:
+                    logger.warning(f"Failed to invalidate cache: {cache_err}")
             else:
                 logger.error(f"❌ AnalysisService.save_analysis_data FAILED - returned None")
             

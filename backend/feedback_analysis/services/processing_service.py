@@ -19,6 +19,7 @@ from .retry_service import get_retry_service
 from .schema_validator import get_validation_service
 from apis.prompts import getSentAnalysisPrompt, getDeepAnalysisPrompt
 from aiCore.services.completion_service import generate_completions
+import tiktoken
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,61 +33,56 @@ class ProcessingService:
         self.retry_service = get_retry_service()
         self.validation_service = get_validation_service()
     
-    async def process_chunks(self, text: str, prompt_template: str = None, analysis_type: int = 0, 
-                            company_name: str = None, suggested_aspects: list = None):
+    async def process_chunks(self, text: str = None, prompt_template: str = None, analysis_type: int = 0,
+                            company_name: str = None, suggested_aspects: list = None,
+                            comments: list = None):
         """
-        Process text chunks with AI analysis with automatic retry and batch integrity validation.
-        
-        CRITICAL: Each batch is validated for integrity before acceptance:
-        - Output is valid JSON
-        - Output length == input comment count
-        - Every comment_id exists exactly once
-        - All enum fields contain allowed values
-        - If validation fails: retry the batch (do NOT partially store)
-        
+        Process comment batches with AI analysis with automatic retry and batch integrity validation.
+
+        For sentiment analysis (analysis_type=0), pass comments as a list to avoid
+        newline-split issues. Falls back to text-based chunking for deep analysis.
+
         Args:
-            text: Input text to analyze
-            prompt_template: Base prompt template (deprecated, prompts are created per chunk) - kept for backward compatibility
+            text: Input text to analyze (used for deep analysis fallback)
+            prompt_template: Deprecated, kept for backward compatibility
             analysis_type: 0 for sentiment, 1 for deep analysis
             company_name: Optional company name for prompt customization
-            suggested_aspects: Optional list of approved aspects (frozen aspect list) - LLM MUST use only these
-            
+            suggested_aspects: Optional list of approved aspects (frozen aspect list)
+            comments: List of comment strings (preferred for sentiment analysis)
+
         Returns:
             Analysis results from AI service (only validated batches included)
         """
-        # Choose chunking strategy based on analysis type
-        if analysis_type == 0:  # Sentiment analysis
-            chunks = self.chunking_service.chunk_feedback_for_sentiment(text)
-        else:  # Deep analysis
-            chunks = self.chunking_service.chunk_feedback_for_deep_analysis(text)
-        
-        logger.info(f"Processing {len(chunks)} chunks for analysis type {analysis_type}")
-        
-        # Calculate expected comment count per chunk
-        chunk_comment_counts = [self._count_comments_in_chunk(chunk) for chunk in chunks]
-        logger.debug(f"Expected comment counts per chunk: {chunk_comment_counts}")
-        
-        # Calculate starting indices for each batch (for global comment_id mapping)
-        # Batch 0: starts at 0, Batch 1: starts at count of batch 0, etc.
-        batch_start_indices = []
-        cumulative_index = 0
-        for count in chunk_comment_counts:
-            batch_start_indices.append(cumulative_index)
-            cumulative_index += count
-        
-        # Bounded concurrency: cap concurrent LLM requests to avoid TPM/RPM rate limits
+        # For sentiment analysis with a comments list, use token-based batching directly
+        if analysis_type == 0 and comments is not None:
+            batches = self._batch_comments_by_tokens(comments)
+            logger.info(f"Processing {len(batches)} batches for {len(comments)} comments (token-based batching)")
+        else:
+            # Fallback to text-based chunking for deep analysis
+            if analysis_type == 0:
+                chunks = self.chunking_service.chunk_feedback_for_sentiment(text)
+            else:
+                chunks = self.chunking_service.chunk_feedback_for_deep_analysis(text)
+            # Convert text chunks into indexed tuple batches for uniform handling
+            batches = []
+            global_idx = 0
+            for chunk in chunks:
+                lines = [l for l in chunk.split('\n') if l.strip()]
+                batch = [(global_idx + i, line.strip()) for i, line in enumerate(lines)]
+                global_idx += len(batch)
+                batches.append(batch)
+            logger.info(f"Processing {len(batches)} chunks for analysis type {analysis_type}")
+
+        # Bounded concurrency
         max_concurrent = int(os.getenv("LLM_MAX_CONCURRENT_REQUESTS", "8"))
         max_concurrent = max(1, min(max_concurrent, 32))
         semaphore = asyncio.Semaphore(max_concurrent)
         logger.info(f"Using bounded concurrency: max {max_concurrent} concurrent LLM requests")
-        
-        async def _process_one_batch(
-            batch_index: int,
-            chunk: str,
-            expected_count: int,
-            comment_start_index: int,
-        ):
-            """Process a single batch with retries. Holds semaphore for the whole attempt."""
+
+        async def _process_one_batch(batch_index, batch):
+            """Process a single batch with retries."""
+            expected_count = len(batch)
+            comment_start_index = batch[0][0]  # global index of first comment in batch
             max_retries = 3
             validation_errors = []
             async with semaphore:
@@ -96,13 +92,15 @@ class ProcessingService:
                         if analysis_type == 0:
                             chunk_prompt = getSentAnalysisPrompt(
                                 company_name=company_name,
-                                feedback_data=chunk,
+                                feedback_data=batch,
                                 suggested_aspects=suggested_aspects,
                                 comment_start_index=comment_start_index,
                             )
                         else:
+                            # Deep analysis still uses string
+                            chunk_text = "\n".join(text for _, text in batch)
                             chunk_prompt = getDeepAnalysisPrompt(
-                                company_name=company_name, feedback_data=chunk
+                                company_name=company_name, feedback_data=chunk_text
                             )
                         estimated_tokens_needed = (expected_count * 200) + 500
                         max_tokens = max(estimated_tokens_needed, 4000)
@@ -164,57 +162,81 @@ class ProcessingService:
                             f"Retrying in {delay}s... ({max_retries - attempt} retries left)"
                         )
                         await asyncio.sleep(delay)
-        
+
         tasks = [
-            _process_one_batch(
-                i,
-                chunks[i],
-                chunk_comment_counts[i],
-                batch_start_indices[i],
-            )
-            for i in range(len(chunks))
+            _process_one_batch(i, batches[i])
+            for i in range(len(batches))
         ]
         results = await asyncio.gather(*tasks)
         results = list(results)
-        
+
         successful_batches = sum(
             1 for r in results
             if not (isinstance(r, dict) and r.get("processed") is False)
         )
-        failed_batches = len(chunks) - successful_batches
-        
+        failed_batches = len(batches) - successful_batches
+
         logger.info(
-            f"Completed processing {len(chunks)} chunks: "
+            f"Completed processing {len(batches)} chunks: "
             f"{successful_batches} successful, {failed_batches} failed"
         )
-        failure_rate = failed_batches / len(chunks) if chunks else 0
+        failure_rate = failed_batches / len(batches) if batches else 0
         if failure_rate > 0.1:
             logger.warning(
-                f"High batch failure rate: {failed_batches}/{len(chunks)} batches failed "
+                f"High batch failure rate: {failed_batches}/{len(batches)} batches failed "
                 f"({failure_rate:.1%})"
             )
         return results
-    
-    def _count_comments_in_chunk(self, chunk: str) -> int:
+
+    def _batch_comments_by_tokens(self, comments, max_tokens=None):
         """
-        Count comments in a chunk string.
-        
-        Since chunks are created by joining comments with '\n', we count
-        non-empty lines as comments.
-        
-        Args:
-            chunk: Chunk string (newline-separated comments)
-            
-        Returns:
-            Number of comments in the chunk
+        Batch comments by token count. Each batch is a list of (global_index, comment_text) tuples.
+        Comments are never split across batches.
         """
-        if not chunk:
-            return 0
-        
-        # Count non-empty lines (comments)
-        lines = chunk.split('\n')
-        comment_count = len([line for line in lines if line.strip()])
-        return comment_count
+        model = os.getenv("DEPLOYMENT_NAME") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+
+        raw = os.getenv("MAX_INPUT_TOKENS_PER_BATCH", "100000")
+        try:
+            limit = max(4000, min(128000, int(raw)))
+        except (TypeError, ValueError):
+            limit = 100000
+        if max_tokens:
+            limit = max_tokens
+
+        # Cap comments per batch to enable parallel processing
+        # With 25-35 comments per batch, 99 comments -> 3-4 parallel LLM calls
+        raw_max_comments = os.getenv("MAX_COMMENTS_PER_BATCH", "30")
+        try:
+            max_comments_per_batch = max(10, int(raw_max_comments))
+        except (TypeError, ValueError):
+            max_comments_per_batch = 30
+
+        batches = []
+        current_batch = []
+        current_tokens = 0
+
+        for i, comment in enumerate(comments):
+            text = str(comment).strip()
+            tokens = len(encoding.encode(text)) + 10  # overhead for "COMMENT N: " prefix
+            if (current_tokens + tokens > limit or len(current_batch) >= max_comments_per_batch) and current_batch:
+                batches.append(current_batch)
+                current_batch = []
+                current_tokens = 0
+            current_batch.append((i, text))
+            current_tokens += tokens
+
+        if current_batch:
+            batches.append(current_batch)
+
+        logger.info(
+            f"Batched {len(comments)} comments into {len(batches)} batches "
+            f"(max {limit} input tokens, max {max_comments_per_batch} comments per batch)"
+        )
+        return batches
     
     async def process_feedback(self, text, company_name: str = None, suggested_aspects: list = None):
         """
@@ -228,14 +250,12 @@ class ProcessingService:
         Returns:
             Normalized analysis results
         """
-        # Process chunks with sentiment analysis (prompts are created per chunk inside process_chunks)
-        comments_analysis = await self.process_chunks(
-            text, None, 0, company_name=company_name, suggested_aspects=suggested_aspects
+        # Run sentiment and deep analysis in parallel (both are independent)
+        comments_analysis, deep_analysis = await asyncio.gather(
+            self.process_chunks(text, None, 0, company_name=company_name, suggested_aspects=suggested_aspects),
+            self.process_chunks(text, None, 1, company_name=company_name),
         )
         logger.debug("Comment analysis completed", extra={"result": comments_analysis})
-
-        # Process chunks with deep analysis (prompts are created per chunk inside process_chunks)
-        deep_analysis = await self.process_chunks(text, None, 1, company_name=company_name)
         logger.debug("Deep analysis completed", extra={"result": deep_analysis})
 
         # Ensure lists

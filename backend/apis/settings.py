@@ -260,7 +260,8 @@ CORS_ALLOWED_ORIGINS = [
     'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
     'https://saramsa-chi.vercel.app',
     'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
-    'http://localhost:3000',      
+    'http://localhost:3000',
+    'http://localhost:3001',      
     'http://localhost:8000',
     'http://localhost',
 ]
@@ -290,6 +291,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://saramsa-chi.vercel.app',
     'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:8000',
     'http://localhost',
 ]
