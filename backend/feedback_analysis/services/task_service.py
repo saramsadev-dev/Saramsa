@@ -7,9 +7,23 @@ from .schema_validator import get_validation_service
 import logging
 import json
 import uuid
+import os
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Environment variable to toggle between local ML pipeline and LLM-based processing
+USE_LOCAL_PIPELINE = os.getenv('USE_LOCAL_PIPELINE', 'false').lower() == 'true'
+
+# Import local processing service if enabled
+if USE_LOCAL_PIPELINE:
+    try:
+        from .local_processing_service import LocalProcessingService
+        logger.info("🤖 Local ML Pipeline enabled - using LocalProcessingService")
+    except Exception as e:
+        logger.error(f"❌ Failed to import LocalProcessingService: {e}")
+        logger.info("🔄 Falling back to LLM-based processing")
+        USE_LOCAL_PIPELINE = False
 
 
 class TaskService:
@@ -18,15 +32,28 @@ class TaskService:
     def __init__(self):
         self.processing_service = get_processing_service()
         self.validation_service = get_validation_service()
+        
+        # Initialize local processing service if enabled
+        if USE_LOCAL_PIPELINE:
+            try:
+                self.local_processing_service = LocalProcessingService()
+                logger.info("✅ LocalProcessingService initialized successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize LocalProcessingService: {e}")
+                logger.info("🔄 Falling back to LLM-based processing for this instance")
+                # Note: Cannot modify global variable here, will use instance flag
+                self._use_local_pipeline = False
+        else:
+            self.local_processing_service = None
+            self._use_local_pipeline = USE_LOCAL_PIPELINE
     
     def process_feedback_background(self, comments, company_name, user_id_str, project_id, suggested_aspects=None):
         """
-        Process user feedback using LLM with proper chunking, normalize, and save.
-        This is the main business logic for background feedback processing.
+        Process user feedback using either local ML pipeline or LLM-based processing.
         
-        CRITICAL: Uses token-based chunking (max input tokens per batch) to avoid token limits.
-        Comments are never split; if one would exceed the limit, it goes to the next batch.
-        Uses LOCKED SEMANTIC SCHEMA - all LLM outputs are validated against exact schema.
+        The processing method is determined by the USE_LOCAL_PIPELINE environment variable:
+        - If True: Uses local ML models (embedding + sentiment) with single GPT synthesis call
+        - If False: Uses existing LLM-based chunked processing (backward compatibility)
         
         Args:
             comments: List of comment strings
@@ -36,114 +63,308 @@ class TaskService:
             suggested_aspects: Optional list of frozen aspects (if None, will generate)
         """
         logger.info(f"📈 Background task started: feedback analysis for project {project_id}")
-        logger.info(f"🔍 DEBUG: Input parameters - comments count: {len(comments)}, user: {user_id_str}, project: {project_id}")
-        logger.info(f"🔍 DEBUG: First few comments: {comments[:3] if len(comments) > 3 else comments}")
+        logger.info(f"🔍 Processing method: {'Local ML Pipeline' if USE_LOCAL_PIPELINE else 'LLM-based chunking'}")
+        logger.info(f"🔍 Input: {len(comments)} comments, user: {user_id_str}, project: {project_id}")
         
         try:
-            # 1. Generate aspect suggestions if not provided (Step 2 of workflow)
-            if suggested_aspects is None:
-                logger.info("No suggested_aspects provided - generating aspect suggestions")
-                from .aspect_suggestion_service import get_aspect_suggestion_service
-                aspect_service = get_aspect_suggestion_service()
-                aspect_suggestions_result = async_to_sync(aspect_service.suggest_aspects)(comments)
-                suggested_aspects = aspect_suggestions_result.get('suggested_aspects', [])
-                logger.info(f"✅ Generated {len(suggested_aspects)} aspect suggestions: {suggested_aspects}")
-            else:
-                logger.info(f"🔒 Using provided frozen aspect list: {suggested_aspects}")
-            
-            # 2. Process with token-based batching (pass comments list directly to avoid newline-split issues)
-            logger.info(f"Processing {len(comments)} comments with token-based batching")
-            comments_analysis = async_to_sync(self.processing_service.process_chunks)(
-                analysis_type=0,  # Sentiment analysis
-                company_name=company_name,
-                suggested_aspects=suggested_aspects,  # Pass frozen aspect list
-                comments=comments,  # Pass list directly — batched by token count
-            )
-            
-            # 4. Validate and parse LLM extractions from all chunks (uses locked schema)
-            logger.info(f"🔍 STEP 4: Parsing and combining validated results from {len(comments_analysis)} batches...")
-            extracted_comments = self._validate_and_parse_chunks(comments_analysis, comments)
-            logger.info(f"🔍 STEP 4: Extracted {len(extracted_comments)} total comments from all batches")
-            
-            if not extracted_comments:
-                details = self._format_validation_failure_details(comments_analysis, comments)
-                err_suffix = f" First errors: {details[:500]}" if details else " Check server logs for details."
-                raise ValueError(
-                    "Failed to extract valid comment data from LLM responses. "
-                    "All batches failed validation."
-                    + err_suffix
+            # Choose processing method based on configuration
+            if USE_LOCAL_PIPELINE and self.local_processing_service:
+                return self._process_with_local_pipeline(
+                    comments, company_name, user_id_str, project_id, suggested_aspects
                 )
-            
-            # 5. Validate batch integrity
-            self._validate_batch_integrity(extracted_comments, comments)
-            
-            # 6. Generate unique run_id for this processing run (for tracking/auditing, not persistence)
-            run_id = str(uuid.uuid4())
-            logger.info(f"Generated run_id {run_id} for processing {len(comments)} comments")
-            
-            # 7. Aggregate using aggregation service (works directly from extracted_comments in memory)
-            from .aggregation_service import get_aggregation_service
-            aggregation_service = get_aggregation_service()
-            normalized = aggregation_service.aggregate_comment_extractions(extracted_comments)
-            
-            # Ensure counts match actual comment count (system of record)
-            normalized['counts']['total'] = len(comments)
-            
-            # 9. Save aggregated analysis to database with original comments included
-            insight_id = str(uuid.uuid4())
-            insight_data = {
-                'id': f'insight_{insight_id}',
-                'type': 'insight',
-                'projectId': project_id,  # Use projectId for consistency
-                'userId': user_id_str,    # Use userId for consistency
-                'analysis_type': 'sentiment_analysis',
-                'analysis_date': datetime.now().isoformat(),
-                'createdAt': datetime.now().isoformat(),
-                'run_id': run_id,  # Unique identifier for this analysis run
-                'result': normalized,
-                'status': 'complete',
-                # Store original comments for retrieval (NEVER overwrite)
-                'original_comments': comments,
-                'feedback': comments,  # Alternative field name
-                'company_name': company_name,
-                'comments_count': len(comments)
-            }
-            
-            logger.info(f"🔍 DEBUG: About to save insight_data with keys: {list(insight_data.keys())}")
-            logger.info(f"🔍 DEBUG: insight_data id: {insight_data['id']}")
-            logger.info(f"🔍 DEBUG: insight_data projectId: {insight_data['projectId']}")
-            logger.info(f"🔍 DEBUG: insight_data userId: {insight_data['userId']}")
-            logger.info(f"🔍 DEBUG: insight_data original_comments count: {len(insight_data['original_comments'])}")
-            logger.info(f"🔍 DEBUG: insight_data feedback count: {len(insight_data['feedback'])}")
-            
-            # Save using analysis service
-            analysis_service = get_analysis_service()
-            saved_result = analysis_service.save_analysis_data(insight_data)
-            
-            if saved_result:
-                logger.info(f"✅ Analysis saved to Cosmos DB successfully with ID: {saved_result.get('id')}")
-                logger.info(f"🔍 DEBUG: Saved result keys: {list(saved_result.keys()) if saved_result else 'None'}")
-                try:
-                    analysis_service.update_project_last_analysis(project_id, insight_data["id"])
-                except Exception as e:
-                    logger.warning(f"Could not update project last_analysis: {e}")
             else:
-                logger.error(f"Failed to save analysis data to Cosmos DB")
-            
-            logger.info(f"Analysis saved to Cosmos DB for background task with {len(comments)} comments")
-            
-            # Return minimal payload to avoid Celery result backend serialization issues
-            # (large normalized result can cause task to be marked FAILURE after save).
-            # Frontend fetches latest analysis by project_id on SUCCESS.
-            return {
-                "insight_id": insight_data["id"],
-                "project_id": project_id,
-                "status": "complete",
-            }
-
+                return self._process_with_llm_chunking(
+                    comments, company_name, user_id_str, project_id, suggested_aspects
+                )
+                
         except Exception as e:
             logger.error(f"Error in feedback analysis task: {str(e)}", exc_info=True)
             raise
+    
+    def _process_with_local_pipeline(self, comments, company_name, user_id_str, project_id, suggested_aspects=None):
+        """
+        Process feedback using the local ML pipeline.
+        
+        This method uses local models for embedding and sentiment analysis,
+        with a single GPT call for final synthesis.
+        """
+        logger.info("🤖 Processing with Local ML Pipeline")
+        
+        # 1. Generate aspect suggestions if not provided
+        if suggested_aspects is None:
+            logger.info("Generating aspect suggestions...")
+            from .aspect_suggestion_service import get_aspect_suggestion_service
+            aspect_service = get_aspect_suggestion_service()
+            aspect_suggestions_result = async_to_sync(aspect_service.suggest_aspects)(comments)
+            suggested_aspects = aspect_suggestions_result.get('suggested_aspects', [])
+            logger.info(f"✅ Generated {len(suggested_aspects)} aspect suggestions: {suggested_aspects}")
+        else:
+            logger.info(f"🔒 Using provided frozen aspect list: {suggested_aspects}")
+        
+        # 2. Process through local ML pipeline
+        run_id = str(uuid.uuid4())
+        logger.info(f"🚀 Processing {len(comments)} comments through local ML pipeline (run: {run_id})")
+        
+        pipeline_result = self.local_processing_service.process_comments(
+            comments=comments,
+            aspects=suggested_aspects,
+            company_name=company_name or "Company",
+            run_id=run_id
+        )
+        
+        logger.info(f"✅ Local ML pipeline completed in {pipeline_result.processing_time:.2f}s")
+        logger.info(f"📊 Results: {len(pipeline_result.features)} features, {len(pipeline_result.insights)} insights, {len(pipeline_result.work_items)} work items")
+        
+        # 3. Convert pipeline result to expected format
+        normalized_result = self._convert_pipeline_result_to_schema(pipeline_result, comments)
+        
+        # 4. Save to database
+        insight_id = str(uuid.uuid4())
+        insight_data = {
+            'id': f'insight_{insight_id}',
+            'type': 'insight',
+            'projectId': project_id,
+            'userId': user_id_str,
+            'analysis_type': 'sentiment_analysis_local_ml',
+            'analysis_date': datetime.now().isoformat(),
+            'createdAt': datetime.now().isoformat(),
+            'run_id': run_id,
+            'result': normalized_result,
+            'status': 'complete',
+            'original_comments': comments,
+            'feedback': comments,
+            'company_name': company_name,
+            'comments_count': len(comments),
+            'processing_method': 'local_ml_pipeline',
+            'model_info': pipeline_result.model_info,
+            'processing_time': pipeline_result.processing_time,
+            'pipeline_insights': pipeline_result.insights,
+            'pipeline_work_items': pipeline_result.work_items
+        }
+        
+        # Save using analysis service
+        analysis_service = get_analysis_service()
+        saved_result = analysis_service.save_analysis_data(insight_data)
+        
+        if saved_result:
+            logger.info(f"✅ Local ML analysis saved to Cosmos DB with ID: {saved_result.get('id')}")
+            try:
+                analysis_service.update_project_last_analysis(project_id, insight_data["id"])
+            except Exception as e:
+                logger.warning(f"Could not update project last_analysis: {e}")
+        else:
+            logger.error(f"❌ Failed to save local ML analysis data to Cosmos DB")
+        
+        return {
+            "insight_id": insight_data["id"],
+            "project_id": project_id,
+            "status": "complete",
+            "processing_method": "local_ml_pipeline",
+            "processing_time": pipeline_result.processing_time
+        }
+    
+    def _process_with_llm_chunking(self, comments, company_name, user_id_str, project_id, suggested_aspects=None):
+        """
+        Process feedback using the existing LLM-based chunking approach.
+        
+        This is the original implementation for backward compatibility.
+        """
+        logger.info("🔄 Processing with LLM-based chunking (legacy method)")
+        
+        # 1. Generate aspect suggestions if not provided (Step 2 of workflow)
+        if suggested_aspects is None:
+            logger.info("No suggested_aspects provided - generating aspect suggestions")
+            from .aspect_suggestion_service import get_aspect_suggestion_service
+            aspect_service = get_aspect_suggestion_service()
+            aspect_suggestions_result = async_to_sync(aspect_service.suggest_aspects)(comments)
+            suggested_aspects = aspect_suggestions_result.get('suggested_aspects', [])
+            logger.info(f"✅ Generated {len(suggested_aspects)} aspect suggestions: {suggested_aspects}")
+        else:
+            logger.info(f"🔒 Using provided frozen aspect list: {suggested_aspects}")
+        
+        # 2. Process with token-based batching (pass comments list directly to avoid newline-split issues)
+        logger.info(f"Processing {len(comments)} comments with token-based batching")
+        comments_analysis = async_to_sync(self.processing_service.process_chunks)(
+            analysis_type=0,  # Sentiment analysis
+            company_name=company_name,
+            suggested_aspects=suggested_aspects,  # Pass frozen aspect list
+            comments=comments,  # Pass list directly — batched by token count
+        )
+        
+        # 4. Validate and parse LLM extractions from all chunks (uses locked schema)
+        logger.info(f"🔍 STEP 4: Parsing and combining validated results from {len(comments_analysis)} batches...")
+        extracted_comments = self._validate_and_parse_chunks(comments_analysis, comments)
+        logger.info(f"🔍 STEP 4: Extracted {len(extracted_comments)} total comments from all batches")
+        
+        if not extracted_comments:
+            details = self._format_validation_failure_details(comments_analysis, comments)
+            err_suffix = f" First errors: {details[:500]}" if details else " Check server logs for details."
+            raise ValueError(
+                "Failed to extract valid comment data from LLM responses. "
+                "All batches failed validation."
+                + err_suffix
+            )
+        
+        # 5. Validate batch integrity
+        self._validate_batch_integrity(extracted_comments, comments)
+        
+        # 6. Generate unique run_id for this processing run (for tracking/auditing, not persistence)
+        run_id = str(uuid.uuid4())
+        logger.info(f"Generated run_id {run_id} for processing {len(comments)} comments")
+        
+        # 7. Aggregate using aggregation service (works directly from extracted_comments in memory)
+        from .aggregation_service import get_aggregation_service
+        aggregation_service = get_aggregation_service()
+        normalized = aggregation_service.aggregate_comment_extractions(extracted_comments)
+        
+        # Ensure counts match actual comment count (system of record)
+        normalized['counts']['total'] = len(comments)
+        
+        # 9. Save aggregated analysis to database with original comments included
+        insight_id = str(uuid.uuid4())
+        insight_data = {
+            'id': f'insight_{insight_id}',
+            'type': 'insight',
+            'projectId': project_id,  # Use projectId for consistency
+            'userId': user_id_str,    # Use userId for consistency
+            'analysis_type': 'sentiment_analysis',
+            'analysis_date': datetime.now().isoformat(),
+            'createdAt': datetime.now().isoformat(),
+            'run_id': run_id,  # Unique identifier for this analysis run
+            'result': normalized,
+            'status': 'complete',
+            # Store original comments for retrieval (NEVER overwrite)
+            'original_comments': comments,
+            'feedback': comments,  # Alternative field name
+            'company_name': company_name,
+            'comments_count': len(comments),
+            'processing_method': 'llm_chunking'
+        }
+        
+        logger.info(f"🔍 DEBUG: About to save insight_data with keys: {list(insight_data.keys())}")
+        logger.info(f"🔍 DEBUG: insight_data id: {insight_data['id']}")
+        logger.info(f"🔍 DEBUG: insight_data projectId: {insight_data['projectId']}")
+        logger.info(f"🔍 DEBUG: insight_data userId: {insight_data['userId']}")
+        logger.info(f"🔍 DEBUG: insight_data original_comments count: {len(insight_data['original_comments'])}")
+        logger.info(f"🔍 DEBUG: insight_data feedback count: {len(insight_data['feedback'])}")
+        
+        # Save using analysis service
+        analysis_service = get_analysis_service()
+        saved_result = analysis_service.save_analysis_data(insight_data)
+        
+        if saved_result:
+            logger.info(f"✅ Analysis saved to Cosmos DB successfully with ID: {saved_result.get('id')}")
+            logger.info(f"🔍 DEBUG: Saved result keys: {list(saved_result.keys()) if saved_result else 'None'}")
+            try:
+                analysis_service.update_project_last_analysis(project_id, insight_data["id"])
+            except Exception as e:
+                logger.warning(f"Could not update project last_analysis: {e}")
+        else:
+            logger.error(f"❌ Failed to save analysis data to Cosmos DB")
+        
+        logger.info(f"Analysis saved to Cosmos DB for background task with {len(comments)} comments")
+        
+        # Return minimal payload to avoid Celery result backend serialization issues
+        # (large normalized result can cause task to be marked FAILURE after save).
+        # Frontend fetches latest analysis by project_id on SUCCESS.
+        return {
+            "insight_id": insight_data["id"],
+            "project_id": project_id,
+            "status": "complete",
+            "processing_method": "llm_chunking"
+        }
+    
+    def _convert_pipeline_result_to_schema(self, pipeline_result, original_comments):
+        """
+        Convert LocalProcessingService result to the expected frontend schema.
+        
+        This ensures compatibility with existing frontend components.
+        """
+        # Convert features to expected format
+        features_normalized = []
+        for feature in pipeline_result.features:
+            features_normalized.append({
+                'name': feature['feature'],
+                'description': feature['description'],
+                'sentiment': feature['sentiment'],
+                'keywords': feature['keywords'],
+                'comment_count': feature['comment_count']
+            })
+        
+        # Calculate overall sentiment from aggregated stats
+        overall_sentiment = pipeline_result.aggregated_stats.overall_sentiment
+        
+        # Calculate counts from aggregated stats
+        total_comments = len(original_comments)
+        positive_count = 0
+        negative_count = 0
+        neutral_count = 0
+        
+        # Sum up counts from aspect sentiment counts
+        for aspect, sentiment_counts in pipeline_result.aggregated_stats.aspect_sentiment_counts.items():
+            positive_count += sentiment_counts.get('POSITIVE', 0)
+            negative_count += sentiment_counts.get('NEGATIVE', 0)
+            neutral_count += sentiment_counts.get('NEUTRAL', 0)
+        
+        # Handle unmapped comments (they still have sentiment)
+        unmapped_count = pipeline_result.aggregated_stats.unmapped_count
+        if unmapped_count > 0:
+            # Distribute unmapped comments proportionally
+            remaining = total_comments - (positive_count + negative_count + neutral_count)
+            if remaining > 0:
+                # Use overall sentiment distribution to estimate unmapped sentiment
+                pos_pct = overall_sentiment.get('positive', 0) / 100
+                neg_pct = overall_sentiment.get('negative', 0) / 100
+                neu_pct = overall_sentiment.get('neutral', 0) / 100
+                
+                positive_count += int(remaining * pos_pct)
+                negative_count += int(remaining * neg_pct)
+                neutral_count = total_comments - positive_count - negative_count
+        
+        # Extract keywords from features
+        positive_keywords = []
+        negative_keywords = []
+        
+        for feature in pipeline_result.features:
+            sentiment = feature['sentiment']
+            keywords = feature['keywords']
+            
+            # Classify keywords based on dominant sentiment
+            pos_pct = sentiment.get('positive', 0)
+            neg_pct = sentiment.get('negative', 0)
+            
+            if pos_pct > neg_pct and pos_pct > 40:
+                positive_keywords.extend(keywords[:3])
+            elif neg_pct > pos_pct and neg_pct > 40:
+                negative_keywords.extend(keywords[:3])
+        
+        # Remove duplicates and limit
+        positive_keywords = list(dict.fromkeys(positive_keywords))[:10]
+        negative_keywords = list(dict.fromkeys(negative_keywords))[:10]
+        
+        return {
+            'overall': {
+                'positive': overall_sentiment.get('positive', 0),
+                'negative': overall_sentiment.get('negative', 0),
+                'neutral': overall_sentiment.get('neutral', 0),
+            },
+            'counts': {
+                'total': total_comments,
+                'positive': positive_count,
+                'negative': negative_count,
+                'neutral': neutral_count,
+            },
+            'features': features_normalized,
+            'positive_keywords': positive_keywords,
+            'negative_keywords': negative_keywords,
+            # Additional metadata from local pipeline
+            'pipeline_metadata': {
+                'processing_time': pipeline_result.processing_time,
+                'model_info': pipeline_result.model_info,
+                'unmapped_percentage': pipeline_result.aggregated_stats.unmapped_percentage,
+                'confidence_distribution': dict(pipeline_result.aggregated_stats.confidence_distribution)
+            }
+        }
     
     def _format_validation_failure_details(self, chunk_results, original_comments):
         """Build a short summary of validation failures from chunk error dicts."""

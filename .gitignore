@@ -62,9 +62,13 @@ venv.bak/
 # IDE files
 .vscode/
 .idea/
+.kiro/
 *.swp
 *.swo
 *~
+
+# Test/hypothesis cache
+.hypothesis/
 
 # Next.js
 .next/

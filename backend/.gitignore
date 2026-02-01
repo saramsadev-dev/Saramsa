@@ -110,10 +110,17 @@ dmypy.json
 */migrations/*.py
 !*/migrations/__init__.py
 
-# Local development files
-local_*
-dev_*
-test_*
+# Local development / test files (root-level only for dev/local scripts)
+/local_*
+/dev_*
+/test_*
+
+# Test files in subdirectories (ad-hoc test scripts, not in a tests/ folder)
+**/test_*.py
+!**/tests/test_*.py
+
+# Unused ML scaffold directory
+feedback_analysis/services/ml/
 
 # Specific files to ignore
 pyvenv.cfg 

@@ -79,6 +79,27 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': False,
         },
+        # ML Pipeline logging (detailed debugging for local ML services)
+        'feedback_analysis.services.ml': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'feedback_analysis.services.ml.embedding_service': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services.ml.local_sentiment_service': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services.ml.local_processing_service': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'apis.prompts': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
@@ -337,6 +358,9 @@ REDIS_URL = os.getenv('REDIS_URL')
 COSMOS_CONNECTION_POOL_SIZE = int(os.getenv('COSMOS_CONNECTION_POOL_SIZE', '10'))
 COSMOS_REQUEST_TIMEOUT = int(os.getenv('COSMOS_REQUEST_TIMEOUT', '30'))
 COSMOS_RETRY_TOTAL = int(os.getenv('COSMOS_RETRY_TOTAL', '3'))
+
+# Local ML Pipeline Configuration
+USE_LOCAL_PIPELINE = os.getenv('USE_LOCAL_PIPELINE', 'false').lower() == 'true'
 AZURE_DEVOPS_ORGANIZATION = os.getenv('AZURE_DEVOPS_ORGANIZATION')
 AZURE_DEVOPS_PROJECT = os.getenv('AZURE_DEVOPS_PROJECT')
 AZURE_DEVOPS_PAT = os.getenv('AZURE_DEVOPS_PAT')
