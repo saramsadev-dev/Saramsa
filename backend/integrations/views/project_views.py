@@ -10,6 +10,10 @@ Contains views for project management:
 - Get latest analysis for projects
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
@@ -193,47 +197,47 @@ class LatestAnalysisView(APIView):
     def get(self, request, project_id: str):
         # Use the project_id as-is since projects are created with UUID only (no prefix)
         stored_project_id = project_id
-        
+
         # Get services
         from feedback_analysis.services import get_analysis_service
         from work_items.services import get_devops_service
-        
+
         analysis_service = get_analysis_service()
         devops_service = get_devops_service()
-        
+
         # Get the latest comment analysis using analysis service
         latest_analysis = analysis_service.get_latest_analysis_for_project(stored_project_id)
-        
+
         # Get the latest user story collection (work items) using work items service
         latest_user_stories = devops_service.get_work_items_by_project(stored_project_id)
-        
+
         if not latest_analysis:
             return StandardResponse.success(
                 data={'exists': False},
                 message="No analysis found for this project"
             )
-        
+
         # Get user ID for submission status lookup
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
-        
+
         # Combine the data
         response_data = {
-            'exists': True, 
+            'exists': True,
             'analysis': latest_analysis
         }
-        
+
         # Add user stories if available
         if latest_user_stories:
             # Get the most recent user story collection
             latest_stories = latest_user_stories[0] if isinstance(latest_user_stories, list) else latest_user_stories
-            
+
             # Get submission status for work items
             work_items_with_submission_status = self._enrich_work_items_with_submission_status(
-                latest_stories.get('work_items', []), 
-                user_id, 
+                latest_stories.get('work_items', []),
+                user_id,
                 stored_project_id
             )
-            
+
             response_data['analysis']['userStories'] = {
                 'work_items': work_items_with_submission_status,
                 'work_items_by_feature': self._group_work_items_by_feature(work_items_with_submission_status),
@@ -244,7 +248,7 @@ class LatestAnalysisView(APIView):
             }
         else:
             response_data['analysis']['userStories'] = None
-            
+
         # Add comments data using analysis service
         if user_id:
             try:
@@ -261,31 +265,51 @@ class LatestAnalysisView(APIView):
             except Exception as e:
                 logger.error(f"Error fetching comments: {e}")
                 response_data['analysis']['comments'] = None
-            
+
         return StandardResponse.success(
             data=response_data,
             message="Latest analysis retrieved successfully"
         )
-    
+
     def _group_work_items_by_feature(self, work_items: list) -> dict:
         """Groups work items by their 'feature_area' or 'featurearea' attribute."""
         grouped_items = {}
         for item in work_items:
-            # Handle both 'feature_area' and 'featurearea' field names
             feature_area = item.get('feature_area') or item.get('featurearea') or 'General'
             if feature_area not in grouped_items:
                 grouped_items[feature_area] = []
             grouped_items[feature_area].append(item)
         return grouped_items
-    
+
     def _enrich_work_items_with_submission_status(self, work_items: list, user_id: str, project_id: str) -> list:
         """Return work items as-is since they should already have submission status."""
         if not work_items:
             return work_items
-            
-        # Log submission status for debugging
         for item in work_items:
             if item.get('submitted'):
                 logger.info(f"Work item {item.get('id')} is submitted: {item.get('submitted_to')} at {item.get('submitted_at')}")
-        
         return work_items
+
+
+class ProjectTrendsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def get(self, request, project_id: str):
+        limit = int(request.query_params.get("limit", 20))
+        from feedback_analysis.services import get_trend_service
+        trend_service = get_trend_service()
+        data = trend_service.get_project_trends(project_id, limit=limit)
+        return StandardResponse.success(data=data, message="Project trends retrieved successfully")
+
+
+class ProjectAspectTrendView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def get(self, request, project_id: str, aspect_key: str):
+        limit = int(request.query_params.get("limit", 20))
+        from feedback_analysis.services import get_trend_service
+        trend_service = get_trend_service()
+        data = trend_service.get_aspect_trend(project_id, aspect_key, limit=limit)
+        return StandardResponse.success(data=data, message="Aspect trend retrieved successfully")

@@ -15,12 +15,14 @@ from datetime import datetime
 import json
 import uuid
 import logging
+import os
 
 from aiCore.services.completion_service import generate_completions
 from authentication.permissions import IsAdminOrUser
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from celery.result import AsyncResult
+from apis.infrastructure.cache_service import get_cache_service
 
 from apis.prompts import getSentAnalysisPrompt
 from ..services import get_task_service
@@ -46,6 +48,13 @@ class AnalyzeCommentsView(APIView):
                 errors=[{"field": "comments", "message": "This field must be a list."}],
                 instance=request.path
             )
+        max_comments = int(os.getenv("MAX_COMMENTS_PER_ANALYSIS", "50000"))
+        if len(comments) > max_comments:
+            return StandardResponse.validation_error(
+                detail=f"Too many comments for one analysis (max {max_comments}).",
+                errors=[{"field": "comments", "message": "Max comments per analysis exceeded."}],
+                instance=request.path
+            )
 
         # Get user info and project context
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
@@ -60,6 +69,7 @@ class AnalyzeCommentsView(APIView):
             )
         
         analysis_service = get_analysis_service()
+        from ..services import get_taxonomy_service
         
         company_name = None
         if hasattr(request, 'user') and request.user.is_authenticated:
@@ -82,12 +92,22 @@ class AnalyzeCommentsView(APIView):
                 instance=request.path
             )
         
+        # Generate idempotency key for analysis
+        analysis_id = str(uuid.uuid4())
+
+        # Track task start for TTL safeguards
+        cache = get_cache_service()
+
         # Trigger background task
-        task = process_feedback_task.delay(comments, company_name, user_id_str, project_id)
+        task = process_feedback_task.delay(comments, company_name, user_id_str, project_id, analysis_id)
+        cache.set(f"task_start:{task.id}", datetime.now().isoformat(), ttl=3600)
+        hour_key = datetime.now().strftime("%Y-%m-%d-%H")
+        cache.incr(f"analyses_hour:{project_id}:{hour_key}", 1, ttl=3600)
         
         response = StandardResponse.success(
             data={
                 "task_id": task.id,
+                "analysis_id": analysis_id,
                 "message": "Analysis started in background.",
                 "status": "processing"
             }
@@ -208,6 +228,16 @@ class UpdateKeywordsView(APIView):
             'negative_keywords': neg_keys,
         }
 
+        # Resolve taxonomy for versioned linkage (Phase-1)
+        taxonomy_service = get_taxonomy_service()
+        taxonomy = taxonomy_service.get_active_taxonomy(project_id, comments=None)
+        if not taxonomy and updated_keywords:
+            taxonomy = taxonomy_service.create_initial_taxonomy(
+                project_id,
+                list(updated_keywords.keys()),
+                source="user"
+            )
+
         # Save updated analysis to service layer
         try:
             analysis_id = str(uuid.uuid4())
@@ -215,6 +245,8 @@ class UpdateKeywordsView(APIView):
                 'id': f'analysis_{analysis_id}',
                 'projectId': project_id,
                 'userId': user_id_str,
+                'taxonomy_id': taxonomy.get('taxonomy_id') if taxonomy else None,
+                'taxonomy_version': taxonomy.get('version') if taxonomy else None,
                 'createdAt': datetime.now().isoformat(),
                 'analysisType': 'commentSentiment',
                 'rawLlm': result,
@@ -487,6 +519,28 @@ class TaskStatusView(APIView):
     
     def get(self, request, task_id):
         res = AsyncResult(task_id)
+        cache = get_cache_service()
+        max_runtime = int(os.getenv("ANALYSIS_TASK_MAX_RUNTIME_SECONDS", "1800"))
+        started_at = cache.get(f"task_start:{task_id}")
+        pipeline_health = cache.get(f"pipeline_health:{task_id}") if cache else None
+        elapsed = None
+        if started_at:
+            try:
+                started_dt = datetime.fromisoformat(started_at)
+                elapsed = (datetime.now() - started_dt).total_seconds()
+            except Exception:
+                elapsed = None
+        if res.status in ("PENDING", "STARTED") and elapsed is not None and elapsed > max_runtime:
+            return StandardResponse.success(data={
+                "task_id": task_id,
+                "status": "FAILED",
+                "ready": False,
+                "pipeline_health": {
+                    "status": "FAILED",
+                    "errors": {"timeout": f"Exceeded max runtime {max_runtime}s"},
+                    "started_at": started_at,
+                }
+            })
         response_data = {
             "task_id": task_id,
             "status": res.status,  # PENDING, STARTED, SUCCESS, FAILURE
@@ -495,9 +549,24 @@ class TaskStatusView(APIView):
         
         if res.ready():
             if res.successful():
-                response_data["result"] = res.result
+                result = res.result or {}
+                response_data["result"] = result
+                if result.get("pipeline_health"):
+                    pipeline_health = result.get("pipeline_health")
+                pipeline_status = result.get("pipeline_health", {}).get("status", "COMPLETE")
+                if pipeline_status == "DEGRADED":
+                    response_data["status"] = "PARTIAL"
+                elif pipeline_status in ("COMPLETE", "SUCCESS"):
+                    response_data["status"] = "SUCCESS"
+                else:
+                    response_data["status"] = pipeline_status
             else:
                 response_data["error"] = str(res.result)
+                response_data["status"] = "FAILED"
+        else:
+            response_data["status"] = "RUNNING"
+        if pipeline_health:
+            response_data["pipeline_health"] = pipeline_health
                 
         return StandardResponse.success(data=response_data)
 
