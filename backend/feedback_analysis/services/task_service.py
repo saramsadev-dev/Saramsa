@@ -14,16 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Environment variable to toggle between local ML pipeline and LLM-based processing
 USE_LOCAL_PIPELINE = os.getenv('USE_LOCAL_PIPELINE', 'false').lower() == 'true'
-
-# Import local processing service if enabled
-if USE_LOCAL_PIPELINE:
-    try:
-        from .local_processing_service import LocalProcessingService
-        logger.info("🤖 Local ML Pipeline enabled - using LocalProcessingService")
-    except Exception as e:
-        logger.error(f"❌ Failed to import LocalProcessingService: {e}")
-        logger.info("🔄 Falling back to LLM-based processing")
-        USE_LOCAL_PIPELINE = False
+logger.info(f"Pipeline mode: {'Local ML (NLI)' if USE_LOCAL_PIPELINE else 'LLM-based chunking'}")
 
 
 class TaskService:
@@ -33,19 +24,9 @@ class TaskService:
         self.processing_service = get_processing_service()
         self.validation_service = get_validation_service()
         
-        # Initialize local processing service if enabled
-        if USE_LOCAL_PIPELINE:
-            try:
-                self.local_processing_service = LocalProcessingService()
-                logger.info("✅ LocalProcessingService initialized successfully")
-            except Exception as e:
-                logger.error(f"❌ Failed to initialize LocalProcessingService: {e}")
-                logger.info("🔄 Falling back to LLM-based processing for this instance")
-                # Note: Cannot modify global variable here, will use instance flag
-                self._use_local_pipeline = False
-        else:
-            self.local_processing_service = None
-            self._use_local_pipeline = USE_LOCAL_PIPELINE
+        # Initialize local processing service if enabled (lazy loading)
+        self.local_processing_service = None
+        self._use_local_pipeline = USE_LOCAL_PIPELINE
     
     def process_feedback_background(self, comments, company_name, user_id_str, project_id, suggested_aspects=None):
         """
@@ -68,7 +49,7 @@ class TaskService:
         
         try:
             # Choose processing method based on configuration
-            if USE_LOCAL_PIPELINE and self.local_processing_service:
+            if self._use_local_pipeline:
                 return self._process_with_local_pipeline(
                     comments, company_name, user_id_str, project_id, suggested_aspects
                 )
@@ -85,10 +66,23 @@ class TaskService:
         """
         Process feedback using the local ML pipeline.
         
-        This method uses local models for embedding and sentiment analysis,
+        This method uses local models for NLI aspect classification and sentiment analysis,
         with a single GPT call for final synthesis.
         """
         logger.info("🤖 Processing with Local ML Pipeline")
+        
+        # Lazy load the local processing service
+        if self.local_processing_service is None:
+            try:
+                from .local_processing_service import LocalProcessingService
+                self.local_processing_service = LocalProcessingService()
+                logger.info("✅ LocalProcessingService initialized successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize LocalProcessingService: {e}")
+                logger.info("🔄 Falling back to LLM-based processing")
+                return self._process_with_llm_chunking(
+                    comments, company_name, user_id_str, project_id, suggested_aspects
+                )
         
         # 1. Generate aspect suggestions if not provided
         if suggested_aspects is None:

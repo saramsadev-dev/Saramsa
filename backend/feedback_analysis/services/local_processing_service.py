@@ -1,13 +1,12 @@
 """
 Local ML Processing Service
 
-Orchestrates the local ML pipeline: embedding → aspect matching → sentiment → aggregation → GPT synthesis.
-Uses all-MiniLM-L6-v2 for embeddings, cardiffnlp/twitter-roberta-base for sentiment,
+Orchestrates the local ML pipeline: NLI aspect classification → sentiment → aggregation → GPT synthesis.
+Uses cross-encoder/nli-deberta-v3-small for aspect matching, cardiffnlp/twitter-roberta-base for sentiment,
 and a single GPT-5-mini call for insights/work items.
 """
 
 import logging
-import numpy as np
 import time
 import json
 import re
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from collections import defaultdict, Counter
 from asgiref.sync import async_to_sync
 
-from aiCore.services.embedding_service import EmbeddingService
+from aiCore.services.nli_aspect_service import get_nli_aspect_service
 from aiCore.services.local_sentiment_service import LocalSentimentService, SentimentResult
 from aiCore.services.completion_service import generate_completions
 from apis.prompts.synthesis_prompt import create_synthesis_prompt, FALLBACK_RESPONSE_TEMPLATE
@@ -54,7 +53,7 @@ class AspectMatch:
     comment_id: int
     comment_text: str
     matched_aspects: List[str]
-    similarity_scores: Dict[str, float]
+    aspect_scores: Dict[str, float]  # Changed from similarity_scores to aspect_scores
     sentiment_result: SentimentResult
 
 
@@ -85,22 +84,19 @@ class LocalProcessingService:
     Orchestrates the local ML pipeline for feedback analysis.
 
     Pipeline:
-      1. Embed comments (all-MiniLM-L6-v2)
-      2. Embed aspects (cached per run)
-      3. Cosine similarity → map comments to aspects
-      4. Sentiment classification (twitter-roberta-base)
-      5. Aggregate statistics + extract keywords
-      6. Single GPT-5-mini call for insights + work items
+      1. NLI-based aspect classification (cross-encoder/nli-deberta-v3-small)
+      2. Sentiment classification (twitter-roberta-base)
+      3. Aggregate statistics + extract keywords
+      4. Single GPT-5-mini call for insights + work items
     """
 
-    SIMILARITY_THRESHOLD = 0.45
     UNMAPPED_WARNING_THRESHOLD = 0.20
     REPRESENTATIVE_SAMPLE_SIZE = 50
 
     def __init__(self):
-        self.embedding_service = EmbeddingService()
+        self.nli_service = get_nli_aspect_service()
         self.sentiment_service = LocalSentimentService()
-        logger.info("LocalProcessingService initialized")
+        logger.info("LocalProcessingService initialized with NLI-based aspect classification")
 
     def process_comments(self, comments: List[str], aspects: List[str],
                          company_name: str = "Company", run_id: str = None) -> ProcessingResult:
@@ -117,27 +113,24 @@ class LocalProcessingService:
 
         logger.info(f"Processing {len(comments)} comments with {len(aspects)} aspects (run: {run_id})")
 
-        # Steps 1-2: embed
-        comment_embeddings = self.embedding_service.get_embeddings(comments)
-        aspect_embeddings = self.embedding_service.cache_aspect_embeddings(aspects, run_id)
+        # Step 1: NLI-based aspect classification
+        nli_results = self.nli_service.classify_aspects(comments, aspects)
 
-        # Step 3: aspect matching
-        raw_matches = self._match_aspects(comments, comment_embeddings, aspects, aspect_embeddings)
-
-        # Step 4: sentiment
+        # Step 2: sentiment classification
         sentiment_results = self.sentiment_service.classify_batch(comments)
 
+        # Combine NLI and sentiment results
         combined_matches = []
-        for match, sentiment in zip(raw_matches, sentiment_results):
+        for nli_result, sentiment in zip(nli_results, sentiment_results):
             combined_matches.append(AspectMatch(
-                comment_id=match["comment_id"],
-                comment_text=match["comment_text"],
-                matched_aspects=match["matched_aspects"],
-                similarity_scores=match["similarity_scores"],
+                comment_id=nli_result["comment_id"],
+                comment_text=nli_result["comment_text"],
+                matched_aspects=nli_result["matched_aspects"],
+                aspect_scores=nli_result["aspect_scores"],
                 sentiment_result=sentiment,
             ))
 
-        # Step 5: aggregate + keywords
+        # Step 3: aggregate + keywords
         aggregated_stats = self._aggregate_results(combined_matches, aspects)
 
         if aggregated_stats.unmapped_percentage > self.UNMAPPED_WARNING_THRESHOLD:
@@ -147,7 +140,7 @@ class LocalProcessingService:
                 "Consider updating the aspect taxonomy."
             )
 
-        # Step 6: GPT synthesis
+        # Step 4: GPT synthesis
         insights, features, work_items = self._synthesize_with_gpt(
             combined_matches, aggregated_stats, aspects, comments, company_name
         )
@@ -160,40 +153,14 @@ class LocalProcessingService:
             aggregated_stats=aggregated_stats,
             processing_time=processing_time,
             model_info={
-                "embedding_model": self.embedding_service.MODEL_NAME,
+                "aspect_model": self.nli_service.model_name,
                 "sentiment_model": self.sentiment_service.MODEL_NAME,
-                "processing_method": "local_ml_pipeline",
+                "processing_method": "local_ml_pipeline_nli",
             },
             insights=insights,
             features=features,
             work_items=work_items,
         )
-
-    # ------------------------------------------------------------------
-    # Aspect matching
-    # ------------------------------------------------------------------
-
-    def _match_aspects(self, comments, comment_embeddings, aspects, aspect_embeddings):
-        aspect_matrix = np.array([aspect_embeddings[a] for a in aspects])
-        matches = []
-
-        for i, (comment, emb) in enumerate(zip(comments, comment_embeddings)):
-            similarities = np.dot(emb, aspect_matrix.T)
-            matched = []
-            scores = {}
-            for j, (aspect, sim) in enumerate(zip(aspects, similarities)):
-                scores[aspect] = float(sim)
-                if sim >= self.SIMILARITY_THRESHOLD:
-                    matched.append(aspect)
-            if not matched:
-                matched = ["UNMAPPED"]
-            matches.append({
-                "comment_id": i,
-                "comment_text": comment,
-                "matched_aspects": matched,
-                "similarity_scores": scores,
-            })
-        return matches
 
     # ------------------------------------------------------------------
     # Aggregation + keyword extraction
