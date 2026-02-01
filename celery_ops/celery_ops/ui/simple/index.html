@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Celery Ops</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #0a0a0b;
+            color: #fafafa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .logo {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 24px;
+            color: white;
+            margin: 0 auto 20px;
+        }
+        h1 {
+            margin-bottom: 10px;
+            color: #fafafa;
+        }
+        .subtitle {
+            color: #a1a1aa;
+            margin-bottom: 40px;
+        }
+        .links {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .link {
+            padding: 12px 24px;
+            background: #111113;
+            border: 1px solid #1f1f23;
+            border-radius: 8px;
+            color: #fafafa;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .link:hover {
+            background: #1f1f23;
+            border-color: #3b82f6;
+        }
+        .status {
+            margin-top: 40px;
+            padding: 20px;
+            background: #111113;
+            border: 1px solid #1f1f23;
+            border-radius: 8px;
+            text-align: left;
+        }
+        .status h3 {
+            margin-top: 0;
+            color: #28bf5c;
+        }
+        .note {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1f1f23;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #a1a1aa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">Co</div>
+        <h1>Celery Ops</h1>
+        <p class="subtitle">Task monitoring and management for Celery</p>
+        
+        <div class="links">
+            <a href="/api/tasks" class="link">📋 View Tasks</a>
+            <a href="/docs" class="link">📚 API Documentation</a>
+            <a href="/api/workers" class="link">👥 Workers</a>
+            <a href="/api/queues" class="link">📥 Queues</a>
+        </div>
+        
+        <div class="status">
+            <h3>✅ Service Status</h3>
+            <p><strong>API:</strong> Running on port 9800</p>
+            <p><strong>Event Consumer:</strong> Active</p>
+            <p><strong>Store:</strong> Connected to Redis</p>
+        </div>
+        
+        <div class="note">
+            <strong>Note:</strong> The React UI is being built. This is a temporary interface.<br>
+            Use the API endpoints above to interact with Celery Ops programmatically.
+        </div>
+    </div>
+</body>
+</html>

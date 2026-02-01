@@ -65,10 +65,10 @@ function TabsTrigger({ value, className, children, isActive, onClick }: TabsTrig
     <button
       data-state={isActive ? "active" : "inactive"}
       className={cn(
-        "flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50",
+        "flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-xl border transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 px-3 py-2 text-sm font-medium whitespace-nowrap",
         isActive 
-          ? "bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white shadow-sm" 
-          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-600",
+          ? "bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white shadow-lg border-[#E603EB]/30 transform scale-105" 
+          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 border-transparent hover:border-gray-200 dark:hover:border-gray-500 hover:shadow-md",
         className,
       )}
       onClick={onClick}

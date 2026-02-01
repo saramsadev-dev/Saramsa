@@ -99,17 +99,39 @@ export const analyzeComments = createAsyncThunk<
 
           if (statusResult.status === 'SUCCESS') {
             clearInterval(pollInterval);
-            // Extract the actual analysis data from nested result
-            // Backend returns: { result: { insight_id, result: { actual data } } }
-            const rawData = statusResult.result?.result || statusResult.result;
+            const taskResult = statusResult.result;
 
-            // Wrap in the format expected by Dashboard
-            // Dashboard expects: { analysisData: { overall, counts, features, ... } }
+            // Backend returns minimal { insight_id, project_id, status } to avoid
+            // Celery result serialization issues. Fetch latest analysis by project.
+            if (taskResult?.project_id && !taskResult?.result) {
+              try {
+                const latestRes = await apiRequest(
+                  'get',
+                  `/projects/${taskResult.project_id}/analysis/latest/`,
+                  undefined,
+                  true
+                );
+                const latestData = latestRes.data?.data;
+                const analysis = latestData?.analysis;
+                if (latestData?.exists && analysis) {
+                  resolve({
+                    id: analysis.id || taskResult.insight_id,
+                    analysisData: analysis.result ?? analysis
+                  });
+                  return;
+                }
+              } catch (fetchErr: any) {
+                reject(fetchErr?.message || 'Analysis saved but failed to load result.');
+                return;
+              }
+            }
+
+            // Legacy: task included full result (e.g. older backend)
+            const rawData = taskResult?.result ?? taskResult;
             const wrappedData = {
-              id: statusResult.result?.insight_id || `analysis_${Date.now()}`,
+              id: taskResult?.insight_id || `analysis_${Date.now()}`,
               analysisData: rawData
             };
-
             resolve(wrappedData);
           } else if (statusResult.status === 'FAILURE') {
             clearInterval(pollInterval);
@@ -234,11 +256,25 @@ export const generateUserStories = createAsyncThunk<
       { timeout: 180000 } // 3 minutes timeout for LLM calls
     );
 
+    console.log('✅ Raw API response received:', {
+      status: response.status,
+      dataSize: JSON.stringify(response.data).length,
+      hasData: !!response.data,
+      hasNestedData: !!response.data?.data
+    });
+
     // Fix: Extract user stories from nested response structure
     // Backend returns: { data: { data: { user_stories: [{ work_items: [...] }] } } }
     const userStoriesData = response.data.data?.user_stories?.[0];
+    
+    console.log('✅ Extracted user stories data:', {
+      hasUserStoriesData: !!userStoriesData,
+      workItemsCount: userStoriesData?.work_items?.length || 0
+    });
+    
     return userStoriesData || response.data;
   } catch (err: any) {
+    console.error('❌ generateUserStories error:', err);
     let errorMessage = `${data.platform === 'jira' ? 'Jira' : 'Azure'} work items generation failed. Please try again.`;
 
     // Handle timeout errors specifically
@@ -253,6 +289,8 @@ export const generateUserStories = createAsyncThunk<
     } else if (err.message) {
       errorMessage = err.message;
     }
+    
+    console.error('❌ Final error message:', errorMessage);
     return rejectWithValue(errorMessage);
   }
 });

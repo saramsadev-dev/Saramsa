@@ -15,18 +15,27 @@ logger = logging.getLogger(__name__)
 def format_comments_for_prompt(comments, start_index: int = 0):
     """
     Format comments with clear indexes for LLM processing.
-    
+
     This ensures LLM can correctly map outputs back to input comments.
     Uses global comment indices across batches so comment_id matches the original comment position.
-    
+
     Args:
-        comments: List of comment strings or single string with newline-separated comments
-        start_index: Starting index for this batch (0 for first batch, 25 for second batch, etc.)
-        
+        comments: List of (index, text) tuples, list of comment strings, or single string with newline-separated comments
+        start_index: Starting index for this batch (used when comments is a plain list or string)
+
     Returns:
-        Formatted string with "COMMENT {start_index}:", "COMMENT {start_index+1}:", etc. prefixes
+        Formatted string with "COMMENT {index}:" prefixes
     """
-    # Handle list of comments
+    # Handle list of (index, text) tuples from token-based batching
+    if isinstance(comments, list) and comments and isinstance(comments[0], (tuple, list)) and len(comments[0]) == 2:
+        formatted_lines = []
+        for global_index, comment_text in comments:
+            text = str(comment_text).strip()
+            if text:
+                formatted_lines.append(f"COMMENT {global_index}: {text}")
+        return "\n".join(formatted_lines)
+
+    # Handle list of comment strings
     if isinstance(comments, list):
         formatted_lines = []
         for i, comment in enumerate(comments):
@@ -35,7 +44,7 @@ def format_comments_for_prompt(comments, start_index: int = 0):
                 global_index = start_index + i
                 formatted_lines.append(f"COMMENT {global_index}: {comment_text}")
         return "\n".join(formatted_lines)
-    
+
     # Handle string (newline-separated comments)
     if isinstance(comments, str):
         lines = comments.split('\n')
@@ -46,7 +55,7 @@ def format_comments_for_prompt(comments, start_index: int = 0):
                 global_index = start_index + i
                 formatted_lines.append(f"COMMENT {global_index}: {line_text}")
         return "\n".join(formatted_lines)
-    
+
     return str(comments)
 
 

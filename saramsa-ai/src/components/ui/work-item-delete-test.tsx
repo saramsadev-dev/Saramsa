@@ -143,15 +143,25 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
         </div>
 
         {result && (
-          <div className={`p-4 rounded-lg ${
+          <div className={`p-4 rounded-lg border-2 ${
             result.success 
-              ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800'
-              : 'bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800'
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-600'
+              : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-300 dark:from-red-900/20 dark:to-rose-900/20 dark:border-red-600'
           }`}>
-            <div className="font-medium mb-2">
-              {result.success ? '✅ Success' : '❌ Error'}
+            <div className="flex items-center gap-2 font-medium mb-2">
+              {result.success ? (
+                <>
+                  <span className="text-2xl">✅</span>
+                  <span className="text-green-800 dark:text-green-300">Success</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">❌</span>
+                  <span className="text-red-800 dark:text-red-300">Error</span>
+                </>
+              )}
             </div>
-            <pre className="text-xs overflow-auto">
+            <pre className="text-xs overflow-auto bg-white/50 dark:bg-black/20 p-2 rounded border">
               {JSON.stringify(result.success ? result.data : result.error, null, 2)}
             </pre>
           </div>
