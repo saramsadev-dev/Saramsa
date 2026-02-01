@@ -137,12 +137,13 @@ class TaskService:
             saved_result = analysis_service.save_analysis_data(insight_data)
             
             if saved_result:
-                logger.info(f"✅ Analysis saved to Cosmos DB successfully with ID: {saved_result.get('id')}")
-                logger.info(f"🔍 DEBUG: Saved result keys: {list(saved_result.keys()) if saved_result else 'None'}")
+                logger.info(f"Analysis saved to Cosmos DB successfully with ID: {saved_result.get('id')}")
+                logger.info(f"DEBUG: Saved result keys: {list(saved_result.keys()) if saved_result else 'None'}")
             else:
-                logger.error(f"❌ Failed to save analysis data to Cosmos DB")
+                logger.error(f"Failed to save analysis data to Cosmos DB")
             
             logger.info(f"Analysis saved to Cosmos DB for background task with {len(comments)} comments")
+            logger.info(f"TASK COMPLETED SUCCESSFULL- Worker will continue running to process future tasks")
             
             return {"insight_id": insight_id, "result": normalized}
 
