@@ -210,6 +210,29 @@ class CacheService:
         except Exception as e:
             logger.error(f"Cache delete error for key {key}: {e}")
             return False
+
+    def incr(self, key: str, amount: int = 1, ttl: int = 3600) -> int:
+        """Increment a counter in cache."""
+        cache_key = self._generate_key(key)
+        try:
+            if self.redis_client:
+                value = self.redis_client.incrby(cache_key, amount)
+                if ttl:
+                    self.redis_client.expire(cache_key, ttl)
+                return int(value)
+            # In-memory counter
+            current = 0
+            if cache_key in self.memory_cache:
+                current = int(self.memory_cache[cache_key].get('value', 0))
+            current += amount
+            self.memory_cache[cache_key] = {
+                'value': current,
+                'expires_at': datetime.now() + timedelta(seconds=ttl)
+            }
+            return current
+        except Exception as e:
+            logger.error(f"Cache incr error for key {key}: {e}")
+            return 0
     
     def clear_pattern(self, pattern: str) -> int:
         """

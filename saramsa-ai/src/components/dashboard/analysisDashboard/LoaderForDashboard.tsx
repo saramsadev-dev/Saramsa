@@ -11,10 +11,10 @@ export const LoaderForDashboard: React.FC = () => {
           <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
         </div>
         <p className="mt-4 text-lg font-medium text-gray-700 dark:text-gray-300">
-          Loading analysis...
+          Processing with AI models...
         </p>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          This may take a few moments
+          Large datasets may take 5-10 minutes to process
         </p>
       </div>
 

@@ -91,11 +91,15 @@ class WorkItemGenerationView(APIView):
         # Save work items if project exists
         if resolved_project_id:
             try:
+                analysis_id = None
+                if isinstance(analysis_data, dict):
+                    analysis_id = analysis_data.get("analysis_id") or analysis_data.get("id")
                 saved_work_items = devops_service.create_work_items(
                     user_id=user_id_str,
                     work_items=result['work_items'],
                     platform=platform,
-                    project_id=resolved_project_id
+                    project_id=resolved_project_id,
+                    analysis_id=analysis_id
                 )
                 result['saved_id'] = saved_work_items.get('id')
             except Exception as e:

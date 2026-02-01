@@ -144,11 +144,11 @@ export const analyzeComments = createAsyncThunk<
         }
       }, 2000); // Poll every 2 seconds
 
-      // Timeout after 5 minutes
+      // Timeout after 15 minutes (for large datasets with NLI processing)
       setTimeout(() => {
         clearInterval(pollInterval);
         reject('Analysis timeout - task took too long');
-      }, 300000);
+      }, 900000); // 15 minutes timeout
     });
   } catch (err: any) {
     let errorMessage = 'Sentiment analysis failed. Please try again.';

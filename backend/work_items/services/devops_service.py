@@ -3,13 +3,15 @@ DevOps service for work item and integration-related business logic.
 This service delegates to the integrations app for external platform operations.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
 import uuid
 import json
 from ..repositories import WorkItemRepository
-from apis.prompts import getDeepAnalysisPrompt, WORK_ITEM_TYPES_BY_TEMPLATE
+from apis.prompts import WORK_ITEM_TYPES_BY_TEMPLATE
+from feedback_analysis.services.narration_service import get_narration_service
 import logging
+from .work_item_candidate_service import get_work_item_candidate_service
 
 logger = logging.getLogger(__name__)
 
@@ -31,46 +33,57 @@ class DevOpsService:
                                               process_template: str = "Agile",
                                               company_name: str = None,
                                               project_metadata: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Generate work items from analysis data using AI."""
+        """Generate work items from analysis data using deterministic candidates + optional AI narration."""
         try:
-            from aiCore.services.completion_service import generate_completions
-            
-            # Convert analysis_data to feedback string for prompt
-            feedback_block = json.dumps(analysis_data, indent=2) if isinstance(analysis_data, dict) else str(analysis_data)
-            
-            # Build prompt using structured system - now using local prompts
-            if platform.lower() == "jira":
-                prompt = getDeepAnalysisPrompt(
-                    platform='jira',
-                    project_metadata=project_metadata,
-                    company_name=company_name,
-                    feedback_data=feedback_block
-                )
+            # Phase-2: deterministic candidates from analysis metrics (LLM does not decide existence/priority/type)
+            candidate_service = get_work_item_candidate_service()
+            candidates = candidate_service.generate_candidates(analysis_data, previous_analysis=None)
+
+            if not candidates:
+                return {
+                    'success': True,
+                    'work_items': [],
+                    'summary': self._generate_summary([]),
+                    'process_template': process_template,
+                    'platform': platform,
+                    'generated_at': datetime.now().isoformat(),
+                    'raw_llm_response': None
+                }
+
+            # Generate work item narration using unified NarrationService (optional)
+            narration_service = get_narration_service()
+            narration_input = {
+                "project_id": analysis_data.get("project_id") if isinstance(analysis_data, dict) else None,
+                "analysis_id": analysis_data.get("analysis_id") if isinstance(analysis_data, dict) else None,
+                "taxonomy_id": analysis_data.get("taxonomy_id") if isinstance(analysis_data, dict) else None,
+                "taxonomy_version": analysis_data.get("taxonomy_version") if isinstance(analysis_data, dict) else None,
+                "overall": analysis_data.get("overall") if isinstance(analysis_data, dict) else None,
+                "features": [],
+                "evidence": [],
+                "work_item_candidates": candidates,
+            }
+            narratives = None
+            cached_narration = None
+            if isinstance(analysis_data, dict):
+                cached_narration = analysis_data.get("narration")
+            if isinstance(cached_narration, dict) and cached_narration.get("work_items"):
+                narratives = cached_narration
             else:
-                prompt = getDeepAnalysisPrompt(
-                    platform='azure',
-                    project_metadata=None,
-                    company_name=company_name,
-                    feedback_data=feedback_block
-                )
-            
-            # Generate work items using AI
-            result = await generate_completions(prompt)
-            logger.info(f"LLM response received, length: {len(str(result))}")
-            
-            # Enhanced parsing with better error handling
-            parsed = self._parse_llm_response(result)
-            
-            # Validate and structure the response
-            work_items = parsed.get("work_items", []) or parsed.get("workitems", [])
-            
+                narratives = narration_service.generate_narratives(narration_input)
+            work_items_llm = narratives.get("work_items", []) if isinstance(narratives, dict) else []
+            result = narratives
+
+            # Build deterministic work items from candidates
+            work_items = self._build_work_items_from_candidates(candidates, analysis_data, process_template)
+
+            # Phase-0/2 guards: LLM must not add/remove/change candidates or priority/type
+            self._warn_on_llm_candidate_mutation(candidates, work_items_llm)
+
+            # Apply LLM phrasing to title/description only (never priority/type)
+            work_items = self._apply_llm_phrasing(work_items, work_items_llm)
+
             # Enhanced validation of work items
             work_items = self._validate_and_clean_work_items(work_items, process_template)
-            
-            # Prioritize work items based on sentiment metrics (deterministic, in code)
-            from .prioritization_service import get_prioritization_service
-            prioritization_service = get_prioritization_service()
-            work_items = prioritization_service.prioritize_work_items(work_items, analysis_data)
             
             # Generate summary in code (not from LLM)
             summary = self._generate_summary(work_items)
@@ -187,13 +200,14 @@ class DevOpsService:
         return work_items
     
     def create_work_items(self, user_id: str, work_items: List[Dict[str, Any]], 
-                         platform: str, project_id: str = None) -> Dict[str, Any]:
+                         platform: str, project_id: str = None, analysis_id: str = None) -> Dict[str, Any]:
         """Create work items collection."""
         try:
             work_items_doc = {
-                "id": str(uuid.uuid4()),
+                "id": f"workitems_{analysis_id}" if analysis_id else str(uuid.uuid4()),
                 "userId": user_id,
                 "platform": platform,
+                "analysis_id": analysis_id,
                 "work_items": work_items,
                 "summary": self._generate_summary(work_items),
                 "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -204,7 +218,8 @@ class DevOpsService:
             
             if project_id:
                 work_items_doc["projectId"] = project_id
-            
+            if analysis_id and project_id:
+                return self.work_item_repo.upsert_by_id(work_items_doc["id"], project_id, work_items_doc)
             return self.work_item_repo.create(work_items_doc)
             
         except Exception as e:
@@ -473,6 +488,142 @@ class DevOpsService:
         
         logger.info(f"Validated {len(valid_work_items)} out of {len(work_items)} work items")
         return valid_work_items
+
+    # ------------------------------------------------------------------
+    # Phase-2: Candidate-driven work items (LLM phrasing only)
+    # ------------------------------------------------------------------
+
+    def _build_work_items_from_candidates(self, candidates: List[Dict[str, Any]],
+                                          analysis_data: Dict[str, Any],
+                                          process_template: str) -> List[Dict[str, Any]]:
+        """Build deterministic work items from candidates."""
+        aspect_labels = self._extract_aspect_labels(analysis_data)
+        work_items = []
+        for c in candidates:
+            aspect_key = c.get("aspect_key")
+            label = aspect_labels.get(aspect_key, self._humanize_aspect(aspect_key))
+            item_type = self._map_candidate_type(c.get("type"), process_template)
+            priority = self._map_candidate_priority(c.get("priority"))
+            title, description = self._template_text(c, label)
+            work_items.append({
+                "type": item_type,
+                "title": title,
+                "description": description,
+                "priority": priority,
+                "tags": [aspect_key, "customer-feedback"] if aspect_key else ["customer-feedback"],
+                "acceptance_criteria": "Define acceptance criteria based on analysis metrics",
+                "business_value": "Reduce negative feedback and improve customer satisfaction",
+                "effort_estimate": "3",
+                "feature_area": label,
+                "candidate_id": c.get("candidate_id"),
+            })
+        return work_items
+
+    def _apply_llm_phrasing(self, work_items: List[Dict[str, Any]], llm_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Apply LLM title/description only, never priority/type."""
+        if not llm_items:
+            return work_items
+        llm_map = {str(i.get("candidate_id")): i for i in llm_items if isinstance(i, dict) and i.get("candidate_id")}
+        for item in work_items:
+            candidate_id = item.get("candidate_id")
+            if candidate_id in llm_map:
+                llm_item = llm_map[candidate_id]
+                llm_title = llm_item.get("title")
+                llm_desc = llm_item.get("description")
+                if llm_title:
+                    item["title"] = str(llm_title).strip()[:100]
+                if llm_desc:
+                    item["description"] = str(llm_desc).strip()[:500]
+        return work_items
+
+    def _warn_on_llm_candidate_mutation(self, candidates: List[Dict[str, Any]], llm_items: List[Dict[str, Any]]) -> None:
+        """Warn if LLM output attempts to add/remove/change deterministic candidates."""
+        if not llm_items:
+            return
+        candidate_ids = {str(c.get("candidate_id")) for c in candidates if c.get("candidate_id")}
+        llm_ids = {str(i.get("candidate_id")) for i in llm_items if isinstance(i, dict) and i.get("candidate_id")}
+        introduced = llm_ids - candidate_ids if llm_ids else set()
+        missing = candidate_ids - llm_ids if llm_ids else set()
+        if introduced:
+            logger.warning(
+                "CONTRACT VIOLATION (Phase-2): LLM attempted to add candidates: %s",
+                sorted(introduced),
+            )
+        if missing and llm_ids:
+            logger.warning(
+                "CONTRACT VIOLATION (Phase-2): LLM attempted to remove candidates: %s",
+                sorted(missing),
+            )
+        for item in llm_items:
+            if isinstance(item, dict) and item.get("priority"):
+                logger.warning(
+                    "CONTRACT VIOLATION (Phase-2): LLM attempted to set priority"
+                )
+                break
+
+    @staticmethod
+    def _map_candidate_priority(priority: Optional[str]) -> str:
+        mapping = {
+            "P0": "critical",
+            "P1": "high",
+            "P2": "medium",
+            "P3": "low",
+        }
+        return mapping.get(str(priority).upper(), "medium")
+
+    @staticmethod
+    def _map_candidate_type(candidate_type: Optional[str], process_template: str) -> str:
+        # Map candidate type to existing work item types supported by templates
+        ct = str(candidate_type or "").lower()
+        if ct == "bug":
+            return "bug"
+        if ct == "taxonomy_gap":
+            return "task"
+        if ct in ("ux", "performance", "improvement"):
+            return "feature"
+        return "task"
+
+    @staticmethod
+    def _humanize_aspect(aspect_key: Optional[str]) -> str:
+        if not aspect_key:
+            return "General"
+        if aspect_key == "__taxonomy__":
+            return "Taxonomy"
+        return str(aspect_key).replace("_", " ").title()
+
+    def _extract_aspect_labels(self, analysis_data: Dict[str, Any]) -> Dict[str, str]:
+        labels = {}
+        for source in (analysis_data, analysis_data.get("analysisData") if isinstance(analysis_data, dict) else None):
+            if not isinstance(source, dict):
+                continue
+            feats = source.get("features") or source.get("featureasba") or source.get("feature_asba") or []
+            for f in feats:
+                if not isinstance(f, dict):
+                    continue
+                key = f.get("key") or f.get("name") or f.get("feature")
+                if key:
+                    labels[self._normalize_feature_key(key)] = str(f.get("name") or f.get("feature") or key)
+        # Normalize keys to aspect_key style
+        return {self._normalize_feature_key(k): v for k, v in labels.items()}
+
+    @staticmethod
+    def _normalize_feature_key(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        return str(value).strip().lower().replace(" ", "_")
+
+    @staticmethod
+    def _template_text(candidate: Dict[str, Any], label: str) -> Tuple[str, str]:
+        ctype = (candidate.get("type") or "").lower()
+        if ctype == "taxonomy_gap":
+            return (
+                "Review taxonomy gaps in customer feedback",
+                "Unmapped feedback indicates missing or unclear taxonomy coverage. Review and update taxonomy as needed.",
+            )
+        return (
+            f"Improve {label} based on customer feedback",
+            f"Address negative or mixed feedback related to {label}. Prioritize fixes based on customer impact.",
+        )
 
 
 # Global service instance

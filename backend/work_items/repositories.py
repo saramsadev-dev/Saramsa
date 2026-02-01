@@ -25,6 +25,15 @@ class WorkItemRepository:
         except Exception as e:
             logger.error(f"Error creating work item: {e}")
             raise
+
+    def upsert_by_id(self, item_id: str, project_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Upsert a work item document by ID (idempotent retries)."""
+        try:
+            data['type'] = self.entity_type
+            return self.cosmos_service.update_document(self.container_name, item_id, project_id, data)
+        except Exception as e:
+            logger.error(f"Error upserting work item {item_id}: {e}")
+            raise
     
     def get_by_id(self, work_item_id: str) -> Optional[Dict[str, Any]]:
         """Get work item by ID."""

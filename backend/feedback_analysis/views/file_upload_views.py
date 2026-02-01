@@ -152,17 +152,11 @@ class FeedbackFileUploadView(APIView):
             original_comments = self.extract_comments_from_data(data, 'json')
             logger.info(f"📊 JSON Upload: Extracted {len(original_comments)} comments from file")
             
-            # Step 2: Generate aspect suggestions (one-time pass)
-            from ..services import get_aspect_suggestion_service
-            aspect_service = get_aspect_suggestion_service()
-            aspect_suggestions = await aspect_service.suggest_aspects(original_comments)
-            logger.info(
-                f"✅ Aspect suggestions generated: domain='{aspect_suggestions['identified_domain']}', "
-                f"aspects={len(aspect_suggestions['suggested_aspects'])}"
+            # Step 2: Resolve project-owned taxonomy (Phase-1)
+            taxonomy, aspect_suggestions = await self._resolve_taxonomy_for_upload(
+                project_id, original_comments
             )
-            
-            # Extract frozen aspect list for prompt
-            frozen_aspects = aspect_suggestions.get('suggested_aspects', [])
+            frozen_aspects = [a.get("label") or a.get("key") for a in taxonomy.get("aspects", []) if isinstance(a, dict)]
             logger.info(f"🔒 Using frozen aspect list: {frozen_aspects}")
             
             processing_service = get_processing_service()
@@ -208,7 +202,7 @@ class FeedbackFileUploadView(APIView):
             # Save analysis data to Cosmos DB (includes aspect suggestions)
             await self._save_analysis_data(
                 user_id, project_id, file.name, 'json', 
-                original_comments, formatted, aspect_suggestions
+                original_comments, formatted, aspect_suggestions, taxonomy
             )
             
             return StandardResponse.success(
@@ -235,17 +229,11 @@ class FeedbackFileUploadView(APIView):
             original_comments = self.extract_comments_from_data(csv_data, 'csv')
             logger.info(f"📊 CSV Upload: Extracted {len(original_comments)} comments from file")
             
-            # Step 2: Generate aspect suggestions (one-time pass)
-            from ..services import get_aspect_suggestion_service
-            aspect_service = get_aspect_suggestion_service()
-            aspect_suggestions = await aspect_service.suggest_aspects(original_comments)
-            logger.info(
-                f"✅ Aspect suggestions generated: domain='{aspect_suggestions['identified_domain']}', "
-                f"aspects={len(aspect_suggestions['suggested_aspects'])}"
+            # Step 2: Resolve project-owned taxonomy (Phase-1)
+            taxonomy, aspect_suggestions = await self._resolve_taxonomy_for_upload(
+                project_id, original_comments
             )
-            
-            # Extract frozen aspect list for prompt
-            frozen_aspects = aspect_suggestions.get('suggested_aspects', [])
+            frozen_aspects = [a.get("label") or a.get("key") for a in taxonomy.get("aspects", []) if isinstance(a, dict)]
             logger.info(f"🔒 Using frozen aspect list: {frozen_aspects}")
             
             processing_service = get_processing_service()
@@ -270,7 +258,7 @@ class FeedbackFileUploadView(APIView):
             # Save CSV analysis data to Cosmos DB (includes aspect suggestions)
             await self._save_analysis_data(
                 user_id, project_id, file.name, 'csv', 
-                original_comments, formatted, aspect_suggestions
+                original_comments, formatted, aspect_suggestions, taxonomy
             )
             
             return StandardResponse.success(
@@ -288,7 +276,7 @@ class FeedbackFileUploadView(APIView):
             )
     
     async def _save_analysis_data(self, user_id, project_id, file_name, file_type, 
-                                  original_comments, formatted_result, aspect_suggestions=None):
+                                  original_comments, formatted_result, aspect_suggestions=None, taxonomy=None):
         """Save analysis data using service layer."""
         try:
             from ..services import get_analysis_service
@@ -317,6 +305,8 @@ class FeedbackFileUploadView(APIView):
                 "id": f"analysis_{analysis_id}",
                 "projectId": project_id,
                 "userId": user_id,
+                "taxonomy_id": taxonomy.get("taxonomy_id") if taxonomy else None,
+                "taxonomy_version": taxonomy.get("version") if taxonomy else None,
                 "createdAt": datetime.now().isoformat(),
                 "analysisType": "commentSentiment",
                 "rawLlm": formatted_result.get("rawLlm", {}),
@@ -336,6 +326,70 @@ class FeedbackFileUploadView(APIView):
                     analysis_service.update_project_last_analysis(project_id, saved['id'])
             except Exception:
                 pass
+
+            # Record taxonomy health snapshot (best-effort, no behavior change)
+            if taxonomy:
+                try:
+                    counts = formatted_result.get("analysisData", {}).get("counts", {}) or {}
+                    total_comments = counts.get("total") or len(original_comments)
+                    features = formatted_result.get("analysisData", {}).get("features", []) or []
+                    total_mentions = sum(
+                        int(f.get("comment_count") or 0) for f in features if isinstance(f, dict)
+                    )
+                    unmapped_rate = 0.0
+                    if total_comments:
+                        unmapped_rate = max(0.0, (total_comments - total_mentions) / total_comments)
+                    avg_aspects = (total_mentions / total_comments) if total_comments else 0.0
+                    from ..services import get_taxonomy_service
+                    taxonomy_service = get_taxonomy_service()
+                    created_at = taxonomy.get("created_at") or taxonomy.get("createdAt")
+                    taxonomy_age_days = 0.0
+                    if created_at:
+                        try:
+                            created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                            taxonomy_age_days = (datetime.now() - created_dt).days
+                        except Exception:
+                            taxonomy_age_days = 0.0
+                    taxonomy_service.record_health_snapshot(project_id, taxonomy, {
+                        "last_unmapped_rate": unmapped_rate,
+                        "last_avg_aspects_per_comment": avg_aspects,
+                        "last_confidence_p95": None,
+                        "taxonomy_age_days": taxonomy_age_days,
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to record taxonomy health snapshot: {e}")
                 
         except Exception as e:
             logger.error(f"Error saving to Cosmos DB: {e}")
+
+    async def _resolve_taxonomy_for_upload(self, project_id, original_comments):
+        """
+        Resolve project-owned taxonomy for uploads.
+
+        If no taxonomy exists, bootstrap once using GPT and persist version=1.
+        """
+        from ..services import get_taxonomy_service, get_aspect_suggestion_service
+        taxonomy_service = get_taxonomy_service()
+        taxonomy = taxonomy_service.get_active_taxonomy(project_id, comments=None)
+        aspect_suggestions = None
+
+        if not taxonomy:
+            aspect_service = get_aspect_suggestion_service()
+            aspect_suggestions = await aspect_service.suggest_aspects(original_comments)
+            logger.info(
+                f"✅ Aspect suggestions generated: domain='{aspect_suggestions['identified_domain']}', "
+                f"aspects={len(aspect_suggestions['suggested_aspects'])}"
+            )
+            taxonomy = taxonomy_service.create_initial_taxonomy(
+                project_id,
+                aspect_suggestions.get("suggested_aspects", []),
+                source="gpt"
+            )
+        else:
+            aspects = [a.get("label") or a.get("key") for a in taxonomy.get("aspects", []) if isinstance(a, dict)]
+            aspect_suggestions = {
+                "identified_domain": "taxonomy",
+                "suggested_aspects": aspects
+            }
+
+        return taxonomy, aspect_suggestions

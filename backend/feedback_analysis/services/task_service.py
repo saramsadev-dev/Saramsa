@@ -1,20 +1,23 @@
-from celery import shared_task
-import asyncio
+from celery import shared_task, current_task
+from typing import List
 from asgiref.sync import async_to_sync
 from .processing_service import get_processing_service
 from .analysis_service import get_analysis_service
 from .schema_validator import get_validation_service
+from .taxonomy_service import get_taxonomy_service
+from .pipeline_health import PipelineHealth
+from apis.infrastructure.cache_service import get_cache_service
 import logging
 import json
 import uuid
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
 # Environment variable to toggle between local ML pipeline and LLM-based processing
 USE_LOCAL_PIPELINE = os.getenv('USE_LOCAL_PIPELINE', 'false').lower() == 'true'
-logger.info(f"Pipeline mode: {'Local ML (NLI)' if USE_LOCAL_PIPELINE else 'LLM-based chunking'}")
+logger.info(f"Pipeline mode: {'Local ML' if USE_LOCAL_PIPELINE else 'LLM-based chunking'}")
 
 
 class TaskService:
@@ -28,7 +31,7 @@ class TaskService:
         self.local_processing_service = None
         self._use_local_pipeline = USE_LOCAL_PIPELINE
     
-    def process_feedback_background(self, comments, company_name, user_id_str, project_id, suggested_aspects=None):
+    def process_feedback_background(self, comments, company_name, user_id_str, project_id, analysis_id, task_id=None, suggested_aspects=None):
         """
         Process user feedback using either local ML pipeline or LLM-based processing.
         
@@ -46,23 +49,69 @@ class TaskService:
         logger.info(f"📈 Background task started: feedback analysis for project {project_id}")
         logger.info(f"🔍 Processing method: {'Local ML Pipeline' if USE_LOCAL_PIPELINE else 'LLM-based chunking'}")
         logger.info(f"🔍 Input: {len(comments)} comments, user: {user_id_str}, project: {project_id}")
+        max_comments = int(os.getenv("MAX_COMMENTS_PER_ANALYSIS", "50000"))
+        if len(comments) > max_comments:
+            health.mark_failed("max_comments_per_analysis exceeded")
+            if task_id:
+                cache.set(f"analysis_failed:{analysis_id}", True, ttl=86400)
+                cache.set(f"pipeline_health:{task_id}", health.to_dict(), ttl=3600)
+            raise ValueError(f"Too many comments for one analysis (max {max_comments})")
+        health = PipelineHealth(analysis_id=analysis_id, task_id=task_id)
+        cache = get_cache_service()
+        if task_id:
+            cache.set(f"pipeline_health:{task_id}", health.to_dict(), ttl=3600)
         
         try:
             # Choose processing method based on configuration
             if self._use_local_pipeline:
-                return self._process_with_local_pipeline(
-                    comments, company_name, user_id_str, project_id, suggested_aspects
+                health.start_stage("local_pipeline")
+                result = self._process_with_local_pipeline(
+                    comments, company_name, user_id_str, project_id, analysis_id, suggested_aspects
                 )
+                health.end_stage("local_pipeline")
             else:
-                return self._process_with_llm_chunking(
-                    comments, company_name, user_id_str, project_id, suggested_aspects
+                health.start_stage("llm_chunking")
+                result = self._process_with_llm_chunking(
+                    comments, company_name, user_id_str, project_id, analysis_id, suggested_aspects
                 )
+                health.end_stage("llm_chunking")
+
+            # Mark partial/degraded/failed based on narration status
+            try:
+                from .narration_service import get_narration_service
+                narration_status = getattr(get_narration_service(), "last_status", None)
+                if narration_status == "FALLBACK":
+                    health.mark_partial("narration_fallback")
+                if narration_status in ("BUDGET_EXCEEDED", "THROTTLED"):
+                    health.mark_degraded("budget_exceeded", narration_status.lower())
+                if narration_status == "HARD_CAP":
+                    health.mark_failed("narration_hard_cap")
+            except Exception:
+                pass
+
+            health.mark_complete()
+            try:
+                narration_service = get_narration_service()
+                if getattr(narration_service, "last_cost", None):
+                    health.cost = narration_service.last_cost
+            except Exception:
+                pass
+            result["pipeline_health"] = health.to_dict()
+            cache.set(f"pipeline_health:{analysis_id}", health.to_dict(), ttl=3600)
+            if task_id:
+                cache.set(f"pipeline_health:{task_id}", health.to_dict(), ttl=3600)
+            return result
                 
         except Exception as e:
             logger.error(f"Error in feedback analysis task: {str(e)}", exc_info=True)
+            health.mark_failed(str(e))
+            cache.set(f"pipeline_health:{analysis_id}", health.to_dict(), ttl=3600)
+            if task_id:
+                cache.set(f"pipeline_health:{task_id}", health.to_dict(), ttl=3600)
+            cache.set(f"analysis_failed:{analysis_id}", True, ttl=86400)
             raise
     
-    def _process_with_local_pipeline(self, comments, company_name, user_id_str, project_id, suggested_aspects=None):
+    def _process_with_local_pipeline(self, comments, company_name, user_id_str, project_id, analysis_id, suggested_aspects=None):
         """
         Process feedback using the local ML pipeline.
         
@@ -84,16 +133,8 @@ class TaskService:
                     comments, company_name, user_id_str, project_id, suggested_aspects
                 )
         
-        # 1. Generate aspect suggestions if not provided
-        if suggested_aspects is None:
-            logger.info("Generating aspect suggestions...")
-            from .aspect_suggestion_service import get_aspect_suggestion_service
-            aspect_service = get_aspect_suggestion_service()
-            aspect_suggestions_result = async_to_sync(aspect_service.suggest_aspects)(comments)
-            suggested_aspects = aspect_suggestions_result.get('suggested_aspects', [])
-            logger.info(f"✅ Generated {len(suggested_aspects)} aspect suggestions: {suggested_aspects}")
-        else:
-            logger.info(f"🔒 Using provided frozen aspect list: {suggested_aspects}")
+        # 1. Resolve aspect taxonomy (cached → last analysis → GPT suggestion)
+        taxonomy, resolved_aspects = self._resolve_taxonomy(comments, project_id, suggested_aspects)
         
         # 2. Process through local ML pipeline
         run_id = str(uuid.uuid4())
@@ -101,7 +142,7 @@ class TaskService:
         
         pipeline_result = self.local_processing_service.process_comments(
             comments=comments,
-            aspects=suggested_aspects,
+            aspects=resolved_aspects,
             company_name=company_name or "Company",
             run_id=run_id
         )
@@ -113,12 +154,15 @@ class TaskService:
         normalized_result = self._convert_pipeline_result_to_schema(pipeline_result, comments)
         
         # 4. Save to database
-        insight_id = str(uuid.uuid4())
+        insight_id = analysis_id
         insight_data = {
             'id': f'insight_{insight_id}',
             'type': 'insight',
             'projectId': project_id,
             'userId': user_id_str,
+            'analysis_id': analysis_id,
+            'taxonomy_id': taxonomy.get('taxonomy_id') if taxonomy else None,
+            'taxonomy_version': taxonomy.get('version') if taxonomy else None,
             'analysis_type': 'sentiment_analysis_local_ml',
             'analysis_date': datetime.now().isoformat(),
             'createdAt': datetime.now().isoformat(),
@@ -149,15 +193,18 @@ class TaskService:
         else:
             logger.error(f"❌ Failed to save local ML analysis data to Cosmos DB")
         
+        self._record_taxonomy_health(taxonomy, project_id, self._compute_health_metrics_local(pipeline_result))
+
         return {
             "insight_id": insight_data["id"],
             "project_id": project_id,
+            "analysis_id": analysis_id,
             "status": "complete",
             "processing_method": "local_ml_pipeline",
             "processing_time": pipeline_result.processing_time
         }
     
-    def _process_with_llm_chunking(self, comments, company_name, user_id_str, project_id, suggested_aspects=None):
+    def _process_with_llm_chunking(self, comments, company_name, user_id_str, project_id, analysis_id, suggested_aspects=None):
         """
         Process feedback using the existing LLM-based chunking approach.
         
@@ -166,22 +213,14 @@ class TaskService:
         logger.info("🔄 Processing with LLM-based chunking (legacy method)")
         
         # 1. Generate aspect suggestions if not provided (Step 2 of workflow)
-        if suggested_aspects is None:
-            logger.info("No suggested_aspects provided - generating aspect suggestions")
-            from .aspect_suggestion_service import get_aspect_suggestion_service
-            aspect_service = get_aspect_suggestion_service()
-            aspect_suggestions_result = async_to_sync(aspect_service.suggest_aspects)(comments)
-            suggested_aspects = aspect_suggestions_result.get('suggested_aspects', [])
-            logger.info(f"✅ Generated {len(suggested_aspects)} aspect suggestions: {suggested_aspects}")
-        else:
-            logger.info(f"🔒 Using provided frozen aspect list: {suggested_aspects}")
+        taxonomy, resolved_aspects = self._resolve_taxonomy(comments, project_id, suggested_aspects)
         
         # 2. Process with token-based batching (pass comments list directly to avoid newline-split issues)
         logger.info(f"Processing {len(comments)} comments with token-based batching")
         comments_analysis = async_to_sync(self.processing_service.process_chunks)(
             analysis_type=0,  # Sentiment analysis
             company_name=company_name,
-            suggested_aspects=suggested_aspects,  # Pass frozen aspect list
+            suggested_aspects=resolved_aspects,  # Pass frozen aspect list
             comments=comments,  # Pass list directly — batched by token count
         )
         
@@ -215,12 +254,15 @@ class TaskService:
         normalized['counts']['total'] = len(comments)
         
         # 9. Save aggregated analysis to database with original comments included
-        insight_id = str(uuid.uuid4())
+        insight_id = analysis_id
         insight_data = {
             'id': f'insight_{insight_id}',
             'type': 'insight',
             'projectId': project_id,  # Use projectId for consistency
             'userId': user_id_str,    # Use userId for consistency
+            'analysis_id': analysis_id,
+            'taxonomy_id': taxonomy.get('taxonomy_id') if taxonomy else None,
+            'taxonomy_version': taxonomy.get('version') if taxonomy else None,
             'analysis_type': 'sentiment_analysis',
             'analysis_date': datetime.now().isoformat(),
             'createdAt': datetime.now().isoformat(),
@@ -261,13 +303,125 @@ class TaskService:
         # Return minimal payload to avoid Celery result backend serialization issues
         # (large normalized result can cause task to be marked FAILURE after save).
         # Frontend fetches latest analysis by project_id on SUCCESS.
+        self._record_taxonomy_health(taxonomy, project_id, self._compute_health_metrics_llm(extracted_comments))
+
         return {
             "insight_id": insight_data["id"],
             "project_id": project_id,
+            "analysis_id": analysis_id,
             "status": "complete",
             "processing_method": "llm_chunking"
         }
     
+    def _resolve_taxonomy(self, comments, project_id, suggested_aspects=None):
+        """
+        Resolve project-owned taxonomy (Phase-1).
+
+        This replaces reuse-from-last-analysis with explicit taxonomy ownership.
+        """
+        taxonomy_service = get_taxonomy_service()
+
+        # If suggested_aspects are provided (e.g., upload bootstrap), avoid extra GPT calls.
+        if suggested_aspects is not None:
+            active = taxonomy_service.get_active_taxonomy(project_id, comments=None)
+            if not active:
+                active = taxonomy_service.create_initial_taxonomy(
+                    project_id, suggested_aspects, source="gpt"
+                )
+                return active, suggested_aspects
+            aspects = [a.get("label") or a.get("key") for a in active.get("aspects", []) if isinstance(a, dict)]
+            return active, [a for a in aspects if a]
+
+        taxonomy = taxonomy_service.get_active_taxonomy(project_id, comments=comments)
+        aspects = [a.get("label") or a.get("key") for a in taxonomy.get("aspects", []) if isinstance(a, dict)]
+        return taxonomy, [a for a in aspects if a]
+
+    def _record_taxonomy_health(self, taxonomy, project_id, metrics):
+        """Record taxonomy health snapshot without changing taxonomy content."""
+        if not taxonomy or not metrics:
+            return
+        metrics = metrics.copy()
+        metrics["taxonomy_age_days"] = self._taxonomy_age_days(taxonomy)
+        taxonomy_service = get_taxonomy_service()
+        taxonomy_service.record_health_snapshot(project_id, taxonomy, metrics)
+
+    def _compute_health_metrics_local(self, pipeline_result):
+        """Compute taxonomy health metrics from local ML pipeline output."""
+        try:
+            matches = pipeline_result.matches
+            total = len(matches)
+            if total == 0:
+                return None
+            aspects_total = 0
+            confidence_scores = []
+            for match in matches:
+                aspects_total += len([a for a in match.matched_aspects if a != "UNMAPPED"])
+                scores = match.comment_sentiment.raw_scores or {}
+                if scores:
+                    confidence_scores.append(max(scores.values()))
+            avg_aspects = aspects_total / total if total else 0.0
+            confidence_p95 = self._percentile(confidence_scores, 0.95)
+            return {
+                "last_unmapped_rate": float(pipeline_result.aggregated_stats.unmapped_percentage),
+                "last_avg_aspects_per_comment": avg_aspects,
+                "last_confidence_p95": confidence_p95,
+            }
+        except Exception as e:
+            logger.warning(f"Failed to compute local taxonomy health metrics: {e}")
+            return None
+
+    def _compute_health_metrics_llm(self, extracted_comments):
+        """Compute taxonomy health metrics from LLM extractions."""
+        try:
+            total = len(extracted_comments)
+            if total == 0:
+                return None
+            unmapped_count = 0
+            aspects_total = 0
+            confidence_scores = []
+            conf_map = {"HIGH": 0.9, "MEDIUM": 0.6, "LOW": 0.3}
+            for item in extracted_comments:
+                aspects = item.get("aspects") or []
+                if not aspects:
+                    unmapped_count += 1
+                aspects_total += len(aspects)
+                conf = str(item.get("confidence", "")).upper()
+                if conf in conf_map:
+                    confidence_scores.append(conf_map[conf])
+            avg_aspects = aspects_total / total if total else 0.0
+            confidence_p95 = self._percentile(confidence_scores, 0.95)
+            return {
+                "last_unmapped_rate": unmapped_count / total if total else 0.0,
+                "last_avg_aspects_per_comment": avg_aspects,
+                "last_confidence_p95": confidence_p95,
+            }
+        except Exception as e:
+            logger.warning(f"Failed to compute LLM taxonomy health metrics: {e}")
+            return None
+
+    @staticmethod
+    def _percentile(values, p):
+        if not values:
+            return None
+        values = sorted(values)
+        if len(values) == 1:
+            return values[0]
+        idx = int(round((len(values) - 1) * p))
+        return values[max(0, min(idx, len(values) - 1))]
+
+    @staticmethod
+    def _taxonomy_age_days(taxonomy):
+        created_at = taxonomy.get("created_at") or taxonomy.get("createdAt")
+        if not created_at:
+            return 0.0
+        try:
+            created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except Exception:
+            return 0.0
+        if created_dt.tzinfo is None:
+            created_dt = created_dt.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - created_dt).days
+
     def _convert_pipeline_result_to_schema(self, pipeline_result, original_comments):
         """
         Convert LocalProcessingService result to the expected frontend schema.
@@ -288,32 +442,20 @@ class TaskService:
         # Calculate overall sentiment from aggregated stats
         overall_sentiment = pipeline_result.aggregated_stats.overall_sentiment
         
-        # Calculate counts from aggregated stats
+        # Count sentiment per comment (not per aspect-match, to avoid inflation)
         total_comments = len(original_comments)
         positive_count = 0
         negative_count = 0
         neutral_count = 0
-        
-        # Sum up counts from aspect sentiment counts
-        for aspect, sentiment_counts in pipeline_result.aggregated_stats.aspect_sentiment_counts.items():
-            positive_count += sentiment_counts.get('POSITIVE', 0)
-            negative_count += sentiment_counts.get('NEGATIVE', 0)
-            neutral_count += sentiment_counts.get('NEUTRAL', 0)
-        
-        # Handle unmapped comments (they still have sentiment)
-        unmapped_count = pipeline_result.aggregated_stats.unmapped_count
-        if unmapped_count > 0:
-            # Distribute unmapped comments proportionally
-            remaining = total_comments - (positive_count + negative_count + neutral_count)
-            if remaining > 0:
-                # Use overall sentiment distribution to estimate unmapped sentiment
-                pos_pct = overall_sentiment.get('positive', 0) / 100
-                neg_pct = overall_sentiment.get('negative', 0) / 100
-                neu_pct = overall_sentiment.get('neutral', 0) / 100
-                
-                positive_count += int(remaining * pos_pct)
-                negative_count += int(remaining * neg_pct)
-                neutral_count = total_comments - positive_count - negative_count
+
+        for match in pipeline_result.matches:
+            sentiment = match.comment_sentiment.sentiment.upper()
+            if sentiment == 'POSITIVE':
+                positive_count += 1
+            elif sentiment == 'NEGATIVE':
+                negative_count += 1
+            else:
+                neutral_count += 1
         
         # Extract keywords from features
         positive_keywords = []
@@ -628,7 +770,7 @@ def get_task_service():
 
 # Celery task wrapper - this stays at module level for Celery discovery
 @shared_task(name="feedback_analysis.tasks.process_feedback_task")
-def process_feedback_task(comments, company_name, user_id_str, project_id, suggested_aspects=None):
+def process_feedback_task(comments, company_name, user_id_str, project_id, analysis_id, suggested_aspects=None):
     """
     Celery background task wrapper for feedback processing.
     Delegates to TaskService for actual business logic.
@@ -641,4 +783,5 @@ def process_feedback_task(comments, company_name, user_id_str, project_id, sugge
         suggested_aspects: Optional list of frozen aspects (if None, will generate in background task)
     """
     task_service = get_task_service()
-    return task_service.process_feedback_background(comments, company_name, user_id_str, project_id, suggested_aspects)
+    task_id = getattr(current_task.request, "id", None)
+    return task_service.process_feedback_background(comments, company_name, user_id_str, project_id, analysis_id, task_id, suggested_aspects)

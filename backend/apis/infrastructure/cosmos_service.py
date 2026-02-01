@@ -66,9 +66,9 @@ class CosmosDBService:
             self.is_enabled = False
     
     def _initialize_containers(self):
-        """Initialize container clients for all data types"""
-        for container_name in settings.COSMOS_DB_CONFIG['containers'].values():
-            self.containers[container_name] = self.database.get_container_client(container_name)
+        """Ensure containers exist and initialize clients."""
+        # Create containers with correct partition keys before caching clients.
+        self.create_all_containers()
     
     def get_container(self, container_type: str):
         """Get container client by type"""
@@ -103,7 +103,9 @@ class CosmosDBService:
             'user_data': '/projectId',
             'password_resets': '/id',
             'insights': '/id',
-            'comment_extractions': '/project_id'  # Partition by project_id for efficient queries
+            'comment_extractions': '/project_id',  # Partition by project_id for efficient queries
+            'taxonomies': '/projectId',
+            'usage': '/projectId'
         }
         partition_key = partition_keys.get(container_type, '/id')  # Default to '/id' if not specified
 
@@ -157,7 +159,9 @@ class CosmosDBService:
             'user_data': '/projectId',
             'password_resets': '/id',
             'insights': '/id',
-            'comment_extractions': '/project_id'  # Partition by project_id for efficient queries
+            'comment_extractions': '/project_id',  # Partition by project_id for efficient queries
+            'taxonomies': '/projectId',
+            'usage': '/projectId'
         }
         
         for container_type, partition_key in containers_config.items():
@@ -227,7 +231,10 @@ class CosmosDBService:
                 'user_stories': 'projectId',
                 'user_data': 'projectId',
                 'password_resets': 'id',
-                'insights': 'id'
+                'insights': 'id',
+                'comment_extractions': 'project_id',
+                'taxonomies': 'projectId',
+                'usage': 'projectId'
             }
             
             # Get the partition key field name for this container
@@ -461,8 +468,15 @@ class CosmosDBService:
         # Add versioning and temporal fields
         project_id = analysis_data.get('projectId')  # Updated to use projectId
         logger.info(f"🔍 DEBUG: Project ID from data: {project_id}")
-        
-        if project_id:
+        existing = None
+        if project_id and analysis_data.get('id'):
+            try:
+                container = self.get_container('analysis')
+                existing = container.read_item(item=analysis_data['id'], partition_key=project_id)
+            except Exception:
+                existing = None
+
+        if project_id and not existing:
             # Get next version number for this project
             next_version = self._get_next_analysis_version(project_id)
             analysis_data['version'] = next_version
@@ -473,6 +487,11 @@ class CosmosDBService:
             
             # Mark previous analyses as not latest
             self._mark_previous_analyses_not_latest(project_id)
+        elif existing:
+            # Idempotent retry: preserve existing versioning fields
+            analysis_data['version'] = existing.get('version')
+            analysis_data['quarter'] = existing.get('quarter')
+            analysis_data['is_latest'] = existing.get('is_latest', True)
         
         logger.info(f"🔍 DEBUG: Final analysis_data before save:")
         logger.info(f"🔍 DEBUG: - id: {analysis_data.get('id')}")

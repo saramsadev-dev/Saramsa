@@ -1214,31 +1214,25 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   console.log('Raw features array:', activeAnalysisData?.analysisData?.features);
   console.log('First feature example:', activeAnalysisData?.analysisData?.features?.[0]);
 
-  // Enhanced colorful metrics with status and duration support
+  // Enhanced colorful metrics
   const metrics = [
     {
       title: "Total Comments",
       value: String(activeAnalysisData?.analysisData?.counts?.total ?? 0),
       color: "blue" as const,
-      description: "Comments analyzed in current file",
-      status: activeAnalysisData?.analysisData?.counts?.total ? 'success' as const : undefined,
-      duration: activeAnalysisData?.analysisData?.counts?.total ? '2.3s' : undefined
+      description: "Comments analyzed in current file"
     },
     {
       title: "Positive Comments",
       value: String(activeAnalysisData?.analysisData?.counts?.positive ?? 0),
       color: "green" as const,
-      description: "Comments with positive sentiment",
-      status: 'success' as const,
-      duration: activeAnalysisData?.analysisData?.counts?.positive ? '1.8s' : undefined
+      description: "Comments with positive sentiment"
     },
     {
       title: "Negative Comments", 
       value: String(activeAnalysisData?.analysisData?.counts?.negative ?? 0),
       color: "red" as const,
-      description: "Comments with negative sentiment",
-      status: activeAnalysisData?.analysisData?.counts?.negative ? 'failure' as const : undefined,
-      duration: activeAnalysisData?.analysisData?.counts?.negative ? '1.2s' : undefined
+      description: "Comments with negative sentiment"
     }
   ];
 

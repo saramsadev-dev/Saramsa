@@ -3,6 +3,7 @@ Analysis repository for analysis-related data operations.
 """
 
 from typing import Dict, List, Optional, Any
+from datetime import datetime, timezone
 from apis.infrastructure.cosmos_service import cosmos_service
 import logging
 
@@ -68,6 +69,24 @@ class AnalysisRepository:
             return self.cosmos_service.query_documents(self.container_name, query, parameters)
         except Exception as e:
             logger.error(f"Error getting analyses for project {project_id}: {e}")
+            return []
+
+    def get_recent_by_project(self, project_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get recent analyses for trend calculations."""
+        try:
+            query = """
+            SELECT * FROM c
+            WHERE c.projectId = @project_id AND c.result != null
+            ORDER BY c.createdAt DESC
+            OFFSET 0 LIMIT @limit
+            """
+            parameters = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@limit", "value": limit}
+            ]
+            return self.cosmos_service.query_documents(self.container_name, query, parameters)
+        except Exception as e:
+            logger.error(f"Error getting recent analyses for project {project_id}: {e}")
             return []
     
     def get_cumulative_data_by_user(self, user_id: str) -> Dict[str, Any]:
@@ -303,6 +322,120 @@ class AnalysisRepository:
         except Exception as e:
             logger.error(f"Error in get_latest_analysis_by_project: {e}")
             return None
+
+
+class ProjectTaxonomyRepository:
+    """Repository for project taxonomy operations."""
+
+    def __init__(self):
+        self.cosmos_service = cosmos_service
+        self.container_name = 'taxonomies'
+        self.entity_type = "taxonomy"
+
+    def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new taxonomy document."""
+        try:
+            data['type'] = self.entity_type
+            return self.cosmos_service.create_document(self.container_name, data)
+        except Exception as e:
+            logger.error(f"Error creating taxonomy: {e}")
+            raise
+
+    def update(self, taxonomy_id: str, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update a taxonomy document."""
+        try:
+            return self.cosmos_service.update_document(self.container_name, taxonomy_id, project_id, data)
+        except Exception as e:
+            logger.error(f"Error updating taxonomy {taxonomy_id}: {e}")
+            return None
+
+    def get_by_id(self, taxonomy_id: str, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get taxonomy by ID."""
+        try:
+            return self.cosmos_service.get_document(self.container_name, taxonomy_id, project_id)
+        except Exception as e:
+            logger.error(f"Error getting taxonomy by ID {taxonomy_id}: {e}")
+            return None
+
+    def get_pinned_by_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get pinned taxonomy for a project."""
+        try:
+            query = """
+            SELECT * FROM c
+            WHERE c.projectId = @project_id AND c.type = @type AND c.is_pinned = true
+            ORDER BY c.version DESC
+            OFFSET 0 LIMIT 1
+            """
+            parameters = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@type", "value": self.entity_type},
+            ]
+            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+            return results[0] if results else None
+        except Exception as e:
+            logger.error(f"Error getting pinned taxonomy for project {project_id}: {e}")
+            return None
+
+    def get_active_by_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get active taxonomy for a project."""
+        try:
+            query = """
+            SELECT * FROM c
+            WHERE c.projectId = @project_id AND c.type = @type AND c.status = @status
+            ORDER BY c.version DESC
+            OFFSET 0 LIMIT 1
+            """
+            parameters = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@type", "value": self.entity_type},
+                {"name": "@status", "value": "active"},
+            ]
+            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+            return results[0] if results else None
+        except Exception as e:
+            logger.error(f"Error getting active taxonomy for project {project_id}: {e}")
+            return None
+
+    def get_latest_version(self, project_id: str) -> int:
+        """Get latest taxonomy version for a project."""
+        try:
+            query = """
+            SELECT VALUE MAX(c.version) FROM c
+            WHERE c.projectId = @project_id AND c.type = @type
+            """
+            parameters = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@type", "value": self.entity_type},
+            ]
+            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+            if results and isinstance(results[0], (int, float)):
+                return int(results[0])
+            return 0
+        except Exception as e:
+            logger.error(f"Error getting latest taxonomy version for project {project_id}: {e}")
+            return 0
+
+    def archive_others_for_project(self, project_id: str, keep_taxonomy_id: str) -> None:
+        """Archive all other active taxonomies for a project."""
+        try:
+            query = """
+            SELECT * FROM c
+            WHERE c.projectId = @project_id AND c.type = @type AND c.status = @status
+            """
+            parameters = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@type", "value": self.entity_type},
+                {"name": "@status", "value": "active"},
+            ]
+            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+            for doc in results:
+                if doc.get("id") == keep_taxonomy_id:
+                    continue
+                doc["status"] = "archived"
+                doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+                self.update(doc["id"], project_id, doc)
+        except Exception as e:
+            logger.error(f"Error archiving other taxonomies for project {project_id}: {e}")
     
     def get_analysis_by_id(self, analysis_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get specific analysis by ID and verify user ownership."""

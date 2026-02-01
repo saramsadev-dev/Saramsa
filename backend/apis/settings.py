@@ -150,6 +150,8 @@ COSMOS_DB_CONFIG = {
         'password_resets': os.getenv('COSMOS_DB_PASSWORD_RESETS_CONTAINER', 'password_resets'),
         'insights': os.getenv('COSMOS_DB_INSIGHTS_CONTAINER', 'insights'),
         'comment_extractions': os.getenv('COSMOS_DB_COMMENT_EXTRACTIONS_CONTAINER', 'comment_extractions'),
+        'taxonomies': os.getenv('COSMOS_DB_TAXONOMIES_CONTAINER', 'taxonomies'),
+        'usage': os.getenv('COSMOS_DB_USAGE_CONTAINER', 'usage'),
     }
 }
 

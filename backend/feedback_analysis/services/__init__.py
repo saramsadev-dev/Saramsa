@@ -4,8 +4,14 @@ from .task_service import TaskService, get_task_service
 from .processing_service import ProcessingService, get_processing_service
 from .aggregation_service import SentimentAggregationService, get_aggregation_service
 from .schema_validator import SchemaValidationService, get_validation_service
-from .extraction_persistence_service import ExtractionPersistenceService, get_extraction_persistence_service
 from .aspect_suggestion_service import AspectSuggestionService, get_aspect_suggestion_service
+from .aspect_taxonomy_service import AspectTaxonomyService, get_aspect_taxonomy_service
+from .production_processing_service import ProductionProcessingService, get_production_processing_service
+from .taxonomy_service import TaxonomyService, get_taxonomy_service
+from .narration_service import NarrationService, get_narration_service
+from .pipeline_health import PipelineHealth
+from .trend_service import TrendService, get_trend_service
+from .usage_service import UsageService, get_usage_service
 
 __all__ = [
     'AnalysisService',
@@ -20,8 +26,19 @@ __all__ = [
     'get_aggregation_service',
     'SchemaValidationService',
     'get_validation_service',
-    'ExtractionPersistenceService',
-    'get_extraction_persistence_service',
     'AspectSuggestionService',
     'get_aspect_suggestion_service',
+    'AspectTaxonomyService',
+    'get_aspect_taxonomy_service',
+    'ProductionProcessingService',
+    'get_production_processing_service',
+    'TaxonomyService',
+    'get_taxonomy_service',
+    'NarrationService',
+    'get_narration_service',
+    'PipelineHealth',
+    'TrendService',
+    'get_trend_service',
+    'UsageService',
+    'get_usage_service',
 ]

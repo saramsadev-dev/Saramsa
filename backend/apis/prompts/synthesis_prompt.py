@@ -20,15 +20,17 @@ def create_synthesis_prompt(structured_extractions: dict, aggregated_stats: dict
         Formatted prompt string for GPT-5-mini
     """
     
-    total_comments = len(structured_extractions.get('per_comment_extractions', []))
-    
+    total_comments = structured_extractions.get('total_comments',
+                        len(structured_extractions.get('per_comment_extractions', [])))
+
     prompt = f"""
 You are an expert customer feedback analyst. Analyze the following structured customer feedback data for {company_name} and provide actionable insights.
 
 ## OVERVIEW
 - Total Comments Analyzed: {total_comments}
 - Processing Method: Local ML Pipeline (all-MiniLM-L6-v2 + cardiffnlp/twitter-roberta-base-sentiment-latest)
-- Aspect Matching Threshold: 0.45 cosine similarity
+- Sentiment Method: Aspect-relative (sentence-level sentiment per matched aspect)
+- Aspect Matching: Bi-encoder cosine similarity with tiered thresholds (0.60 strong / 0.55 weak)
 
 ## AGGREGATED STATISTICS
 Overall Sentiment Distribution:

@@ -6,8 +6,6 @@ interface Metric {
   value: string;
   color: 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'teal';
   description?: string;
-  duration?: string; // Add duration support
-  status?: 'success' | 'failure' | 'processing' | 'pending';
 }
 
 interface MetricsCardsProps {
@@ -31,21 +29,6 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
         return "border-teal-300 dark:border-teal-600 bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/30";
       default:
         return "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
-    }
-  };
-
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'success':
-        return <span className="text-green-600 dark:text-green-400 text-lg">✅</span>;
-      case 'failure':
-        return <span className="text-red-600 dark:text-red-400 text-lg">❌</span>;
-      case 'processing':
-        return <span className="text-purple-600 dark:text-purple-400 text-lg animate-spin">⚙️</span>;
-      case 'pending':
-        return <span className="text-blue-600 dark:text-blue-400 text-lg">⏳</span>;
-      default:
-        return null;
     }
   };
 
@@ -81,12 +64,11 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
         >
           <div className={`${getCardStyles(metric.color)} border-2 hover:shadow-xl hover:scale-105 transition-all duration-300 rounded-xl p-6`}>
             <div className="space-y-3">
-              {/* Title and Status */}
+              {/* Title */}
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   {metric.title}
                 </h3>
-                {getStatusIcon(metric.status)}
               </div>
 
               {/* Value */}
@@ -94,11 +76,6 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
                 <span className={`text-3xl font-bold ${getValueColor(metric.color)}`}>
                   {metric.value}
                 </span>
-                {metric.duration && (
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-                    {metric.duration}
-                  </span>
-                )}
               </div>
 
               {/* Description */}
