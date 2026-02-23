@@ -98,8 +98,30 @@ class AnalyzeCommentsView(APIView):
         # Track task start for TTL safeguards
         cache = get_cache_service()
 
-        # Trigger background task
-        task = process_feedback_task.delay(comments, company_name, user_id_str, project_id, analysis_id)
+        # Trigger background task (requires Redis and Celery worker)
+        try:
+            task = process_feedback_task.delay(comments, company_name, user_id_str, project_id, analysis_id)
+        except Exception as e:
+            err_msg = str(e).lower()
+            # Redis/Celery broker connection refused (e.g. Redis not running on localhost:6379)
+            if "6379" in err_msg or "refused" in err_msg or "redis" in err_msg or (hasattr(e, "errno") and getattr(e, "errno") == 10061):
+                logger.error(
+                    "Redis/Celery broker unavailable for analysis. Start Redis and Celery (e.g. saramsa start all dev). Error: %s",
+                    e,
+                    exc_info=True,
+                )
+                return StandardResponse.error(
+                    title="Service unavailable",
+                    detail=(
+                        "Redis is not reachable from this machine. Analysis requires Redis and a Celery worker. "
+                        "If Redis runs in WSL, the Windows backend cannot connect to it. "
+                        "Install Redis for Windows: choco install redis-64 -y then run redis-server (or start the Redis service)."
+                    ),
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    error_type="service-unavailable",
+                )
+            raise
+
         cache.set(f"task_start:{task.id}", datetime.now().isoformat(), ttl=3600)
         hour_key = datetime.now().strftime("%Y-%m-%d-%H")
         cache.incr(f"analyses_hour:{project_id}:{hour_key}", 1, ttl=3600)

@@ -105,29 +105,17 @@ function Install-RedisWindows {
 }
 
 function Start-Redis {
-    Write-Host "Checking Redis..." -ForegroundColor Cyan
+    Write-Host "Checking Redis (Windows)..." -ForegroundColor Cyan
     if (Check-Redis) { Write-Host "[OK] Redis is already running" -ForegroundColor Green; return }
-    $wsl = Check-WSL
     $win = Check-WindowsRedis
-    if ($wsl) {
-        try {
-            $null = Start-Process wsl -ArgumentList "bash", "-c", "redis-server --daemonize yes" -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
-            foreach ($i in 1..6) {
-                Start-Sleep -Seconds 2
-                if (Check-Redis) { Write-Host "[OK] Redis started (WSL)" -ForegroundColor Green; return }
-            }
-            $which = (wsl which redis-server 2>&1) -join " "
-            if ($which -match "not found|command not found|no redis") {
-                Write-Host "[WARNING] Redis not installed in WSL. Install: wsl sudo apt-get update && wsl sudo apt-get install -y redis-server" -ForegroundColor Yellow
-                return
-            }
-        } catch { }
-    }
+    $wsl = Check-WSL
+    # Prefer Windows Redis so backend/Celery (running on Windows) can connect to localhost:6379
     if ($win) {
         try {
             $exe = (Get-Command redis-server -ErrorAction SilentlyContinue).Source
             if (-not $exe) { foreach ($p in @("C:\Program Files\Redis\redis-server.exe", "C:\redis\redis-server.exe", "$env:ProgramFiles\Redis\redis-server.exe")) { if (Test-Path $p) { $exe = $p; break } } }
             if ($exe) {
+                # Try Windows service first, then foreground process
                 $null = Start-Process -FilePath $exe -ArgumentList "--service-run" -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
                 if (-not $?) { $null = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue }
                 Start-Sleep -Seconds 3
@@ -135,14 +123,23 @@ function Start-Redis {
             }
         } catch { }
     }
-    if (-not $wsl -and -not $win) { Install-RedisWindows; Write-Host "[ERROR] Redis required. Install and retry." -ForegroundColor Red; exit 1 }
-    Write-Host "[WARNING] Redis failed to start. Start manually:" -ForegroundColor Yellow
+    # Fallback: try WSL only if Windows Redis not installed or failed to start
     if ($wsl) {
-        Write-Host "  wsl redis-server --daemonize yes" -ForegroundColor Gray
-        Write-Host "  (If not installed: wsl sudo apt-get update && wsl sudo apt-get install -y redis-server)" -ForegroundColor Gray
-    } else {
-        Write-Host "  Install Redis (e.g. choco install redis-64) then run redis-server" -ForegroundColor Gray
+        try {
+            $null = Start-Process wsl -ArgumentList "bash", "-c", "redis-server --daemonize yes" -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+            foreach ($i in 1..6) {
+                Start-Sleep -Seconds 2
+                if (Check-Redis) { Write-Host "[OK] Redis started (WSL)" -ForegroundColor Green; return }
+            }
+        } catch { }
     }
+    if (-not $win -and -not $wsl) { Install-RedisWindows; Write-Host "[ERROR] Redis required. Install and retry." -ForegroundColor Red; exit 1 }
+    # Not reachable from Windows - require Windows Redis for backend/Celery on Windows
+    Write-Host "[WARNING] Redis must run on Windows for this setup. Start manually:" -ForegroundColor Yellow
+    Write-Host "  1. Install: choco install redis-64 -y" -ForegroundColor Gray
+    Write-Host "  2. Start:   redis-server   (or start the Redis service in services.msc)" -ForegroundColor Gray
+    Write-Host "  3. Check:   redis-cli ping   (should return PONG)" -ForegroundColor Gray
+    Write-Host "  See START-SERVICES.md section 'Redis failed to start' for details." -ForegroundColor Gray
 }
 
 function Stop-AllServices {

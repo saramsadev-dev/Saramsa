@@ -146,7 +146,7 @@ export const FeatureSentimentsTable = ({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+    <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 relative z-[900]">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -306,82 +306,113 @@ export const FeatureSentimentsTable = ({
         )}
       </div>
 
-      {/* Keywords Edit Modal */}
+      {/* Keywords Edit Modal - full-screen overlay, always centered */}
       {isDialogOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[1000] px-4"
           onClick={handleBackdropClick}
         >
-          <div 
-            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full mx-4"
+          <div
+            className="bg-slate-950/95 dark:bg-slate-950/95 text-white p-6 md:p-8 rounded-2xl shadow-2xl max-w-5xl w-full mx-4 border border-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Edit Keywords for {editingFeature}
-              </h3>
-              <button 
-                onClick={handleCancelEdit} 
-                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                  Feature Keyword Editing
+                </p>
+                <h3 className="text-xl font-semibold">
+                  Edit keywords for <span className="text-saramsa-brand">{editingFeature}</span>
+                </h3>
+              </div>
+              <button
+                onClick={handleCancelEdit}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="space-y-4">
-              {/* Current Keywords */}
-              <div className="space-y-2">
-                <Label>Current Keywords</Label>
-                <div className="flex flex-wrap gap-1 min-h-[40px] p-2 border border-gray-200 dark:border-gray-700 rounded-md">
-                  {editingKeywords.map((keyword, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="text-xs bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-                      onClick={() => handleRemoveKeyword(keyword)}
-                    >
-                      {keyword} ×
-                    </Badge>
-                  ))}
-                  {editingKeywords.length === 0 && (
-                    <span className="text-gray-400 text-sm">No keywords</span>
+
+            {/* Main Layout: central options panel anchored near top */}
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)] gap-6 md:gap-8 items-start">
+              {/* Center options panel */}
+              <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-5 md:p-6 space-y-5">
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-sm font-semibold tracking-wide text-slate-100">
+                    Options
+                  </h4>
+                  {editingKeywords.length > 0 && (
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                      {editingKeywords.length} keyword{editingKeywords.length > 1 ? 's' : ''} selected
+                    </span>
                   )}
                 </div>
-              </div>
 
-              {/* Add New Keyword */}
-              <div className="space-y-2">
-                <Label>Add New Keyword</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={newKeyword}
-                    onChange={(e) => setNewKeyword(e.target.value)}
-                    placeholder="Enter keyword..."
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddKeyword()}
-                  />
+                {/* Current Keywords */}
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-[0.16em] text-slate-400">
+                    Current Keywords
+                  </Label>
+                  <div className="flex flex-wrap gap-2 min-h-[48px] px-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800">
+                    {editingKeywords.map((keyword, index) => (
+                      <Badge
+                        key={index}
+                        variant="outline"
+                        className="text-xs bg-slate-900/80 border-saramsa-brand/40 text-slate-100 cursor-pointer hover:bg-red-500/10 hover:border-red-500/60 transition-colors"
+                        onClick={() => handleRemoveKeyword(keyword)}
+                      >
+                        {keyword} ×
+                      </Badge>
+                    ))}
+                    {editingKeywords.length === 0 && (
+                      <span className="text-slate-500 text-sm">
+                        No keywords added yet. Start by adding a few below.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Add New Keyword */}
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-[0.16em] text-slate-400">
+                    Add New Keyword
+                  </Label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Input
+                      value={newKeyword}
+                      onChange={(e) => setNewKeyword(e.target.value)}
+                      placeholder="Enter keyword..."
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddKeyword()}
+                      className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500"
+                    />
+                    <Button
+                      onClick={handleAddKeyword}
+                      disabled={!newKeyword.trim()}
+                      size="sm"
+                      className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                      Add Keyword
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                   <Button
-                    onClick={handleAddKeyword}
-                    disabled={!newKeyword.trim()}
-                    size="sm"
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    className="border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white"
                   >
-                    Add
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveKeywords}
+                    className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white shadow-lg shadow-[#E603EB]/30"
+                  >
+                    Save Changes
                   </Button>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleCancelEdit}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveKeywords}
-                  className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white"
-                >
-                  Save Changes
-                </Button>
               </div>
             </div>
           </div>
