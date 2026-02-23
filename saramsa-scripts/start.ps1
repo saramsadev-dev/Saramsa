@@ -161,6 +161,7 @@ cmd /c "npm run dev 2>&1" | Out-File -FilePath '$FrontendLog' -Append -Encoding 
 
 function Show-LogsHelp {
     Write-Host "Logs:" -ForegroundColor Yellow
+    Write-Host "   All:         saramsa logs all   # tail all services in one stream" -ForegroundColor White
     Write-Host "   Backend:     Get-Content '$BackendLog','$BackendErrLog' -Wait -Tail 50" -ForegroundColor White
     Write-Host "   Frontend:    Get-Content '$FrontendLog' -Wait -Tail 50" -ForegroundColor White
     Write-Host "   Celery:      Get-Content '$CeleryErrLog' -Wait -Tail 50   # task/app logs; startup: $CeleryLog" -ForegroundColor White
