@@ -119,8 +119,5 @@ dmypy.json
 **/test_*.py
 !**/tests/test_*.py
 
-# Unused ML scaffold directory
-feedback_analysis/services/ml/
-
 # Specific files to ignore
 pyvenv.cfg 
