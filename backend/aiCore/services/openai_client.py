@@ -9,10 +9,10 @@ load_dotenv()
 logger = logging.getLogger("apis.app")
 
 AZURE_OPENAI = {
-    "ENDPOINT_URL": os.getenv('ENDPOINT_URL'),
-    "DEPLOYMENT_NAME": os.getenv('DEPLOYMENT_NAME'),
-    "API_KEY": os.getenv('API_KEY'),
-    "API_VERSION": os.getenv('API_VERSION'),
+    "ENDPOINT_URL": os.getenv('AZURE_ENDPOINT_URL'),
+    "DEPLOYMENT_NAME": os.getenv('AZURE_DEPLOYMENT_NAME'),
+    "API_KEY": os.getenv('AZURE_API_KEY'),
+    "API_VERSION": os.getenv('AZURE_API_VERSION'),
 }
 
 class AzureOpenAIClient:
@@ -93,7 +93,7 @@ class AzureOpenAIClient:
             client = self.get_client()
             # Simple test call to verify connection
             response = client.chat.completions.create(
-                model=AZURE_OPENAI["DEPLOYMENT_NAME"] or "gpt-4o-mini",
+                model=AZURE_OPENAI["DEPLOYMENT_NAME"] or "gpt-5-mini",
                 messages=[{"role": "user", "content": "test"}],
                 max_completion_tokens=1
             )

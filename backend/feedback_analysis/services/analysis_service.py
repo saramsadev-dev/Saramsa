@@ -4,6 +4,7 @@ Analysis service for analysis-related business logic.
 
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
+import os
 import uuid
 from ..repositories import AnalysisRepository
 from .chunking_service import get_chunking_service
@@ -114,7 +115,7 @@ class AnalysisService:
                 },
                 "metadata": {
                     "analysisEngine": "azure_openai",
-                    "modelUsed": "gpt-4",
+                    "modelUsed": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-5-mini"),
                     "processingTime": analysis_results.get('processing_time'),
                     "commentsProcessed": len(feedback_data.split('\n')) if feedback_data else 0,
                     "chunksProcessed": len(chunks)
@@ -147,7 +148,7 @@ class AnalysisService:
                 },
                 "metadata": {
                     "analysisEngine": "azure_openai",
-                    "modelUsed": "gpt-4",
+                    "modelUsed": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-5-mini"),
                     "platform": platform,
                     "workItemsGenerated": len(work_items),
                     "commentsProcessed": len(feedback_data.split('\n')) if feedback_data else 0,

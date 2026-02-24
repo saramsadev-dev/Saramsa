@@ -193,7 +193,7 @@ class ProcessingService:
         Batch comments by token count. Each batch is a list of (global_index, comment_text) tuples.
         Comments are never split across batches.
         """
-        model = os.getenv("DEPLOYMENT_NAME") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        model = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-5-mini")
         try:
             encoding = tiktoken.encoding_for_model(model)
         except KeyError:

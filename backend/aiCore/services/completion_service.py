@@ -6,8 +6,8 @@ import os
 import logging
 
 # LLM Configuration Constants
-# Use DEPLOYMENT_NAME (Azure deployment) or OPENAI_MODEL; must match an existing Azure OpenAI deployment.
-DEFAULT_MODEL = os.getenv("DEPLOYMENT_NAME") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+# Use AZURE_DEPLOYMENT_NAME; must match an existing Azure OpenAI deployment.
+DEFAULT_MODEL = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-5-mini")
 DEFAULT_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '1300'))
 DEFAULT_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', '0.7'))
 DEFAULT_TOP_P = float(os.getenv('OPENAI_TOP_P', '0.95'))

@@ -35,10 +35,10 @@ jobs:
       - name: Run Django migrations & collectstatic
         env:
           DJANGO_SETTINGS_MODULE: apis.settings
-          API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
-          DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
-          API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
+          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
           AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
@@ -88,10 +88,10 @@ jobs:
           slot-name: 'Production'
           package: artifact/celery.zip
         env:
-          API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
-          DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
-          API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
+          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
           AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}

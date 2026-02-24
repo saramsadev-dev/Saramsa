@@ -377,7 +377,7 @@ class FeedbackFileUploadView(APIView):
             aspect_service = get_aspect_suggestion_service()
             aspect_suggestions = await aspect_service.suggest_aspects(original_comments)
             logger.info(
-                f"✅ Aspect suggestions generated: domain='{aspect_suggestions['identified_domain']}', "
+                f"Aspect suggestions generated: domain='{aspect_suggestions['identified_domain']}', "
                 f"aspects={len(aspect_suggestions['suggested_aspects'])}"
             )
             taxonomy = taxonomy_service.create_initial_taxonomy(
