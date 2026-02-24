@@ -8,7 +8,7 @@ This package contains all AI/ML related services including:
 """
 
 from .completion_service import generate_completions
-from .openai_client import get_azure_client, AzureOpenAIClient
+from .openai_client import get_azure_client, AzureOpenAIClient, get_azure_deployment_name
 from .utilities import (
     fix_json_string, 
     validate_json_structure, 
@@ -21,6 +21,7 @@ __all__ = [
     'generate_completions',
     'get_azure_client',
     'AzureOpenAIClient',
+    'get_azure_deployment_name',
     'fix_json_string',
     'validate_json_structure',
     'flatten_feedback',

@@ -16,6 +16,8 @@ from typing import List, Dict, Any
 
 import tiktoken
 
+from aiCore.services.openai_client import get_azure_deployment_name
+
 logger = logging.getLogger(__name__)
 
 # Default max input tokens per batch (128K context minus prompt/output reserve).
@@ -28,7 +30,7 @@ class FeedbackChunkingService:
     """Service for chunking feedback data optimally for AI analysis."""
     
     def __init__(self):
-        self.default_model = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-5-mini")
+        self.default_model = get_azure_deployment_name()
         raw = os.getenv("MAX_INPUT_TOKENS_PER_BATCH", str(_DEFAULT_MAX_INPUT_TOKENS))
         try:
             self.max_input_tokens_per_batch = max(4_000, min(128_000, int(raw)))

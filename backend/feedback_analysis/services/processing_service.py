@@ -19,6 +19,7 @@ from .retry_service import get_retry_service
 from .schema_validator import get_validation_service
 from apis.prompts import getSentAnalysisPrompt, getDeepAnalysisPrompt
 from aiCore.services.completion_service import generate_completions
+from aiCore.services.openai_client import get_azure_deployment_name
 import tiktoken
 import logging
 
@@ -193,7 +194,7 @@ class ProcessingService:
         Batch comments by token count. Each batch is a list of (global_index, comment_text) tuples.
         Comments are never split across batches.
         """
-        model = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-5-mini")
+        model = get_azure_deployment_name()
         try:
             encoding = tiktoken.encoding_for_model(model)
         except KeyError:

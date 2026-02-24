@@ -8,12 +8,20 @@ load_dotenv()
 
 logger = logging.getLogger("apis.app")
 
+# Single source of truth: env key is AZURE_DEPLOYMENT_NAME (must match your Azure OpenAI deployment name).
+_DEFAULT_DEPLOYMENT_NAME = "gpt-5-mini"
+
 AZURE_OPENAI = {
     "ENDPOINT_URL": os.getenv('AZURE_ENDPOINT_URL'),
     "DEPLOYMENT_NAME": os.getenv('AZURE_DEPLOYMENT_NAME'),
     "API_KEY": os.getenv('AZURE_API_KEY'),
     "API_VERSION": os.getenv('AZURE_API_VERSION'),
 }
+
+
+def get_azure_deployment_name() -> str:
+    """Return the deployment name to use as 'model' in Azure OpenAI API (single source of truth)."""
+    return os.getenv('AZURE_DEPLOYMENT_NAME') or _DEFAULT_DEPLOYMENT_NAME
 
 class AzureOpenAIClient:
     """
@@ -93,9 +101,9 @@ class AzureOpenAIClient:
             client = self.get_client()
             # Simple test call to verify connection
             response = client.chat.completions.create(
-                model=AZURE_OPENAI["DEPLOYMENT_NAME"] or "gpt-5-mini",
-                messages=[{"role": "user", "content": "test"}],
-                max_completion_tokens=1
+                model=get_azure_deployment_name(),
+                messages=[{"role": "user", "content": "test connection to Azure OpenAI"}],
+                max_completion_tokens=16
             )
             logger.info("Azure OpenAI connection test successful")
             return True

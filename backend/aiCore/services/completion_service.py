@@ -1,13 +1,12 @@
-from .openai_client import get_azure_client
+from .openai_client import get_azure_client, get_azure_deployment_name
 from .utilities import fix_json_string, validate_json_structure
 from apis.infrastructure.usage_logging import log_token_usage
 from apis.core.error_handlers import handle_service_errors
 import os
 import logging
 
-# LLM Configuration Constants
-# Use AZURE_DEPLOYMENT_NAME; must match an existing Azure OpenAI deployment.
-DEFAULT_MODEL = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-5-mini")
+# LLM Configuration Constants (deployment name = single source in openai_client)
+DEFAULT_MODEL = get_azure_deployment_name()
 DEFAULT_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '1300'))
 DEFAULT_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', '0.7'))
 DEFAULT_TOP_P = float(os.getenv('OPENAI_TOP_P', '0.95'))
