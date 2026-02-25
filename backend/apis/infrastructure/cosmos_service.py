@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class CosmosDBService:
-    def __init__(self):
+    def __init__(self, client_override=None):
         self.client = None
         self.database = None
         self.containers = {}
@@ -31,6 +31,16 @@ class CosmosDBService:
             'last_reset': datetime.now()
         }
         self._stats_lock = threading.Lock()
+
+        # Use injected client (e.g. LocalJsonClient for testing)
+        if client_override is not None:
+            self.client = client_override
+            self.database = self.client.get_database_client(
+                settings.COSMOS_DB_CONFIG['database_name']
+            )
+            self._initialize_containers()
+            logger.info("Cosmos DB initialized with LOCAL JSON client")
+            return
 
         try:
             endpoint = settings.COSMOS_DB_CONFIG.get('endpoint')
@@ -50,7 +60,7 @@ class CosmosDBService:
             # Initialize client with basic configuration
             # Azure Cosmos Python SDK uses different parameter names than the old SDK
             self.client = CosmosClient(endpoint, key)
-            
+
             self.database = self.client.get_database_client(
                 settings.COSMOS_DB_CONFIG['database_name']
             )
@@ -58,7 +68,7 @@ class CosmosDBService:
             # Initialize container clients
             self._initialize_containers()
             logger.info(f"Cosmos DB initialized with connection pool size: {self._connection_pool_size}")
-            
+
         except Exception as e:
             # Gracefully disable Cosmos in development/migrations if credentials invalid
             self._init_error = str(e)
@@ -1523,10 +1533,16 @@ def get_cosmos_service() -> CosmosDBService:
     """
     Get the global Cosmos DB service instance (lazy initialization).
     Initializes only when first accessed, not at import time.
+    When USE_LOCAL_DB=true is set, uses local JSON files instead of Azure.
     """
     global _cosmos_service
     if _cosmos_service is None:
-        _cosmos_service = CosmosDBService()
+        if os.getenv('USE_LOCAL_DB', '').lower() in ('true', '1', 'yes'):
+            from .local_json_db import LocalJsonClient
+            logger.info("USE_LOCAL_DB is set -- using local JSON file storage")
+            _cosmos_service = CosmosDBService(client_override=LocalJsonClient())
+        else:
+            _cosmos_service = CosmosDBService()
     return _cosmos_service
 
 # Proxy object for backward compatibility with existing imports

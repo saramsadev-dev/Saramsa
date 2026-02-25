@@ -12,12 +12,13 @@ import logging
 import time
 import re
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional, Callable
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter
 from sklearn.metrics.pairwise import cosine_similarity
 
-from aiCore.services.similarity_aspect_service import get_similarity_aspect_service
+from aiCore.services.aspect_service_factory import get_aspect_service
+from aiCore.services.embedding_service import EmbeddingService
 from aiCore.services.local_sentiment_service import LocalSentimentService, SentimentResult
 from apis.prompts.synthesis_prompt import FALLBACK_RESPONSE_TEMPLATE
 from .narration_service import get_narration_service
@@ -58,7 +59,7 @@ _WORD_RE = re.compile(r'[a-zA-Z]{3,}')
 class AspectSentiment:
     """Sentiment result for a specific aspect within a comment."""
     aspect: str
-    sentiment: str        # POSITIVE / NEGATIVE / NEUTRAL / MIXED
+    sentiment: str        # POSITIVE / NEGATIVE / NEUTRAL
     confidence: str       # HIGH / MEDIUM / LOW
     source_sentence: str  # The sentence used for this aspect's sentiment
     raw_scores: Dict[str, float] = field(default_factory=dict)
@@ -112,12 +113,14 @@ class LocalProcessingService:
     SAMPLES_PER_ASPECT = 5
 
     def __init__(self):
-        self.similarity_service = get_similarity_aspect_service()
+        self.aspect_service = get_aspect_service()
+        self.embedding_service = EmbeddingService()
         self.sentiment_service = LocalSentimentService()
-        logger.info("LocalProcessingService initialized with bi-encoder similarity + aspect-relative sentiment")
+        logger.info("LocalProcessingService initialized with aspect classification + aspect-relative sentiment")
 
     def process_comments(self, comments: List[str], aspects: List[str],
-                         company_name: str = "Company", run_id: str = None) -> ProcessingResult:
+                         company_name: str = "Company", run_id: str = None,
+                         is_cancelled: Optional[Callable[[], bool]] = None) -> ProcessingResult:
         """Run the full pipeline and return a ProcessingResult."""
         start_time = time.time()
 
@@ -131,8 +134,10 @@ class LocalProcessingService:
 
         logger.info(f"Processing {len(comments)} comments with {len(aspects)} aspects (run: {run_id})")
 
-        # Step 1: Bi-encoder similarity aspect classification
-        similarity_results = self.similarity_service.classify_aspects(comments, aspects, run_id)
+        # Step 1: Aspect classification (NLI or similarity, via factory)
+        similarity_results = self.aspect_service.classify_aspects(
+            comments, aspects, run_id, is_cancelled=is_cancelled
+        )
 
         # Step 2: Aspect-relative sentiment
         # 2a. Get comment-level sentiment for overall counts
@@ -166,7 +171,7 @@ class LocalProcessingService:
             aggregated_stats=aggregated_stats,
             processing_time=processing_time,
             model_info={
-                "aspect_model": self.similarity_service.embedding_service.MODEL_NAME,
+                "aspect_model": self.aspect_service.MODEL_NAME,
                 "sentiment_model": self.sentiment_service.MODEL_NAME,
                 "processing_method": "local_ml_pipeline_aspect_sentiment",
             },
@@ -198,7 +203,7 @@ class LocalProcessingService:
 
         For single-sentence comments, uses the comment-level sentiment directly.
         """
-        embedding_service = self.similarity_service.embedding_service
+        embedding_service = self.embedding_service
 
         # Pre-compute aspect embeddings once
         aspect_embeddings = embedding_service.get_embeddings(aspects)
@@ -380,7 +385,6 @@ class LocalProcessingService:
                 "metrics": {
                     "comment_count": total,
                     "neg_pct": (sentiment_counts.get("NEGATIVE", 0) / total),
-                    "mixed_pct": (sentiment_counts.get("MIXED", 0) / total),
                 },
                 "keywords": aggregated_stats.aspect_keywords.get(aspect, [])[:5],
             })

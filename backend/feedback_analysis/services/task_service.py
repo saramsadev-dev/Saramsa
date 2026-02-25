@@ -139,12 +139,16 @@ class TaskService:
         # 2. Process through local ML pipeline
         run_id = str(uuid.uuid4())
         logger.info(f"🚀 Processing {len(comments)} comments through local ML pipeline (run: {run_id})")
-        
+
+        # Build cooperative cancellation checker (Windows solo pool ignores SIGTERM)
+        is_cancelled = self._build_cancel_checker(analysis_id)
+
         pipeline_result = self.local_processing_service.process_comments(
             comments=comments,
             aspects=resolved_aspects,
             company_name=company_name or "Company",
-            run_id=run_id
+            run_id=run_id,
+            is_cancelled=is_cancelled,
         )
         
         logger.info(f"✅ Local ML pipeline completed in {pipeline_result.processing_time:.2f}s")
@@ -204,6 +208,41 @@ class TaskService:
             "processing_time": pipeline_result.processing_time
         }
     
+    def _build_cancel_checker(self, analysis_id: str):
+        """
+        Return a callable that checks Redis for a cancellation flag.
+
+        The celery_ops cancel endpoint sets ``saramsa:cancelled:<task_id>``
+        in Redis.  Because we may not know the Celery task_id at this level
+        we also check by analysis_id.  The callable is cheap (single Redis
+        GET) and is called between NLI batches for cooperative cancellation
+        on Windows where SIGTERM is ignored.
+        """
+        try:
+            cache = get_cache_service()
+        except Exception:
+            return None
+
+        # Get the celery task id if available
+        try:
+            from celery import current_task
+            celery_task_id = getattr(current_task.request, "id", None)
+        except Exception:
+            celery_task_id = None
+
+        def _is_cancelled() -> bool:
+            try:
+                if celery_task_id:
+                    val = cache.get(f"saramsa:cancelled:{celery_task_id}")
+                    if val:
+                        logger.info(f"Task {celery_task_id} cancelled via Redis flag")
+                        return True
+                return False
+            except Exception:
+                return False
+
+        return _is_cancelled
+
     def _process_with_llm_chunking(self, comments, company_name, user_id_str, project_id, analysis_id, suggested_aspects=None):
         """
         Process feedback using the existing LLM-based chunking approach.

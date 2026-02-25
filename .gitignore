@@ -63,6 +63,7 @@ venv.bak/
 .vscode/
 .idea/
 .kiro/
+.claude/
 *.swp
 *.swo
 *~
@@ -81,6 +82,9 @@ dist/
 # Temporary files
 *.tmp
 *.temp
+
+# Local JSON DB (temporary Cosmos replacement)
+backend/local_db/
 
 # OS generated files
 .DS_Store

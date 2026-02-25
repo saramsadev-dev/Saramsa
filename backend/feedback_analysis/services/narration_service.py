@@ -134,25 +134,49 @@ class NarrationService:
         features = [
             {
                 "aspect_key": f.get("aspect_key"),
-                "description": f"Customer feedback about {f.get('aspect_key')}.",
+                "description": f"Customer feedback about {self._humanize_key(f.get('aspect_key'))}.",
             }
             for f in narration_input.get("features", [])
             if isinstance(f, dict) and f.get("aspect_key")
         ]
-        work_items = [
-            {
+        work_items = []
+        for c in narration_input.get("work_item_candidates", []):
+            if not isinstance(c, dict) or not c.get("candidate_id"):
+                continue
+            ctype = (c.get("type") or "").lower()
+            aspect_key = c.get("aspect_key", "")
+            reason = c.get("reason") or {}
+            if ctype == "taxonomy_gap":
+                title = "Review taxonomy gaps in customer feedback"
+                desc = (
+                    "A large portion of feedback could not be mapped to existing categories. "
+                    "Review unmapped comments and expand the taxonomy to capture recurring themes."
+                )
+            else:
+                label = self._humanize_key(aspect_key)
+                neg_pct = reason.get("neg_pct", 0)
+                count = reason.get("comment_count", 0)
+                title = f"Improve {label} based on customer feedback"
+                desc = (
+                    f"{label} has {neg_pct:.0%} negative sentiment across {count} comments. "
+                    f"Investigate root causes and address the top concerns."
+                )
+            work_items.append({
                 "candidate_id": c.get("candidate_id"),
-                "title": f"Address {c.get('aspect_key')} feedback",
-                "description": "Review evidence and address customer concerns.",
-            }
-            for c in narration_input.get("work_item_candidates", [])
-            if isinstance(c, dict) and c.get("candidate_id")
-        ]
+                "title": title,
+                "description": desc,
+            })
         return {
             "insights": insights[:5],
             "features": features,
             "work_items": work_items,
         }
+
+    @staticmethod
+    def _humanize_key(key: str) -> str:
+        if not key or key == "__taxonomy__":
+            return "taxonomy coverage"
+        return str(key).replace("_", " ").title()
 
     def _record_usage(self, project_id: Optional[str], prompt: str, output: Any, cache_hit: bool) -> None:
         if not project_id:

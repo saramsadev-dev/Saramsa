@@ -1,8 +1,9 @@
 import logging
 import time
+import threading
 import numpy as np
 import re
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from sklearn.metrics.pairwise import cosine_similarity
 
 from aiCore.services.embedding_service import EmbeddingService
@@ -17,30 +18,22 @@ CONJUNCTION_PATTERNS = [
 CONJUNCTION_REGEX = re.compile('|'.join(CONJUNCTION_PATTERNS), re.IGNORECASE)
 
 
-class SingletonMeta(type):
-    """Metaclass for singleton pattern."""
-    _instances = {}
-    
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class SimilarityAspectService(metaclass=SingletonMeta):
+class SimilarityAspectService:
     """
     Production-grade bi-encoder aspect classification using cosine similarity.
-    
+
     Uses sentence-transformers/all-MiniLM-L6-v2 for embedding generation
     and cosine similarity for aspect assignment.
-    
+
     Performance characteristics:
     - 1,000 comments × 9 aspects: ~3-5 seconds total
     - Linear scaling with comment count
     - Aspect embeddings cached per run
     - Deterministic results
     """
-    
+
+    MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
     def __init__(self):
         """Initialize the similarity-based aspect classification service."""
         self.embedding_service = EmbeddingService()
@@ -60,8 +53,9 @@ class SimilarityAspectService(metaclass=SingletonMeta):
         self.fragment_length_threshold = 100  # chars
         self.enable_fragment_processing = True
         
-    def classify_aspects(self, comments: List[str], aspects: List[str], 
-                        run_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def classify_aspects(self, comments: List[str], aspects: List[str],
+                        run_id: Optional[str] = None,
+                        is_cancelled=None) -> List[Dict[str, Any]]:
         """
         Classify comments against aspects using bi-encoder cosine similarity.
         
@@ -402,12 +396,16 @@ class SimilarityAspectService(metaclass=SingletonMeta):
         }
 
 
-# Singleton instance getter
+# Singleton instance getter (thread-safe for concurrent Celery workers)
 _similarity_aspect_service = None
+_similarity_lock = threading.Lock()
+
 
 def get_similarity_aspect_service() -> SimilarityAspectService:
     """Get the singleton instance of SimilarityAspectService."""
     global _similarity_aspect_service
     if _similarity_aspect_service is None:
-        _similarity_aspect_service = SimilarityAspectService()
+        with _similarity_lock:
+            if _similarity_aspect_service is None:
+                _similarity_aspect_service = SimilarityAspectService()
     return _similarity_aspect_service

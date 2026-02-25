@@ -33,7 +33,7 @@ class SentimentAggregationService:
         Args:
             extracted_comments: List of comment extractions from LLM (CommentExtraction schema), where each entry has:
                 - comment_id (int)
-                - sentiment (POSITIVE/NEGATIVE/NEUTRAL/MIXED)
+                - sentiment (POSITIVE/NEGATIVE/NEUTRAL)
                 - confidence (HIGH/MEDIUM/LOW)
                 - intent_type (PRAISE/COMPLAINT/SUGGESTION/OBSERVATION)
                 - intent_phrase (str)
@@ -46,7 +46,7 @@ class SentimentAggregationService:
         if not extracted_comments:
             return self._empty_results()
         
-        # Step 1: Count sentiments (handles POSITIVE, NEGATIVE, NEUTRAL, MIXED)
+        # Step 1: Count sentiments (handles POSITIVE, NEGATIVE, NEUTRAL)
         sentiment_counts = self._count_sentiments(extracted_comments)
         
         # Step 2: Calculate percentages
@@ -70,9 +70,8 @@ class SentimentAggregationService:
             "positive": sentiment_percentages.get("positive", 0.0),
             "negative": sentiment_percentages.get("negative", 0.0),
             "neutral": sentiment_percentages.get("neutral", 0.0),
-            "mixed": sentiment_percentages.get("mixed", 0.0),
         }
-        
+
         return {
             "overall": overall_summary,  # Frontend expects this field
             "counts": {
@@ -80,13 +79,11 @@ class SentimentAggregationService:
                 "positive": sentiment_counts.get("positive", 0),
                 "negative": sentiment_counts.get("negative", 0),
                 "neutral": sentiment_counts.get("neutral", 0),
-                "mixed": sentiment_counts.get("mixed", 0),
             },
             "sentiment_summary": {
                 "positive": f"{sentiment_percentages.get('positive', 0):.2f}%",
                 "negative": f"{sentiment_percentages.get('negative', 0):.2f}%",
                 "neutral": f"{sentiment_percentages.get('neutral', 0):.2f}%",
-                "mixed": f"{sentiment_percentages.get('mixed', 0):.2f}%",
             },
             "features": filtered_aspects,  # Use "features" for frontend (alias for aspects)
             "feature_asba": filtered_aspects,  # Keep legacy field name for compatibility
@@ -96,7 +93,7 @@ class SentimentAggregationService:
         }
     
     def _count_sentiments(self, extracted_comments: List[Dict[str, Any]]) -> Dict[str, int]:
-        """Count comments by sentiment type (handles POSITIVE, NEGATIVE, NEUTRAL, MIXED)."""
+        """Count comments by sentiment type (handles POSITIVE, NEGATIVE, NEUTRAL)."""
         counts = Counter()
         for comment in extracted_comments:
             sentiment = comment.get("sentiment", "NEUTRAL").upper()
@@ -105,14 +102,14 @@ class SentimentAggregationService:
                 "POSITIVE": "positive",
                 "NEGATIVE": "negative",
                 "NEUTRAL": "neutral",
-                "MIXED": "mixed"
+                "MIXED": "neutral",
             }
             if sentiment in sentiment_map:
                 counts[sentiment_map[sentiment]] += 1
             else:
                 # Fallback: try lowercase
                 sentiment_lower = sentiment.lower()
-                if sentiment_lower in ["positive", "negative", "neutral", "mixed"]:
+                if sentiment_lower in ["positive", "negative", "neutral"]:
                     counts[sentiment_lower] += 1
                 else:
                     logger.warning(f"Unknown sentiment value: {sentiment}, defaulting to neutral")
@@ -120,15 +117,14 @@ class SentimentAggregationService:
         return dict(counts)
     
     def _calculate_percentages(self, counts: Dict[str, int], total: int) -> Dict[str, float]:
-        """Calculate sentiment percentages (including MIXED)."""
+        """Calculate sentiment percentages."""
         if total == 0:
-            return {"positive": 0.0, "negative": 0.0, "neutral": 0.0, "mixed": 0.0}
-        
+            return {"positive": 0.0, "negative": 0.0, "neutral": 0.0}
+
         return {
             "positive": (counts.get("positive", 0) / total) * 100,
             "negative": (counts.get("negative", 0) / total) * 100,
             "neutral": (counts.get("neutral", 0) / total) * 100,
-            "mixed": (counts.get("mixed", 0) / total) * 100,
         }
     
     def _aggregate_aspects(self, extracted_comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -144,12 +140,12 @@ class SentimentAggregationService:
         # Aspect aggregation structure:
         # aspect_name -> {
         #   "comment_indices": [list of indices],
-        #   "sentiment_counts": {"positive": 0, "negative": 0, "neutral": 0, "mixed": 0},
+        #   "sentiment_counts": {"positive": 0, "negative": 0, "neutral": 0},
         #   "all_keywords": set(),
         # }
         aspect_data = defaultdict(lambda: {
             "comment_indices": [],
-            "sentiment_counts": Counter(),
+            "sentiment_counts": Counter({"positive": 0, "negative": 0, "neutral": 0}),
             "all_keywords": set(),
         })
         
@@ -166,7 +162,7 @@ class SentimentAggregationService:
                 "POSITIVE": "positive",
                 "NEGATIVE": "negative",
                 "NEUTRAL": "neutral",
-                "MIXED": "mixed"
+                "MIXED": "neutral",
             }
             sentiment_key = sentiment_map.get(comment_sentiment, "neutral")
             
@@ -214,14 +210,12 @@ class SentimentAggregationService:
                     "positive": 0.0,
                     "negative": 0.0,
                     "neutral": 100.0,
-                    "mixed": 0.0
                 }
             else:
                 sentiment_percentages = {
                     "positive": round((data['sentiment_counts']['positive'] / total_aspect_mentions) * 100, 1),
                     "negative": round((data['sentiment_counts']['negative'] / total_aspect_mentions) * 100, 1),
                     "neutral": round((data['sentiment_counts']['neutral'] / total_aspect_mentions) * 100, 1),
-                    "mixed": round((data['sentiment_counts']['mixed'] / total_aspect_mentions) * 100, 1),
                 }
             
             # Generate description
@@ -313,11 +307,7 @@ class SentimentAggregationService:
                     positive_keywords[kw_text] += 1
                 elif comment_sentiment == "NEGATIVE":
                     negative_keywords[kw_text] += 1
-                elif comment_sentiment == "MIXED":
-                    # Split MIXED sentiment keywords evenly
-                    positive_keywords[kw_text] += 0.5
-                    negative_keywords[kw_text] += 0.5
-                else:  # NEUTRAL
+                else:  # NEUTRAL (includes former MIXED)
                     neutral_keywords[kw_text] += 1
         
         # Build keyword lists (only include keywords meeting minimum occurrences)
@@ -391,19 +381,17 @@ class SentimentAggregationService:
             desc = f"Users generally have positive feedback about {aspect_name}."
         elif dominant_sentiment == "negative":
             desc = f"Users have concerns and negative feedback about {aspect_name}."
-        elif dominant_sentiment == "mixed":
-            desc = f"Users have mixed feedback about {aspect_name}."
         else:
-            desc = f"Mixed or neutral feedback about {aspect_name} from users."
+            desc = f"Neutral feedback about {aspect_name} from users."
         
         return desc
     
     def _empty_results(self) -> Dict[str, Any]:
         """Return empty results structure."""
         return {
-            "overall": {"positive": 0.0, "negative": 0.0, "neutral": 0.0, "mixed": 0.0},
-            "counts": {"total": 0, "positive": 0, "negative": 0, "neutral": 0, "mixed": 0},
-            "sentiment_summary": {"positive": "0%", "negative": "0%", "neutral": "0%", "mixed": "0%"},
+            "overall": {"positive": 0.0, "negative": 0.0, "neutral": 0.0},
+            "counts": {"total": 0, "positive": 0, "negative": 0, "neutral": 0},
+            "sentiment_summary": {"positive": "0%", "negative": "0%", "neutral": "0%"},
             "features": [],
             "feature_asba": [],
             "positive_keywords": [],

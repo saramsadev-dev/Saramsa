@@ -16,18 +16,18 @@ logger = logging.getLogger(__name__)
 class WorkItemCandidateService:
     """Deterministic work item candidate generator."""
 
-    # Rule Group A thresholds
-    NEGATIVE_CREATE_THRESHOLD = 0.40
+    # Rule Group A thresholds (feature-level negative sentiment)
+    NEGATIVE_CREATE_THRESHOLD = 0.30
     NEGATIVE_PRIORITY_P0 = 0.55
     NEGATIVE_PRIORITY_P1 = 0.40
-    NEGATIVE_MIN_COMMENTS = 20
-
-    # Rule Group B thresholds
-    MIXED_CREATE_THRESHOLD = 0.30
-    MIXED_MIN_COMMENTS = 30
+    NEGATIVE_MIN_COMMENTS = 3
 
     # Rule Group D thresholds
     TAXONOMY_GAP_UNMAPPED_THRESHOLD = 0.15
+
+    # Rule Group E thresholds (overall-level negative sentiment)
+    OVERALL_NEGATIVE_THRESHOLD = 0.25
+    OVERALL_MIN_COMMENTS = 10
 
     # Known bug aspect keys (project-specific in future)
     KNOWN_BUG_ASPECT_KEYS = set()  # TODO(phase-3): load from project config
@@ -37,8 +37,6 @@ class WorkItemCandidateService:
     def generate_candidates(self, analysis: Dict[str, Any], previous_analysis: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Generate deterministic candidates from analysis metrics only."""
         features = self._extract_features(analysis)
-        if not features:
-            return []
 
         project_id = self._get_analysis_field(analysis, "project_id") or self._get_analysis_field(analysis, "projectId")
         analysis_id = self._get_analysis_field(analysis, "analysis_id") or self._get_analysis_field(analysis, "id")
@@ -48,17 +46,17 @@ class WorkItemCandidateService:
         previous_map = self._build_previous_neg_map(previous_analysis)
 
         candidates: List[Dict[str, Any]] = []
+
+        # Rule Group A — Feature-level negative sentiment
         for feature in features:
             aspect_key, metrics = self._feature_metrics(feature)
             if not aspect_key:
                 continue
 
             neg_pct = metrics.get("neg_pct", 0.0)
-            mixed_pct = metrics.get("mixed_pct", 0.0)
             comment_count = metrics.get("comment_count", 0)
             confidence_p95 = metrics.get("confidence_p95")
 
-            # Rule Group A — Negative sentiment
             if neg_pct >= self.NEGATIVE_CREATE_THRESHOLD and comment_count >= self.NEGATIVE_MIN_COMMENTS:
                 priority = self._priority_from_negative(neg_pct)
                 candidate_type = "bug" if aspect_key in self.KNOWN_BUG_ASPECT_KEYS else "improvement"
@@ -70,26 +68,6 @@ class WorkItemCandidateService:
                     aspect_key=aspect_key,
                     candidate_type=candidate_type,
                     priority=priority,
-                    reason={
-                        "neg_pct": neg_pct,
-                        "comment_count": comment_count,
-                        "trend": self._trend_direction(neg_pct, previous_map.get(aspect_key)),
-                        "confidence_p95": confidence_p95,
-                    },
-                    evidence=self._extract_evidence(feature),
-                ))
-                continue
-
-            # Rule Group B — Mixed/ambiguous sentiment
-            if mixed_pct >= self.MIXED_CREATE_THRESHOLD and comment_count >= self.MIXED_MIN_COMMENTS:
-                candidates.append(self._build_candidate(
-                    project_id=project_id,
-                    analysis_id=analysis_id,
-                    taxonomy_id=taxonomy_id,
-                    taxonomy_version=taxonomy_version,
-                    aspect_key=aspect_key,
-                    candidate_type="ux",
-                    priority="P2",
                     reason={
                         "neg_pct": neg_pct,
                         "comment_count": comment_count,
@@ -111,8 +89,34 @@ class WorkItemCandidateService:
                 candidate_type="taxonomy_gap",
                 priority="P2",
                 reason={
-                    "neg_pct": 0.0,
+                    "unmapped_rate": unmapped_rate,
                     "comment_count": self._total_comment_count(analysis),
+                    "trend": "flat",
+                    "confidence_p95": None,
+                },
+                evidence=[],
+            ))
+
+        # Rule Group E — Overall-level negative sentiment
+        # When overall negative is high but few/no feature candidates, create an overall work item
+        overall_neg = self._extract_overall_negative(analysis)
+        total_comments = self._total_comment_count(analysis)
+        feature_candidate_count = sum(1 for c in candidates if c.get("type") not in ("taxonomy_gap",))
+        if (overall_neg >= self.OVERALL_NEGATIVE_THRESHOLD
+                and total_comments >= self.OVERALL_MIN_COMMENTS
+                and feature_candidate_count == 0):
+            priority = self._priority_from_negative(overall_neg)
+            candidates.append(self._build_candidate(
+                project_id=project_id,
+                analysis_id=analysis_id,
+                taxonomy_id=taxonomy_id,
+                taxonomy_version=taxonomy_version,
+                aspect_key="__overall__",
+                candidate_type="improvement",
+                priority=priority,
+                reason={
+                    "neg_pct": overall_neg,
+                    "comment_count": total_comments,
                     "trend": "flat",
                     "confidence_p95": None,
                 },
@@ -188,7 +192,7 @@ class WorkItemCandidateService:
     def _extract_features(self, analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
         if not isinstance(analysis, dict):
             return []
-        for source in (analysis, analysis.get("analysisData")):
+        for source in (analysis, analysis.get("analysisData"), analysis.get("result")):
             if isinstance(source, dict):
                 feats = source.get("features") or source.get("featureasba") or source.get("feature_asba")
                 if isinstance(feats, list):
@@ -203,7 +207,6 @@ class WorkItemCandidateService:
 
         sentiment = feature.get("sentiment") or {}
         neg_pct = self._to_ratio(sentiment.get("negative"))
-        mixed_pct = self._to_ratio(sentiment.get("mixed"))
         comment_count = feature.get("comment_count") or feature.get("commentcount") or feature.get("total_mentions") or 0
         try:
             comment_count = int(comment_count)
@@ -212,27 +215,46 @@ class WorkItemCandidateService:
 
         return aspect_key, {
             "neg_pct": neg_pct,
-            "mixed_pct": mixed_pct,
             "comment_count": comment_count,
             "confidence_p95": None,
         }
 
+    def _extract_overall_negative(self, analysis: Dict[str, Any]) -> float:
+        """Extract the overall negative sentiment percentage (as 0-1 ratio)."""
+        if not isinstance(analysis, dict):
+            return 0.0
+        for source in (analysis, analysis.get("analysisData"), analysis.get("result")):
+            if not isinstance(source, dict):
+                continue
+            overall = source.get("overall")
+            if isinstance(overall, dict):
+                val = overall.get("negative")
+                if val is not None:
+                    return self._to_ratio(val)
+        return 0.0
+
     def _extract_unmapped_rate(self, analysis: Dict[str, Any]) -> Optional[float]:
         if not isinstance(analysis, dict):
             return None
-        for source in (analysis, analysis.get("analysisData")):
-            if isinstance(source, dict):
-                metadata = source.get("pipeline_metadata") or source.get("pipelineMetadata")
-                if isinstance(metadata, dict):
-                    val = metadata.get("unmapped_percentage")
-                    if val is not None:
-                        return float(val)
+        for source in (analysis, analysis.get("analysisData"), analysis.get("result")):
+            if not isinstance(source, dict):
+                continue
+            # Check top-level unmapped_percentage first
+            val = source.get("unmapped_percentage")
+            if val is not None:
+                return float(val)
+            # Then check inside pipeline_metadata
+            metadata = source.get("pipeline_metadata") or source.get("pipelineMetadata")
+            if isinstance(metadata, dict):
+                val = metadata.get("unmapped_percentage")
+                if val is not None:
+                    return float(val)
         return None
 
     def _total_comment_count(self, analysis: Dict[str, Any]) -> int:
         if not isinstance(analysis, dict):
             return 0
-        for source in (analysis, analysis.get("analysisData")):
+        for source in (analysis, analysis.get("analysisData"), analysis.get("result")):
             if isinstance(source, dict):
                 counts = source.get("counts")
                 if isinstance(counts, dict) and counts.get("total") is not None:
