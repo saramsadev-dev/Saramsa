@@ -3,7 +3,7 @@ param serverfarms_ASP_saramsa_858d_externalid string = '/subscriptions/2c1142e4-
 
 resource sites_saramsa_backend_name_resource 'Microsoft.Web/sites@2024-11-01' = {
   name: sites_saramsa_backend_name
-  location: 'West US 2'
+  location: 'Central US'
   tags: {
     'hidden-link: /app-insights-resource-id': '/subscriptions/2c1142e4-ebe1-4ee9-9f3a-bf71506c8668/resourceGroups/saramsa/providers/microsoft.insights/components/saramsa-backend'
   }
@@ -12,12 +12,12 @@ resource sites_saramsa_backend_name_resource 'Microsoft.Web/sites@2024-11-01' = 
     enabled: true
     hostNameSslStates: [
       {
-        name: '${sites_saramsa_backend_name}-hcgffgadgefca5fm.westus2-01.azurewebsites.net'
+        name: '${sites_saramsa_backend_name}-h6b6edbjbcawbnee.centralus-01.azurewebsites.net'
         sslState: 'Disabled'
         hostType: 'Standard'
       }
       {
-        name: '${sites_saramsa_backend_name}-hcgffgadgefca5fm.scm.westus2-01.azurewebsites.net'
+        name: '${sites_saramsa_backend_name}-h6b6edbjbcawbnee.scm.centralus-01.azurewebsites.net'
         sslState: 'Disabled'
         hostType: 'Repository'
       }
@@ -66,7 +66,7 @@ resource sites_saramsa_backend_name_resource 'Microsoft.Web/sites@2024-11-01' = 
 resource sites_saramsa_backend_name_ftp 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: 'ftp'
-  location: 'West US 2'
+  location: 'Central US'
   tags: {
     'hidden-link: /app-insights-resource-id': '/subscriptions/2c1142e4-ebe1-4ee9-9f3a-bf71506c8668/resourceGroups/saramsa/providers/microsoft.insights/components/saramsa-backend'
   }
@@ -78,7 +78,7 @@ resource sites_saramsa_backend_name_ftp 'Microsoft.Web/sites/basicPublishingCred
 resource sites_saramsa_backend_name_scm 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: 'scm'
-  location: 'West US 2'
+  location: 'Central US'
   tags: {
     'hidden-link: /app-insights-resource-id': '/subscriptions/2c1142e4-ebe1-4ee9-9f3a-bf71506c8668/resourceGroups/saramsa/providers/microsoft.insights/components/saramsa-backend'
   }
@@ -90,7 +90,7 @@ resource sites_saramsa_backend_name_scm 'Microsoft.Web/sites/basicPublishingCred
 resource sites_saramsa_backend_name_web 'Microsoft.Web/sites/config@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: 'web'
-  location: 'West US 2'
+  location: 'Central US'
   tags: {
     'hidden-link: /app-insights-resource-id': '/subscriptions/2c1142e4-ebe1-4ee9-9f3a-bf71506c8668/resourceGroups/saramsa/providers/microsoft.insights/components/saramsa-backend'
   }
@@ -172,7 +172,7 @@ resource sites_saramsa_backend_name_web 'Microsoft.Web/sites/config@2024-11-01' 
 resource sites_saramsa_backend_name_14e55f63_0dec_4733_80c4_011bacc66123 'Microsoft.Web/sites/deployments@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: '14e55f63-0dec-4733-80c4-011bacc66123'
-  location: 'West US 2'
+  location: 'Central US'
   properties: {
     status: 4
     author_email: 'N/A'
@@ -188,7 +188,7 @@ resource sites_saramsa_backend_name_14e55f63_0dec_4733_80c4_011bacc66123 'Micros
 resource sites_saramsa_backend_name_2fb12cf1_1fdc_412a_963b_fbc0823f3771 'Microsoft.Web/sites/deployments@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: '2fb12cf1-1fdc-412a-963b-fbc0823f3771'
-  location: 'West US 2'
+  location: 'Central US'
   properties: {
     status: 4
     author_email: 'N/A'
@@ -204,7 +204,7 @@ resource sites_saramsa_backend_name_2fb12cf1_1fdc_412a_963b_fbc0823f3771 'Micros
 resource sites_saramsa_backend_name_84d9b76a_d02a_4c98_8d0d_046d9b2a99a7 'Microsoft.Web/sites/deployments@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: '84d9b76a-d02a-4c98-8d0d-046d9b2a99a7'
-  location: 'West US 2'
+  location: 'Central US'
   properties: {
     status: 4
     author_email: 'N/A'
@@ -220,7 +220,7 @@ resource sites_saramsa_backend_name_84d9b76a_d02a_4c98_8d0d_046d9b2a99a7 'Micros
 resource sites_saramsa_backend_name_90ca560c_7cb3_45ba_b276_d4b2176c1b64 'Microsoft.Web/sites/deployments@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: '90ca560c-7cb3-45ba-b276-d4b2176c1b64'
-  location: 'West US 2'
+  location: 'Central US'
   properties: {
     status: 4
     author_email: 'N/A'
@@ -236,7 +236,7 @@ resource sites_saramsa_backend_name_90ca560c_7cb3_45ba_b276_d4b2176c1b64 'Micros
 resource sites_saramsa_backend_name_b749e24e_f836_42f5_ab75_9a8b5907da45 'Microsoft.Web/sites/deployments@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: 'b749e24e-f836-42f5-ab75-9a8b5907da45'
-  location: 'West US 2'
+  location: 'Central US'
   properties: {
     status: 4
     author_email: 'N/A'
@@ -252,7 +252,7 @@ resource sites_saramsa_backend_name_b749e24e_f836_42f5_ab75_9a8b5907da45 'Micros
 resource sites_saramsa_backend_name_d6ba2c3d_be49_4bc8_9f97_0e2128b78126 'Microsoft.Web/sites/deployments@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: 'd6ba2c3d-be49-4bc8-9f97-0e2128b78126'
-  location: 'West US 2'
+  location: 'Central US'
   properties: {
     status: 4
     author_email: 'N/A'
@@ -268,7 +268,7 @@ resource sites_saramsa_backend_name_d6ba2c3d_be49_4bc8_9f97_0e2128b78126 'Micros
 resource sites_saramsa_backend_name_f6d818f3_5e05_4c05_809f_37a10dacf0b9 'Microsoft.Web/sites/deployments@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
   name: 'f6d818f3-5e05-4c05-809f-37a10dacf0b9'
-  location: 'West US 2'
+  location: 'Central US'
   properties: {
     status: 4
     author_email: 'N/A'
@@ -281,10 +281,10 @@ resource sites_saramsa_backend_name_f6d818f3_5e05_4c05_809f_37a10dacf0b9 'Micros
   }
 }
 
-resource sites_saramsa_backend_name_sites_saramsa_backend_name_hcgffgadgefca5fm_westus2_01_azurewebsites_net 'Microsoft.Web/sites/hostNameBindings@2024-11-01' = {
+resource sites_saramsa_backend_name_sites_saramsa_backend_name_h6b6edbjbcawbnee_centralus_01_azurewebsites_net 'Microsoft.Web/sites/hostNameBindings@2024-11-01' = {
   parent: sites_saramsa_backend_name_resource
-  name: '${sites_saramsa_backend_name}-hcgffgadgefca5fm.westus2-01.azurewebsites.net'
-  location: 'West US 2'
+  name: '${sites_saramsa_backend_name}-h6b6edbjbcawbnee.centralus-01.azurewebsites.net'
+  location: 'Central US'
   properties: {
     siteName: 'saramsa-backend'
     hostNameType: 'Verified'

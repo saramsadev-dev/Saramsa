@@ -12,7 +12,17 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here-change-in-production')
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
+# Backend's own URL in production (e.g. https://saramsa-backend-xxx.centralus-01.azurewebsites.net).
+# When set, this host is added to ALLOWED_HOSTS so Azure can route to the app.
+BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', '').rstrip('/')
+
+_allowed = os.getenv("ALLOWED_HOSTS", "*").split(",")
+if BACKEND_BASE_URL:
+    from urllib.parse import urlparse
+    _backend_host = urlparse(BACKEND_BASE_URL).netloc or BACKEND_BASE_URL
+    if _backend_host and _backend_host not in _allowed and '*' not in _allowed:
+        _allowed.append(_backend_host)
+ALLOWED_HOSTS = _allowed
 
 APPLICATIONINSIGHTS_CONNECTION_STRING = os.getenv(
     'APPLICATIONINSIGHTS_CONNECTION_STRING',
@@ -284,10 +294,14 @@ CORS_ALLOWED_ORIGINS = [
     'https://saramsa-chi.vercel.app',
     'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
     'http://localhost:3000',
-    'http://localhost:3001',      
+    'http://localhost:3001',
     'http://localhost:8000',
     'http://localhost',
 ]
+# Extra CORS origins from env (comma-separated), e.g. production frontend URL
+_cors_extra = os.getenv('CORS_EXTRA_ORIGINS', '')
+if _cors_extra:
+    CORS_ALLOWED_ORIGINS = list(CORS_ALLOWED_ORIGINS) + [o.strip() for o in _cors_extra.split(',') if o.strip()]
 
 CORS_ALLOW_METHODS = [
     'GET',
@@ -318,6 +332,10 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://localhost',
 ]
+# Extra CSRF origins from env (comma-separated), e.g. production frontend URL
+_csrf_extra = os.getenv('CSRF_EXTRA_ORIGINS', '')
+if _csrf_extra:
+    CSRF_TRUSTED_ORIGINS = list(CSRF_TRUSTED_ORIGINS) + [o.strip() for o in _csrf_extra.split(',') if o.strip()]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

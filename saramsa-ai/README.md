@@ -112,9 +112,12 @@ npm run lint         # Run ESLint
 
 ### Environment Variables
 
+**Local:**
 ```env
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
 ```
+
+**Production (Azure):** See [PRODUCTION-URLS.md](../PRODUCTION-URLS.md) for the backend URL. Set `NEXT_PUBLIC_API_URL` to `https://saramsa-backend-h6b6edbjbcawbnee.centralus-01.azurewebsites.net/api` for production builds.
 
 ## Security Features
 
