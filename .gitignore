@@ -82,6 +82,9 @@ dist/
 *.tmp
 *.temp
 
+# Local JSON DB (temporary Cosmos replacement)
+backend/local_db/
+
 # OS generated files
 .DS_Store
 .DS_Store?

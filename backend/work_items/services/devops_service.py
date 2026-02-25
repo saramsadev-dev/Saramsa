@@ -505,12 +505,14 @@ class DevOpsService:
             item_type = self._map_candidate_type(c.get("type"), process_template)
             priority = self._map_candidate_priority(c.get("priority"))
             title, description = self._template_text(c, label)
+            # Use human-readable tag, not internal keys like __taxonomy__
+            tag = label.lower().replace(" ", "-") if label else "customer-feedback"
             work_items.append({
                 "type": item_type,
                 "title": title,
                 "description": description,
                 "priority": priority,
-                "tags": [aspect_key, "customer-feedback"] if aspect_key else ["customer-feedback"],
+                "tags": [tag, "customer-feedback"],
                 "acceptance_criteria": "Define acceptance criteria based on analysis metrics",
                 "business_value": "Reduce negative feedback and improve customer satisfaction",
                 "effort_estimate": "3",
@@ -525,6 +527,9 @@ class DevOpsService:
             return work_items
         llm_map = {str(i.get("candidate_id")): i for i in llm_items if isinstance(i, dict) and i.get("candidate_id")}
         for item in work_items:
+            # Skip LLM phrasing for special items — template text is already good
+            if item.get("feature_area") in ("Taxonomy Coverage", "Overall Customer Satisfaction"):
+                continue
             candidate_id = item.get("candidate_id")
             if candidate_id in llm_map:
                 llm_item = llm_map[candidate_id]
@@ -588,7 +593,9 @@ class DevOpsService:
         if not aspect_key:
             return "General"
         if aspect_key == "__taxonomy__":
-            return "Taxonomy"
+            return "Taxonomy Coverage"
+        if aspect_key == "__overall__":
+            return "Overall Customer Satisfaction"
         return str(aspect_key).replace("_", " ").title()
 
     def _extract_aspect_labels(self, analysis_data: Dict[str, Any]) -> Dict[str, str]:
@@ -615,14 +622,33 @@ class DevOpsService:
     @staticmethod
     def _template_text(candidate: Dict[str, Any], label: str) -> Tuple[str, str]:
         ctype = (candidate.get("type") or "").lower()
+        reason = candidate.get("reason") or {}
         if ctype == "taxonomy_gap":
+            unmapped_rate = reason.get("unmapped_rate", reason.get("neg_pct", 0))
+            comment_count = reason.get("comment_count", 0)
+            pct_str = f"{unmapped_rate:.0%}" if isinstance(unmapped_rate, float) else str(unmapped_rate)
             return (
-                "Review taxonomy gaps in customer feedback",
-                "Unmapped feedback indicates missing or unclear taxonomy coverage. Review and update taxonomy as needed.",
+                "Expand feedback taxonomy to capture uncategorized themes",
+                f"{pct_str} of {comment_count} comments could not be mapped to existing categories. "
+                "Review the unmapped feedback, identify recurring themes, and add new categories to the taxonomy.",
             )
+        aspect_key = candidate.get("aspect_key", "")
+        if aspect_key == "__overall__":
+            neg_pct = reason.get("neg_pct", 0)
+            comment_count = reason.get("comment_count", 0)
+            pct_str = f"{neg_pct:.0%}" if isinstance(neg_pct, float) else str(neg_pct)
+            return (
+                "Investigate high negative sentiment in customer feedback",
+                f"Overall analysis of {comment_count} comments shows {pct_str} negative sentiment. "
+                "Review the top negative feedback themes, identify root causes, and create targeted improvement plans.",
+            )
+        neg_pct = reason.get("neg_pct", 0)
+        comment_count = reason.get("comment_count", 0)
+        pct_str = f"{neg_pct:.0%}" if isinstance(neg_pct, float) else str(neg_pct)
         return (
             f"Improve {label} based on customer feedback",
-            f"Address negative or mixed feedback related to {label}. Prioritize fixes based on customer impact.",
+            f"{label} has {pct_str} negative sentiment across {comment_count} comments. "
+            f"Investigate the top concerns and prioritize fixes based on customer impact.",
         )
 
 

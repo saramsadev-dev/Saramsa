@@ -25,7 +25,6 @@ class Sentiment(str, Enum):
     POSITIVE = "POSITIVE"
     NEGATIVE = "NEGATIVE"
     NEUTRAL = "NEUTRAL"
-    MIXED = "MIXED"
 
 
 class Confidence(str, Enum):
@@ -52,7 +51,7 @@ class CommentExtraction(TypedDict):
     All enums must match exactly (case-sensitive).
     """
     comment_id: int  # Required: integer index (0-based)
-    sentiment: Literal["POSITIVE", "NEGATIVE", "NEUTRAL", "MIXED"]  # Required: exact enum
+    sentiment: Literal["POSITIVE", "NEGATIVE", "NEUTRAL"]  # Required: exact enum
     confidence: Literal["HIGH", "MEDIUM", "LOW"]  # Required: exact enum
     intent_type: Literal["PRAISE", "COMPLAINT", "SUGGESTION", "OBSERVATION"]  # Required: exact enum
     intent_phrase: str  # Required: string (can be empty string but must be present)
@@ -177,7 +176,8 @@ def normalize_comment_extraction(data: dict, comment_index: int = None) -> dict:
             "POS": "POSITIVE",
             "NEG": "NEGATIVE",
             "NEU": "NEUTRAL",
-            "MIX": "MIXED",
+            "MIX": "NEUTRAL",
+            "MIXED": "NEUTRAL",
             "SUGGESTION": "NEUTRAL"
         }
         if sentiment_raw in sentiment_map:
@@ -256,7 +256,7 @@ SCHEMA_VERSION = "1.0"
 # Schema description for prompts (JSON string)
 SCHEMA_DESCRIPTION = """{
   "comment_id": number (required, 0-based index),
-  "sentiment": "POSITIVE" | "NEGATIVE" | "NEUTRAL" | "MIXED" (required, exact case),
+  "sentiment": "POSITIVE" | "NEGATIVE" | "NEUTRAL" (required, exact case),
   "confidence": "HIGH" | "MEDIUM" | "LOW" (required, exact case),
   "intent_type": "PRAISE" | "COMPLAINT" | "SUGGESTION" | "OBSERVATION" (required, exact case),
   "intent_phrase": string (required, can be empty),

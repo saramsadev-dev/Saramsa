@@ -1,15 +1,15 @@
 """
 Local Sentiment Service for Saramsa Local ML Pipeline
 
-This service provides singleton-based sentiment classification using the 
-cardiffnlp/twitter-roberta-base-sentiment-latest model from transformers. 
+This service provides singleton-based sentiment classification using the
+nlptown/bert-base-multilingual-uncased-sentiment model from transformers.
 It supports both single text and batch processing with confidence scoring.
 
 Key Features:
 - Singleton pattern for model instance management
-- cardiffnlp/twitter-roberta-base-sentiment-latest model
-- Confidence level calculation (HIGH/MEDIUM/LOW/MIXED)
-- Twitter-specific text preprocessing
+- nlptown/bert-base-multilingual-uncased-sentiment model (trained on 629K product reviews)
+- 5-star output mapped to 3-class sentiment (POSITIVE/NEGATIVE/NEUTRAL)
+- Confidence level calculation (HIGH/MEDIUM/LOW)
 - Batch processing support for efficiency
 - Comprehensive error handling and logging
 """
@@ -34,7 +34,7 @@ class SentimentResult:
     Data class for sentiment classification results.
     
     Attributes:
-        sentiment: Classified sentiment (POSITIVE, NEGATIVE, NEUTRAL, MIXED)
+        sentiment: Classified sentiment (POSITIVE, NEGATIVE, NEUTRAL)
         confidence: Confidence level (HIGH, MEDIUM, LOW)
         raw_scores: Dictionary of raw probability scores for each class
         processing_time: Time taken for classification in seconds
@@ -66,35 +66,44 @@ class SingletonMeta(type):
 
 class LocalSentimentService(metaclass=SingletonMeta):
     """
-    Singleton service for sentiment classification using cardiffnlp/twitter-roberta-base-sentiment-latest.
-    
-    This service provides efficient sentiment analysis with confidence scoring
-    and Twitter-specific text preprocessing capabilities.
-    
+    Singleton service for sentiment classification using nlptown/bert-base-multilingual-uncased-sentiment.
+
+    This service provides efficient sentiment analysis with confidence scoring,
+    optimized for customer feedback and product review text.
+
     Model Specifications:
-    - Model: cardiffnlp/twitter-roberta-base-sentiment-latest
-    - Training: 124M tweets (Jan 2018 - Dec 2021) + TweetEval benchmark
-    - Classes: 0=Negative, 1=Neutral, 2=Positive
-    - Preprocessing: Handles @mentions and URLs appropriately
+    - Model: nlptown/bert-base-multilingual-uncased-sentiment
+    - Training: 629K product reviews (English, German, French, Dutch, Italian, Spanish)
+    - Classes: 5 stars (mapped to POSITIVE/NEGATIVE/NEUTRAL)
+    - Accuracy: 95% off-by-1 on English product reviews
     """
-    
-    MODEL_NAME = "cardiffnlp/twitter-roberta-base-sentiment-latest"
-    
+
+    MODEL_NAME = "nlptown/bert-base-multilingual-uncased-sentiment"
+
     # Confidence thresholds
     HIGH_CONFIDENCE_THRESHOLD = 0.5
     MEDIUM_CONFIDENCE_THRESHOLD = 0.25
     MIXED_SENTIMENT_THRESHOLD = 0.15
-    
+
     # Batch processing constants
     DEFAULT_BATCH_SIZE = 32
     MAX_BATCH_SIZE = 64
     MIN_BATCH_SIZE = 8
-    
-    # Label mapping from model output to schema
+
+    # Star-to-sentiment mapping: 1-2 stars = NEGATIVE, 3 stars = NEUTRAL, 4-5 stars = POSITIVE
+    STAR_TO_SENTIMENT = {
+        '1 star': 'NEGATIVE',
+        '2 stars': 'NEGATIVE',
+        '3 stars': 'NEUTRAL',
+        '4 stars': 'POSITIVE',
+        '5 stars': 'POSITIVE',
+    }
+
+    # Label mapping for raw_scores output (collapsed to 3-class)
     LABEL_MAPPING = {
-        'positive': 'POSITIVE',
-        'negative': 'NEGATIVE', 
-        'neutral': 'NEUTRAL'
+        'POSITIVE': 'POSITIVE',
+        'NEGATIVE': 'NEGATIVE',
+        'NEUTRAL': 'NEUTRAL',
     }
     
     def __init__(self):
@@ -119,57 +128,46 @@ class LocalSentimentService(metaclass=SingletonMeta):
     def _initialize_model(self) -> None:
         """
         Load the sentiment classification model with comprehensive error handling.
-        
+
         Raises:
             RuntimeError: If model loading fails
         """
         try:
             logger.info(f"Loading sentiment model: {self.MODEL_NAME}")
-            
-            # Set device preference (CPU for compatibility, GPU if available)
+
+            # Set device preference (GPU if available)
             device = 0 if torch.cuda.is_available() else -1
             device_name = "cuda" if device == 0 else "cpu"
             logger.info(f"Using device: {device_name}")
-            
+
             # Load tokenizer and model
             self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
             model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
-            
+
             # Create pipeline for efficient inference
             self._pipeline = pipeline(
                 "sentiment-analysis",
                 model=model,
                 tokenizer=self._tokenizer,
                 device=device,
-                return_all_scores=True,  # Get scores for all classes
-                top_k=None  # Return all scores
+                top_k=None,  # Return all 5 star scores
             )
-            
+
             # Test model with a simple classification
             test_result = self._pipeline("test")
             if not test_result or not isinstance(test_result, list):
                 raise RuntimeError("Model test failed - unexpected output format")
-            
-            # With return_all_scores=True and top_k=None, we get a list of lists
-            # Each inner list contains all class scores for one input
+
             first_result = test_result[0]
-            
-            if not isinstance(first_result, list) or len(first_result) < 3:
-                raise RuntimeError("Model test failed - expected list of 3 sentiment classes")
-            
-            # Verify each result has label and score
-            for result in first_result:
-                if not isinstance(result, dict) or 'label' not in result or 'score' not in result:
-                    logger.error(f"Invalid result format: {result}")
-                    raise RuntimeError("Model test failed - invalid result format")
-            
+            if not isinstance(first_result, list) or len(first_result) < 5:
+                raise RuntimeError("Model test failed - expected list of 5 star classes")
+
             logger.info(f"Model test passed. Sample result: {first_result[0]}")
-            
             logger.info(
                 f"Successfully loaded {self.MODEL_NAME} "
-                f"(device: {device_name}, classes: {len(test_result[0])})"
+                f"(device: {device_name}, classes: {len(first_result)})"
             )
-            
+
         except Exception as e:
             error_msg = f"Failed to load sentiment model {self.MODEL_NAME}: {str(e)}"
             logger.error(error_msg)
@@ -177,71 +175,71 @@ class LocalSentimentService(metaclass=SingletonMeta):
     
     def _preprocess_text(self, text: str) -> str:
         """
-        Preprocess text for Twitter-specific sentiment analysis.
-        
-        The cardiffnlp model was trained on Twitter data, so we apply
-        Twitter-specific preprocessing to improve accuracy.
-        
+        Preprocess text for sentiment analysis.
+
+        Minimal preprocessing — the nlptown model was trained on real product
+        reviews and handles natural text well without heavy cleaning.
+
         Args:
             text: Raw input text
-            
+
         Returns:
             Preprocessed text suitable for the model
         """
         if not text or not text.strip():
             return ""
-        
-        # Start with the original text
-        processed_text = text.strip()
-        
-        # Handle @mentions - replace with @user (common Twitter preprocessing)
-        processed_text = re.sub(r'@\w+', '@user', processed_text)
-        
-        # Handle URLs - replace with http (common Twitter preprocessing)
-        processed_text = re.sub(r'http\S+|www\S+|https\S+', 'http', processed_text, flags=re.MULTILINE)
-        
+
         # Normalize whitespace
-        processed_text = re.sub(r'\s+', ' ', processed_text).strip()
-        
-        # Handle empty result
+        processed_text = re.sub(r'\s+', ' ', text.strip())
+
         if not processed_text:
-            processed_text = "neutral text"  # Fallback for empty preprocessed text
-        
+            processed_text = "neutral text"
+
         return processed_text
     
+    def _collapse_star_scores(self, scores: List[Dict[str, float]]) -> Dict[str, float]:
+        """
+        Collapse 5-star probabilities into 3-class sentiment probabilities.
+
+        Mapping: 1-2 stars → NEGATIVE, 3 stars → NEUTRAL, 4-5 stars → POSITIVE
+        """
+        collapsed = {'POSITIVE': 0.0, 'NEGATIVE': 0.0, 'NEUTRAL': 0.0}
+        for item in scores:
+            label = item['label']
+            score = item['score']
+            sentiment = self.STAR_TO_SENTIMENT.get(label)
+            if sentiment:
+                collapsed[sentiment] += score
+        return collapsed
+
     def _calculate_confidence(self, scores: List[Dict[str, float]]) -> Tuple[str, str]:
         """
-        Calculate confidence level and detect mixed sentiment based on probability scores.
-        
+        Calculate confidence level from 5-star scores collapsed to 3-class sentiment.
+
         Args:
-            scores: List of score dictionaries from the model (all classes)
-            
+            scores: List of score dictionaries from the model (5 star classes)
+
         Returns:
             Tuple of (sentiment, confidence_level)
         """
-        if not scores or len(scores) < 3:
+        if not scores or len(scores) < 5:
             return "NEUTRAL", "LOW"
-        
-        # Extract probabilities and sort by score
-        sorted_scores = sorted(scores, key=lambda x: x['score'], reverse=True)
-        
-        top_score = sorted_scores[0]
-        second_score = sorted_scores[1]
-        
-        top_prob = top_score['score']
-        second_prob = second_score['score']
-        
-        # Get the predicted sentiment
-        predicted_label = top_score['label']
-        sentiment = self.LABEL_MAPPING.get(predicted_label, 'NEUTRAL')
-        
+
+        # Collapse 5 stars → 3 classes
+        collapsed = self._collapse_star_scores(scores)
+
+        # Find top and second sentiment
+        sorted_sentiments = sorted(collapsed.items(), key=lambda x: x[1], reverse=True)
+        top_sentiment, top_prob = sorted_sentiments[0]
+        _, second_prob = sorted_sentiments[1]
+
         # Calculate confidence difference
         confidence_diff = top_prob - second_prob
-        
-        # Check for mixed sentiment (top two probabilities are very close)
+
+        # When top two probabilities are very close, classify as NEUTRAL with LOW confidence
         if confidence_diff < self.MIXED_SENTIMENT_THRESHOLD:
-            return "MIXED", "LOW"
-        
+            return "NEUTRAL", "LOW"
+
         # Determine confidence level based on difference
         if confidence_diff > self.HIGH_CONFIDENCE_THRESHOLD:
             confidence = "HIGH"
@@ -249,8 +247,8 @@ class LocalSentimentService(metaclass=SingletonMeta):
             confidence = "MEDIUM"
         else:
             confidence = "LOW"
-        
-        return sentiment, confidence
+
+        return top_sentiment, confidence
     
     def classify_sentiment(self, text: str) -> SentimentResult:
         """
@@ -284,19 +282,16 @@ class LocalSentimentService(metaclass=SingletonMeta):
             if not result or not isinstance(result, list) or not result[0]:
                 raise RuntimeError("Unexpected model output format")
             
-            # Extract the scores for all classes
+            # Extract the scores for all classes (5 star ratings)
             scores = result[0]  # First (and only) result for single text
             if not isinstance(scores, list):
                 raise RuntimeError("Expected list of scores for all classes")
-            
+
             # Calculate sentiment and confidence
             sentiment, confidence = self._calculate_confidence(scores)
-            
-            # Create raw scores dictionary
-            raw_scores = {
-                self.LABEL_MAPPING.get(score['label'], score['label']): score['score']
-                for score in scores
-            }
+
+            # Create raw scores dictionary (collapsed to 3-class)
+            raw_scores = self._collapse_star_scores(scores)
             
             processing_time = time.time() - start_time
             
@@ -384,15 +379,13 @@ class LocalSentimentService(metaclass=SingletonMeta):
             
             for i, original_text in enumerate(texts):
                 if i in valid_indices:
-                    # Process valid text result
-                    scores = all_results[valid_result_idx]  # This is a list of score dicts
+                    # Process valid text result (5-star scores)
+                    scores = all_results[valid_result_idx]
                     sentiment, confidence = self._calculate_confidence(scores)
-                    
-                    raw_scores = {
-                        self.LABEL_MAPPING.get(score['label'], score['label']): score['score']
-                        for score in scores
-                    }
-                    
+
+                    # Collapse to 3-class for raw_scores
+                    raw_scores = self._collapse_star_scores(scores)
+
                     results.append(SentimentResult(
                         sentiment=sentiment,
                         confidence=confidence,

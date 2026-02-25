@@ -25,7 +25,7 @@ You MUST follow these rules:
 - Be precise and conservative.
 
 Allowed values:
-- sentiment: POSITIVE | NEGATIVE | NEUTRAL | MIXED
+- sentiment: POSITIVE | NEGATIVE | NEUTRAL
 - confidence: HIGH | MEDIUM | LOW
 - intent_type: PRAISE | COMPLAINT | SUGGESTION | OBSERVATION
 
@@ -40,7 +40,7 @@ Return ONLY valid JSON in the following format:
 [
   {{
     "comment_id": number,
-    "sentiment": "POSITIVE | NEGATIVE | NEUTRAL | MIXED",
+    "sentiment": "POSITIVE | NEGATIVE | NEUTRAL",
     "confidence": "HIGH | MEDIUM | LOW",
     "intent_type": "PRAISE | COMPLAINT | SUGGESTION | OBSERVATION",
     "intent_phrase": "short neutral phrase describing what the user is talking about",

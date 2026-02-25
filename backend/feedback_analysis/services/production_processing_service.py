@@ -35,7 +35,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from collections import defaultdict, Counter
 
-from aiCore.services.similarity_aspect_service import get_similarity_aspect_service
+from aiCore.services.aspect_service_factory import get_aspect_service
 from aiCore.services.local_sentiment_service import LocalSentimentService, SentimentResult
 from feedback_analysis.services.narration_service import get_narration_service
 from feedback_analysis.services.aspect_taxonomy_service import get_aspect_taxonomy_service
@@ -88,7 +88,7 @@ class ProductionProcessingService:
     """
     
     def __init__(self):
-        self.similarity_service = get_similarity_aspect_service()
+        self.aspect_service = get_aspect_service()
         self.sentiment_service = LocalSentimentService()
         self.taxonomy_service = get_aspect_taxonomy_service()
         logger.info("ProductionProcessingService initialized with bi-encoder similarity and frozen taxonomies")
@@ -192,7 +192,7 @@ class ProductionProcessingService:
         
         # Step 1: Bi-encoder similarity classification
         step_start = time.time()
-        similarity_results = self.similarity_service.classify_aspects(comments, aspects, run_id)
+        similarity_results = self.aspect_service.classify_aspects(comments, aspects, run_id)
         performance_metrics["aspect_classification_time"] = time.time() - step_start
         
         # Step 2: Sentiment classification
@@ -256,7 +256,7 @@ class ProductionProcessingService:
             aggregated_stats=aggregated_stats,
             processing_time=total_time,
             model_info={
-                "aspect_model": self.similarity_service.embedding_service.MODEL_NAME,
+                "aspect_model": self.aspect_service.MODEL_NAME,
                 "sentiment_model": self.sentiment_service.MODEL_NAME,
                 "processing_method": "production_bi_encoder_similarity_v2",
                 "taxonomy_info": taxonomy_info
@@ -462,13 +462,11 @@ class ProductionProcessingService:
             if not name or total == 0:
                 continue
             neg_pct = (sentiment_counts.get("NEGATIVE", 0) / total) if total else 0.0
-            mixed_pct = (sentiment_counts.get("MIXED", 0) / total) if total else 0.0
             features.append({
                 "aspect_key": self._normalize_aspect_key(name),
                 "metrics": {
                     "comment_count": total,
                     "neg_pct": neg_pct,
-                    "mixed_pct": mixed_pct,
                 },
                 "keywords": (feature.get("keywords") or [])[:5],
             })

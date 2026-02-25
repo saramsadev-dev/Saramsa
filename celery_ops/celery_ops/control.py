@@ -18,15 +18,34 @@ from .store import OpsStore
 logger = logging.getLogger(__name__)
 
 
+_CANCEL_KEY_PREFIX = "saramsa:cancelled:"
+_CANCEL_TTL = 3600  # 1 hour
+
+
 def revoke_task(app: Celery, task_id: str, terminate: bool = True) -> dict[str, Any]:
     """
     Best-effort task cancel (revoke).
 
     Cooperative and non-guaranteed: workers must honour revoke.
     terminate=True sends SIGTERM; worker must support it.
+
+    Also sets a Redis flag so the worker can detect cancellation
+    cooperatively (required on Windows where SIGTERM is ignored).
     """
     try:
         app.control.revoke(task_id, terminate=terminate, signal="SIGTERM")
+
+        # Set Redis cancellation flag for cooperative cancellation
+        # (Windows solo pool ignores SIGTERM, so workers poll this key)
+        try:
+            broker_url = app.conf.broker_url or "redis://localhost:6379/0"
+            import redis
+            r = redis.Redis.from_url(broker_url, decode_responses=True, socket_connect_timeout=2)
+            r.setex(f"{_CANCEL_KEY_PREFIX}{task_id}", _CANCEL_TTL, "1")
+            logger.info("Celery Ops: set cancellation flag in Redis for %s", task_id)
+        except Exception as redis_err:
+            logger.warning("Celery Ops: could not set Redis cancel flag: %s", redis_err)
+
         return {"ok": True, "task_id": task_id, "message": "Revoke sent (best-effort, cooperative)"}
     except Exception as e:
         logger.warning("Celery Ops: revoke %s failed: %s", task_id, e)
