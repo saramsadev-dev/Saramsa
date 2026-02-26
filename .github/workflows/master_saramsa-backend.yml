@@ -10,9 +10,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: read
 
     defaults:
@@ -28,12 +29,16 @@ jobs:
           python-version: '3.11'
 
       - name: Cache virtualenv
+        id: cache-venv
         uses: actions/cache@v4
         with:
           path: backend/.venv
           key: venv-backend-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            venv-backend-
 
       - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           python -m venv .venv
           source .venv/bin/activate
@@ -58,27 +63,7 @@ jobs:
         run: |
           mkdir -p ../artifact
           rm -f ../artifact/backend.zip
-          zip -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
-
-      - name: Upload backend artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-build
-          path: artifact/backend.zip
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-build
-          path: artifact
+          zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
 
       - name: Login to Azure
         uses: azure/login@v2
