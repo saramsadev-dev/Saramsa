@@ -63,7 +63,7 @@ jobs:
       - name: Build Celery Ops React UI
         working-directory: celery_ops/celery_ops/ui/react
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Create deployment bundle
