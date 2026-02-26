@@ -189,10 +189,10 @@ export default function ProjectDashboardPage() {
               Back to Projects
             </button>
             <button
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/projects")}
               className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
-              Go to Dashboard
+              Go to Projects
             </button>
           </div>
         </div>
@@ -227,17 +227,6 @@ export default function ProjectDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Project Header */}
-      {/* <div className="flex items-center gap-4">
-        <button
-          onClick={() => router.push("/projects")}
-          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-          title="Back to Projects"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Projects
-        </button>
-      </div> */}
       {/* Dashboard Content */}
       {EnhancedDashboard}
     </div>
