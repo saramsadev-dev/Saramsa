@@ -22,7 +22,7 @@ if os.path.isdir(celery_ops_dir):
 # Start Celery worker as a subprocess
 logger.info("Starting Celery worker...")
 celery_proc = subprocess.Popen(
-    [sys.executable, "-m", "celery", "-A", "apis", "worker", "--loglevel=info", "--concurrency=2"],
+    [sys.executable, "-m", "celery", "-A", "apis", "worker", "--loglevel=info", "--concurrency=2", "-E"],
     cwd=workdir
 )
 
