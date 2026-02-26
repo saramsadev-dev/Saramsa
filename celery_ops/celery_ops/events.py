@@ -175,15 +175,23 @@ class TaskEventConsumer:
             "task-retried": wrap("task-retried", self._handle_retried),
         }
 
-        try:
-            conn = self._app.connection_for_read().clone()
-            conn.ensure_connection(max_retries=3)
-            logger.info("Celery Ops: event consumer connected to broker")
-            recv = EventReceiver(
-                conn,
-                handlers=handlers,
-                app=self._app,
-            )
-            recv.capture(limit=None, timeout=None, wakeup=True)
-        except Exception as e:
-            logger.warning("Celery Ops: event consumer stopped: %s", e)
+        max_attempts = 10
+        for attempt in range(1, max_attempts + 1):
+            try:
+                conn = self._app.connection_for_read().clone()
+                conn.ensure_connection(max_retries=3)
+                logger.info("Celery Ops: event consumer connected to broker")
+                recv = EventReceiver(
+                    conn,
+                    handlers=handlers,
+                    app=self._app,
+                )
+                recv.capture(limit=None, timeout=None, wakeup=True)
+            except Exception as e:
+                logger.warning("Celery Ops: event consumer error (attempt %d/%d): %s", attempt, max_attempts, e)
+                if attempt < max_attempts:
+                    wait = min(attempt * 5, 30)
+                    logger.info("Celery Ops: retrying event consumer in %ds...", wait)
+                    time.sleep(wait)
+                else:
+                    logger.error("Celery Ops: event consumer gave up after %d attempts", max_attempts)

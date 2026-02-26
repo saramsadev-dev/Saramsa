@@ -13,11 +13,11 @@ logger = logging.getLogger("start_celery")
 
 workdir = os.path.dirname(os.path.abspath(__file__))
 
-# Install celery_ops package if present
+# Add celery_ops to sys.path (avoids pip install delay and preserves UI build files)
 celery_ops_dir = os.path.join(workdir, "celery_ops")
-if os.path.isdir(celery_ops_dir):
-    logger.info("Installing celery_ops package...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", celery_ops_dir])
+if os.path.isdir(celery_ops_dir) and celery_ops_dir not in sys.path:
+    sys.path.insert(0, celery_ops_dir)
+    logger.info("Added celery_ops to sys.path: %s", celery_ops_dir)
 
 # Start Celery worker as a subprocess
 logger.info("Starting Celery worker...")
