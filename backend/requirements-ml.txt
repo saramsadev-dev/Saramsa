@@ -1,0 +1,9 @@
+# ML pipeline dependencies (Celery worker only)
+# These are NOT needed by the Django backend API.
+# Only installed in the celery workflow.
+torch>=2.0.0
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+optimum[onnxruntime]>=1.17.0

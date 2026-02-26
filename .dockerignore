@@ -1,0 +1,38 @@
+# Version control
+.git
+.gitignore
+
+# Python
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+
+# Node
+**/node_modules
+
+# Directories not needed in celery container
+frontend
+infra
+docs
+saramsa-ai
+saramsa-scripts
+logs
+
+# IDE / OS
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db
+
+# CI / Docker
+.github
+.dockerignore
+Dockerfile*
+
+# Misc
+dump.rdb
+*.zip
+*.log

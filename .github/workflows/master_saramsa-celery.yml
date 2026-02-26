@@ -7,8 +7,15 @@ on:
     paths:
       - 'backend/**'
       - 'celery_ops/**'
+      - 'Dockerfile.celery'
       - '.github/workflows/master_saramsa-celery.yml'
   workflow_dispatch:
+
+env:
+  ACR_NAME: saramsaacr
+  ACR_REGISTRY: saramsaacr.azurecr.io
+  BASE_IMAGE_REPO: saramsa-celery-base
+  APP_IMAGE_REPO: saramsa-celery
 
 jobs:
   build-and-deploy:
@@ -17,77 +24,14 @@ jobs:
       id-token: write
       contents: read
 
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Cache virtualenv
-        id: cache-venv
-        uses: actions/cache@v4
-        with:
-          path: backend/.venv
-          key: venv-celery-${{ hashFiles('backend/requirements.txt') }}
-          restore-keys: |
-            venv-celery-
-
-      - name: Install dependencies
-        if: steps.cache-venv.outputs.cache-hit != 'true'
+      - name: Compute base image tag from requirements hash
+        id: hash
         run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run Django collectstatic
-        env:
-          DJANGO_SETTINGS_MODULE: apis.settings
-          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
-          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
-          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
-          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
-          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
-          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-        run: |
-          source .venv/bin/activate
-          python manage.py collectstatic --noinput
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Cache Celery Ops node_modules
-        id: cache-npm
-        uses: actions/cache@v4
-        with:
-          path: celery_ops/celery_ops/ui/react/node_modules
-          key: celery-ops-npm-${{ hashFiles('celery_ops/celery_ops/ui/react/package.json') }}
-
-      - name: Install Celery Ops UI dependencies
-        if: steps.cache-npm.outputs.cache-hit != 'true'
-        working-directory: celery_ops/celery_ops/ui/react
-        run: npm install
-
-      - name: Build Celery Ops React UI
-        working-directory: celery_ops/celery_ops/ui/react
-        run: npm run build
-
-      - name: Create deployment bundle
-        run: |
-          # Copy celery_ops package into the backend bundle
-          cp -r ../celery_ops ./celery_ops
-          mkdir -p ../artifact
-          rm -f ../artifact/celery.zip
-          zip -1 -r ../artifact/celery.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc' 'celery_ops/celery_ops/ui/react/node_modules/*' 'celery_ops/celery_ops/ui/react/src/*'
+          TAG=$(cat backend/requirements.txt backend/requirements-ml.txt | sha256sum | cut -c1-16)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -96,18 +40,22 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DF861B6FC11548C7BDB03BE8989F7214 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_13ED96C692AA42E5A05EBD10D66B8BDD }}
 
+      - name: Login to ACR
+        run: az acr login --name $ACR_NAME
+
+      - name: Build app image
+        run: |
+          docker build \
+            -f Dockerfile.celery \
+            --build-arg BASE_IMAGE=$ACR_REGISTRY/$BASE_IMAGE_REPO:${{ steps.hash.outputs.tag }} \
+            -t $ACR_REGISTRY/$APP_IMAGE_REPO:${{ github.sha }} \
+            .
+
+      - name: Push app image
+        run: docker push $ACR_REGISTRY/$APP_IMAGE_REPO:${{ github.sha }}
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
-        id: deploy-to-webapp
         with:
           app-name: 'saramsa-celery'
-          slot-name: 'Production'
-          package: artifact/celery.zip
-        env:
-          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
-          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
-          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
-          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
-          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
-          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          images: ${{ env.ACR_REGISTRY }}/${{ env.APP_IMAGE_REPO }}:${{ github.sha }}
