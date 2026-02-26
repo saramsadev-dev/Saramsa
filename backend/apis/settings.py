@@ -290,6 +290,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
+    'https://witty-ground-07c303810.4.azurestaticapps.net',
     'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
     'https://saramsa-chi.vercel.app',
     'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
@@ -324,6 +325,7 @@ CORS_ALLOW_HEADERS = [
 
 # Trust requests coming from the static frontend domain (needed for some POSTs)
 CSRF_TRUSTED_ORIGINS = [
+    'https://witty-ground-07c303810.4.azurestaticapps.net',
     'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
     'https://saramsa-chi.vercel.app',
     'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
