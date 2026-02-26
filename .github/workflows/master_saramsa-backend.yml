@@ -26,15 +26,21 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
+
+      - name: Cache virtualenv
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-backend-${{ hashFiles('backend/requirements.txt') }}
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Django migrations & collectstatic
+      - name: Run Django collectstatic
         env:
           DJANGO_SETTINGS_MODULE: apis.settings
           AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
@@ -45,15 +51,14 @@ jobs:
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
+          source .venv/bin/activate
           python manage.py collectstatic --noinput
-
-      # If you want to run tests, add a step here
 
       - name: Create deployment bundle
         run: |
           mkdir -p ../artifact
           rm -f ../artifact/backend.zip
-          zip -r ../artifact/backend.zip . -x 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
+          zip -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
