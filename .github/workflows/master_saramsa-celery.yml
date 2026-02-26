@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - 'backend/**'
+      - 'celery_ops/**'
       - '.github/workflows/master_saramsa-celery.yml'
   workflow_dispatch:
 
@@ -51,9 +52,11 @@ jobs:
 
       - name: Create deployment bundle
         run: |
+          # Copy celery_ops package into the backend bundle
+          cp -r ../celery_ops ./celery_ops
           mkdir -p ../artifact
           rm -f ../artifact/celery.zip
-          zip -r ../artifact/celery.zip . -x 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
+          zip -r ../artifact/celery.zip . -x 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc' 'celery_ops/celery_ops/ui/react/node_modules/*'
 
       - name: Upload celery artifact
         uses: actions/upload-artifact@v4
