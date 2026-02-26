@@ -9,7 +9,7 @@ ARG BASE_IMAGE
 FROM node:20-alpine AS ui-builder
 WORKDIR /app
 COPY celery_ops/celery_ops/ui/react/package.json celery_ops/celery_ops/ui/react/package-lock.json ./
-RUN npm ci
+RUN npm install
 COPY celery_ops/celery_ops/ui/react/ ./
 RUN npm run build
 
