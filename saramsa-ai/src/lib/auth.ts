@@ -22,7 +22,9 @@ type RegisterParams = {
 type Tokens = { access: string; refresh: string };
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8000';
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ||
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, '') ||
+  'http://localhost:8000';
 const AUTH_BASE = `${API_BASE_URL}/api/auth`;
 
 // Standardized token storage keys
