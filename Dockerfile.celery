@@ -2,6 +2,9 @@
 # Uses the pre-built base image (Dockerfile.celery-base) for fast builds.
 # Only rebuilds when application code changes (~2-3 min).
 
+# Global ARG — must be before the first FROM to be available in FROM directives
+ARG BASE_IMAGE
+
 # ── Stage 1: Build Celery Ops React UI ──────────────────────────────
 FROM node:20-alpine AS ui-builder
 WORKDIR /app
@@ -11,7 +14,6 @@ COPY celery_ops/celery_ops/ui/react/ ./
 RUN npm run build
 
 # ── Stage 2: Application ────────────────────────────────────────────
-ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 WORKDIR /app
