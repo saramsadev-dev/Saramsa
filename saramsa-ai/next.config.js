@@ -4,6 +4,9 @@ const path = require('path');
 const nextConfig = {
   output: 'standalone',
   trailingSlash: true,
+
+  // Set tracing root to this directory so standalone output is flat (not nested under saramsa-ai/)
+  outputFileTracingRoot: path.resolve(__dirname),
   
   // Enable React strict mode
   reactStrictMode: true,
