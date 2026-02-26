@@ -43,4 +43,4 @@ where = ["."]
 include = ["celery_ops*"]
 
 [tool.setuptools.package-data]
-celery_ops = ["ui/static/*"]
+celery_ops = ["ui/static/*", "ui/react/build/**/*", "ui/react/build/*"]

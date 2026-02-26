@@ -55,13 +55,24 @@ jobs:
           source .venv/bin/activate
           python manage.py collectstatic --noinput
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Celery Ops React UI
+        working-directory: celery_ops/celery_ops/ui/react
+        run: |
+          npm ci
+          npm run build
+
       - name: Create deployment bundle
         run: |
           # Copy celery_ops package into the backend bundle
           cp -r ../celery_ops ./celery_ops
           mkdir -p ../artifact
           rm -f ../artifact/celery.zip
-          zip -r ../artifact/celery.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc' 'celery_ops/celery_ops/ui/react/node_modules/*'
+          zip -r ../artifact/celery.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc' 'celery_ops/celery_ops/ui/react/node_modules/*' 'celery_ops/celery_ops/ui/react/src/*'
 
       - name: Upload celery artifact
         uses: actions/upload-artifact@v4
