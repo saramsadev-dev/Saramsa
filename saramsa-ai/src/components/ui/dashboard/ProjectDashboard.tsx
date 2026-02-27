@@ -209,10 +209,10 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
 
   if (loading && projects.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         </div>
       </div>
@@ -220,30 +220,30 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projects</h1>
+            <h1 className="text-3xl font-semibold text-foreground">Projects</h1>
             
             {/* Stats Cards */}
             {projects.length > 0 && (
               <div className="flex items-center gap-3">
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 flex items-center gap-2">
-                  <FolderPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <div className="bg-card/80 border border-border/60 rounded-2xl px-3 py-2 flex items-center gap-2 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.45)]">
+                  <FolderPlus className="w-4 h-4 text-saramsa-brand" />
                   <div className="flex items-baseline gap-1">
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">{projects.length}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Projects</span>
+                    <span className="text-lg font-semibold text-foreground">{projects.length}</span>
+                    <span className="text-xs text-muted-foreground">Projects</span>
                   </div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 flex items-center gap-2">
-                  <ExternalLink className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <div className="bg-card/80 border border-border/60 rounded-2xl px-3 py-2 flex items-center gap-2 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.45)]">
+                  <ExternalLink className="w-4 h-4 text-saramsa-brand" />
                   <div className="flex items-baseline gap-1">
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">
+                    <span className="text-lg font-semibold text-foreground">
                       {projects.filter(p => p.externalLinks && p.externalLinks.length > 0).length}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Integrations</span>
+                    <span className="text-xs text-muted-foreground">Integrations</span>
                   </div>
                 </div>
               </div>
@@ -255,7 +255,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             {onNavigateToAnalysis && (
               <button
                 onClick={onNavigateToAnalysis}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-secondary/70 text-foreground rounded-xl border border-border/60 hover:bg-secondary transition-colors"
                 title="Go to Analysis Dashboard"
               >
                 <ArrowRight className="w-4 h-4" />
@@ -267,7 +267,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             <div className="relative">
               <button
                 onClick={() => setShowNewProjectDropdown(!showNewProjectDropdown)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white rounded-lg hover:shadow-lg transition-all duration-200"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white rounded-xl shadow-[0_14px_30px_-18px_rgba(230,3,235,0.7)] hover:shadow-[0_18px_40px_-20px_rgba(230,3,235,0.8)] transition-all duration-200"
               >
                 <Plus className="w-4 h-4" />
                 New Project
@@ -291,7 +291,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"
+            className="bg-red-50/80 dark:bg-red-900/20 border border-red-200/70 dark:border-red-800/60 rounded-2xl p-4"
           >
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-500" />
@@ -300,7 +300,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
                 onClick={() => dispatch(clearError())}
                 className="ml-auto text-red-500 hover:text-red-700"
               >
-                ×
+                x
               </button>
             </div>
           </motion.div>
@@ -311,13 +311,13 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-20 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600"
+            className="text-center py-20 bg-card/80 rounded-2xl border border-dashed border-border/70 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.6)]"
           >
-            <FolderPlus className="w-16 h-16 text-gray-400 mx-auto mb-6" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            <FolderPlus className="w-16 h-16 text-muted-foreground mx-auto mb-6" />
+            <h3 className="text-xl font-semibold text-foreground mb-2">
               No projects yet
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
               Create your first project to start analyzing feedback and generating insights. 
               You can create a blank project or import from your DevOps platforms.
             </p>
@@ -325,7 +325,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={() => handleCreateProject('My First Project', 'A sample project to get started')}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white rounded-lg hover:shadow-lg transition-all duration-200"
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white rounded-xl shadow-[0_14px_30px_-18px_rgba(230,3,235,0.7)] hover:shadow-[0_18px_40px_-20px_rgba(230,3,235,0.8)] transition-all duration-200"
               >
                 <FolderPlus className="w-5 h-5" />
                 Create Project
@@ -333,7 +333,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
               
               <button
                 onClick={() => setShowNewProjectDropdown(true)}
-                className="flex items-center gap-2 px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 border border-border/70 text-foreground rounded-xl hover:bg-accent/60 transition-colors"
               >
                 <Download className="w-5 h-5" />
                 Import from DevOps
@@ -341,11 +341,11 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             </div>
             
             {accounts.length === 0 && (
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg max-w-md mx-auto">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  💡 <strong>Tip:</strong> Connect your Azure DevOps or Jira accounts in{' '}
+              <div className="mt-6 p-4 bg-secondary/60 rounded-2xl max-w-md mx-auto border border-border/60">
+                <p className="text-sm text-muted-foreground">
+                  Tip: Connect your Azure DevOps or Jira accounts in{' '}
                   <a href="/settings" className="underline hover:no-underline">
-                    Settings → Integrations
+                    Settings > Integrations
                   </a>{' '}
                   to import existing projects.
                 </p>

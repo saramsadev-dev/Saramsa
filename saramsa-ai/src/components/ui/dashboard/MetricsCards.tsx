@@ -16,19 +16,19 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
   const getCardStyles = (color: string) => {
     switch (color) {
       case "blue":
-        return "border-blue-300 dark:border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/30";
+        return "border-blue-200/70 dark:border-blue-500/60 bg-gradient-to-br from-blue-50/80 to-blue-100/80 dark:from-blue-900/20 dark:to-blue-800/30";
       case "green":
-        return "border-green-300 dark:border-green-600 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/30";
+        return "border-green-200/70 dark:border-green-500/60 bg-gradient-to-br from-green-50/80 to-green-100/80 dark:from-green-900/20 dark:to-green-800/30";
       case "red":
-        return "border-red-300 dark:border-red-600 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/30";
+        return "border-red-200/70 dark:border-red-500/60 bg-gradient-to-br from-red-50/80 to-red-100/80 dark:from-red-900/20 dark:to-red-800/30";
       case "purple":
-        return "border-purple-300 dark:border-purple-600 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/30";
+        return "border-purple-200/70 dark:border-purple-500/60 bg-gradient-to-br from-purple-50/80 to-purple-100/80 dark:from-purple-900/20 dark:to-purple-800/30";
       case "orange":
-        return "border-orange-300 dark:border-orange-600 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/30";
+        return "border-orange-200/70 dark:border-orange-500/60 bg-gradient-to-br from-orange-50/80 to-orange-100/80 dark:from-orange-900/20 dark:to-orange-800/30";
       case "teal":
-        return "border-teal-300 dark:border-teal-600 bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/30";
+        return "border-teal-200/70 dark:border-teal-500/60 bg-gradient-to-br from-teal-50/80 to-teal-100/80 dark:from-teal-900/20 dark:to-teal-800/30";
       default:
-        return "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800";
+        return "border-border/60 bg-card/80";
     }
   };
 
@@ -62,11 +62,11 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: index * 0.1 }}
         >
-          <div className={`${getCardStyles(metric.color)} border-2 hover:shadow-xl hover:scale-105 transition-all duration-300 rounded-xl p-6`}>
+          <div className={`${getCardStyles(metric.color)} border rounded-2xl p-6 shadow-[0_18px_50px_-40px_rgba(15,23,42,0.6)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.7)]`}>
             <div className="space-y-3">
               {/* Title */}
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                <h3 className="text-sm font-medium text-muted-foreground">
                   {metric.title}
                 </h3>
               </div>
@@ -80,7 +80,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
 
               {/* Description */}
               {metric.description && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   {metric.description}
                 </p>
               )}

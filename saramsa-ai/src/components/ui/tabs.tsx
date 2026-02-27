@@ -51,7 +51,7 @@ function TabsList({ className, children }: TabsListProps) {
   return (
     <div
       className={cn(
-        "bg-gray-100 dark:bg-gray-700 flex h-9 w-fit items-center justify-center rounded-xl p-[3px]",
+        "flex h-10 w-fit items-center justify-center rounded-2xl border border-border/60 bg-secondary/60 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-sm",
         className,
       )}
     >
@@ -65,10 +65,10 @@ function TabsTrigger({ value, className, children, isActive, onClick }: TabsTrig
     <button
       data-state={isActive ? "active" : "inactive"}
       className={cn(
-        "flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-xl border transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 px-3 py-2 text-sm font-medium whitespace-nowrap",
+        "flex h-full flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent px-4 py-2 text-sm font-semibold whitespace-nowrap transition-[transform,box-shadow,background-color,color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/40 disabled:pointer-events-none disabled:opacity-50",
         isActive 
-          ? "bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white shadow-lg border-[#E603EB]/30 transform scale-105" 
-          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-100 dark:hover:from-gray-600 dark:hover:to-gray-500 border-transparent hover:border-gray-200 dark:hover:border-gray-500 hover:shadow-md",
+          ? "bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white shadow-[0_10px_24px_-16px_rgba(230,3,235,0.65)] border-white/20 -translate-y-0.5" 
+          : "text-muted-foreground hover:text-foreground hover:bg-background/80 hover:shadow-[0_8px_20px_-18px_rgba(15,23,42,0.35)]",
         className,
       )}
       onClick={onClick}

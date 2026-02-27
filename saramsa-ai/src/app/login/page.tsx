@@ -139,8 +139,8 @@ export default function LoginPage() {
       </div>
 
       {/* Left Visual Pane - Hidden on mobile, visible on tablet+ */}
-      <div className="hidden md:flex md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 relative bg-gradient-to-br from-background via-muted/50 to-accent overflow-hidden min-h-[40vh] lg:min-h-screen">
-        <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/5 via-transparent to-saramsa-gradient-to/5" />
+      <div className="hidden md:flex md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 relative bg-gradient-to-br from-background via-muted/60 to-accent/40 overflow-hidden min-h-[40vh] lg:min-h-screen">
+        <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/10 via-transparent to-saramsa-gradient-to/10" />
         
         {/* Data Stream Animation - Hidden on tablet/iPad */}
         {/* <div className="hidden lg:block">
@@ -159,7 +159,7 @@ export default function LoginPage() {
             transition={{ duration: 1, delay: 0.5 }}
             className="max-w-full mx-auto lg:mx-0"
           >
-            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-2xl 2xl:text-4xl font-bold mb-4 md:mb-6 text-foreground leading-tight">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-2xl 2xl:text-4xl font-semibold mb-4 md:mb-6 text-foreground leading-tight">
               Transform Feedback into Action
             </h1>
             <p className="text-sm md:text-base lg:text-lg xl:text-sm 2xl:text-lg text-muted-foreground mb-6 md:mb-8 leading-relaxed">
@@ -179,7 +179,7 @@ export default function LoginPage() {
                   transition={{ duration: 0.8, delay: 1 + index * 0.2 }}
                   className="flex items-center gap-3"
                 >
-                  <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse-glow shadow-lg flex-shrink-0" />
+                  <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse-glow shadow-[0_0_16px_rgba(230,3,235,0.45)] flex-shrink-0" />
                   <span className="text-sm md:text-base xl:text-xs text-muted-foreground">{feature}</span>
                 </motion.div>
               ))}
@@ -194,7 +194,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Login Form */}
-      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-8 xl:p-12 bg-card md:border-l border-border relative overflow-y-auto min-h-screen md:min-h-[60vh] lg:min-h-screen">
+      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-8 xl:p-12 bg-card/70 md:border-l border-border/60 relative overflow-y-auto min-h-screen md:min-h-[60vh] lg:min-h-screen">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -225,7 +225,7 @@ export default function LoginPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"
+              className="bg-red-50/80 dark:bg-red-900/20 border border-red-200/70 dark:border-red-800/60 rounded-2xl p-4"
             >
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             </motion.div>
@@ -236,7 +236,7 @@ export default function LoginPage() {
             <div className="space-y-3 sm:space-y-4">
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                <label htmlFor="email" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
                   Email Address
                 </label>
                 <div className="relative mt-1 sm:mt-2">
@@ -245,10 +245,9 @@ export default function LoginPage() {
                     id="email"
                     type="email"
                     placeholder="Enter your email address"
-                    className="w-full pl-8 sm:pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 
-                    dark:border-gray-700 rounded-lg focus:border-[#E603EB] focus:ring-[#E603EB]/20 focus:outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    className="w-full pl-8 sm:pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
-                  <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+                  <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                 </div>
                 {errors.email && (
                   <p className="mt-1 text-xs sm:text-sm text-red-500">{errors.email.message}</p>
@@ -257,7 +256,7 @@ export default function LoginPage() {
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                <label htmlFor="password" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
                   Password
                 </label>
                 <div className="relative mt-1 sm:mt-2">
@@ -266,13 +265,13 @@ export default function LoginPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
-                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:border-[#E603EB] focus:ring-[#E603EB]/20 focus:outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
-                  <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+                  <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#E603EB] transition-colors"
+                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                   </button>
@@ -287,7 +286,7 @@ export default function LoginPage() {
             <div className="text-right">
               <Link
                 href="/forgot-password"
-                className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-[#E603EB] hover:text-[#E603EB]/80 transition-colors"
+                className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-saramsa-brand hover:text-saramsa-brand-hover transition-colors"
               >
                 Forgot password?
               </Link>
@@ -297,7 +296,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-saramsa-brand to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white py-2.5 sm:py-3 px-4 rounded-lg text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base font-medium shadow-lg hover:shadow-xl transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed animate-glow"
+              className="w-full bg-gradient-to-r from-saramsa-brand to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white py-2.5 sm:py-3 px-4 rounded-2xl text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base font-semibold shadow-[0_18px_40px_-24px_rgba(230,3,235,0.75)] hover:shadow-[0_24px_60px_-28px_rgba(230,3,235,0.8)] transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
@@ -311,11 +310,11 @@ export default function LoginPage() {
 
             {/* Register Link */}
             <div className="text-center">
-              <p className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-muted-foreground">
                 New to Saramsa AI?{' '}
                 <Link
                   href="/register"
-                  className="text-[#E603EB] hover:text-[#E603EB]/80 font-medium transition-colors"
+                  className="text-saramsa-brand hover:text-saramsa-brand-hover font-medium transition-colors"
                 >
                   Create an account
                 </Link>

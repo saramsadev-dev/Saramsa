@@ -94,12 +94,12 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-card/95 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <div className="flex items-center justify-between p-6 border-b border-border/60">
+            <h2 className="text-xl font-semibold text-foreground">
               Create New Project
             </h2>
             <button
@@ -114,7 +114,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
-              <label htmlFor="project-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="project-name" className="block text-sm font-medium text-muted-foreground mb-2">
                 Project Name *
               </label>
               <input
@@ -122,7 +122,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#E603EB] focus:border-transparent"
+                className="w-full px-3 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground focus:ring-2 focus:ring-[#E603EB] focus:border-transparent"
                 placeholder="Enter project name"
                 required
                 disabled={loading}
@@ -131,7 +131,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
             </div>
 
             <div>
-              <label htmlFor="project-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="project-description" className="block text-sm font-medium text-muted-foreground mb-2">
                 Description
               </label>
               <textarea
@@ -144,12 +144,12 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                   }
                 }}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#E603EB] focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground focus:ring-2 focus:ring-[#E603EB] focus:border-transparent resize-none"
                 placeholder="Enter project description (optional)"
                 disabled={loading}
               />
               <div className="flex justify-end items-center mt-1">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   {description.length}/{maxDescriptionLength}
                 </p>
               </div>
@@ -157,8 +157,8 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
 
             {/* Link to External Project */}
             {(azureIntegrations.length > 0 || jiraIntegrations.length > 0) && (
-              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              <div className="pt-4 border-t border-border/60">
+                <label className="block text-sm font-medium text-muted-foreground mb-3">
                   Link to External Project (Optional)
                 </label>
                 
@@ -167,10 +167,10 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                   <button
                     type="button"
                     onClick={() => setSelectedProvider('none')}
-                    className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                    className={`px-3 py-2 text-sm rounded-xl border transition-colors ${
                       selectedProvider === 'none'
-                        ? 'border-[#E603EB] bg-[#E603EB]/10 text-[#E603EB] dark:text-[#E603EB]'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        ? 'border-saramsa-brand/60 bg-saramsa-brand/10 text-saramsa-brand dark:text-saramsa-brand'
+                        : 'border-border/60 text-muted-foreground hover:bg-accent/60'
                     }`}
                     disabled={loading}
                   >
@@ -180,10 +180,10 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                     <button
                       type="button"
                       onClick={() => setSelectedProvider('azure')}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                      className={`px-3 py-2 text-sm rounded-xl border transition-colors ${
                         selectedProvider === 'azure'
-                          ? 'border-[#E603EB] bg-[#E603EB]/10 text-[#E603EB] dark:text-[#E603EB]'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          ? 'border-saramsa-brand/60 bg-saramsa-brand/10 text-saramsa-brand dark:text-saramsa-brand'
+                          : 'border-border/60 text-muted-foreground hover:bg-accent/60'
                       }`}
                       disabled={loading}
                     >
@@ -194,10 +194,10 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                     <button
                       type="button"
                       onClick={() => setSelectedProvider('jira')}
-                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                      className={`px-3 py-2 text-sm rounded-xl border transition-colors ${
                         selectedProvider === 'jira'
-                          ? 'border-[#E603EB] bg-[#E603EB]/10 text-[#E603EB] dark:text-[#E603EB]'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          ? 'border-saramsa-brand/60 bg-saramsa-brand/10 text-saramsa-brand dark:text-saramsa-brand'
+                          : 'border-border/60 text-muted-foreground hover:bg-accent/60'
                       }`}
                       disabled={loading}
                     >
@@ -218,7 +218,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                         <select
                           value={selectedAccount}
                           onChange={(e) => setSelectedAccount(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 text-sm border border-border/60 rounded-xl bg-background/80 text-foreground"
                           disabled={loading}
                         >
                           {(selectedProvider === 'azure' ? azureIntegrations : jiraIntegrations).map((account) => (
@@ -239,7 +239,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           placeholder="Search projects..."
-                          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500"
+                          className="w-full pl-9 pr-3 py-2 text-sm border border-border/60 rounded-xl bg-background/80 text-foreground placeholder-gray-500"
                           disabled={loading}
                         />
                       </div>
@@ -247,8 +247,8 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
 
                     {/* Info Banner */}
                     {!isFetchingProjects && filteredProjects.length > 0 && (
-                      <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                      <div className="mb-2 p-2 bg-secondary/60 rounded-xl">
+                        <p className="text-xs text-muted-foreground">
                           {filteredProjects.filter(p => getLinkedProject(p.id)).length > 0 ? (
                             <>
                               <strong>{filteredProjects.filter(p => getLinkedProject(p.id)).length}</strong> project(s) already linked. 
@@ -262,7 +262,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                     )}
 
                     {/* Projects List */}
-                    <div className="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg">
+                    <div className="max-h-48 overflow-y-auto border border-border/60 rounded-xl">
                       {isFetchingProjects ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
@@ -275,7 +275,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                           </p>
                         </div>
                       ) : (
-                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                        <div className="divide-y divide-border/60">
                           {filteredProjects.map((project) => {
                             const linkedProject = getLinkedProject(project.id);
                             const isAlreadyLinked = !!linkedProject;
@@ -287,20 +287,20 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                                 onClick={() => !isAlreadyLinked && setSelectedExternalProject(project)}
                                 className={`w-full px-3 py-2 text-left transition-colors ${
                                   isAlreadyLinked
-                                    ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800'
+                                    ? 'opacity-60 cursor-not-allowed bg-secondary/60'
                                     : selectedExternalProject?.id === project.id
-                                    ? 'bg-[#E603EB]/10 dark:bg-[#E603EB]/20'
-                                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                    ? 'bg-saramsa-brand/10 dark:bg-saramsa-brand/20'
+                                    : 'hover:bg-accent/60'
                                 }`}
                                 disabled={loading || isAlreadyLinked}
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                    <p className="text-sm font-medium text-foreground truncate">
                                       {project.name}
                                     </p>
                                     {project.key && (
-                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      <p className="text-xs text-muted-foreground">
                                         {project.key}
                                       </p>
                                     )}
@@ -314,7 +314,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                                     <div className="w-2 h-2 bg-[#E603EB] rounded-full ml-2 flex-shrink-0"></div>
                                   )}
                                   {isAlreadyLinked && (
-                                    <span className="flex items-center gap-1 text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded flex-shrink-0">
+                                    <span className="flex items-center gap-1 text-xs px-2 py-1 bg-amber-100/80 dark:bg-amber-900/30 text-orange-700 dark:text-orange-400 rounded flex-shrink-0">
                                       <Link2 className="w-3 h-3" />
                                       Linked
                                     </span>
@@ -328,8 +328,8 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                     </div>
 
                     {selectedExternalProject && (
-                      <div className="mt-2 p-2 bg-[#E603EB]/10 dark:bg-[#E603EB]/20 rounded-lg">
-                        <p className="text-xs text-gray-700 dark:text-gray-300">
+                      <div className="mt-2 p-2 bg-saramsa-brand/10 dark:bg-saramsa-brand/20 rounded-xl">
+                        <p className="text-xs text-muted-foreground">
                           <strong>Selected:</strong> {selectedExternalProject.name}
                         </p>
                       </div>
@@ -344,14 +344,14 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex-1 px-4 py-2 border border-border/60 text-muted-foreground rounded-xl hover:bg-accent/60 transition-colors"
                 disabled={loading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={loading || !name.trim()}
               >
                 <FolderPlus className="w-4 h-4" />

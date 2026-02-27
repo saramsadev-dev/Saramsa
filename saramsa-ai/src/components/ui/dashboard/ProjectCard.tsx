@@ -83,7 +83,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
       case 'error':
         return <AlertCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-400" />;
+        return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -98,10 +98,10 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
   return (
     <motion.div
       whileHover={{ y: -2 }}
-      className={`relative bg-white dark:bg-gray-800 rounded-xl border-2 transition-all duration-200 cursor-pointer group flex flex-col ${
+      className={`relative bg-card/90 rounded-2xl border transition-all duration-200 cursor-pointer group flex flex-col shadow-[0_20px_60px_-40px_rgba(15,23,42,0.6)] ${
         isSelected 
-          ? 'border-[#E603EB] shadow-lg shadow-[#E603EB]/20' 
-          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
+          ? 'border-saramsa-brand/60 shadow-[0_22px_60px_-36px_rgba(230,3,235,0.5)]' 
+          : 'border-border/60 hover:border-border hover:shadow-[0_24px_70px_-40px_rgba(15,23,42,0.65)]'
       }`}
       onClick={onClick}
     >
@@ -109,12 +109,12 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
       <div className="p-6 pb-3">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+            <h3 className="text-lg font-semibold text-foreground truncate">
               {project.name}
             </h3>
             <div className="h-5 mt-1">
               {project.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                <p className="text-sm text-muted-foreground line-clamp-1">
                   {project.description}
                 </p>
               )}
@@ -128,13 +128,13 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                 e.stopPropagation();
                 setShowMenu(!showMenu);
               }}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-opacity"
+              className="p-1 hover:bg-accent/60 rounded-lg transition-opacity"
             >
-              <MoreVertical className="w-4 h-4 text-gray-400" />
+              <MoreVertical className="w-4 h-4 text-muted-foreground" />
             </button>
             
             {showMenu && (
-              <div className="absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[150px] py-1">
+              <div className="absolute right-0 top-8 bg-popover/95 border border-border/60 rounded-xl shadow-[0_24px_60px_-40px_rgba(15,23,42,0.7)] z-10 min-w-[160px] py-1 backdrop-blur-xl">
                 {onEdit && (
                   <button
                     onClick={(e) => {
@@ -142,7 +142,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                       setShowMenu(false);
                       onEdit(project);
                     }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent/60 transition-colors"
                   >
                     <Edit className="w-4 h-4" />
                     Edit
@@ -157,7 +157,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                       onSync(project, provider);
                     }}
                     disabled={syncLoading}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-saramsa-brand hover:bg-saramsa-brand/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`w-4 h-4 ${syncLoading ? 'animate-spin' : ''}`} />
                     Sync with {project.externalLinks[0].provider === 'azure' ? 'Azure' : 'Jira'}
@@ -169,7 +169,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                     setShowMenu(false);
                     setShowDeleteModal(true);
                   }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -192,7 +192,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
               </span>
             ))
           ) : (
-            <span className="inline-flex items-center px-2 py-0.5 bg-gray-500 text-white text-xs rounded-full h-5">
+            <span className="inline-flex items-center px-2 py-0.5 bg-muted text-foreground text-xs rounded-full h-5 border border-border/60">
               Basic
             </span>
           )}
@@ -203,30 +203,30 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
       <div className="px-6 py-3">
         <div className="grid grid-cols-2 gap-4">
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-gray-400" />
+            <BarChart3 className="w-4 h-4 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
+              <p className="text-sm font-medium text-foreground">
                 {project.metadata?.totalComments || 0}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Comments</p>
+              <p className="text-xs text-muted-foreground">Comments</p>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
             {getStatusIcon(project.metadata?.analysisStatus)}
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+              <p className="text-sm font-medium text-foreground capitalize">
                 {project.metadata?.analysisStatus || 'Not started'}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Analysis</p>
+              <p className="text-xs text-muted-foreground">Analysis</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl mt-auto">
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
+      <div className="px-6 py-3 border-t border-border/60 bg-secondary/40 rounded-b-2xl mt-auto">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             Created {formatDate(project.createdAt)}
@@ -241,7 +241,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
         </div>
         
         {project.metadata?.lastAnalysisAt && (
-          <div className="flex items-center gap-1 mb-2 text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1 mb-2 text-xs text-muted-foreground">
             <BarChart3 className="w-3 h-3" />
             Last analyzed {formatDate(project.metadata.lastAnalysisAt)}
           </div>
@@ -254,7 +254,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
               e.stopPropagation();
               onGoToProject(project);
             }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white text-sm rounded-lg hover:shadow-lg transition-all duration-200"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white text-sm rounded-xl shadow-[0_14px_30px_-18px_rgba(230,3,235,0.7)] hover:shadow-[0_18px_40px_-20px_rgba(230,3,235,0.8)] transition-all duration-200"
           >
             <ArrowRight className="w-4 h-4" />
             Go to Analysis
@@ -265,7 +265,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
       {/* Selection Indicator */}
       {isSelected && (
         <div className="absolute top-4 right-4">
-          <div className="w-3 h-3 bg-[#E603EB] rounded-full"></div>
+          <div className="w-3 h-3 bg-saramsa-brand rounded-full shadow-[0_0_10px_rgba(230,3,235,0.7)]"></div>
         </div>
       )}
       

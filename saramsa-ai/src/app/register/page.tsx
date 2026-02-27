@@ -113,8 +113,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Left Visual Pane - Hidden on mobile, visible on tablet+ */}
-      <div className="hidden md:flex md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 relative bg-gradient-to-br from-background via-muted/50 to-accent overflow-hidden min-h-[40vh] lg:min-h-screen">
-        <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/5 via-transparent to-saramsa-gradient-to/5" />
+      <div className="hidden md:flex md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 relative bg-gradient-to-br from-background via-muted/60 to-accent/40 overflow-hidden min-h-[40vh] lg:min-h-screen">
+        <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/10 via-transparent to-saramsa-gradient-to/10" />
         
         {/* Data Stream Animation - Hidden on tablet/iPad */}
         {/* <div className="hidden lg:block">
@@ -134,7 +134,7 @@ export default function RegisterPage() {
             transition={{ duration: 1, delay: 0.5 }}
             className="max-w-md mx-auto lg:mx-0"
           >
-            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-2xl 2xl:text-4xl font-bold mb-4 md:mb-6 text-foreground leading-tight">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-2xl 2xl:text-4xl font-semibold mb-4 md:mb-6 text-foreground leading-tight">
               Join Saramsa AI
             </h1>
             <p className="text-sm md:text-base lg:text-lg xl:text-sm 2xl:text-lg text-muted-foreground mb-6 md:mb-8 leading-relaxed">
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                   transition={{ duration: 0.8, delay: 1 + index * 0.2 }}
                   className="flex items-center gap-3"
                 >
-                  <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse-glow shadow-lg flex-shrink-0" />
+                  <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse-glow shadow-[0_0_16px_rgba(230,3,235,0.45)] flex-shrink-0" />
                   <span className="text-sm md:text-base xl:text-xs text-muted-foreground">{feature}</span>
                 </motion.div>
               ))}
@@ -168,7 +168,7 @@ export default function RegisterPage() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.8, delay: 2 }}
-                className="mt-8 p-4 bg-card/80 rounded-lg backdrop-blur-sm border border-border animate-glow"
+                className="mt-8 p-4 bg-card/80 rounded-2xl backdrop-blur-sm border border-border/60 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.6)]"
               >
                 <div className="flex items-center gap-3">
                   <motion.div
@@ -202,7 +202,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Register Form */}
-      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-8 xl:p-12 bg-card md:border-l border-border relative overflow-y-auto min-h-screen md:min-h-[60vh] lg:min-h-screen">
+      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-8 xl:p-12 bg-card/70 md:border-l border-border/60 relative overflow-y-auto min-h-screen md:min-h-[60vh] lg:min-h-screen">
 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -224,7 +224,7 @@ export default function RegisterPage() {
 
           {/* Header */}
           <div className="text-center">
-            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-xl xl:text-lg 2xl:text-3xl font-bold text-foreground leading-tight">
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-xl xl:text-lg 2xl:text-3xl font-semibold text-foreground leading-tight">
               Create Your Account
             </h2>
             <p className="mt-2 sm:mt-3  lg:mt-2 xl:mt-3 text-sm sm:text-base md:text-lg lg:text-sm xl:text-xs 2xl:text-base text-muted-foreground leading-relaxed px-2 sm:px-0">
@@ -237,7 +237,7 @@ export default function RegisterPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"
+              className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4"
             >
               <p className="text-sm text-destructive">{error}</p>
             </motion.div>
@@ -248,7 +248,7 @@ export default function RegisterPage() {
             <div className="space-y-3 sm:space-y-4">
               {/* Username */}
               <div>
-                <label htmlFor="username" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                <label htmlFor="username" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
                   Username
                 </label>
                 <div className="relative">
@@ -257,12 +257,12 @@ export default function RegisterPage() {
                     id="username"
                     type="text"
                     placeholder="Choose a username"
-                    className={`w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:border-[#E603EB] focus:ring-[#E603EB]/20 focus:outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                    className={`w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
                       usernameStatus === 'available' ? 'border-green-500' : 
                       usernameStatus === 'unavailable' ? 'border-destructive' : ''
                     }`}
                   />
-                  <User className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+                  <User className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   
                   {/* Username status indicator */}
                   {usernameStatus === 'checking' && (
@@ -290,7 +290,7 @@ export default function RegisterPage() {
 
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                <label htmlFor="email" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
                   Email address
                 </label>
                 <div className="relative">
@@ -299,9 +299,9 @@ export default function RegisterPage() {
                     id="email"
                     type="email"
                     placeholder="Enter your email"
-                    className="w-full pl-8 sm:pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:border-[#E603EB] focus:ring-[#E603EB]/20 focus:outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    className="w-full pl-8 sm:pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
-                  <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+                  <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                 </div>
                 {errors.email && (
                   <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.email.message}</p>
@@ -310,7 +310,7 @@ export default function RegisterPage() {
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                <label htmlFor="password" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -319,13 +319,13 @@ export default function RegisterPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Create a password"
-                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:border-[#E603EB] focus:ring-[#E603EB]/20 focus:outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
-                  <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+                  <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#E603EB] transition-colors"
+                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                   </button>
@@ -337,7 +337,7 @@ export default function RegisterPage() {
 
               {/* Confirm Password */}
               <div>
-                <label htmlFor="confirmPassword" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-gray-900 dark:text-white mb-1 sm:mb-2">
+                <label htmlFor="confirmPassword" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -346,13 +346,13 @@ export default function RegisterPage() {
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm your password"
-                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:border-[#E603EB] focus:ring-[#E603EB]/20 focus:outline-none transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
-                  <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
+                  <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#E603EB] transition-colors"
+                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand transition-colors"
                   >
                     {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                   </button>
@@ -367,7 +367,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-saramsa-brand to-saramsa-gradient-to hover:from-saramsa-brand hover:to-saramsa-gradient-to text-white py-2.5 sm:py-3 px-4 rounded-lg text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base font-medium shadow-lg hover:shadow-xl transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed animate-glow"
+              className="w-full bg-gradient-to-r from-saramsa-brand to-saramsa-gradient-to hover:from-saramsa-brand hover:to-saramsa-gradient-to text-white py-2.5 sm:py-3 px-4 rounded-2xl text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base font-semibold shadow-[0_18px_40px_-24px_rgba(230,3,235,0.75)] hover:shadow-[0_24px_60px_-28px_rgba(230,3,235,0.8)] transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
@@ -381,11 +381,11 @@ export default function RegisterPage() {
 
             {/* Login Link */}
             <div className="text-center">
-              <p className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <Link
                   href="/login"
-                  className="text-[#E603EB] hover:text-[#E603EB]/80 font-medium transition-colors"
+                  className="text-saramsa-brand hover:text-saramsa-brand-hover font-medium transition-colors"
                 >
                   Sign in
                 </Link>

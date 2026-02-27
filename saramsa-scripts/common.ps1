@@ -153,21 +153,33 @@ function Stop-AllServices {
         try {
             $p = Get-Process -Id $pid_ -ErrorAction SilentlyContinue
             if ($p) {
-                $null = & taskkill /PID $pid_ /T /F 2>$null
+                Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue
                 Write-Host "  Stopped $sn (PID: $pid_)" -ForegroundColor Gray
                 $killed[$pid_] = $true
                 $n++
+            } else {
+                Write-Host "  Stale PID for $sn (PID: $pid_) not found" -ForegroundColor DarkYellow
             }
         } catch { }
     }
     $portPids = @{}
     try {
         $net = netstat -ano 2>$null
-        foreach ($port in @(8000, 3001, 9800)) {
-            foreach ($line in ($net | Select-String "LISTENING" | Select-String ":$port\b")) {
-                $tokens = ($line.ToString().Trim() -split '\s+')
-                $last = $tokens[-1]
-                if ($last -match '^\d+$') { $portPids[$last] = $port }
+        $wantedPorts = @(3000, 3001, 5173, 8000, 9800)
+        $listenLines = $net | Select-String "LISTENING"
+        foreach ($line in $listenLines) {
+            $text = $line.ToString().Trim()
+            $tokens = $text -split '\s+'
+            if ($tokens.Length -lt 5) { continue }
+            $local = $tokens[1]
+            $pidToken = $tokens[-1]
+            if ($pidToken -notmatch '^\d+$') { continue }
+            $portToken = $local.Split(':')[-1]
+            if ($portToken -notmatch '^\d+$') { continue }
+            $port = [int]$portToken
+            $procId = [int]$pidToken
+            if ($wantedPorts -contains $port) {
+                $portPids[$procId] = $port
             }
         }
         foreach ($kv in $portPids.GetEnumerator()) {
@@ -176,40 +188,17 @@ function Stop-AllServices {
             try {
                 $qp = Get-Process -Id $portPid -ErrorAction SilentlyContinue
                 if ($qp) {
-                    $null = & taskkill /PID $portPid /T /F 2>$null
+                    Stop-Process -Id $portPid -Force -ErrorAction SilentlyContinue
                     Write-Host "  Stopped process on port $($kv.Value) (PID: $portPid)" -ForegroundColor Gray
                     $n++
                 }
             } catch { }
         }
     } catch { }
-    try {
-        $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-            $cmd = $_.CommandLine
-            if (-not $cmd) { return $false }
-            ($cmd -match "celery" -and $cmd -match "apis" -and $cmd -match "worker") -or
-            ($cmd -match "manage\.py" -and $cmd -match "runserver") -or
-            ($cmd -match "celery_ops" -and $cmd -match "serve")
-        }
-        foreach ($proc in $procs) {
-            $pid_ = $proc.ProcessId
-            if ($killed.ContainsKey($pid_)) { continue }
-            try {
-                $qp = Get-Process -Id $pid_ -ErrorAction SilentlyContinue
-                if ($qp) {
-                    $label = "stray"
-                    if ($proc.CommandLine -match "celery_ops") { $label = "celery-ops" }
-                    elseif ($proc.CommandLine -match "celery.*apis.*worker") { $label = "celery" }
-                    elseif ($proc.CommandLine -match "manage\.py.*runserver") { $label = "backend" }
-                    $null = & taskkill /PID $pid_ /T /F 2>$null
-                    Write-Host "  Stopped $label (PID: $pid_)" -ForegroundColor Gray
-                    $n++
-                }
-            } catch { }
-        }
-    } catch { }
-    try { wsl bash -c "redis-cli shutdown" 2>$null } catch { }
-    try { if (Get-Command redis-cli -ErrorAction SilentlyContinue) { & redis-cli shutdown 2>$null } } catch { }
+    if ($portPids.Count -eq 0) {
+        Write-Host "  No listening processes found on ports 3000/3001/5173/8000/9800" -ForegroundColor DarkYellow
+    }
+    Write-Host "  Redis shutdown skipped (use redis-cli shutdown if needed)" -ForegroundColor DarkYellow
     Clear-ProcessIds
     Write-Host "[OK] Stopped $n service(s)." -ForegroundColor Green
 }

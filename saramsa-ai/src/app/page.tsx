@@ -34,10 +34,10 @@ export default function HomePage() {
   // Show loading while checking auth
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-saramsa-brand/20 border-t-saramsa-brand mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -50,7 +50,7 @@ export default function HomePage() {
 
   // Show projects dashboard if authenticated
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       <ProjectDashboard 
         onGoToProject={handleGoToProject}
       />

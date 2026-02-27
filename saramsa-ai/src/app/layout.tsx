@@ -1,13 +1,21 @@
 // app/layout.tsx
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import StoreProvider from "@/store/StoreProvider";
 import { Navbar } from "@/components/ui/navbar";
 import { Providers } from "@/components/providers/providers";
 import { Toaster } from "sonner";
 
-const inter = Inter({ subsets: ["latin"] });
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+});
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-ibm-plex-mono",
+});
 
 export const metadata: Metadata = {
   title: "Saramsa AI",
@@ -26,7 +34,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} flex flex-col min-h-screen`}>
+      <body className={`${spaceGrotesk.className} ${spaceGrotesk.variable} ${ibmPlexMono.variable} flex flex-col min-h-screen`}>
         <Providers>
           <StoreProvider>
             <Navbar/>

@@ -94,7 +94,7 @@ export function BaseModal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className={`fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 ${overlayClassName}`}
+          className={`fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 ${overlayClassName}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -105,7 +105,7 @@ export function BaseModal({
             aria-modal="true"
             aria-labelledby={title ? titleId : undefined}
             aria-describedby={description ? descriptionId : undefined}
-            className={`w-full ${sizeClass} rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-100 dark:border-gray-800 ${className}`}
+            className={`w-full ${sizeClass} rounded-3xl bg-card/95 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.7)] border border-border/60 backdrop-blur-sm ${className}`}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -113,18 +113,18 @@ export function BaseModal({
             onClick={handlePanelClick}
           >
             {(title || description || icon || headerContent || !hideCloseButton) && (
-              <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-start justify-between gap-4 p-6 border-b border-border/60">
                 {headerContent ?? (
                   <div className="flex items-start gap-4">
                     {icon && <div className="flex-shrink-0">{icon}</div>}
                     <div className="space-y-1">
                       {title && (
-                        <h3 id={titleId} className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3 id={titleId} className="text-lg font-semibold text-foreground">
                           {title}
                         </h3>
                       )}
                       {description && (
-                        <p id={descriptionId} className="text-sm text-gray-600 dark:text-gray-300">
+                        <p id={descriptionId} className="text-sm text-muted-foreground">
                           {description}
                         </p>
                       )}
@@ -135,7 +135,7 @@ export function BaseModal({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/70 transition-colors"
                     aria-label={closeButtonLabel}
                   >
                     <X className="w-5 h-5" />
@@ -147,7 +147,7 @@ export function BaseModal({
             <div className="p-6">{children}</div>
 
             {footer && (
-              <div className="p-6 border-t border-gray-100 dark:border-gray-800">
+              <div className="p-6 border-t border-border/60">
                 {footer}
               </div>
             )}

@@ -89,8 +89,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-geist-mono)', 'monospace'],
+        sans: ['var(--font-space-grotesk)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-ibm-plex-mono)', 'monospace'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
