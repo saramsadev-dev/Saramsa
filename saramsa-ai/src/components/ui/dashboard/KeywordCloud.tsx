@@ -14,25 +14,15 @@ export function KeywordCloud({
   negativeKeywords,
   className = "",
 }: KeywordCloudProps) {
-  // Use actual keywords from props, fallback to default words if empty
-  const positiveWords = positiveKeywords.length > 0 
+  // Use actual keywords from props; no placeholders when empty
+  const positiveWords = positiveKeywords.length > 0
     ? positiveKeywords.slice(0, 9).map((word, index) => ({
         word,
         size: Math.max(10, 32 - index * 2),
         x: Math.random() * 80 + 10,
         y: Math.random() * 80 + 10,
       }))
-    : [
-        { word: "love", size: 32, x: 25, y: 30 },
-        { word: "great", size: 28, x: 60, y: 20 },
-        { word: "excellent", size: 24, x: 20, y: 60 },
-        { word: "amazing", size: 20, x: 70, y: 50 },
-        { word: "fantastic", size: 18, x: 45, y: 40 },
-        { word: "perfect", size: 16, x: 30, y: 75 },
-        { word: "helpful", size: 14, x: 80, y: 30 },
-        { word: "useful", size: 12, x: 15, y: 45 },
-        { word: "fast", size: 10, x: 85, y: 70 }
-      ];
+    : [];
 
   const negativeWords = negativeKeywords.length > 0
     ? negativeKeywords.slice(0, 9).map((word, index) => ({
@@ -41,17 +31,7 @@ export function KeywordCloud({
         x: Math.random() * 80 + 10,
         y: Math.random() * 80 + 10,
       }))
-    : [
-        { word: "slow", size: 32, x: 30, y: 35 },
-        { word: "bad", size: 28, x: 65, y: 25 },
-        { word: "terrible", size: 24, x: 25, y: 65 },
-        { word: "awful", size: 20, x: 75, y: 55 },
-        { word: "frustrating", size: 18, x: 50, y: 45 },
-        { word: "confusing", size: 16, x: 35, y: 80 },
-        { word: "broken", size: 14, x: 85, y: 35 },
-        { word: "difficult", size: 12, x: 20, y: 50 },
-        { word: "annoying", size: 10, x: 80, y: 75 }
-      ];
+    : [];
 
   const WordCloud = ({ 
     words, 
@@ -75,7 +55,11 @@ export function KeywordCloud({
       </CardHeader>
       <CardContent>
         <div className={`relative h-64 ${bgGradient} rounded-lg overflow-hidden`}>
-          {words.map((wordItem, index) => (
+          {words.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400">No keywords</p>
+            </div>
+          ) : words.map((wordItem, index) => (
             <motion.div
               key={wordItem.word}
               className={`absolute cursor-pointer select-none font-medium ${color}`}
@@ -112,9 +96,9 @@ export function KeywordCloud({
               {wordItem.word}
             </motion.div>
           ))}
-          
-          {/* Floating Particles */}
-          {Array.from({ length: 4 }, (_, i) => (
+
+          {/* Floating Particles - only when there are words */}
+          {words.length > 0 && Array.from({ length: 4 }, (_, i) => (
             <motion.div
               key={i}
               className={`absolute w-2 h-2 ${color.includes('green') ? 'bg-green-400' : 'bg-red-400'} rounded-full opacity-30`}

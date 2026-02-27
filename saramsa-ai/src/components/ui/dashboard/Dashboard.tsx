@@ -11,7 +11,8 @@ import {
   setAnalysisData, 
   setDeepAnalysis, 
   setLoadedComments,
-  clearAnalysisData 
+  clearAnalysisData,
+  clearError 
 } from '../../../store/features/analysis/analysisSlice';
 import { fetchProjects } from '../../../store/features/projects/projectsSlice';
 import { fetchIntegrationAccounts } from '../../../store/features/integrations/integrationsSlice';
@@ -23,6 +24,7 @@ import {
 
 
 import type { AnalysisData } from '../../../lib/uploadService';
+import { uploadService } from '@/lib/uploadService';
 import { apiRequest } from '@/lib/apiRequest';
 import { Sparkles } from 'lucide-react';
 import { AnalysisProjectSelector } from './AnalysisProjectSelector';
@@ -65,7 +67,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     deepAnalysis, 
     loading, 
     error, 
-    isAnalyzing, 
+    isAnalyzing,
+    analyzingByProject,
     loadedComments,
     latestAnalysis,
     projectContext,
@@ -112,6 +115,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const [wordCloudView, setWordCloudView] = useState<'split' | 'advanced'>('split');
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
+  const analyzingKey = currentProjectId || projectId || 'personal';
+  const isProjectAnalyzing = !!analyzingByProject[analyzingKey] || false;
   const selectedPlatform = useMemo((): 'azure' | 'jira' | null => {
     if (!projects || !projects.length) return null;
     const pid = currentProjectId || projectId || '';
@@ -680,9 +685,15 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       setTopError('Please select a file first');
       return;
     }
+    const validation = uploadService.validateFile(topFile);
+    if (!validation.isValid) {
+      setTopError(validation.error);
+      return;
+    }
     try {
       setTopError(null);
-      
+      dispatch(clearError());
+
       // Load file data first
       const text = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -802,7 +813,15 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       }
       
     } catch (e: any) {
-      setTopError(e?.message || 'Analysis failed');
+      const data = e?.response?.data;
+      const message =
+        (typeof data?.message === 'string' && data.message) ||
+        (typeof data?.error === 'string' && data.error) ||
+        (typeof data?.detail === 'string' && data.detail) ||
+        (Array.isArray(data?.errors) && data.errors[0]) ||
+        e?.message ||
+        'Analysis failed. Please try again.';
+      setTopError(message);
     }
   }
 
@@ -1326,7 +1345,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                   topFile={topFile}
                   topError={error || topError}
                   loadedComments={loadedComments}
-                  topUploading={isAnalyzing}
+                  topUploading={isProjectAnalyzing}
                   onFileSelect={setTopFile}
                   onAnalyze={handleTopAnalyze}
                   onCloudConnect={handleCloudConnect}
@@ -1451,14 +1470,34 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 topFile={topFile}
                 topError={error || topError}
                 loadedComments={loadedComments}
-                topUploading={isAnalyzing}
+                topUploading={isProjectAnalyzing}
                 onFileSelect={setTopFile}
                 onAnalyze={handleTopAnalyze}
                 onCloudConnect={handleCloudConnect}
               />
 
+              {/* Dismissible error banner above results */}
+              {(error || topError) && (
+                <div className="flex items-center justify-between gap-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                  <p className="text-sm text-red-700 dark:text-red-300 flex-1">
+                    {error || topError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTopError(null);
+                      dispatch(clearError());
+                    }}
+                    className="shrink-0 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                    aria-label="Dismiss error"
+                  >
+                    <span className="text-lg leading-none">×</span>
+                  </button>
+                </div>
+              )}
+
               {/* Analysis Results Section */}
-              {(isAnalyzing || loading) ? (
+              {(isProjectAnalyzing || loading) ? (
                 <LoaderForDashboard />
               ) : (
                 <>
@@ -1767,36 +1806,24 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                         : "No comments available. Please upload feedback data to use Jira integration."
                       }
                     </p>
-                    {/* Debug button to manually fetch user stories */}
-                    <button
-                      onClick={() => {
-                        const effectiveProjectId = currentProjectId || personalProjectId;
-                        if (effectiveProjectId && user?.id) {
-                          console.log('🔄 Manual fetch user stories debug...');
-                          const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
-                          const userId = user.id || user.user_id || user.username;
-                          console.log('🔍 Manual fetch params:', { 
-                            projectId: formattedProjectId, 
-                            userId, 
-                            selectedPlatform,
-                            userObject: user 
-                          });
-                          dispatch(fetchUserStoriesByProject({ 
-                            projectId: formattedProjectId,
-                            userId
-                          }));
-                        } else {
-                          console.log('🔍 Cannot fetch - missing data:', {
-                            effectiveProjectId: currentProjectId || personalProjectId,
-                            userId: user?.id,
-                            user
-                          });
-                        }
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      🔄 Refresh User Stories (Debug)
-                    </button>
+                    {process.env.NODE_ENV === 'development' && (
+                      <button
+                        onClick={() => {
+                          const effectiveProjectId = currentProjectId || personalProjectId;
+                          if (effectiveProjectId && user?.id) {
+                            const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
+                            const userId = user.id || user.user_id || user.username;
+                            dispatch(fetchUserStoriesByProject({
+                              projectId: formattedProjectId,
+                              userId
+                            }));
+                          }
+                        }}
+                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        Refresh user stories
+                      </button>
+                    )}
                   </div>
                 )
               ) : (

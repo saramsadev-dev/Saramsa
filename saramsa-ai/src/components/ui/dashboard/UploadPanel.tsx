@@ -70,8 +70,6 @@ export function UploadPanel({
     }
   };
 
-  console.log("topFile:", topFile);
-
   const canAnalyze =
     (activeTab === "file" && topFile) || (activeTab === "cloud" && isConnected);
 
@@ -150,10 +148,10 @@ export function UploadPanel({
               aria-disabled={!isCloudEnabled}
             >
               <Cloud className="w-4 h-4 mr-2" />
-              Connect Cloud
+              Connect               Cloud
               {!isCloudEnabled && (
                 <span className="ml-2 text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                  {/* Coming Soon */}
+                  Coming soon
                 </span>
               )}
             </TabsTrigger>
@@ -176,14 +174,14 @@ export function UploadPanel({
                       Choose a file to upload
                     </Label>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Support for CSV, JSON, and Excel files
+                      CSV and JSON files
                     </p>
                   </div>
                   <Input
                     id="file-upload"
                     type="file"
                     ref={fileInputRef}
-                    accept=".csv,.json,.xlsx,.xls"
+                    accept=".csv,.json"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (!f) return;
@@ -222,10 +220,11 @@ export function UploadPanel({
                   <Button
                     onClick={onAnalyze}
                     disabled={topUploading}
-                    className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#D602E0] hover:to-[#7A4FAF] disabled:opacity-50 w-10 h-10 p-0"
+                    className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#D602E0] hover:to-[#7A4FAF] disabled:opacity-50 gap-2 px-4"
                     title={topUploading ? "Analyzing..." : "Analyze"}
                   >
-                    <BarChart3 className="w-5 h-5" />
+                    <BarChart3 className="w-5 h-5 shrink-0" />
+                    <span className="hidden sm:inline">{topUploading ? "Analyzing..." : "Analyze"}</span>
                   </Button>
                   <Button
                     type="button"

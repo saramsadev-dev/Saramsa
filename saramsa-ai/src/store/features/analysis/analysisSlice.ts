@@ -15,6 +15,7 @@ interface AnalysisState {
   loading: boolean;
   error: string | null;
   isAnalyzing: boolean;
+  analyzingByProject: Record<string, boolean>;
   loadedComments: string[] | null;
   latestAnalysis: any | null;
   latestLoading: boolean;
@@ -32,6 +33,7 @@ const initialState: AnalysisState = {
   loading: false,
   error: null,
   isAnalyzing: false,
+  analyzingByProject: {},
   loadedComments: null,
   latestAnalysis: null,
   latestLoading: false,
@@ -375,12 +377,16 @@ const analysisSlice = createSlice({
         state.loading = true;
         state.error = null;
         state.isAnalyzing = true;
+        const key = action.meta.arg.projectId ?? 'personal';
+        state.analyzingByProject[key] = true;
         state.analysisStatus = 'pending';
       })
       .addCase(analyzeComments.fulfilled, (state, action) => {
         state.loading = false;
         state.error = null;
-        state.isAnalyzing = false;
+        const key = action.meta.arg.projectId ?? 'personal';
+        state.analyzingByProject[key] = false;
+        state.isAnalyzing = Object.values(state.analyzingByProject).some(Boolean);
         state.analysisStatus = 'success';
         state.taskId = null;
         // Store the comments that were analyzed
@@ -393,7 +399,9 @@ const analysisSlice = createSlice({
       .addCase(analyzeComments.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Analysis failed.';
-        state.isAnalyzing = false;
+        const key = action.meta.arg.projectId ?? 'personal';
+        state.analyzingByProject[key] = false;
+        state.isAnalyzing = Object.values(state.analyzingByProject).some(Boolean);
         state.analysisStatus = 'failure';
         state.taskId = null;
       })
