@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequest } from '@/lib/apiRequest';
-import type { AnalysisData } from '@/lib/uploadService';
+import type { AnalysisData } from '@/types/analysis';
 
 interface ProjectContext {
   project_id: string;

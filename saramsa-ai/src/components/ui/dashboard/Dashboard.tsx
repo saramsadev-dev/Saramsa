@@ -23,8 +23,7 @@ import {
 } from '../../../store/features/userStories/userStoriesSlice';
 
 
-import type { AnalysisData } from '../../../lib/uploadService';
-import { uploadService } from '@/lib/uploadService';
+import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
 import { Sparkles } from 'lucide-react';
 import { AnalysisProjectSelector } from './AnalysisProjectSelector';
@@ -58,6 +57,43 @@ interface DashboardProps {
   onProjectSelect?: (projectId: string) => void;
   initialProjectId?: string;
   skipBootstrapFetches?: boolean; // when true, parent handles projects/integrations fetching
+}
+
+type ValidationResult = { isValid: true } | { isValid: false; error: string };
+
+const MAX_SIZE_BYTES: Record<string, number> = {
+  'text/csv': 250 * 1024 * 1024,
+  'application/json': 250 * 1024 * 1024,
+  'audio/mpeg': 500 * 1024 * 1024,
+};
+
+const ACCEPTED_TYPES = new Set(Object.keys(MAX_SIZE_BYTES));
+
+function isAcceptedType(type: string): boolean {
+  return ACCEPTED_TYPES.has(type) || type.includes('csv') || type.includes('json');
+}
+
+function acceptedByFileName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith('.csv') || lower.endsWith('.json');
+}
+
+function validateFile(file: File): ValidationResult {
+  const typeOk = isAcceptedType(file.type) || acceptedByFileName(file.name);
+  if (!typeOk) {
+    return { isValid: false, error: 'Unsupported file type. Use CSV or JSON.' };
+  }
+
+  const typeForLimit =
+    file.type && isAcceptedType(file.type)
+      ? file.type
+      : (file.name.toLowerCase().endsWith('.json') ? 'application/json' : 'text/csv');
+  const limit = MAX_SIZE_BYTES[typeForLimit];
+  if (limit && file.size > limit) {
+    return { isValid: false, error: 'File is too large. Maximum size is 250 MB for CSV and JSON.' };
+  }
+
+  return { isValid: true };
 }
 
 export function DashboardComponent({ data, onProjectSelect, initialProjectId, skipBootstrapFetches = false }: DashboardProps) {
@@ -685,7 +721,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       setTopError('Please select a file first');
       return;
     }
-    const validation = uploadService.validateFile(topFile);
+    const validation = validateFile(topFile);
     if (!validation.isValid) {
       setTopError(validation.error);
       return;
