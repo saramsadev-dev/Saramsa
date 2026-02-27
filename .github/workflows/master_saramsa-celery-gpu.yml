@@ -1,0 +1,65 @@
+name: Saramsa-celery-gpu (master)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - 'celery_ops/**'
+      - 'Dockerfile.celery-gpu'
+      - '.github/workflows/master_saramsa-celery-gpu.yml'
+  workflow_dispatch:
+
+env:
+  ACR_NAME: saramsaacr
+  ACR_REGISTRY: saramsaacr.azurecr.io
+  GPU_BASE_IMAGE_REPO: saramsa-celery-gpu-base
+  APP_IMAGE_REPO: saramsa-celery-gpu
+  CONTAINER_APP_NAME: saramsa-celery-gpu
+  CONTAINER_APP_ENV: saramsa-gpu-env
+  RESOURCE_GROUP: saramsa
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute base image tag from requirements hash
+        id: hash
+        run: |
+          TAG=$(cat backend/requirements.txt backend/requirements-ml.txt | sha256sum | cut -c1-16)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_5D4B3D5D28E9477FAA936C6524EB3A4D }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DF861B6FC11548C7BDB03BE8989F7214 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_13ED96C692AA42E5A05EBD10D66B8BDD }}
+
+      - name: Login to ACR
+        run: az acr login --name $ACR_NAME
+
+      - name: Build app image
+        run: |
+          docker build \
+            -f Dockerfile.celery-gpu \
+            --build-arg BASE_IMAGE=$ACR_REGISTRY/$GPU_BASE_IMAGE_REPO:${{ steps.hash.outputs.tag }} \
+            -t $ACR_REGISTRY/$APP_IMAGE_REPO:${{ github.sha }} \
+            .
+
+      - name: Push app image
+        run: docker push $ACR_REGISTRY/$APP_IMAGE_REPO:${{ github.sha }}
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update \
+            --name $CONTAINER_APP_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --image $ACR_REGISTRY/$APP_IMAGE_REPO:${{ github.sha }}

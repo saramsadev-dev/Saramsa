@@ -58,9 +58,8 @@ class AnalysisService:
             logger.error(f"Error creating analysis: {e}")
             raise
     
-    @cache_analysis_result(ttl=900)  # Cache for 15 minutes
     def get_latest_project_analysis(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get the latest analysis for a project."""
+        """Get the latest analysis for a project. No caching — must always return fresh data."""
         return self.analysis_repo.get_latest_by_project(project_id)
     
     def get_latest_analysis_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
@@ -266,18 +265,13 @@ class AnalysisService:
                 logger.info(f"🔍 DEBUG: Returned result keys: {list(result.keys())}")
                 logger.info(f"🔍 DEBUG: Returned result id: {result.get('id')}")
 
-                # Invalidate cached analysis data so frontend gets fresh results
+                # Clear any remaining analysis cache entries
                 try:
                     cache = get_cache_service()
-                    project_id = analysis_data.get('projectId')
-                    if project_id:
-                        cache.clear_pattern(f"analysis:*{project_id}*")
-                        logger.info(f"🗑️ Invalidated analysis cache for project {project_id}")
-                    # Also clear broad analysis cache patterns
                     cache.clear_pattern("analysis:*")
-                    logger.info("🗑️ Invalidated all analysis cache entries")
+                    logger.info("🗑️ Cleared analysis cache entries")
                 except Exception as cache_err:
-                    logger.warning(f"Failed to invalidate cache: {cache_err}")
+                    logger.warning(f"Failed to clear cache: {cache_err}")
             else:
                 logger.error(f"❌ AnalysisService.save_analysis_data FAILED - returned None")
             

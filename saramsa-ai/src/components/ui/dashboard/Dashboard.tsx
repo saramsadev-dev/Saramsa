@@ -705,17 +705,47 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           // ignore, will error below if empty
         }
       } else if (lowerName.endsWith('.csv')) {
+        // Parse CSV properly handling quoted fields (commas inside quotes)
+        const parseCSVLine = (line: string): string[] => {
+          const fields: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (inQuotes) {
+              if (ch === '"' && line[i + 1] === '"') {
+                current += '"';
+                i++; // skip escaped quote
+              } else if (ch === '"') {
+                inQuotes = false;
+              } else {
+                current += ch;
+              }
+            } else {
+              if (ch === '"') {
+                inQuotes = true;
+              } else if (ch === ',') {
+                fields.push(current);
+                current = '';
+              } else {
+                current += ch;
+              }
+            }
+          }
+          fields.push(current);
+          return fields;
+        };
+
         const lines = text.split(/\r?\n/).filter(Boolean);
         if (lines.length > 0) {
-          const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+          const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
           const commentIdx = header.indexOf('comment');
           if (commentIdx >= 0) {
             comments = lines.slice(1)
-              .map(line => line.split(',')[commentIdx] || '')
-              .map(s => s.trim())
+              .map(line => (parseCSVLine(line)[commentIdx] || '').trim())
               .filter(Boolean);
           } else {
-            comments = lines.slice(1).map(line => (line.split(',')[0] || '').trim()).filter(Boolean);
+            comments = lines.slice(1).map(line => (parseCSVLine(line)[0] || '').trim()).filter(Boolean);
           }
         }
       }

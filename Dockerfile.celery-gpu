@@ -1,0 +1,41 @@
+# GPU Celery worker application image.
+# Uses the pre-built GPU base image (Dockerfile.celery-gpu-base) for fast builds.
+
+# Global ARG — must be before the first FROM to be available in FROM directives
+ARG BASE_IMAGE
+
+# ── Stage 1: Build Celery Ops React UI ──────────────────────────────
+FROM node:20-alpine AS ui-builder
+WORKDIR /app
+COPY celery_ops/celery_ops/ui/react/package.json celery_ops/celery_ops/ui/react/package-lock.json ./
+RUN npm install
+COPY celery_ops/celery_ops/ui/react/ ./
+RUN npm run build
+
+# ── Stage 2: Application ────────────────────────────────────────────
+FROM ${BASE_IMAGE}
+
+ENV PYTHONUNBUFFERED=1
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+WORKDIR /app
+
+# Copy backend code
+COPY backend/ ./
+
+# Copy celery_ops package (start_celery.py expects it at ./celery_ops/)
+COPY celery_ops/ ./celery_ops/
+
+# Copy built React UI into the celery_ops package
+COPY --from=ui-builder /app/build ./celery_ops/celery_ops/ui/react/build/
+
+# Collect Django static files (dummy env vars — only needed to load settings module)
+RUN AZURE_API_KEY=x AZURE_ENDPOINT_URL=x AZURE_DEPLOYMENT_NAME=x \
+    AZURE_API_VERSION=x AZURE_DEVOPS_ORGANIZATION=x AZURE_DEVOPS_PROJECT=x \
+    AZURE_DEVOPS_PAT=x DJANGO_SETTINGS_MODULE=apis.settings \
+    python manage.py collectstatic --noinput
+
+EXPOSE 8000
+
+CMD ["python", "start_celery.py"]
