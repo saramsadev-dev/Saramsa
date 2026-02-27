@@ -5,6 +5,7 @@ from .views import (
     UpdateKeywordsView,
     GetUserCommentsView,
     TaskStatusView,
+    AnalysisByIdView,
     # Insights views
     InsightsListView,
     InsightDetailView,
@@ -22,6 +23,7 @@ urlpatterns = [
     # Core analysis endpoints
     path('analyze/', AnalyzeCommentsView.as_view(), name='analyze_comments'),
     path('task-status/<str:task_id>/', TaskStatusView.as_view(), name='task_status'),
+    path('analysis/<str:analysis_id>/', AnalysisByIdView.as_view(), name='analysis_by_id'),
     path('keywords/update/', UpdateKeywordsView.as_view(), name='update_keywords'),
     path('comments/', GetUserCommentsView.as_view(), name='get_user_comments'),
     

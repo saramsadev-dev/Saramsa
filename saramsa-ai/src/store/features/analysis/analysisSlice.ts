@@ -101,27 +101,28 @@ export const analyzeComments = createAsyncThunk<
             clearInterval(pollInterval);
             const taskResult = statusResult.result;
 
-            // Backend returns minimal { insight_id, project_id, status } to avoid
-            // Celery result serialization issues. Fetch latest analysis by project.
-            if (taskResult?.project_id && !taskResult?.result) {
+            // Preferred: fetch the exact analysis by ID (avoids "latest" race conditions)
+            if (taskResult?.insight_id) {
               try {
-                const latestRes = await apiRequest(
+                const analysisRes = await apiRequest(
                   'get',
-                  `/projects/${taskResult.project_id}/analysis/latest/`,
+                  `/insights/analysis/${taskResult.insight_id}/`,
                   undefined,
                   true
                 );
-                const latestData = latestRes.data?.data;
-                const analysis = latestData?.analysis;
-                if (latestData?.exists && analysis) {
+                const analysisData = analysisRes.data?.data;
+                if (analysisData?.exists && analysisData?.analysis) {
+                  const analysis = analysisData.analysis;
                   resolve({
                     id: analysis.id || taskResult.insight_id,
                     analysisData: analysis.result ?? analysis
                   });
                   return;
                 }
+                reject('Analysis saved but not found by ID.');
+                return;
               } catch (fetchErr: any) {
-                reject(fetchErr?.message || 'Analysis saved but failed to load result.');
+                reject(fetchErr?.message || 'Analysis saved but failed to load by ID.');
                 return;
               }
             }
@@ -172,7 +173,7 @@ export const getLatestAnalysis = createAsyncThunk<
   { rejectValue: string }
 >('analysis/getLatestAnalysis', async (projectId, { rejectWithValue }) => {
   try {
-    const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, undefined, true);
+    const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, { refresh: Date.now() }, true);
     // StandardResponse format: response.data.data contains the actual data
     return response.data.data;
   } catch (err: any) {
@@ -198,7 +199,7 @@ export const getConsolidatedDashboardData = createAsyncThunk<
 >('analysis/getConsolidatedDashboardData', async (projectId, { rejectWithValue }) => {
   try {
     // This single call now returns: analysis + user stories + comments + submission status
-    const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, undefined, true);
+    const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, { refresh: Date.now() }, true);
     return response.data.data;
   } catch (err: any) {
     let errorMessage = 'Failed to load dashboard data.';

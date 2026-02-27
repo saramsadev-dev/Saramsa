@@ -592,3 +592,94 @@ class TaskStatusView(APIView):
                 
         return StandardResponse.success(data=response_data)
 
+
+class AnalysisByIdView(APIView):
+    """Get analysis by ID (ensures user ownership)"""
+    permission_classes = [IsAdminOrUser]
+
+    @handle_service_errors
+    def get(self, request, analysis_id: str):
+        analysis_service = get_analysis_service()
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        if not user_id:
+            return StandardResponse.unauthorized(
+                detail="Authentication required",
+                instance=request.path
+            )
+
+        analysis = analysis_service.get_analysis_by_id(analysis_id, str(user_id))
+        if not analysis:
+            return StandardResponse.not_found(
+                detail="Analysis not found",
+                instance=request.path
+            )
+
+        # Enrich with user stories and comments (mirrors latest-analysis response)
+        from work_items.services import get_devops_service
+        devops_service = get_devops_service()
+        project_id = analysis.get('projectId')
+
+        response_data = {
+            'exists': True,
+            'analysis': analysis
+        }
+
+        if project_id:
+            latest_user_stories = devops_service.get_work_items_by_project(project_id)
+            if latest_user_stories:
+                latest_stories = latest_user_stories[0] if isinstance(latest_user_stories, list) else latest_user_stories
+                work_items_with_submission_status = self._enrich_work_items_with_submission_status(
+                    latest_stories.get('work_items', []),
+                    user_id,
+                    project_id
+                )
+                response_data['analysis']['userStories'] = {
+                    'work_items': work_items_with_submission_status,
+                    'work_items_by_feature': self._group_work_items_by_feature(work_items_with_submission_status),
+                    'summary': latest_stories.get('summary', {}),
+                    'process_template': latest_stories.get('process_template', 'Agile'),
+                    'generated_at': latest_stories.get('generated_at'),
+                    'comments_count': latest_stories.get('comments_count', 0)
+                }
+            else:
+                response_data['analysis']['userStories'] = None
+
+            try:
+                user_data = analysis_service.get_user_data_by_project(str(user_id), project_id)
+                if user_data:
+                    response_data['analysis']['comments'] = {
+                        'comments': user_data.get('feedback', []),
+                        'comments_count': len(user_data.get('feedback', [])),
+                        'file_name': user_data.get('file_name'),
+                        'upload_date': user_data.get('uploaded_date')
+                    }
+                else:
+                    response_data['analysis']['comments'] = None
+            except Exception as e:
+                logger.error(f"Error fetching comments: {e}")
+                response_data['analysis']['comments'] = None
+
+        return StandardResponse.success(
+            data=response_data,
+            message="Analysis retrieved successfully"
+        )
+
+    def _group_work_items_by_feature(self, work_items: list) -> dict:
+        """Groups work items by their 'feature_area' or 'featurearea' attribute."""
+        grouped_items = {}
+        for item in work_items:
+            feature_area = item.get('feature_area') or item.get('featurearea') or 'General'
+            if feature_area not in grouped_items:
+                grouped_items[feature_area] = []
+            grouped_items[feature_area].append(item)
+        return grouped_items
+
+    def _enrich_work_items_with_submission_status(self, work_items: list, user_id: str, project_id: str) -> list:
+        """Return work items as-is since they should already have submission status."""
+        if not work_items:
+            return work_items
+        for item in work_items:
+            if item.get('submitted'):
+                logger.info(f"Work item {item.get('id')} is submitted: {item.get('submitted_to')} at {item.get('submitted_at')}")
+        return work_items
+

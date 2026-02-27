@@ -440,22 +440,30 @@ class ProjectTaxonomyRepository:
     def get_analysis_by_id(self, analysis_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get specific analysis by ID and verify user ownership."""
         try:
-            containers_to_try = ['analysis', 'user_data', 'uploads']
-            
-            for container in containers_to_try:
-                try:
-                    # Try to get the specific analysis by ID
-                    result = self.cosmos_service.get_document(container, analysis_id, user_id)
-                    if result and result.get('userId') == user_id:
-                        logger.info(f"Found analysis {analysis_id} in container {container}")
-                        return result
-                except Exception as e:
-                    logger.debug(f"Analysis {analysis_id} not found in container {container}: {e}")
-                    continue
-            
+            # Normalize id to insight_* which is used by analysis documents
+            normalized_id = analysis_id
+            if normalized_id and not normalized_id.startswith("insight_"):
+                if normalized_id.startswith("analysis_"):
+                    normalized_id = normalized_id.replace("analysis_", "insight_", 1)
+                else:
+                    normalized_id = f"insight_{normalized_id}"
+
+            query = """
+            SELECT TOP 1 * FROM c
+            WHERE c.id = @analysis_id AND c.userId = @user_id
+            """
+            parameters = [
+                {"name": "@analysis_id", "value": normalized_id},
+                {"name": "@user_id", "value": user_id}
+            ]
+
+            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+            if results:
+                return results[0]
+
             logger.warning(f"Analysis {analysis_id} not found for user {user_id}")
             return None
-            
+
         except Exception as e:
             logger.error(f"Error getting analysis by ID: {e}")
             return None

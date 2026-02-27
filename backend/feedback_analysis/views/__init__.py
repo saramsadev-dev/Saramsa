@@ -13,6 +13,7 @@ from .analysis_views import (
     UpdateKeywordsView,
     GetUserCommentsView,
     TaskStatusView,
+    AnalysisByIdView,
 )
 from .insights_views import (
     InsightsListView,
@@ -34,6 +35,7 @@ __all__ = [
     'UpdateKeywordsView',
     'GetUserCommentsView',
     'TaskStatusView',
+    'AnalysisByIdView',
     # Insights views
     'InsightsListView',
     'InsightDetailView',
