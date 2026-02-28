@@ -722,6 +722,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       setTopError('Please select a file first');
       return;
     }
+    const effectiveProjectId = currentProjectId || personalProjectId || undefined;
+    if (!effectiveProjectId) {
+      setTopError('Please select a project before analyzing.');
+      return;
+    }
     const validation = validateFile(topFile);
     if (!validation.isValid) {
       setTopError(validation.error);
@@ -807,12 +812,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       dispatch(setLoadedComments(comments));
       
       // Use Redux action to analyze comments
-      const effectiveProjectId = currentProjectId || personalProjectId || undefined;
-      const result = await dispatch(analyzeComments({ 
-        comments, 
-        projectId: effectiveProjectId,
-        fileName: topFile.name 
-      })).unwrap();
+        const result = await dispatch(analyzeComments({ 
+          comments, 
+          projectId: effectiveProjectId,
+          fileName: topFile.name 
+        })).unwrap();
       
 
       // Extract analysis data from the result
@@ -852,6 +856,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     } catch (e: any) {
       const data = e?.response?.data;
       const message =
+        (typeof e === 'string' && e) ||
         (typeof data?.message === 'string' && data.message) ||
         (typeof data?.error === 'string' && data.error) ||
         (typeof data?.detail === 'string' && data.detail) ||
