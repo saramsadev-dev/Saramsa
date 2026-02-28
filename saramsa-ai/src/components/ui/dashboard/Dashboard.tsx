@@ -718,6 +718,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
   // Analyze loaded comments using the backend analyze endpoint
   async function handleTopAnalyze() {
+    setTopError(null);
+    dispatch(clearError());
     if (!topFile) {
       setTopError('Please select a file first');
       return;
@@ -733,9 +735,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       return;
     }
     try {
-      setTopError(null);
-      dispatch(clearError());
-
       // Load file data first
       const text = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
