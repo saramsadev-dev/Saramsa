@@ -132,7 +132,7 @@ export function NewProjectDropdown({
                     Connect your DevOps platforms
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Go to Settings > Integrations to connect Azure DevOps or Jira
+                    Go to Settings {'>'} Integrations to connect Azure DevOps or Jira
                   </p>
                   <a
                     href="/settings"

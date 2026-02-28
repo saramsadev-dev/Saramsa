@@ -352,7 +352,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
                 <p className="text-sm text-muted-foreground">
                   Tip: Connect your Azure DevOps or Jira accounts in{' '}
                   <a href="/settings" className="underline hover:no-underline">
-                    Settings > Integrations
+                    Settings {'>'} Integrations
                   </a>{' '}
                   to import existing projects.
                 </p>
