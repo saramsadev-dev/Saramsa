@@ -27,26 +27,26 @@ export const AnalysisLoading: React.FC<AnalysisLoadingProps> = ({ status, messag
     const getStatusColor = () => {
         switch (status) {
             case 'pending':
-                return 'text-blue-600 dark:text-blue-400';
+                return 'text-saramsa-brand dark:text-saramsa-brand';
             case 'processing':
                 return 'text-purple-600 dark:text-purple-400';
             case 'failure':
                 return 'text-red-600 dark:text-red-400';
             default:
-                return 'text-gray-600 dark:text-gray-400';
+                return 'text-muted-foreground dark:text-muted-foreground';
         }
     };
 
     const getStatusBgColor = () => {
         switch (status) {
             case 'pending':
-                return 'bg-blue-100 dark:bg-blue-900/20';
+                return 'bg-saramsa-brand/10 dark:bg-saramsa-brand/20';
             case 'processing':
                 return 'bg-purple-100 dark:bg-purple-900/20';
             case 'failure':
                 return 'bg-red-100 dark:bg-red-900/20';
             default:
-                return 'bg-gray-100 dark:bg-gray-900/20';
+                return 'bg-secondary/40 dark:bg-background/20';
         }
     };
 
@@ -68,7 +68,7 @@ export const AnalysisLoading: React.FC<AnalysisLoadingProps> = ({ status, messag
 
                 {status === 'processing' && (
                     <div className="mt-4 space-y-2">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                             This may take a few moments...
                         </p>
                         <div className="flex items-center justify-center space-x-2">
@@ -82,10 +82,10 @@ export const AnalysisLoading: React.FC<AnalysisLoadingProps> = ({ status, messag
 
             {status === 'processing' && (
                 <div className="mt-6 w-full max-w-md">
-                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-secondary/60 dark:bg-secondary/40 rounded-full overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse" style={{ width: '60%' }} />
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                    <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2 text-center">
                         Processing AI analysis...
                     </p>
                 </div>

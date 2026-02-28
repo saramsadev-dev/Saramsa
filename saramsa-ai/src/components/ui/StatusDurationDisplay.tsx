@@ -58,10 +58,10 @@ export function StatusDurationDisplay({
         return {
           icon: AlertCircle,
           bgColor: 'bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30',
-          borderColor: 'border-blue-300 dark:border-blue-600',
-          textColor: 'text-blue-800 dark:text-blue-300',
-          iconColor: 'text-blue-600 dark:text-blue-400',
-          durationBg: 'bg-blue-200 dark:bg-blue-800/50',
+          borderColor: 'border-saramsa-brand/30 dark:border-saramsa-brand/40',
+          textColor: 'text-saramsa-brand dark:text-saramsa-brand',
+          iconColor: 'text-saramsa-brand dark:text-saramsa-brand',
+          durationBg: 'bg-saramsa-brand/10 dark:bg-saramsa-brand/20',
           emoji: '⏳'
         };
       case 'warning':
@@ -77,11 +77,11 @@ export function StatusDurationDisplay({
       default:
         return {
           icon: AlertCircle,
-          bgColor: 'bg-gradient-to-r from-gray-100 to-slate-100 dark:from-gray-900/30 dark:to-slate-900/30',
-          borderColor: 'border-gray-300 dark:border-gray-600',
-          textColor: 'text-gray-800 dark:text-gray-300',
-          iconColor: 'text-gray-600 dark:text-gray-400',
-          durationBg: 'bg-gray-200 dark:bg-gray-800/50',
+          bgColor: 'bg-gradient-to-r from-secondary/40 to-secondary/20 dark:from-secondary/40 dark:to-secondary/30',
+          borderColor: 'border-border/60 dark:border-border/60',
+          textColor: 'text-foreground dark:text-muted-foreground',
+          iconColor: 'text-muted-foreground dark:text-muted-foreground',
+          durationBg: 'bg-secondary/60 dark:bg-card/50',
           emoji: 'ℹ️'
         };
     }
@@ -148,7 +148,7 @@ export function StatusDurationDisplay({
               {title}
             </h3>
             {description && (
-              <p className={`${sizeClasses.description} text-gray-600 dark:text-gray-400 mt-1`}>
+              <p className={`${sizeClasses.description} text-muted-foreground dark:text-muted-foreground mt-1`}>
                 {description}
               </p>
             )}
@@ -157,7 +157,7 @@ export function StatusDurationDisplay({
 
         {duration && (
           <div className="flex items-center gap-2">
-            <Clock className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+            <Clock className="w-3 h-3 text-muted-foreground dark:text-muted-foreground" />
             <span className={`
               ${sizeClasses.duration} 
               ${config.durationBg} 
@@ -177,7 +177,7 @@ export function StatusDurationDisplay({
 export function StatusDurationExamples() {
   return (
     <div className="space-y-4 p-6">
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+      <h2 className="text-xl font-bold text-foreground dark:text-foreground mb-4">
         Colorful Status & Duration Display Examples
       </h2>
       
@@ -218,7 +218,7 @@ export function StatusDurationExamples() {
       </div>
 
       <div className="mt-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+        <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-3">
           Different Sizes
         </h3>
         <div className="space-y-3">

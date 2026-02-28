@@ -18,6 +18,7 @@ import {
   encryptProjectId,
 } from "@/lib/encryption";
 import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function ProjectDashboardPage() {
   const params = useParams();
@@ -153,10 +154,10 @@ export default function ProjectDashboardPage() {
   // Analysis loading is handled within the Dashboard component itself
   if ((projectsLoading && projects.length === 0) || !isInitialized) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">
+          <Loader2 className="w-8 h-8 animate-spin text-saramsa-brand mx-auto mb-4" />
+          <p className="text-muted-foreground">
             {projectsLoading ? "Loading projects..." : "Initializing dashboard..."}
           </p>
         </div>
@@ -167,13 +168,13 @@ export default function ProjectDashboardPage() {
   // Error state
   if (decryptionError) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-2xl font-bold text-foreground mb-4">
             Project Not Found
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
+          <p className="text-muted-foreground mb-8">
             {decryptionError === "Invalid project ID"
               ? "The project link appears to be invalid or corrupted."
               : decryptionError === "Project not found"
@@ -181,19 +182,21 @@ export default function ProjectDashboardPage() {
               : decryptionError}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
+            <Button
               onClick={() => router.push("/projects")}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white rounded-lg hover:shadow-lg transition-all duration-200"
+              variant="saramsa"
+              className="px-6 py-3"
             >
               <ArrowLeft className="w-5 h-5" />
               Back to Projects
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => router.push("/projects")}
-              className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              variant="outline"
+              className="px-6 py-3 text-muted-foreground"
             >
               Go to Projects
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -203,30 +206,31 @@ export default function ProjectDashboardPage() {
   // Project not found (but no decryption error)
   if (!project) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
           <AlertCircle className="w-16 h-16 text-yellow-500 mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-2xl font-bold text-foreground mb-4">
             Project Not Found
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
+          <p className="text-muted-foreground mb-8">
             The requested project could not be found. It may have been deleted
             or you may not have access to it.
           </p>
-          <button
+          <Button
             onClick={() => router.push("/projects")}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white rounded-lg hover:shadow-lg transition-all duration-200 mx-auto"
+            variant="saramsa"
+            className="px-6 py-3 mx-auto"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Projects
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Dashboard Content */}
       {EnhancedDashboard}
     </div>

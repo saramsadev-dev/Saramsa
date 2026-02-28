@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card';
 import { Button } from './button';
+import { Input } from './input';
 import { Alert, AlertDescription } from './alert';
 import { Badge } from './badge';
 import { Select } from './select';
@@ -231,26 +232,26 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
 
           {/* Step Indicator */}
           <div className="flex items-center justify-center space-x-4 mb-6">
-            <div className={`flex items-center space-x-2 ${currentStep === 'project-creation' ? 'text-saramsa-brand' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'project-creation' ? 'bg-saramsa-brand text-white' : 'bg-gray-200'}`}>
+            <div className={`flex items-center space-x-2 ${currentStep === 'project-creation' ? 'text-saramsa-brand' : 'text-muted-foreground'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'project-creation' ? 'bg-saramsa-brand text-white' : 'bg-secondary/60'}`}>
                 1
               </div>
               <span className="text-sm font-medium">Create Project</span>
             </div>
-            <div className={`flex items-center space-x-2 ${currentStep === 'analysis' ? 'text-saramsa-brand' : currentStep === 'work-items' || currentStep === 'creation' ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'analysis' ? 'bg-saramsa-brand text-white' : currentStep === 'work-items' || currentStep === 'creation' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>
+            <div className={`flex items-center space-x-2 ${currentStep === 'analysis' ? 'text-saramsa-brand' : currentStep === 'work-items' || currentStep === 'creation' ? 'text-green-600' : 'text-muted-foreground'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'analysis' ? 'bg-saramsa-brand text-white' : currentStep === 'work-items' || currentStep === 'creation' ? 'bg-green-600 text-white' : 'bg-secondary/60'}`}>
                 2
               </div>
               <span className="text-sm font-medium">Analyze</span>
             </div>
-            <div className={`flex items-center space-x-2 ${currentStep === 'work-items' ? 'text-saramsa-brand' : currentStep === 'creation' ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'work-items' ? 'bg-saramsa-brand text-white' : currentStep === 'creation' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>
+            <div className={`flex items-center space-x-2 ${currentStep === 'work-items' ? 'text-saramsa-brand' : currentStep === 'creation' ? 'text-green-600' : 'text-muted-foreground'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'work-items' ? 'bg-saramsa-brand text-white' : currentStep === 'creation' ? 'bg-green-600 text-white' : 'bg-secondary/60'}`}>
                 3
               </div>
               <span className="text-sm font-medium">Work Items</span>
             </div>
-            <div className={`flex items-center space-x-2 ${currentStep === 'creation' ? 'text-saramsa-brand' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'creation' ? 'bg-saramsa-brand text-white' : 'bg-gray-200'}`}>
+            <div className={`flex items-center space-x-2 ${currentStep === 'creation' ? 'text-saramsa-brand' : 'text-muted-foreground'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'creation' ? 'bg-saramsa-brand text-white' : 'bg-secondary/60'}`}>
                 4
               </div>
               <span className="text-sm font-medium">Create Issues</span>
@@ -262,12 +263,12 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Project Name (in our system)</label>
-                <input
+                <Input
                   type="text"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   placeholder="Enter a name for this project"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-border/60 rounded-md"
                 />
               </div>
 
@@ -292,34 +293,34 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Jira Domain</label>
-                <input
+                <Input
                   type="text"
                   value={jiraDomain}
                   onChange={(e) => setJiraDomain(e.target.value)}
                   placeholder="your-domain.atlassian.net"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-border/60 rounded-md"
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Jira Email</label>
-                <input
+                <Input
                   type="email"
                   value={jiraEmail}
                   onChange={(e) => setJiraEmail(e.target.value)}
                   placeholder="your-email@company.com"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-border/60 rounded-md"
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Jira API Token</label>
-                <input
+                <Input
                   type="password"
                   value={jiraApiToken}
                   onChange={(e) => setJiraApiToken(e.target.value)}
                   placeholder="Enter your Jira API token"
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  className="w-full p-2 border border-border/60 rounded-md"
                 />
               </div>
 
@@ -343,7 +344,7 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
           {/* Step 2: Analysis */}
           {currentStep === 'analysis' && (
             <div className="space-y-4">
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <span className="text-green-800 dark:text-green-200 font-medium">Project Created Successfully!</span>
@@ -355,8 +356,8 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Comments to Analyze</label>
-                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="p-3 bg-secondary/40 dark:bg-card/95 rounded-md">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                     {comments.length} comments ready for analysis
                   </p>
                 </div>
@@ -382,7 +383,7 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
           {/* Step 3: Work Items */}
           {currentStep === 'work-items' && workItemsResults && (
             <div className="space-y-4">
-              <div className="p-4 bg-saramsa-accent/10 dark:bg-saramsa-accent/20 rounded-lg">
+              <div className="p-4 bg-saramsa-accent/10 dark:bg-saramsa-accent/20 rounded-xl">
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="h-5 w-5 text-saramsa-brand" />
                   <span className="text-saramsa-brand dark:text-saramsa-brand font-medium">Analysis Complete!</span>
@@ -396,12 +397,12 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
                 <label className="text-sm font-medium">Generated Work Items</label>
                 <div className="max-h-60 overflow-y-auto space-y-2">
                   {workItemsResults.work_items?.map((item: any, index: number) => (
-                    <div key={index} className="p-3 border border-gray-200 dark:border-gray-700 rounded-md">
+                    <div key={index} className="p-3 border border-border/60 dark:border-border/60 rounded-md">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-sm">{item.title}</h4>
                         <Badge variant="secondary">{item.type}</Badge>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
                         {item.description}
                       </p>
                       <div className="flex items-center space-x-2 mt-2">
@@ -441,7 +442,7 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
           {/* Step 4: Creation Results */}
           {currentStep === 'creation' && creationResults.length > 0 && (
             <div className="space-y-4">
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl">
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <span className="text-green-800 dark:text-green-200 font-medium">Jira Issues Created!</span>

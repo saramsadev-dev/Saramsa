@@ -97,9 +97,9 @@ export function AdvancedWordCloud({
     },
     neutral: { 
       icon: Meh, 
-      color: 'text-gray-600', 
-      bgColor: 'bg-gray-50 dark:bg-gray-900/20',
-      borderColor: 'border-gray-200 dark:border-gray-700',
+      color: 'text-muted-foreground', 
+      bgColor: 'bg-secondary/40 dark:bg-background/20',
+      borderColor: 'border-border/60 dark:border-border/60',
       label: 'Neutral',
       count: wordData.neutral.reduce((sum, word) => sum + word.frequency, 0)
     },
@@ -119,14 +119,14 @@ export function AdvancedWordCloud({
   if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg ${className}`}
+        className={`flex items-center justify-center p-8 border-2 border-dashed border-border/60 dark:border-border/60 rounded-xl ${className}`}
       >
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 text-gray-400">💭</div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
+          <div className="w-12 h-12 mx-auto mb-4 text-muted-foreground">...</div>
+          <p className="text-muted-foreground dark:text-muted-foreground text-sm">
             No keywords available
           </p>
-          <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+          <p className="text-muted-foreground dark:text-muted-foreground text-xs mt-1">
             Keywords will appear here after analysis
           </p>
         </div>
@@ -135,14 +135,14 @@ export function AdvancedWordCloud({
   }
 
   return (
-    <Card className={`bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 ${className}`}>
+    <Card className={`bg-card/90 dark:bg-card/95 border-border/60 dark:border-border/60 ${className}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-gray-900 dark:text-white">
+            <CardTitle className="text-foreground dark:text-foreground">
               Sentiment Word Analysis
             </CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
               Most frequently mentioned words by sentiment
             </p>
           </div>
@@ -162,13 +162,14 @@ export function AdvancedWordCloud({
             const isActive = activeSentiment === key;
             
             return (
-              <button
+              <Button
                 key={key}
                 onClick={() => setActiveSentiment(key as any)}
-                className={`flex-1 p-4 rounded-lg border-2 transition-all duration-300 ${
+                variant="ghost"
+                className={`flex-1 p-4 rounded-xl border-2 transition-all duration-300 ${
                   isActive 
                     ? `${config.bgColor} ${config.borderColor} ${config.color}` 
-                    : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    : 'bg-secondary/40 dark:bg-secondary/40/50 border-border/60 dark:border-border/60 text-muted-foreground dark:text-muted-foreground hover:bg-accent/60 dark:hover:bg-accent/60'
                 }`}
               >
                 <div className="flex items-center justify-center gap-2 mb-2">
@@ -181,13 +182,13 @@ export function AdvancedWordCloud({
                 <div className="text-xs opacity-75">
                   mentions
                 </div>
-              </button>
+              </Button>
             );
           })}
         </div>
 
         {/* Word Cloud Visualization */}
-        <div className={`relative h-80 rounded-lg ${currentConfig.bgColor} border ${currentConfig.borderColor} overflow-hidden`}>
+        <div className={`relative h-80 rounded-xl ${currentConfig.bgColor} border ${currentConfig.borderColor} overflow-hidden`}>
           {/* Background Pattern */}
           <div className="absolute inset-0 opacity-5">
             <svg className="w-full h-full" viewBox="0 0 400 320">
@@ -244,12 +245,12 @@ export function AdvancedWordCloud({
               
               {/* Hover Tooltip */}
               <motion.div
-                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10"
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-background dark:bg-secondary/40 text-white dark:text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10"
                 initial={{ opacity: 0, y: 5 }}
                 whileHover={{ opacity: 1, y: 0 }}
               >
                 {wordItem.frequency} mentions
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-gray-100" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-foreground dark:border-b-foreground" />
               </motion.div>
             </motion.div>
           ))}
@@ -297,7 +298,7 @@ export function AdvancedWordCloud({
 
         {/* Top Words List */}
         <div>
-          <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+          <h4 className="font-medium text-foreground dark:text-foreground mb-3">
             Top 5 Words ({currentConfig.label})
           </h4>
           <div className="grid grid-cols-5 gap-2">
@@ -307,7 +308,7 @@ export function AdvancedWordCloud({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="text-center p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                className="text-center p-2 bg-secondary/40 dark:bg-secondary/40/50 rounded-xl"
               >
                 <div 
                   className="text-lg font-semibold mb-1"
@@ -315,7 +316,7 @@ export function AdvancedWordCloud({
                 >
                   {wordItem.word}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
+                <div className="text-xs text-muted-foreground dark:text-muted-foreground">
                   {wordItem.frequency}
                 </div>
               </motion.div>

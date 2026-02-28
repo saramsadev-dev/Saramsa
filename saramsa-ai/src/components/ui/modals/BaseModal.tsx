@@ -4,6 +4,7 @@ import type { ReactNode, MouseEvent } from "react";
 import { useId } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
+import { Button } from "../button";
 
 type ModalSize = "sm" | "md" | "lg";
 
@@ -132,14 +133,16 @@ export function BaseModal({
                   </div>
                 )}
                 {!hideCloseButton && (
-                  <button
+                  <Button
                     type="button"
                     onClick={onClose}
-                    className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/70 transition-colors"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/70"
                     aria-label={closeButtonLabel}
                   >
                     <X className="w-5 h-5" />
-                  </button>
+                  </Button>
                 )}
               </div>
             )}

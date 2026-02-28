@@ -11,6 +11,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import type { IntegrationAccount } from '@/store/features/integrations/integrationsSlice';
+import { Button } from '@/components/ui/button';
 
 interface NewProjectDropdownProps {
   onClose: () => void;
@@ -55,8 +56,9 @@ export function NewProjectDropdown({
     >
       <div className="p-2">
         {/* Create Project */}
-        <button
+        <Button
           onClick={onCreateProject}
+          variant="ghost"
           className="flex items-center gap-3 w-full px-3 py-3 text-left hover:bg-accent/60 rounded-xl transition-colors"
         >
           <div className="w-8 h-8 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-[0_8px_18px_-10px_rgba(230,3,235,0.7)]">
@@ -66,14 +68,15 @@ export function NewProjectDropdown({
             <p className="font-medium text-foreground">Create Project</p>
             <p className="text-sm text-muted-foreground">Start with a blank project</p>
           </div>
-        </button>
+        </Button>
 
         <div className="my-2 border-t border-border/60"></div>
 
         {/* Import from Azure DevOps */}
-        <button
+        <Button
           onClick={() => handleImportClick('azure')}
           disabled={azureIntegrations.length === 0}
+          variant="ghost"
           className="flex items-center gap-3 w-full px-3 py-3 text-left hover:bg-accent/60 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-8 h-8 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-[0_8px_18px_-10px_rgba(230,3,235,0.7)]">
@@ -91,12 +94,13 @@ export function NewProjectDropdown({
           {azureIntegrations.length === 0 && (
             <AlertCircle className="w-4 h-4 text-yellow-500" />
           )}
-        </button>
+        </Button>
 
         {/* Import from Jira */}
-        <button
+        <Button
           onClick={() => handleImportClick('jira')}
           disabled={jiraIntegrations.length === 0}
+          variant="ghost"
           className="flex items-center gap-3 w-full px-3 py-3 text-left hover:bg-accent/60 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-8 h-8 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-[0_8px_18px_-10px_rgba(230,3,235,0.7)]">
@@ -114,7 +118,7 @@ export function NewProjectDropdown({
           {jiraIntegrations.length === 0 && (
             <AlertCircle className="w-4 h-4 text-yellow-500" />
           )}
-        </button>
+        </Button>
 
         {/* No integrations message */}
         {integrations.length === 0 && (
@@ -128,7 +132,7 @@ export function NewProjectDropdown({
                     Connect your DevOps platforms
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Go to Settings → Integrations to connect Azure DevOps or Jira
+                    Go to Settings > Integrations to connect Azure DevOps or Jira
                   </p>
                   <a
                     href="/settings"

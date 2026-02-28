@@ -37,6 +37,7 @@ import { AzureIntegrationForm } from "@/components/ui/settings/AzureIntegrationF
 import { JiraIntegrationForm } from "@/components/ui/settings/JiraIntegrationForm";
 import { BaseModal } from "@/components/ui/modals/BaseModal";
 import type { IntegrationAccount } from "@/store/features/integrations/integrationsSlice";
+import { Button } from "@/components/ui/button";
 
 export function IntegrationsPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -178,7 +179,7 @@ export function IntegrationsPage() {
       case "expired":
         return <AlertCircle className="w-5 h-5 text-yellow-500" />;
       default:
-        return <AlertCircle className="w-5 h-5 text-gray-400" />;
+        return <AlertCircle className="w-5 h-5 text-muted-foreground" />;
     }
   };
 
@@ -186,19 +187,19 @@ export function IntegrationsPage() {
     switch (provider) {
       case "azure":
         return (
-          <div className="w-8 h-8 bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] rounded-lg flex items-center justify-center shadow-lg">
+          <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-lg">
             <Cloud className="w-4 h-4 text-white" />
           </div>
         );
       case "jira":
         return (
-          <div className="w-8 h-8 bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] rounded-lg flex items-center justify-center shadow-lg">
+          <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-lg">
             <span className="text-white text-sm font-bold">J</span>
           </div>
         );
       default:
         return (
-          <div className="w-8 h-8 bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] rounded-lg flex items-center justify-center shadow-lg">
+          <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-lg">
             <Settings className="w-4 h-4 text-white" />
           </div>
         );
@@ -218,22 +219,24 @@ export function IntegrationsPage() {
         {accounts.length > 0 && (
           <div className="flex gap-3">
             {!hasAzureIntegration && (
-              <button
+              <Button
                 onClick={() => setShowAzureForm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white rounded-md transition-all duration-300 font-medium shadow-lg hover:shadow-xl"
+                variant="saramsa"
+                className="flex items-center gap-2 px-4 py-2 font-medium"
               >
                 <Plus className="w-4 h-4" />
                 Add Azure DevOps
-              </button>
+              </Button>
             )}
             {!hasJiraIntegration && (
-              <button
+              <Button
                 onClick={() => setShowJiraForm(true)}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-[#E603EB]/20 hover:border-[#E603EB]/40 hover:bg-[#E603EB]/5 text-gray-900 dark:text-white rounded-md transition-all duration-300 font-medium"
+                variant="outline"
+                className="flex items-center gap-2 px-4 py-2 font-medium border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
               >
                 <Plus className="w-4 h-4" />
                 Add Jira
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -244,17 +247,19 @@ export function IntegrationsPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-destructive/10 border border-destructive/20 rounded-lg p-4"
+          className="bg-destructive/10 border border-destructive/20 rounded-xl p-4"
         >
           <div className="flex items-center gap-2">
             <XCircle className="w-5 h-5 text-destructive" />
             <span className="text-destructive">{error}</span>
-            <button
+            <Button
               onClick={() => dispatch(clearError())}
+              variant="ghost"
+              size="sm"
               className="ml-auto text-destructive hover:text-destructive/80"
             >
-              ×
-            </button>
+              x
+            </Button>
           </div>
         </motion.div>
       )}
@@ -281,22 +286,24 @@ export function IntegrationsPage() {
             </p>
             <div className="flex gap-3 justify-center">
               {!hasAzureIntegration && (
-                <button
+                <Button
                   onClick={() => setShowAzureForm(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white rounded-md transition-all duration-300 shadow-lg hover:shadow-xl"
+                  variant="saramsa"
+                  className="flex items-center gap-2 px-4 py-2"
                 >
                   <Plus className="w-4 h-4" />
                   Connect Azure DevOps
-                </button>
+                </Button>
               )}
               {!hasJiraIntegration && (
-                <button
+                <Button
                   onClick={() => setShowJiraForm(true)}
-                  className="flex items-center gap-2 px-4 py-2 border-2 border-[#E603EB]/20 hover:border-[#E603EB]/40 hover:bg-[#E603EB]/5 text-gray-900 dark:text-white rounded-md transition-all duration-300"
+                  variant="outline"
+                  className="flex items-center gap-2 px-4 py-2 border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
                 >
                   <Plus className="w-4 h-4" />
                   Connect Jira
-                </button>
+                </Button>
               )}
             </div>
           </motion.div>
@@ -308,38 +315,38 @@ export function IntegrationsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-2 border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/30 transition-all duration-300 rounded-xl p-6"
+                className="bg-card/80 dark:bg-card/90 backdrop-blur-sm border-2 border-border/60 dark:border-border/60 hover:border-saramsa-brand/30 transition-all duration-300 rounded-xl p-6"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     {getProviderIcon(account.provider)}
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                        <h3 className="font-semibold text-foreground dark:text-foreground">
                           {account.displayName}
                         </h3>
                         {getStatusIcon(account.status)}
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
                         <span>
                           {account.provider === "azure"
                             ? "Azure DevOps"
                             : "Jira Cloud"}
                         </span>
-                        <span>•</span>
+                        <span>|</span>
                         <span>
                           Connected{" "}
                           {new Date(account.savedAt).toLocaleDateString()}
                         </span>
                         {account.metadata.organization && (
                           <>
-                            <span>•</span>
+                            <span>|</span>
                             <span>{account.metadata.organization}</span>
                           </>
                         )}
                         {account.metadata.domain && (
                           <>
-                            <span>•</span>
+                            <span>|</span>
                             <span>{account.metadata.domain}</span>
                           </>
                         )}
@@ -348,10 +355,11 @@ export function IntegrationsPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={() => handleFetchProjects(account.provider)}
                       disabled={fetchingProjects[account.provider]}
-                      className="flex items-center gap-2 px-3 py-2 text-sm bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white rounded-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="saramsa"
+                      className="flex items-center gap-2 px-3 py-2 text-sm"
                     >
                       {fetchingProjects[account.provider] ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -359,12 +367,13 @@ export function IntegrationsPage() {
                         <Download className="w-4 h-4" />
                       )}
                       Fetch Projects
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
                       onClick={() => handleTestConnection(account.id)}
                       disabled={testingConnection[account.id]}
-                      className="flex items-center gap-2 px-3 py-2 text-sm border-2 border-[#E603EB]/20 hover:border-[#E603EB]/40 hover:bg-[#E603EB]/5 transition-all duration-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="outline"
+                      className="flex items-center gap-2 px-3 py-2 text-sm border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
                     >
                       {testingConnection[account.id] ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -372,39 +381,40 @@ export function IntegrationsPage() {
                         <TestTube className="w-4 h-4" />
                       )}
                       Test
-                    </button>
+                    </Button>
 
                     {account.metadata.baseUrl && (
                       <a
                         href={account.metadata.baseUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 text-sm border-2 border-[#E603EB]/20 hover:border-[#E603EB]/40 hover:bg-[#E603EB]/5 transition-all duration-300 rounded-md"
+                        className="flex items-center gap-2 px-3 py-2 text-sm border-2 border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10 transition-all duration-300 rounded-xl"
                       >
                         <ExternalLink className="w-4 h-4" />
                         Open
                       </a>
                     )}
 
-                    <button
+                    <Button
                       onClick={() => handleDeleteAccount(account)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-destructive border border-destructive/20 rounded-md hover:bg-destructive/10 transition-colors"
+                      variant="outline"
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-destructive border-destructive/20 hover:bg-destructive/10"
                     >
                       <Trash2 className="w-4 h-4" />
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 {/* Scopes */}
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="mt-4 pt-4 border-t border-border/60 dark:border-border/60">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
                     <span className="font-medium">Permissions:</span>
                     <div className="flex gap-2">
                       {account.scopes.map((scope) => (
                         <span
                           key={scope}
-                          className="px-2 py-1 bg-[#E603EB]/10 text-[#E603EB] rounded text-xs font-medium"
+                          className="px-2 py-1 bg-saramsa-brand/10 text-saramsa-brand rounded text-xs font-medium"
                         >
                           {scope}
                         </span>
@@ -434,16 +444,18 @@ export function IntegrationsPage() {
                 Click on any project to create or navigate to it
               </p>
             </div>
-            <button
+            <Button
               onClick={() => dispatch(clearExternalProjects())}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
             >
               Clear
-            </button>
+            </Button>
           </div>
 
           {/* Success Message */}
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
               <p className="text-sm font-medium text-green-700 dark:text-green-400">
@@ -454,7 +466,7 @@ export function IntegrationsPage() {
 
           {/* Project Selection with Folder Icons */}
           <div className="space-y-3">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               Select Project to Import
             </label>
             <div className="grid gap-3 max-h-96 overflow-y-auto">
@@ -464,34 +476,34 @@ export function IntegrationsPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${
+                  className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
                     creatingProject === project.id
-                      ? "border-[#E603EB] bg-[#E603EB]/10 dark:bg-[#E603EB]/20"
-                      : "border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/50 hover:bg-[#E603EB]/5"
+                      ? "border-saramsa-brand/60 bg-saramsa-brand/10 dark:bg-saramsa-brand/20"
+                      : "border-border/60 dark:border-border/60 hover:border-saramsa-brand/60/50 hover:bg-saramsa-brand/10"
                   }`}
                   onClick={() => handleCreateOrNavigateToProject(project)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="flex-shrink-0">
-                        <Folder className="w-6 h-6 text-[#E603EB]" />
+                        <Folder className="w-6 h-6 text-saramsa-brand" />
                       </div>
                       <div className="flex-1">
-                        <div className="font-medium text-gray-900 dark:text-white text-base">
+                        <div className="font-medium text-foreground dark:text-foreground text-base">
                           {project.name}
                         </div>
                         {project.description && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          <div className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
                             {project.description}
                           </div>
                         )}
 
                         {/* Project metadata */}
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground dark:text-muted-foreground">
                           {project.key && (
                             <div className="flex items-center gap-1">
                               <span className="font-medium">Key:</span>
-                              <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded">
+                              <span className="px-2 py-1 bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand rounded">
                                 {project.key}
                               </span>
                             </div>
@@ -521,7 +533,7 @@ export function IntegrationsPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1 px-3 py-2 text-sm border-2 border-[#E603EB]/20 hover:border-[#E603EB]/40 hover:bg-[#E603EB]/5 transition-all duration-300 rounded-md"
+                          className="flex items-center gap-1 px-3 py-2 text-sm border-2 border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10 transition-all duration-300 rounded-xl"
                         >
                           <ExternalLink className="w-4 h-4" />
                           Open
@@ -530,10 +542,10 @@ export function IntegrationsPage() {
 
                       <div className="flex items-center gap-2">
                         {creatingProject === project.id && (
-                          <Loader2 className="w-4 h-4 animate-spin text-[#E603EB]" />
+                          <Loader2 className="w-4 h-4 animate-spin text-saramsa-brand" />
                         )}
                         {creatingProject !== project.id && (
-                          <CheckCircle className="w-5 h-5 text-[#E603EB]" />
+                          <CheckCircle className="w-5 h-5 text-saramsa-brand" />
                         )}
                       </div>
                     </div>
@@ -541,7 +553,7 @@ export function IntegrationsPage() {
                 </motion.div>
               ))}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               Click on any project to create or navigate to it in your dashboard
             </p>
           </div>
@@ -588,19 +600,21 @@ export function IntegrationsPage() {
           }
           footer={
             <div className="flex items-center justify-end gap-3">
-              <button
+              <Button
                 type="button"
                 onClick={closeDeleteModal}
                 disabled={!!deletingAccountId}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+                variant="outline"
+                className="px-4 py-2 text-muted-foreground dark:text-muted-foreground"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleConfirmDeleteAccount}
                 disabled={!!deletingAccountId}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                variant="destructive"
+                className="flex items-center gap-2 px-4 py-2"
               >
                 {deletingAccountId ? (
                   <>
@@ -613,15 +627,15 @@ export function IntegrationsPage() {
                     Delete integration
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           }
         >
-          <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+          <div className="space-y-3 text-sm text-muted-foreground dark:text-muted-foreground">
             <p>
               This action will also delete every project created through this integration along with their analysis history and AI-generated work items.
             </p>
-            <ul className="list-disc list-inside space-y-1 text-gray-500 dark:text-gray-400">
+            <ul className="list-disc list-inside space-y-1 text-muted-foreground dark:text-muted-foreground">
               <li>Associated Saramsa projects</li>
               <li>Stored analysis results</li>
               <li>Work items generated from those projects</li>

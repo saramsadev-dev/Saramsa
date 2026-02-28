@@ -37,6 +37,7 @@ import { AdvancedWordCloud } from './AdvancedWordCloud';
 import { UserStoryList } from '../userStoryList';
 
 import { LoaderForDashboard } from '@/components/dashboard/analysisDashboard/LoaderForDashboard';
+import { Button } from '@/components/ui/button';
 
 // Local interface for the component
 interface LocalFeatureSentiment {
@@ -1327,7 +1328,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   // Analysis loading is handled within the dashboard section
   if (projectsLoading && projects.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen bg-secondary/40 dark:bg-background">
         {/* Main Content */}
         <main className="p-6">
           <div className="max-w-7xl mx-auto space-y-6">
@@ -1335,7 +1336,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             <div className="flex items-center justify-between">
               {/* Unified Project Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
                   Select Project
                 </label>
                 <AnalysisProjectSelector
@@ -1349,27 +1350,29 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               </div>
 
               {/* Navigation Tabs - Inlined */}
-              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                <button
+              <div className="flex bg-secondary/70 rounded-xl p-1">
+                <Button
                   onClick={() => setActiveView('dashboard')}
+                  variant="ghost"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     activeView === 'dashboard' 
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
+                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
                   }`}
                 >
                   Dashboard
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setActiveView('user-stories')}
+                  variant="ghost"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     activeView === 'user-stories' 
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
+                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
                   }`}
                 >
                   User Stories
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -1389,24 +1392,24 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               </>
             ) : activeView === 'user-stories' ? (
               /* User Stories View Loading */
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
                 <div className="animate-pulse">
-                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+                  <div className="h-6 bg-secondary/60 rounded-xl w-1/4 mb-4"></div>
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      <div key={i} className="h-16 bg-secondary/60 rounded-xl"></div>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
               /* Jira Integration View Loading */
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+              <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
                 <div className="animate-pulse">
-                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+                  <div className="h-6 bg-secondary/60 rounded-xl w-1/4 mb-4"></div>
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      <div key={i} className="h-16 bg-secondary/60 rounded-xl"></div>
                     ))}
                   </div>
                 </div>
@@ -1419,7 +1422,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-secondary/40 dark:bg-background">
       {/* Main Content */}
       <main className="p-6">
         <div className="max-w-7xl mx-auto space-y-6">
@@ -1427,7 +1430,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           <div className="flex items-center justify-between">
             {/* Unified Project Selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
                 Select Project
               </label>
               <AnalysisProjectSelector
@@ -1442,18 +1445,19 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
             {/* Navigation Tabs - Inlined */}
             <div className="flex gap-4 items-center">
-              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                <button
+              <div className="flex bg-secondary/70 rounded-xl p-1">
+                <Button
                   onClick={() => setActiveView('dashboard')}
+                  variant="ghost"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     activeView === 'dashboard' 
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
+                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
                   }`}
                 >
                   Dashboard
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => {
                     setActiveView('user-stories');
                     // Fetch user stories when switching to the user stories tab
@@ -1474,27 +1478,29 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                       }));
                     }
                   }}
+                  variant="ghost"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     activeView === 'user-stories' 
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
+                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
                   }`}
                 >
                   User Stories
-                </button>
+                </Button>
               </div>
               
               {/* Projects Button */}
-              <button
+              <Button
                 onClick={() => {
                   if (typeof window !== 'undefined') {
                     window.location.href = '/projects';
                   }
                 }}
-                className="px-4 py-2 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white rounded-lg hover:shadow-lg transition-all duration-200 text-sm font-medium"
+                variant="saramsa"
+                className="px-4 py-2 text-sm font-medium"
               >
                 Projects
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1518,17 +1524,19 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                   <p className="text-sm text-red-700 dark:text-red-300 flex-1">
                     {error || topError}
                   </p>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => {
                       setTopError(null);
                       dispatch(clearError());
                     }}
-                    className="shrink-0 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 h-9 w-9 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30"
                     aria-label="Dismiss error"
                   >
-                    <span className="text-lg leading-none">×</span>
-                  </button>
+                    <span className="text-lg leading-none">x</span>
+                  </Button>
                 </div>
               )}
 
@@ -1538,7 +1546,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               ) : (
                 <>
                   {/* Summary Info */}
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-muted-foreground dark:text-muted-foreground">
                     {hasAnalysisResults ? (
                       <>Current file summary based on the data uploaded as of {
                         (() => {
@@ -1575,7 +1583,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     <>
                       {/* Feature Sentiments Table */}
                       {hasAnalysisResults && (
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
                           <FeatureSentimentsTable
                             features={transformedFeatures}
                             selectedFeatures={selectedFeatures}
@@ -1607,30 +1615,30 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     <div className="space-y-4">
                       {/* Word Cloud View Toggle */}
                       <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
                           Word Cloud Analysis
                         </h3>
-                        {/* <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                          <button
+                        {/* <div className="flex bg-secondary/70 rounded-xl p-1">
+                          <Button
                             onClick={() => setWordCloudView('split')}
                             className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
                               wordCloudView === 'split' 
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
+                                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
                             }`}
                           >
                             Split View
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() => setWordCloudView('advanced')}
                             className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
                               wordCloudView === 'advanced' 
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
+                                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
                             }`}
                           >
                             Advanced View
-                          </button>
+                          </Button>
                         </div> */}
                       </div>
 
@@ -1669,11 +1677,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             </>
           ) : activeView === 'user-stories' ? (
             /* User Stories View */
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
               {isGeneratingUserStories ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <LoaderForDashboard />
-                  <p className="mt-4 text-gray-600 dark:text-gray-400">Generating user stories from analysis...</p>
+                  <p className="mt-4 text-muted-foreground dark:text-muted-foreground">Generating user stories from analysis...</p>
                 </div>
               ) : selectedPlatform === 'jira' ? (
                 /* Jira User Stories View */
@@ -1808,7 +1816,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                         <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
                           <Sparkles className="w-8 h-8 text-slate-400" />
                         </div>
-                        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                        <h3 className="text-lg font-medium text-slate-900 dark:text-foreground mb-2">
                           No User Stories Generated
                         </h3>
                         <p className="text-slate-500 dark:text-slate-400 mb-4">
@@ -1833,7 +1841,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
                       <Sparkles className="w-8 h-8 text-slate-400" />
                     </div>
-                    <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                    <h3 className="text-lg font-medium text-slate-900 dark:text-foreground mb-2">
                       No User Stories Found
                     </h3>
                     <p className="text-slate-500 dark:text-slate-400 mb-4">
@@ -1843,7 +1851,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                       }
                     </p>
                     {process.env.NODE_ENV === 'development' && (
-                      <button
+                      <Button
                         onClick={() => {
                           const effectiveProjectId = currentProjectId || personalProjectId;
                           if (effectiveProjectId && user?.id) {
@@ -1855,10 +1863,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                             }));
                           }
                         }}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                        variant="saramsa"
+                        className="mt-4 px-4 py-2 text-sm"
                       >
                         Refresh user stories
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )
@@ -1909,7 +1918,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     />
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-gray-500 dark:text-gray-400">
+                      <p className="text-muted-foreground dark:text-muted-foreground">
                         No deep analysis data available. Please upload feedback data to generate user stories.
                       </p>
                     </div>

@@ -97,7 +97,7 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
               <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
               <span className="text-red-700 dark:text-red-300">{error}</span>
             </div>
@@ -111,13 +111,13 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
 
           {loading && (
             <div className="text-center py-4">
-              <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading user stories...</p>
+              <div className="animate-spin w-6 h-6 border-2 border-saramsa-brand border-t-transparent rounded-full mx-auto"></div>
+              <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">Loading user stories...</p>
             </div>
           )}
 
           {!loading && currentProjectUserStories.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
               No user stories found for this project.
             </div>
           )}
@@ -132,13 +132,13 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
                           <Badge variant="outline">#{index + 1}</Badge>
-                          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
+                          <Badge className="bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand">
                             {userStory.platform}
                           </Badge>
                         </div>
                         
                         <div className="space-y-1 text-sm">
-                          <div><strong>ID:</strong> <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{userStory.id}</code></div>
+                          <div><strong>ID:</strong> <code className="bg-secondary/40 dark:bg-card/95 px-1 rounded">{userStory.id}</code></div>
                           <div><strong>Type:</strong> {userStory.type}</div>
                           <div><strong>Project ID:</strong> {userStory.projectId}</div>
                           <div><strong>User ID:</strong> {userStory.userId}</div>
@@ -148,10 +148,10 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
 
                         {userStory.work_items.length > 0 && (
                           <details className="mt-2">
-                            <summary className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400">
+                            <summary className="cursor-pointer text-sm font-medium text-saramsa-brand dark:text-saramsa-brand">
                               View Work Items ({userStory.work_items.length})
                             </summary>
-                            <div className="mt-2 space-y-1 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                            <div className="mt-2 space-y-1 pl-4 border-l-2 border-border/60 dark:border-border/60">
                               {userStory.work_items.slice(0, 5).map((item, idx) => (
                                 <div key={item.id} className="text-xs">
                                   <strong>{idx + 1}.</strong> {item.title} 
@@ -160,7 +160,7 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
                                 </div>
                               ))}
                               {userStory.work_items.length > 5 && (
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-muted-foreground">
                                   ... and {userStory.work_items.length - 5} more
                                 </div>
                               )}
@@ -196,7 +196,7 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
           <div className="text-sm space-y-2">
             <p><strong>Current Project ID:</strong> <code>{projectId}</code></p>
             <p><strong>Available User Story IDs:</strong></p>
-            <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs font-mono">
+            <div className="bg-secondary/40 dark:bg-card/95 p-3 rounded text-xs font-mono">
               {currentProjectUserStories.length > 0 ? (
                 currentProjectUserStories.map(story => (
                   <div key={story.id}>"{story.id}"</div>
@@ -209,7 +209,7 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
           
           <div className="text-sm">
             <p><strong>Test with curl:</strong></p>
-            <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs font-mono overflow-x-auto">
+            <div className="bg-secondary/40 dark:bg-card/95 p-3 rounded text-xs font-mono overflow-x-auto">
               {currentProjectUserStories.length > 0 ? (
                 `curl -X DELETE "http://127.0.0.1:8000/api/insights/user-stories/${currentProjectUserStories[0].id}/delete/" \\
   -H "Authorization: Bearer YOUR_JWT_TOKEN"`

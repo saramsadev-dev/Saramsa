@@ -25,6 +25,8 @@ const ThemeToggle = dynamic(
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/useAuth';
 import * as authApi from '@/lib/auth';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // Form validation schema
 const registerSchema = z.object({
@@ -252,7 +254,7 @@ export default function RegisterPage() {
                   Username
                 </label>
                 <div className="relative">
-                  <input
+                  <Input
                     {...register('username')}
                     id="username"
                     type="text"
@@ -294,7 +296,7 @@ export default function RegisterPage() {
                   Email address
                 </label>
                 <div className="relative">
-                  <input
+                  <Input
                     {...register('email')}
                     id="email"
                     type="email"
@@ -314,7 +316,7 @@ export default function RegisterPage() {
                   Password
                 </label>
                 <div className="relative">
-                  <input
+                  <Input
                     {...register('password')}
                     id="password"
                     type={showPassword ? 'text' : 'password'}
@@ -322,13 +324,15 @@ export default function RegisterPage() {
                     className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand transition-colors"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand"
                   >
                     {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                  </button>
+                  </Button>
                 </div>
                 {errors.password && (
                   <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.password.message}</p>
@@ -341,7 +345,7 @@ export default function RegisterPage() {
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <input
+                  <Input
                     {...register('confirmPassword')}
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -349,13 +353,15 @@ export default function RegisterPage() {
                     className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand transition-colors"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand"
                   >
                     {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                  </button>
+                  </Button>
                 </div>
                 {errors.confirmPassword && (
                   <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.confirmPassword.message}</p>
@@ -364,10 +370,11 @@ export default function RegisterPage() {
             </div>
 
             {/* Create Account Button */}
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-saramsa-brand to-saramsa-gradient-to hover:from-saramsa-brand hover:to-saramsa-gradient-to text-white py-2.5 sm:py-3 px-4 rounded-2xl text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base font-semibold shadow-[0_18px_40px_-24px_rgba(230,3,235,0.75)] hover:shadow-[0_24px_60px_-28px_rgba(230,3,235,0.8)] transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="saramsa"
+              className="w-full py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base group"
             >
               {isLoading ? (
                 <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
@@ -377,7 +384,7 @@ export default function RegisterPage() {
                   <ArrowRight className="ml-2 w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform inline" />
                 </>
               )}
-            </button>
+            </Button>
 
             {/* Login Link */}
             <div className="text-center">

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Badge } from './badge';
 import { Trash2 } from 'lucide-react';
 import { apiRequest } from '@/lib/apiRequest';
+import { Checkbox } from './checkbox';
 
 interface WorkItemDeleteTestProps {
   userStoryData: {
@@ -75,7 +76,7 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
     <Card className="w-full max-w-4xl">
       <CardHeader>
         <CardTitle>Work Item Delete Test</CardTitle>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-muted-foreground dark:text-muted-foreground">
           <div><strong>User Story ID:</strong> {userStoryData.id}</div>
           <div><strong>User ID:</strong> {userStoryData.userId}</div>
           <div><strong>Total Work Items:</strong> {userStoryData.work_items.length}</div>
@@ -102,26 +103,25 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
           {userStoryData.work_items.map((workItem, index) => (
             <div
               key={workItem.id}
-              className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+              className={`p-3 border rounded-xl cursor-pointer transition-colors ${
                 selectedWorkItems.includes(workItem.id)
                   ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
-                  : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'bg-secondary/40 border-border/60 dark:bg-card/95 dark:border-border/60 hover:bg-accent/60 dark:hover:bg-accent/60'
               }`}
               onClick={() => toggleWorkItemSelection(workItem.id)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedWorkItems.includes(workItem.id)}
-                      onChange={() => toggleWorkItemSelection(workItem.id)}
-                      className="rounded"
+                      onCheckedChange={() => toggleWorkItemSelection(workItem.id)}
+                      className="border-border/60"
                     />
                     <Badge variant="outline">#{index + 1}</Badge>
                     <Badge className={`text-xs ${
                       workItem.type === 'Bug' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
-                      workItem.type === 'Feature' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
+                      workItem.type === 'Feature' ? 'bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand' :
                       workItem.type === 'Task' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
                       'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
                     }`}>
@@ -133,7 +133,7 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
                   </div>
                   
                   <div className="text-sm font-medium">{workItem.title}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">
+                  <div className="text-xs text-muted-foreground dark:text-muted-foreground font-mono mt-1">
                     ID: {workItem.id}
                   </div>
                 </div>
@@ -143,7 +143,7 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
         </div>
 
         {result && (
-          <div className={`p-4 rounded-lg border-2 ${
+          <div className={`p-4 rounded-xl border-2 ${
             result.success 
               ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-600'
               : 'bg-gradient-to-r from-red-50 to-rose-50 border-red-300 dark:from-red-900/20 dark:to-rose-900/20 dark:border-red-600'
@@ -151,23 +151,23 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
             <div className="flex items-center gap-2 font-medium mb-2">
               {result.success ? (
                 <>
-                  <span className="text-2xl">✅</span>
+                  <span className="text-2xl">OK</span>
                   <span className="text-green-800 dark:text-green-300">Success</span>
                 </>
               ) : (
                 <>
-                  <span className="text-2xl">❌</span>
+                  <span className="text-2xl">NO</span>
                   <span className="text-red-800 dark:text-red-300">Error</span>
                 </>
               )}
             </div>
-            <pre className="text-xs overflow-auto bg-white/50 dark:bg-black/20 p-2 rounded border">
+            <pre className="text-xs overflow-auto bg-card/50 dark:bg-black/20 p-2 rounded border">
               {JSON.stringify(result.success ? result.data : result.error, null, 2)}
             </pre>
           </div>
         )}
 
-        <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 p-3 rounded">
+        <div className="text-xs text-muted-foreground dark:text-muted-foreground bg-secondary/40 dark:bg-card/95 p-3 rounded">
           <div className="font-medium mb-1">API Call Preview:</div>
           <div className="font-mono">
             PUT /api/insights/user-stories/remove-work-items/ (UPDATE operation)

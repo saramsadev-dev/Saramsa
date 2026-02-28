@@ -17,6 +17,7 @@ import { deleteWorkItems, fetchUserStoriesByProject, setCurrentProjectUserStorie
 import { DeleteWorkItemsModal } from './DeleteWorkItemsModal';
 import { DashboardIntegrationModal } from './dashboard/DashboardIntegrationModal';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 import type {
   ActionItem,
   Feature,
@@ -131,19 +132,21 @@ export const UserStoryList = ({
     return (
       <div className="space-y-1">
         <p
-          className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed"
+          className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed"
           style={!isExpanded ? truncateStyle : undefined}
         >
           {text}
         </p>
         {shouldShowToggle && (
-          <button
+          <Button
             type="button"
             onClick={() => toggleDescription(id)}
-            className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none"
+            variant="link"
+            size="sm"
+            className="text-xs font-medium text-saramsa-brand hover:text-saramsa-brand-hover dark:text-saramsa-brand dark:hover:text-saramsa-brand-hover focus:outline-none"
           >
             {isExpanded ? "See less" : "See more"}
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -630,7 +633,7 @@ export const UserStoryList = ({
       case "low":
         return "bg-green-500 text-white";
       default:
-        return "bg-gray-500 text-white";
+        return "bg-secondary/400 text-white";
     }
   };
 
@@ -700,7 +703,7 @@ export const UserStoryList = ({
         <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
           <Sparkles className="w-8 h-8 text-slate-400" />
         </div>
-        <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+        <h3 className="text-lg font-medium text-slate-900 dark:text-foreground mb-2">
           No User Stories Generated
         </h3>
         <p className="text-slate-500 dark:text-slate-400 mb-4">
@@ -718,13 +721,13 @@ export const UserStoryList = ({
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="text-sm text-muted-foreground dark:text-muted-foreground">
         User story generation based on the uploaded feedback analysis for {getPlatformDisplayName()}
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
           <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
         </div>
       )}
@@ -735,7 +738,7 @@ export const UserStoryList = ({
         return !submittedItem?.submitted;
       }).length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             Generated Work Items ({actionItems.filter(actionItem => {
               const submittedItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
               return !submittedItem?.submitted;
@@ -750,7 +753,7 @@ export const UserStoryList = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+              className="bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60 rounded-xl p-4"
             >
               <div className="flex items-start gap-3">
                 <Checkbox
@@ -761,7 +764,7 @@ export const UserStoryList = ({
                 />
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-gray-900 dark:text-white">
+                    <h4 className="font-medium text-foreground dark:text-foreground">
                       {actionItem.title}
                     </h4>
                     <Badge
@@ -779,7 +782,7 @@ export const UserStoryList = ({
                   </div>
                   {renderDescription(actionItem.description, `draft-${actionItem.id}`)}
                   {actionItem.acceptance && (
-                    <div className="text-xs text-gray-500 dark:text-gray-500">
+                    <div className="text-xs text-muted-foreground dark:text-muted-foreground">
                       <strong>Acceptance Criteria:</strong> {actionItem.acceptance}
                     </div>
                   )}
@@ -797,7 +800,7 @@ export const UserStoryList = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => handleEditAction(actionItem)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
                 >
                   <Edit className="w-4 h-4" />
                 </Button>
@@ -810,7 +813,7 @@ export const UserStoryList = ({
       {/* Features and Actions */}
       {features.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             Features ({features.length})
           </h3>
           {features.map((feature: Feature, featureIndex: number) => (
@@ -823,20 +826,22 @@ export const UserStoryList = ({
           >
             {/* Feature Header with Collapse */}
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 onClick={() => toggleFeatureCollapse(feature.name)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-accent/60 dark:hover:bg-accent/60"
               >
                 {collapsedFeatures.has(feature.name) ? (
-                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 )}
-              </button>
-              <Badge className={`px-3 py-1 ${feature.color || 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}`}>
+              </Button>
+              <Badge className={`px-3 py-1 ${feature.color || 'bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand'}`}>
                 {feature.name}
               </Badge>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 {feature.actions.length} items
               </span>
             </div>
@@ -855,7 +860,7 @@ export const UserStoryList = ({
                         delay: featureIndex * 0.1 + actionIndex * 0.05,
                       }}
                     >
-                      <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all duration-300">
+                      <Card className="bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60 hover:shadow-md transition-all duration-300">
                         <CardContent className="p-6">
                           <div className="space-y-4">
                             {/* Action Header */}
@@ -872,7 +877,7 @@ export const UserStoryList = ({
                                 <div className="space-y-1 flex-1">
                                   <div className="flex items-center gap-2">
                                     {getTypeIcon(action.type || "feature")}
-                                    <h4 className="font-medium text-gray-900 dark:text-white">
+                                    <h4 className="font-medium text-foreground dark:text-foreground">
                                       {action.title}
                                     </h4>
                                     <Badge
@@ -890,7 +895,7 @@ export const UserStoryList = ({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEditAction(action)}
-                                className="text-[#E603EB] hover:text-[#E603EB]/80 hover:bg-[#E603EB]/10"
+                                className="text-saramsa-brand hover:text-saramsa-brand/80 hover:bg-saramsa-brand/10"
                               >
                                 <Edit className="w-4 h-4 mr-1" />
                                 Edit
@@ -901,7 +906,7 @@ export const UserStoryList = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                               {/* Description */}
                               <div className="space-y-2">
-                                <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <h5 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                                   Description
                                 </h5>
                                 {renderDescription(action.description, `feature-${action.id}`)}
@@ -909,10 +914,10 @@ export const UserStoryList = ({
 
                               {/* Acceptance Criteria */}
                               <div className="space-y-2">
-                                <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <h5 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                                   Acceptance Criteria
                                 </h5>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
                                   {action.acceptance ||
                                     "Define acceptance criteria for this user story."}
                                 </p>
@@ -927,7 +932,7 @@ export const UserStoryList = ({
                                     <Badge
                                       key={index}
                                       variant="outline"
-                                      className="text-xs bg-gray-50 dark:bg-gray-700"
+                                      className="text-xs bg-secondary/40 dark:bg-secondary/40"
                                     >
                                       {tag}
                                     </Badge>
@@ -951,7 +956,7 @@ export const UserStoryList = ({
       {/* Pushed to Jira/Azure Section */}
       {getSubmittedWorkItems().length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             Pushed to {getPlatformDisplayName()} ({getSubmittedWorkItems().length})
           </h3>
           <div className="space-y-3">
@@ -961,13 +966,13 @@ export const UserStoryList = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
-                className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4"
+                className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600" />
-                      <h4 className="font-medium text-gray-900 dark:text-white">
+                      <h4 className="font-medium text-foreground dark:text-foreground">
                         {workItem.title}
                       </h4>
                       <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200">
@@ -976,7 +981,7 @@ export const UserStoryList = ({
                       <Badge variant="outline">{workItem.type}</Badge>
                     </div>
                     {renderDescription(workItem.description, `submitted-${workItem.id}`)}
-                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground dark:text-muted-foreground">
                       <span>
                         <strong>Submitted:</strong> {new Date(workItem.submittedAt).toLocaleDateString()} at {new Date(workItem.submittedAt).toLocaleTimeString()}
                       </span>
@@ -1006,17 +1011,17 @@ export const UserStoryList = ({
       )}
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex items-center gap-4 pt-6 border-t border-border/60 dark:border-border/60">
         {onRegenerateAnalysis && (
           <Button
             onClick={onRegenerateAnalysis}
             disabled={isAnalyzing}
             variant="outline"
-            className="text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/20"
+            className="text-saramsa-brand border-saramsa-brand/20 hover:bg-saramsa-brand/10 dark:text-saramsa-brand dark:border-saramsa-brand/30 dark:hover:bg-saramsa-brand/20"
           >
             {isAnalyzing ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-saramsa-brand/30 border-t-blue-600 rounded-full animate-spin" />
                 <span>Generating...</span>
               </div>
             ) : (
@@ -1028,7 +1033,7 @@ export const UserStoryList = ({
         <Button
           onClick={handlePushActionItems}
           disabled={selectedActions.length === 0 || isPushing}
-          className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white px-6"
+          className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white px-6"
         >
           {isPushing ? (
             <div className="flex items-center gap-2">
@@ -1058,7 +1063,7 @@ export const UserStoryList = ({
           Delete Selected
         </Button>
 
-        <div className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="text-sm text-muted-foreground dark:text-muted-foreground">
           {selectedActions.length} items selected
         </div>
       </div>

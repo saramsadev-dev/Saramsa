@@ -11,6 +11,8 @@ import * as z from 'zod';
 import dynamic from 'next/dynamic';
 import { apiRequest } from '@/lib/apiRequest';
 import { DataStream, TaskCards, AIProcessing } from '@/components/ui/animations';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // Lazy-load components to avoid SSR issues
 const ThemeToggle = dynamic(
@@ -239,7 +241,7 @@ function ResetPasswordContent() {
                     New Password
                   </label>
                   <div className="relative mt-1 sm:mt-2">
-                    <input
+                    <Input
                       {...register('new_password')}
                       id="new_password"
                       type={showPassword ? 'text' : 'password'}
@@ -247,13 +249,15 @@ function ResetPasswordContent() {
                       className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                     />
                     <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand transition-colors"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand"
                     >
                       {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                    </button>
+                    </Button>
                   </div>
                   {errors.new_password && (
                     <p className="mt-1 text-xs sm:text-sm text-red-500">{errors.new_password.message}</p>
@@ -266,7 +270,7 @@ function ResetPasswordContent() {
                     Confirm Password
                   </label>
                   <div className="relative mt-1 sm:mt-2">
-                    <input
+                    <Input
                       {...register('confirm_password')}
                       id="confirm_password"
                       type={showConfirmPassword ? 'text' : 'password'}
@@ -274,13 +278,15 @@ function ResetPasswordContent() {
                       className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                     />
                     <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
-                    <button
+                    <Button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand transition-colors"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-saramsa-brand"
                     >
                       {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                    </button>
+                    </Button>
                   </div>
                   {errors.confirm_password && (
                     <p className="mt-1 text-xs sm:text-sm text-red-500">{errors.confirm_password.message}</p>
@@ -289,11 +295,12 @@ function ResetPasswordContent() {
               </div>
 
               {/* Submit Button */}
-              <button
+              <Button
                 type="submit"
                 disabled={isLoading}
-              className="w-full bg-gradient-to-r from-saramsa-brand to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white py-2.5 sm:py-3 px-4 rounded-2xl text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base font-semibold shadow-[0_18px_40px_-24px_rgba(230,3,235,0.75)] hover:shadow-[0_24px_60px_-28px_rgba(230,3,235,0.8)] transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+                variant="saramsa"
+                className="w-full py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base group"
+              >
                 {isLoading ? (
                   <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
                 ) : (
@@ -302,7 +309,7 @@ function ResetPasswordContent() {
                     <ArrowRight className="ml-2 w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform inline" />
                   </>
                 )}
-              </button>
+              </Button>
             </form>
           )}
 

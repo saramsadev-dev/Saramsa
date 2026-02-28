@@ -7,6 +7,7 @@ import { Button } from './button';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Badge } from './badge';
 import { Trash2, RefreshCw } from 'lucide-react';
+import { Checkbox } from './checkbox';
 
 interface WorkItemsSimpleProps {
   projectId?: string;
@@ -100,12 +101,12 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
         {loading && (
           <div className="text-center py-4">
             <RefreshCw className="w-6 h-6 animate-spin mx-auto" />
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading work items...</p>
+            <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">Loading work items...</p>
           </div>
         )}
 
         {!loading && allWorkItems.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
             No work items found for this project.
           </div>
         )}
@@ -115,26 +116,25 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
             {allWorkItems.map((workItem, index) => (
               <div
                 key={workItem.id}
-                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                className={`p-3 border rounded-xl cursor-pointer transition-colors ${
                   selectedWorkItems.includes(workItem.id)
-                    ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'
-                    : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-saramsa-brand/10 border-saramsa-brand/20 dark:bg-saramsa-brand/20 dark:border-saramsa-brand/30'
+                    : 'bg-secondary/40 border-border/60 dark:bg-card/95 dark:border-border/60 hover:bg-accent/60 dark:hover:bg-accent/60'
                 }`}
                 onClick={() => toggleWorkItemSelection(workItem.id)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedWorkItems.includes(workItem.id)}
-                        onChange={() => toggleWorkItemSelection(workItem.id)}
-                        className="rounded"
+                        onCheckedChange={() => toggleWorkItemSelection(workItem.id)}
+                        className="border-border/60"
                       />
                       <Badge variant="outline">#{index + 1}</Badge>
                       <Badge className={`text-xs ${
                         workItem.type === 'Bug' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
-                        workItem.type === 'Feature' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
+                        workItem.type === 'Feature' ? 'bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand' :
                         workItem.type === 'Task' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
                         'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
                       }`}>
@@ -146,13 +146,13 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
                     </div>
                     
                     <div className="text-sm font-medium mb-1">{workItem.title}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                    <div className="text-xs text-muted-foreground dark:text-muted-foreground mb-2">
                       {workItem.description}
                     </div>
                     
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      <div><strong>Work Item ID:</strong> <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{workItem.id}</code></div>
-                      <div><strong>User Story:</strong> <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">{workItem.userStoryId}</code></div>
+                    <div className="text-xs text-muted-foreground dark:text-muted-foreground">
+                      <div><strong>Work Item ID:</strong> <code className="bg-secondary/60 dark:bg-secondary/40 px-1 rounded">{workItem.id}</code></div>
+                      <div><strong>User Story:</strong> <code className="bg-secondary/60 dark:bg-secondary/40 px-1 rounded">{workItem.userStoryId}</code></div>
                       <div><strong>Feature Area:</strong> {workItem.featurearea || 'N/A'}</div>
                     </div>
                   </div>
@@ -162,7 +162,7 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
           </div>
         )}
 
-        <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 p-3 rounded">
+        <div className="mt-4 text-xs text-muted-foreground dark:text-muted-foreground bg-secondary/40 dark:bg-card/95 p-3 rounded">
           <div className="font-medium mb-1">API Call Preview:</div>
           <div className="font-mono">POST /api/insights/user-stories/delete-items/</div>
           <div className="font-mono mt-1">

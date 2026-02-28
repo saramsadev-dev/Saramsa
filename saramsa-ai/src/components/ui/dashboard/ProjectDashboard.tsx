@@ -35,6 +35,7 @@ import { NewProjectDropdown } from '@/components/ui/dashboard/NewProjectDropdown
 import { ImportProjectModal } from '@/components/ui/dashboard/ImportProjectModal';
 import { CreateProjectModal } from '@/components/ui/dashboard/CreateProjectModal';
 import { EditProjectModal } from '@/components/ui/dashboard/EditProjectModal';
+import { Button } from '@/components/ui/button';
 
 interface ProjectDashboardProps {
   onNavigateToAnalysis?: () => void;
@@ -125,7 +126,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
     
     if (!hasIntegration) {
       // Show error and redirect to settings
-      alert(`No ${provider === 'azure' ? 'Azure DevOps' : 'Jira'} integration found. Please go to Settings → Integrations to connect your account.`);
+      alert(`No ${provider === 'azure' ? 'Azure DevOps' : 'Jira'} integration found. Please go to Settings > Integrations to connect your account.`);
       return;
     }
     
@@ -189,8 +190,8 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
 
   const getProviderBadge = (provider: 'azure' | 'jira') => {
     const config = {
-      azure: { name: 'Azure DevOps', color: 'bg-blue-500', IconComponent: Cloud },
-      jira: { name: 'Jira', color: 'bg-blue-600', IconComponent: null }
+      azure: { name: 'Azure DevOps', color: 'bg-saramsa-brand', IconComponent: Cloud },
+      jira: { name: 'Jira', color: 'bg-saramsa-brand', IconComponent: null }
     };
     
     const { name, color, IconComponent } = config[provider];
@@ -253,26 +254,28 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
           <div className="flex items-center gap-3">
             {/* Redirect to Analysis Button */}
             {onNavigateToAnalysis && (
-              <button
+              <Button
                 onClick={onNavigateToAnalysis}
-                className="flex items-center gap-2 px-4 py-2 bg-secondary/70 text-foreground rounded-xl border border-border/60 hover:bg-secondary transition-colors"
+                variant="outline"
+                className="flex items-center gap-2 px-4 py-2"
                 title="Go to Analysis Dashboard"
               >
                 <ArrowRight className="w-4 h-4" />
                 Analysis Dashboard
-              </button>
+              </Button>
             )}
             
             {/* New Project Button */}
             <div className="relative">
-              <button
+              <Button
                 onClick={() => setShowNewProjectDropdown(!showNewProjectDropdown)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white rounded-xl shadow-[0_14px_30px_-18px_rgba(230,3,235,0.7)] hover:shadow-[0_18px_40px_-20px_rgba(230,3,235,0.8)] transition-all duration-200"
+                variant="saramsa"
+                className="flex items-center gap-2 px-4 py-2"
               >
                 <Plus className="w-4 h-4" />
                 New Project
                 <ChevronDown className={`w-4 h-4 transition-transform ${showNewProjectDropdown ? 'rotate-180' : ''}`} />
-              </button>
+              </Button>
               
               {showNewProjectDropdown && (
                 <NewProjectDropdown
@@ -296,12 +299,14 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-500" />
               <span className="text-red-700 dark:text-red-300">{error}</span>
-              <button
+              <Button
                 onClick={() => dispatch(clearError())}
+                variant="ghost"
+                size="sm"
                 className="ml-auto text-red-500 hover:text-red-700"
               >
                 x
-              </button>
+              </Button>
             </div>
           </motion.div>
         )}
@@ -323,21 +328,23 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
+              <Button
                 onClick={() => handleCreateProject('My First Project', 'A sample project to get started')}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white rounded-xl shadow-[0_14px_30px_-18px_rgba(230,3,235,0.7)] hover:shadow-[0_18px_40px_-20px_rgba(230,3,235,0.8)] transition-all duration-200"
+                variant="saramsa"
+                className="flex items-center gap-2 px-6 py-3"
               >
                 <FolderPlus className="w-5 h-5" />
                 Create Project
-              </button>
+              </Button>
               
-              <button
+              <Button
                 onClick={() => setShowNewProjectDropdown(true)}
-                className="flex items-center gap-2 px-6 py-3 border border-border/70 text-foreground rounded-xl hover:bg-accent/60 transition-colors"
+                variant="outline"
+                className="flex items-center gap-2 px-6 py-3"
               >
                 <Download className="w-5 h-5" />
                 Import from DevOps
-              </button>
+              </Button>
             </div>
             
             {accounts.length === 0 && (

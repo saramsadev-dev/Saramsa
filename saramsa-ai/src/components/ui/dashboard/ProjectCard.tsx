@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { 
+import {
   Calendar, 
   BarChart3, 
   ExternalLink, 
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { Project } from '@/store/features/projects/projectsSlice';
 import { DeleteProjectModal } from './DeleteProjectModal';
+import { Button } from '@/components/ui/button';
 
 interface ProjectCardProps {
   project: Project;
@@ -66,11 +67,11 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
   const getProviderColor = (provider: 'azure' | 'jira') => {
     switch (provider) {
       case 'azure':
-        return 'bg-blue-500';
+        return 'bg-saramsa-brand';
       case 'jira':
-        return 'bg-blue-600';
+        return 'bg-saramsa-brand';
       default:
-        return 'bg-gray-500';
+        return 'bg-muted';
     }
   };
 
@@ -123,33 +124,36 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
           
           {/* Menu Button */}
           <div className="relative" ref={menuRef}>
-            <button
+            <Button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowMenu(!showMenu);
               }}
-              className="p-1 hover:bg-accent/60 rounded-lg transition-opacity"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 hover:bg-accent/60 rounded-lg transition-opacity"
             >
               <MoreVertical className="w-4 h-4 text-muted-foreground" />
-            </button>
+            </Button>
             
             {showMenu && (
               <div className="absolute right-0 top-8 bg-popover/95 border border-border/60 rounded-xl shadow-[0_24px_60px_-40px_rgba(15,23,42,0.7)] z-10 min-w-[160px] py-1 backdrop-blur-xl">
                 {onEdit && (
-                  <button
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowMenu(false);
                       onEdit(project);
                     }}
+                    variant="ghost"
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent/60 transition-colors"
                   >
                     <Edit className="w-4 h-4" />
                     Edit
-                  </button>
+                  </Button>
                 )}
                 {hasExternalLinks && onSync && (
-                  <button
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowMenu(false);
@@ -157,23 +161,25 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                       onSync(project, provider);
                     }}
                     disabled={syncLoading}
+                    variant="ghost"
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm text-saramsa-brand hover:bg-saramsa-brand/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RefreshCw className={`w-4 h-4 ${syncLoading ? 'animate-spin' : ''}`} />
                     Sync with {project.externalLinks[0].provider === 'azure' ? 'Azure' : 'Jira'}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowMenu(false);
                     setShowDeleteModal(true);
                   }}
+                  variant="ghost"
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -249,16 +255,17 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
         
         {/* Go to Project Button */}
         {onGoToProject && (
-          <button
+          <Button
             onClick={(e) => {
               e.stopPropagation();
               onGoToProject(project);
             }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white text-sm rounded-xl shadow-[0_14px_30px_-18px_rgba(230,3,235,0.7)] hover:shadow-[0_18px_40px_-20px_rgba(230,3,235,0.8)] transition-all duration-200"
+            variant="saramsa"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm"
           >
             <ArrowRight className="w-4 h-4" />
             Go to Analysis
-          </button>
+          </Button>
         )}
       </div>
 

@@ -6,6 +6,7 @@ import { Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Button } from './button';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Badge } from './badge';
+import { Checkbox } from './checkbox';
 import { 
   deleteUserStory, 
   deleteUserStories, 
@@ -130,14 +131,14 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
               <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
               <span className="text-red-700 dark:text-red-300">{error}</span>
             </div>
           )}
 
           {/* Bulk Actions */}
-          <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="flex items-center gap-4 p-4 bg-secondary/40 dark:bg-card/95 rounded-xl">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Selected User Stories:</span>
               <Badge variant="secondary">{selectedUserStories.length}</Badge>
@@ -174,19 +175,18 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
               <Card key={userStory.id} className="border-l-4 border-l-blue-500">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedUserStories.includes(userStory.id)}
-                      onChange={() => toggleUserStorySelection(userStory.id)}
-                      className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      onCheckedChange={() => toggleUserStorySelection(userStory.id)}
+                      className="mt-1 border-border/60"
                     />
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium text-gray-900 dark:text-white">
+                        <h3 className="font-medium text-foreground dark:text-foreground">
                           User Story: {userStory.id}
                         </h3>
                         <div className="flex items-center gap-2">
-                          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
+                          <Badge className="bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand">
                             {userStory.platform}
                           </Badge>
                           <Button
@@ -201,7 +201,7 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
                         </div>
                       </div>
                       
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      <div className="text-sm text-muted-foreground dark:text-muted-foreground mb-3">
                         <p><strong>Project:</strong> {userStory.projectId}</p>
                         <p><strong>Platform:</strong> {userStory.platform}</p>
                         <p><strong>Work Items:</strong> {userStory.work_items.length}</p>
@@ -210,20 +210,19 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
                       {/* Work Items */}
                       {userStory.work_items.length > 0 && (
                         <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <h4 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                             Work Items:
                           </h4>
                           <div className="grid gap-2">
                             {userStory.work_items.map((workItem) => (
                               <div 
                                 key={workItem.id} 
-                                className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded"
+                                className="flex items-center gap-2 p-2 bg-secondary/40 dark:bg-card/95 rounded"
                               >
-                                <input
-                                  type="checkbox"
+                                <Checkbox
                                   checked={selectedWorkItems.includes(workItem.id)}
-                                  onChange={() => toggleWorkItemSelection(workItem.id)}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  onCheckedChange={() => toggleWorkItemSelection(workItem.id)}
+                                  className="border-border/60"
                                 />
                                 <div className="flex-1">
                                   <span className="text-sm font-medium">{workItem.title}</span>
@@ -249,7 +248,7 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
           </div>
 
           {currentProjectUserStories.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
               No user stories found for this project.
             </div>
           )}
@@ -268,7 +267,7 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
           <div className="space-y-3 text-sm">
             <div>
               <h4 className="font-medium mb-2">1. Delete Single User Story:</h4>
-              <code className="block p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+              <code className="block p-3 bg-secondary/40 dark:bg-card/95 rounded-xl text-xs">
                 {`// Using the individual endpoint
 DELETE /api/insights/user-stories/{user_story_id}/delete/
 
@@ -279,7 +278,7 @@ dispatch(deleteUserStory({ userStoryId: "story_id_here" }))`}
             
             <div>
               <h4 className="font-medium mb-2">2. Delete Multiple User Stories:</h4>
-              <code className="block p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+              <code className="block p-3 bg-secondary/40 dark:bg-card/95 rounded-xl text-xs">
                 {`// Using the bulk endpoint
 DELETE /api/insights/user-stories/delete-items/
 Body: {
@@ -294,7 +293,7 @@ dispatch(deleteUserStories({ userStoryIds: ["story_id_1", "story_id_2"] }))`}
             
             <div>
               <h4 className="font-medium mb-2">3. Delete Work Items:</h4>
-              <code className="block p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+              <code className="block p-3 bg-secondary/40 dark:bg-card/95 rounded-xl text-xs">
                 {`// Using the bulk endpoint
 DELETE /api/insights/user-stories/delete-items/
 Body: {

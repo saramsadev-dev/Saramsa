@@ -129,8 +129,8 @@ export const FeatureSentimentsTable = ({
 
   if (!features || features.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+      <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 p-6">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
           Feature Level Sentiments
         </h3>
         <div className="text-center py-8">
@@ -146,11 +146,11 @@ export const FeatureSentimentsTable = ({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 relative z-[900]">
+    <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 relative z-[900]">
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground">
               Feature Level Sentiments
             </h3>
             <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse"></div>
@@ -158,7 +158,7 @@ export const FeatureSentimentsTable = ({
           {hasEditedFeaturesProp && onRegenerateAnalysis && (
             <Button
               onClick={onRegenerateAnalysis}
-              className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white"
+              className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Regenerate Analysis
@@ -197,7 +197,7 @@ export const FeatureSentimentsTable = ({
             {features.map((feature, index) => (
               <div 
                 key={index} 
-                className={`grid grid-cols-6 gap-4 py-4 rounded-lg transition-all duration-200 ${
+                className={`grid grid-cols-6 gap-4 py-4 rounded-xl transition-all duration-200 ${
                   selectedFeatures.includes(feature.name)
                     ? 'bg-saramsa-accent/10 dark:bg-saramsa-accent/20 border border-saramsa-brand/30 dark:border-saramsa-brand/50'
                     : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-transparent'
@@ -205,9 +205,11 @@ export const FeatureSentimentsTable = ({
               >
                 {/* Checkbox Column */}
                 <div className="flex items-center justify-center">
-                  <button
+                  <Button
                     onClick={() => onFeatureToggle(feature.name)}
-                    className={`w-5 h-5 rounded-full border-2 transition-all duration-200 flex items-center justify-center ${
+                    variant="ghost"
+                    size="icon"
+                    className={`h-5 w-5 rounded-full border-2 transition-all duration-200 ${
                       selectedFeatures.includes(feature.name)
                         ? 'bg-saramsa-brand border-saramsa-brand text-white'
                         : 'border-slate-300 dark:border-slate-600 hover:border-saramsa-brand/50'
@@ -216,11 +218,11 @@ export const FeatureSentimentsTable = ({
                     {selectedFeatures.includes(feature.name) && (
                       <CheckCircle2 className="w-4 h-4" />
                     )}
-                  </button>
+                  </Button>
                 </div>
                 
                 {/* Feature Name Column */}
-                <div className="text-sm text-slate-900 dark:text-white">
+                <div className="text-sm text-slate-900 dark:text-foreground">
                   <div className="font-medium">
                     {feature.name}
                     {feature.comment_count && (
@@ -275,7 +277,7 @@ export const FeatureSentimentsTable = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => handleEditKeywords(feature)}
-                    className="text-[#E603EB] hover:text-[#E603EB]/80 hover:bg-[#E603EB]/10"
+                    className="text-saramsa-brand hover:text-saramsa-brand/95 hover:bg-saramsa-brand/10"
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
@@ -297,7 +299,7 @@ export const FeatureSentimentsTable = ({
                 <p className="text-sm font-medium text-saramsa-brand dark:text-saramsa-brand">
                   Selected for Interactive Charts
                 </p>
-                <p className="text-xs text-saramsa-brand/70 dark:text-saramsa-brand/80">
+                <p className="text-xs text-saramsa-brand/70 dark:text-saramsa-brand/95">
                   {selectedFeatures.join(', ')}
                 </p>
               </div>
@@ -326,12 +328,14 @@ export const FeatureSentimentsTable = ({
                   Edit keywords for <span className="text-saramsa-brand">{editingFeature}</span>
                 </h3>
               </div>
-              <button
+              <Button
                 onClick={handleCancelEdit}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full border border-slate-700 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
 
             {/* Main Layout: central options panel anchored near top */}
@@ -354,7 +358,7 @@ export const FeatureSentimentsTable = ({
                   <Label className="text-xs uppercase tracking-[0.16em] text-slate-400">
                     Current Keywords
                   </Label>
-                  <div className="flex flex-wrap gap-2 min-h-[48px] px-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800">
+                  <div className="flex flex-wrap gap-2 min-h-[48px] px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800">
                     {editingKeywords.map((keyword, index) => (
                       <Badge
                         key={index}
@@ -362,7 +366,7 @@ export const FeatureSentimentsTable = ({
                         className="text-xs bg-slate-900/80 border-saramsa-brand/40 text-slate-100 cursor-pointer hover:bg-red-500/10 hover:border-red-500/60 transition-colors"
                         onClick={() => handleRemoveKeyword(keyword)}
                       >
-                        {keyword} ×
+                        {keyword} x
                       </Badge>
                     ))}
                     {editingKeywords.length === 0 && (
@@ -390,7 +394,7 @@ export const FeatureSentimentsTable = ({
                       onClick={handleAddKeyword}
                       disabled={!newKeyword.trim()}
                       size="sm"
-                      className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                      className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                     >
                       Add Keyword
                     </Button>
@@ -408,7 +412,7 @@ export const FeatureSentimentsTable = ({
                   </Button>
                   <Button
                     onClick={handleSaveKeywords}
-                    className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white shadow-lg shadow-[#E603EB]/30"
+                    className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white shadow-lg shadow-[0_18px_40px_-24px_rgba(230,3,235,0.6)]"
                   >
                     Save Changes
                   </Button>

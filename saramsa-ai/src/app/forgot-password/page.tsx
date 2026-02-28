@@ -10,6 +10,8 @@ import * as z from 'zod';
 import dynamic from 'next/dynamic';
 import { apiRequest } from '@/lib/apiRequest';
 import { DataStream, TaskCards, AIProcessing } from '@/components/ui/animations';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // Lazy-load components to avoid SSR issues
 const ThemeToggle = dynamic(
@@ -214,7 +216,7 @@ export default function ForgotPasswordPage() {
                     Email Address
                   </label>
                   <div className="relative mt-1 sm:mt-2">
-                    <input
+                    <Input
                       {...register('email')}
                       id="email"
                       type="email"
@@ -230,11 +232,12 @@ export default function ForgotPasswordPage() {
               </div>
 
               {/* Submit Button */}
-              <button
+              <Button
                 type="submit"
                 disabled={isLoading}
-              className="w-full bg-gradient-to-r from-saramsa-brand to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white py-2.5 sm:py-3 px-4 rounded-2xl text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base font-semibold shadow-[0_18px_40px_-24px_rgba(230,3,235,0.75)] hover:shadow-[0_24px_60px_-28px_rgba(230,3,235,0.8)] transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+                variant="saramsa"
+                className="w-full py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base group"
+              >
                 {isLoading ? (
                   <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
                 ) : (
@@ -243,7 +246,7 @@ export default function ForgotPasswordPage() {
                     <ArrowRight className="ml-2 w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform inline" />
                   </>
                 )}
-              </button>
+              </Button>
             </form>
           )}
 

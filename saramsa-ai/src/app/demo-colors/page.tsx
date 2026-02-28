@@ -62,14 +62,14 @@ export default function DemoColorsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-4xl font-bold text-foreground mb-4">
             🎨 Colorful UI Components Demo
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <p className="text-lg text-muted-foreground">
             Showcasing enhanced colorful status indicators, duration displays, and triggers
           </p>
         </div>
@@ -86,18 +86,18 @@ export default function DemoColorsPage() {
           </div>
 
           <TabsContent value="status">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div className="bg-card/90 rounded-2xl shadow-xl border border-border/60 p-8">
               <StatusDurationExamples />
             </div>
           </TabsContent>
 
           <TabsContent value="metrics">
             <div className="space-y-8">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              <div className="bg-card/90 rounded-2xl shadow-xl border border-border/60 p-8">
+                <h2 className="text-2xl font-bold text-foreground mb-6">
                   Enhanced Metrics Cards
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                <p className="text-muted-foreground mb-6">
                   Colorful metrics with status indicators and duration displays
                 </p>
                 <MetricsCards metrics={demoMetrics} />
@@ -107,17 +107,17 @@ export default function DemoColorsPage() {
 
           <TabsContent value="loading">
             <div className="space-y-8">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              <div className="bg-card/90 rounded-2xl shadow-xl border border-border/60 p-8">
+                <h2 className="text-2xl font-bold text-foreground mb-6">
                   Loading States
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Processing</h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Processing</h3>
                     <AnalysisLoading status="processing" message="Analyzing feedback data..." />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pending</h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Pending</h3>
                     <AnalysisLoading status="pending" />
                   </div>
                 </div>
@@ -126,17 +126,17 @@ export default function DemoColorsPage() {
           </TabsContent>
 
           <TabsContent value="triggers">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+            <div className="bg-card/90 rounded-2xl shadow-xl border border-border/60 p-8">
+              <h2 className="text-2xl font-bold text-foreground mb-6">
                 Enhanced Tab Triggers
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
+              <p className="text-muted-foreground mb-6">
                 Colorful tab triggers with gradients and hover effects
               </p>
               
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  <h3 className="text-lg font-semibold text-foreground mb-3">
                     Dashboard Navigation
                   </h3>
                   <Tabs value="dashboard" onValueChange={() => {}}>
@@ -150,7 +150,7 @@ export default function DemoColorsPage() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  <h3 className="text-lg font-semibold text-foreground mb-3">
                     Analysis Views
                   </h3>
                   <Tabs value="sentiment" onValueChange={() => {}}>
@@ -164,7 +164,7 @@ export default function DemoColorsPage() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  <h3 className="text-lg font-semibold text-foreground mb-3">
                     Project Management
                   </h3>
                   <Tabs value="active" onValueChange={() => {}}>
@@ -181,8 +181,8 @@ export default function DemoColorsPage() {
         </Tabs>
 
         {/* Color Palette Reference */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+        <div className="bg-card/90 rounded-2xl shadow-xl border border-border/60 p-8">
+          <h2 className="text-2xl font-bold text-foreground mb-6">
             Color Palette Reference
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -194,12 +194,12 @@ export default function DemoColorsPage() {
               { name: 'Warning', color: 'bg-orange-500', text: 'Orange for warnings' },
               { name: 'Info', color: 'bg-teal-500', text: 'Teal for information' },
               { name: 'Primary', color: 'bg-indigo-500', text: 'Indigo for primary actions' },
-              { name: 'Secondary', color: 'bg-gray-500', text: 'Gray for secondary elements' }
+              { name: 'Secondary', color: 'bg-muted', text: 'Gray for secondary elements' }
             ].map((item) => (
               <div key={item.name} className="text-center">
                 <div className={`${item.color} w-full h-16 rounded-lg mb-2 shadow-md`}></div>
-                <h4 className="font-medium text-gray-900 dark:text-white">{item.name}</h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{item.text}</p>
+                <h4 className="font-medium text-foreground">{item.name}</h4>
+                <p className="text-xs text-muted-foreground">{item.text}</p>
               </div>
             ))}
           </div>

@@ -16,7 +16,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
   const getCardStyles = (color: string) => {
     switch (color) {
       case "blue":
-        return "border-blue-200/70 dark:border-blue-500/60 bg-gradient-to-br from-blue-50/80 to-blue-100/80 dark:from-blue-900/20 dark:to-blue-800/30";
+        return "border-saramsa-brand/20 dark:border-saramsa-brand/30 bg-gradient-to-br from-saramsa-brand/10 to-saramsa-gradient-to/10 dark:from-saramsa-brand/10 dark:to-saramsa-gradient-to/10";
       case "green":
         return "border-green-200/70 dark:border-green-500/60 bg-gradient-to-br from-green-50/80 to-green-100/80 dark:from-green-900/20 dark:to-green-800/30";
       case "red":
@@ -35,7 +35,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
   const getValueColor = (color: string) => {
     switch (color) {
       case "blue":
-        return "text-blue-700 dark:text-blue-300";
+        return "text-saramsa-brand dark:text-saramsa-brand";
       case "green":
         return "text-green-700 dark:text-green-300";
       case "red":
@@ -47,7 +47,7 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
       case "teal":
         return "text-teal-700 dark:text-teal-300";
       default:
-        return "text-gray-900 dark:text-white";
+        return "text-foreground";
     }
   };
 

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Trash2 } from 'lucide-react';
 import type { Project } from '@/store/features/projects/projectsSlice';
+import { Button } from '@/components/ui/button';
 
 interface DeleteProjectModalProps {
   project: Project;
@@ -58,56 +59,58 @@ export function DeleteProjectModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.18 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full focus:outline-none"
+            className="bg-card/90 dark:bg-card/95 rounded-xl shadow-xl max-w-md w-full focus:outline-none"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-project-modal-title"
           >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-border/60 dark:border-border/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
             </div>
-            <h3 id="delete-project-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 id="delete-project-modal-title" className="text-lg font-semibold text-foreground dark:text-foreground">
               Delete Project
             </h3>
           </div>
-          <button
+          <Button
             onClick={loading ? undefined : onCancel}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 hover:bg-accent/60 dark:hover:bg-accent/60"
             aria-label="Close"
             type="button"
             disabled={loading}
           >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
+            <X className="w-5 h-5 text-muted-foreground" />
+          </Button>
         </div>
 
         {/* Content */}
         <div className="p-6">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-muted-foreground dark:text-muted-foreground mb-4">
             Are you sure you want to delete the project <strong>"{project.name}"</strong>?
             This action cannot be undone and will permanently remove:
           </p>
 
-          <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-6">
+          <ul className="space-y-2 text-sm text-muted-foreground dark:text-muted-foreground mb-6">
             <li className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full" />
               All project data and files
             </li>
             <li className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full" />
               Analysis results and insights
             </li>
             <li className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+              <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full" />
               Integration connections
             </li>
           </ul>
 
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
             <p className="text-sm text-red-700 dark:text-red-300">
               <strong>Warning:</strong> This action is permanent and cannot be reversed.
             </p>
@@ -115,20 +118,22 @@ export function DeleteProjectModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-          <button
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-border/60 dark:border-border/60">
+          <Button
             onClick={loading ? undefined : onCancel}
             type="button"
             disabled={loading}
-            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+            variant="outline"
+            className="px-4 py-2 text-muted-foreground dark:text-muted-foreground"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onConfirm}
             type="button"
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg transition-colors disabled:opacity-50"
+            variant="destructive"
+            className="flex items-center gap-2 px-4 py-2"
           >
             {loading ? (
               <>
@@ -141,7 +146,7 @@ export function DeleteProjectModal({
                 Delete Project
               </>
             )}
-          </button>
+          </Button>
         </div>
           </motion.div>
         </AnimatePresence>

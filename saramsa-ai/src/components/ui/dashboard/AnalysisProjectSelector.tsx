@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Folder, FolderOpen, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface Project {
   id: string;
@@ -64,13 +66,13 @@ export function AnalysisProjectSelector({
   const getProviderIcon = (provider: 'azure' | 'jira') => {
     if (provider === 'azure') {
       return (
-        <div className="w-4 h-4 bg-blue-500 rounded flex items-center justify-center">
+        <div className="w-4 h-4 bg-saramsa-brand rounded flex items-center justify-center">
           <span className="text-white text-xs font-bold">A</span>
         </div>
       );
     }
     return (
-      <div className="w-4 h-4 bg-blue-600 rounded flex items-center justify-center">
+      <div className="w-4 h-4 bg-saramsa-brand rounded flex items-center justify-center">
         <span className="text-white text-xs font-bold">J</span>
       </div>
     );
@@ -94,20 +96,20 @@ export function AnalysisProjectSelector({
       {/* Selected Project Display */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-80 px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+        className="flex items-center justify-between w-80 px-4 py-3 bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60 rounded-xl cursor-pointer hover:border-border dark:hover:border-border transition-colors"
       >
         <div className="flex items-center gap-3">
           {selectedProject ? (
             <>
-              <FolderOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <FolderOpen className="w-5 h-5 text-saramsa-brand dark:text-saramsa-brand" />
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <span className="text-sm font-medium text-foreground dark:text-foreground truncate">
                   {selectedProject.name}
                 </span>
                 {selectedProject.externalLinks && selectedProject.externalLinks.length > 0 && (
                   <div className="flex items-center gap-1">
                     {getProviderIcon(selectedProject.externalLinks[0].provider)}
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                       {selectedProject.externalLinks[0].provider === 'azure' ? 'Azure DevOps' : 'Jira'}
                     </span>
                   </div>
@@ -116,8 +118,8 @@ export function AnalysisProjectSelector({
             </>
           ) : (
             <>
-              <Folder className="w-5 h-5 text-gray-400" />
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <Folder className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground dark:text-muted-foreground">
                 Select a project
               </span>
             </>
@@ -125,7 +127,7 @@ export function AnalysisProjectSelector({
         </div>
         
         <ChevronDown 
-          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} 
         />
       </div>
 
@@ -137,16 +139,16 @@ export function AnalysisProjectSelector({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden"
+            className="absolute top-full left-0 right-0 mt-2 bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60 rounded-xl shadow-lg z-50 max-h-80 overflow-hidden"
           >
             {/* Search Bar */}
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-              <input
+            <div className="p-3 border-b border-border/60 dark:border-border/60">
+              <Input
                 type="text"
                 placeholder="Search projects..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="h-9 text-sm bg-secondary/40 dark:bg-secondary/40 border border-border/60 dark:border-border/60 rounded-md focus:ring-2 focus:ring-saramsa-brand/30 focus:border-saramsa-brand/40"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
@@ -154,8 +156,8 @@ export function AnalysisProjectSelector({
             {/* Loading State */}
             {loading && (
               <div className="p-4 text-center">
-                <Loader2 className="w-5 h-5 animate-spin text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">Loading projects...</p>
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">Loading projects...</p>
               </div>
             )}
 
@@ -165,12 +167,14 @@ export function AnalysisProjectSelector({
                 <AlertCircle className="w-5 h-5 text-red-500 mx-auto mb-2" />
                 <p className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</p>
                 {onRefreshProjects && (
-                  <button
+                  <Button
                     onClick={onRefreshProjects}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                    variant="link"
+                    size="sm"
+                    className="text-saramsa-brand dark:text-saramsa-brand"
                   >
                     Try again
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -180,17 +184,19 @@ export function AnalysisProjectSelector({
               <div className="max-h-60 overflow-y-auto">
                 {filteredProjects.length === 0 ? (
                   <div className="p-4 text-center">
-                    <Folder className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <Folder className="w-8 h-8 text-muted-foreground/70 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       {searchTerm ? 'No projects found matching your search' : 'No projects available'}
                     </p>
                     {!searchTerm && onRefreshProjects && (
-                      <button
+                      <Button
                         onClick={onRefreshProjects}
-                        className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        variant="link"
+                        size="sm"
+                        className="mt-2 text-saramsa-brand dark:text-saramsa-brand"
                       >
                         Refresh projects
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ) : (
@@ -204,18 +210,18 @@ export function AnalysisProjectSelector({
                         onProjectSelect(project.id);
                         setIsOpen(false);
                       }}
-                      className={`p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                        selectedProjectId === project.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      className={`p-3 cursor-pointer hover:bg-secondary/40 dark:hover:bg-accent/60 transition-colors ${
+                        selectedProjectId === project.id ? 'bg-saramsa-brand/10 dark:bg-saramsa-brand/20' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         <FolderOpen className={`w-5 h-5 mt-0.5 ${
-                          selectedProjectId === project.id ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'
+                          selectedProjectId === project.id ? 'text-saramsa-brand dark:text-saramsa-brand' : 'text-muted-foreground'
                         }`} />
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            <h3 className="text-sm font-medium text-foreground dark:text-foreground truncate">
                               {project.name}
                             </h3>
                             {project.externalLinks && project.externalLinks.length > 0 && (
@@ -224,12 +230,12 @@ export function AnalysisProjectSelector({
                           </div>
                           
                           {project.description && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 line-clamp-2">
+                            <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-1 line-clamp-2">
                               {project.description}
                             </p>
                           )}
                           
-                          <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground dark:text-muted-foreground">
                             {project.metadata?.totalComments && (
                               <span>{project.metadata.totalComments} comments</span>
                             )}
@@ -239,7 +245,7 @@ export function AnalysisProjectSelector({
                             <span className={`px-2 py-0.5 rounded-full text-xs ${
                               project.status === 'active' 
                                 ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                : 'bg-secondary/40 text-muted-foreground dark:bg-secondary/40 dark:text-muted-foreground'
                             }`}>
                               {project.status || 'active'}
                             </span>

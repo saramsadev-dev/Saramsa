@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { AppDispatch, RootState } from "@/store/store";
 import { fetchIntegrationAccounts } from "@/store/features/integrations/integrationsSlice";
+import { Button } from "@/components/ui/button";
 
 interface PlatformSelectionScreenProps {
   onPlatformSelect: (platform: "azure" | "jira") => void;
@@ -50,7 +51,7 @@ export function PlatformSelectionScreen({
         ? "Azure DevOps integration is already configured"
         : "Connect your Azure DevOps organization for seamless work item creation",
       icon: <Download className="w-8 h-8" />,
-      color: "from-[#E603EB] to-[#8B5FBF]",
+      color: "from-saramsa-gradient-from to-saramsa-gradient-to",
       features: [
         "AI-Powered Analysis",
         "Auto Work Item Creation",
@@ -92,7 +93,7 @@ export function PlatformSelectionScreen({
       <div className="h-[calc(100vh-65px)] flex flex-col">
         {/* Left Panel - Platform Selection (60% on desktop, full width on mobile) */}
         <motion.div
-          className="flex-1 w-full flex items-center justify-center bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm order-2 lg:order-1"
+          className="flex-1 w-full flex items-center justify-center bg-card/60 dark:bg-background/50 backdrop-blur-sm order-2 lg:order-1"
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
@@ -106,16 +107,16 @@ export function PlatformSelectionScreen({
               className="text-center space-y-4"
             >
               <div className="flex items-center gap-4 justify-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] rounded-xl flex items-center justify-center shadow-lg">
+                <div className="w-10 h-10 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-lg">
                   <Zap className="w-4 h-4 text-white" />
                 </div>
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                <h1 className="text-2xl font-semibold text-foreground">
                   Choose Your Platform
                 </h1>
               </div>
 
               <div className="space-y-2">
-                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed">
                   Integrate with Azure DevOps or Jira to unlock automated work
                   item creation and project management.
                 </p>
@@ -138,14 +139,14 @@ export function PlatformSelectionScreen({
                     transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
                   >
                     <div
-                      className={`relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-2 rounded-xl p-6 transition-all duration-300 ${
+                      className={`relative bg-card/80 dark:bg-card/90 backdrop-blur-sm border-2 rounded-2xl p-6 transition-all duration-300 ${
                         selectedPlatform === platform.id
-                          ? "border-[#E603EB] shadow-lg"
+                          ? "border-saramsa-brand/60 shadow-[0_20px_50px_-35px_rgba(230,3,235,0.5)]"
                           : platform.status === "configured"
-                          ? "border-green-300 dark:border-green-600 bg-green-50/50 dark:bg-green-900/20"
+                          ? "border-green-300/70 dark:border-green-600/60 bg-green-50/60 dark:bg-green-900/20"
                           : platform.comingSoon
-                          ? "border-gray-300 dark:border-gray-600 opacity-50"
-                          : "border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/50 hover:shadow-lg cursor-pointer"
+                          ? "border-border/60 dark:border-border/60 opacity-50"
+                          : "border-border/60 dark:border-border/60 hover:border-saramsa-brand/40 hover:shadow-[0_20px_50px_-35px_rgba(15,23,42,0.55)] cursor-pointer"
                       }`}
                       onClick={() =>
                         !platform.comingSoon &&
@@ -170,17 +171,17 @@ export function PlatformSelectionScreen({
 
                       <div className="flex items-start gap-4">
                         <div
-                          className={`w-12 h-12 bg-gradient-to-br ${platform.color} rounded-lg flex items-center justify-center text-white`}
+                          className={`w-12 h-12 bg-gradient-to-br ${platform.color} rounded-xl flex items-center justify-center text-white`}
                         >
                           {platform.icon}
                         </div>
 
                         <div className="flex-1 space-y-3">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            <h3 className="text-lg font-semibold text-foreground">
                               {platform.name}
                             </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm">
+                            <p className="text-sm text-muted-foreground max-w-sm">
                               {platform.description}
                             </p>
                           </div>
@@ -188,7 +189,7 @@ export function PlatformSelectionScreen({
 
                         {!platform.comingSoon &&
                           platform.status !== "configured" && (
-                            <ArrowRight className="w-5 h-5 text-gray-400" />
+                            <ArrowRight className="w-5 h-5 text-muted-foreground" />
                           )}
                         {platform.status === "configured" && (
                           <CheckCircle className="w-5 h-5 text-green-500" />
@@ -208,12 +209,14 @@ export function PlatformSelectionScreen({
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="text-center"
               >
-                <button
+                <Button
                   onClick={onSkipConfig}
-                  className="text-sm text-muted-foreground hover:text-saramsa-brand transition-colors underline"
+                  variant="link"
+                  size="sm"
+                  className="text-muted-foreground hover:text-saramsa-brand"
                 >
                   Skip configuration and go to dashboard
-                </button>
+                </Button>
               </motion.div>
             )}
 
@@ -224,10 +227,10 @@ export function PlatformSelectionScreen({
               transition={{ duration: 0.6, delay: 0.3 }}
               className="text-center space-y-2"
             >
-              <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
+              <div className="w-full h-px bg-gradient-to-r from-transparent via-border/70 to-transparent" />
               <div className="flex items-center justify-center gap-2">
-                <Shield className="w-4 h-4 text-gray-500" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <Shield className="w-4 h-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
                   Your credentials are encrypted and stored for future use.
                 </p>
               </div>

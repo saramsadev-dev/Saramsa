@@ -257,7 +257,7 @@ export function UploadPanel({
               </div>
 
               {!isCloudEnabled ? (
-                <div className="p-4 bg-secondary/60 rounded-lg text-sm text-gray-600 dark:text-gray-300">
+                <div className="p-4 bg-secondary/60 rounded-lg text-sm text-muted-foreground dark:text-muted-foreground">
                   We’re working on cloud integrations. Stay tuned!
                 </div>
               ) : !isConnected ? (

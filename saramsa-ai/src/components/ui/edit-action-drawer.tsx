@@ -89,13 +89,13 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-50 overflow-hidden"
+            className="fixed right-0 top-0 h-full w-full max-w-2xl bg-card/95 dark:bg-background shadow-2xl z-50 overflow-hidden"
           >
             <div className="flex flex-col h-full">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <div className="flex items-center justify-between p-6 border-b border-border/60 dark:border-border/60 bg-secondary/40 dark:bg-card/95">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
                     Edit Action
                   </h2>
                   {hasChanges && (
@@ -109,7 +109,7 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
                   variant="ghost"
                   size="sm"
                   onClick={handleCancel}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -144,7 +144,7 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
                     rows={4}
                     className="resize-none"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                     Provide a clear description of what needs to be done
                   </p>
                 </div>
@@ -162,14 +162,14 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
                     rows={4}
                     className="resize-none"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                     Specify the conditions that must be met for this action to be accepted
                   </p>
                 </div>
               </div>
 
               {/* Footer Actions */}
-              <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+              <div className="flex items-center justify-between p-6 border-t border-border/60 dark:border-border/60 bg-secondary/40 dark:bg-card/95">
                 <Button
                   variant="outline"
                   onClick={() => console.log('Delete action:', formData.id)}
@@ -189,7 +189,7 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
                   <Button
                     onClick={handleSave}
                     disabled={!hasChanges}
-                    className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white"
+                    className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white"
                   >
                     <Save className="w-4 h-4 mr-2" />
                     Save Changes

@@ -136,7 +136,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
   const getTrendIcon = (change: number) => {
     if (change > 0) return <TrendingUp className="w-4 h-4 text-green-600" />;
     if (change < 0) return <TrendingDown className="w-4 h-4 text-red-600" />;
-    return <BarChart3 className="w-4 h-4 text-gray-600" />;
+    return <BarChart3 className="w-4 h-4 text-muted-foreground" />;
   };
 
   if (loading && analyses.length === 0) {
@@ -150,7 +150,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-saramsa-brand"></div>
           </div>
         </CardContent>
       </Card>
@@ -189,8 +189,8 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-gray-500">No historical analysis data available.</p>
-            <p className="text-sm text-gray-400 mt-2">
+            <p className="text-muted-foreground">No historical analysis data available.</p>
+            <p className="text-sm text-muted-foreground mt-2">
               Upload feedback data to start building your analysis history.
             </p>
           </div>
@@ -258,7 +258,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-sm">Neutral:</span>
-                              <span className="text-gray-600 font-medium">
+                              <span className="text-muted-foreground font-medium">
                                 {analysis.sentimentsummary?.neutral?.toFixed(1) || 0}%
                               </span>
                             </div>
@@ -271,10 +271,10 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
                           <CardTitle className="text-sm">Feedback Count</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-blue-600">
+                          <div className="text-2xl font-bold text-saramsa-brand">
                             {analysis.counts?.total || 0}
                           </div>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-muted-foreground">
                             Total comments analyzed
                           </p>
                         </CardContent>
@@ -315,7 +315,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
                       <CardTitle className="text-sm">Total Analyses</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-saramsa-brand">
                         {cumulativeData.total_analyses}
                       </div>
                     </CardContent>
@@ -419,7 +419,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="text-center">
-                        <div className="text-sm text-gray-500 mb-1">Sentiment Change</div>
+                        <div className="text-sm text-muted-foreground mb-1">Sentiment Change</div>
                         <div className="flex items-center justify-center gap-2">
                           {getTrendIcon(comparisonData.comparison.sentiment_change.positive_change)}
                           <span className="font-medium">
@@ -430,7 +430,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
                       </div>
 
                       <div className="text-center">
-                        <div className="text-sm text-gray-500 mb-1">Feature Change</div>
+                        <div className="text-sm text-muted-foreground mb-1">Feature Change</div>
                         <div className="flex items-center justify-center gap-2">
                           {getTrendIcon(comparisonData.comparison.feature_change)}
                           <span className="font-medium">
@@ -441,7 +441,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
                       </div>
 
                       <div className="text-center">
-                        <div className="text-sm text-gray-500 mb-1">Comment Change</div>
+                        <div className="text-sm text-muted-foreground mb-1">Comment Change</div>
                         <div className="flex items-center justify-center gap-2">
                           {getTrendIcon(comparisonData.comparison.comment_change)}
                           <span className="font-medium">

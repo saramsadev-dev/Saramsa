@@ -9,6 +9,7 @@ import { Textarea } from './textarea';
 import { Label } from './label';
 import { Badge } from './badge';
 import { Card, CardContent } from './card';
+import { Checkbox } from './checkbox';
 
 interface UserStory {
   id: string;
@@ -132,32 +133,32 @@ export function UserStoriesEditor({
       case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
       case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
       case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+      default: return 'bg-secondary/40 text-foreground dark:bg-background/20 dark:text-muted-foreground';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pushed': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-300 dark:border-green-700';
-      case 'ready': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-300 dark:border-blue-700';
+      case 'ready': return 'bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand border border-saramsa-brand/30 dark:border-saramsa-brand/40';
       case 'draft': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400 border border-orange-300 dark:border-orange-700';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border border-gray-300 dark:border-gray-700';
+      default: return 'bg-secondary/40 text-foreground dark:bg-background/20 dark:text-muted-foreground border border-border/60 dark:border-border/60';
     }
   };
 
   if (editingStories.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="w-16 h-16 mx-auto mb-4 text-gray-400">
-          📝
+        <div className="w-16 h-16 mx-auto mb-4 text-muted-foreground">
+          ...
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-medium text-foreground dark:text-foreground mb-2">
           No User Stories Generated
         </h3>
-        <p className="text-gray-500 dark:text-gray-400 mb-4">
+        <p className="text-muted-foreground dark:text-muted-foreground mb-4">
           User stories will appear here after analysis is complete.
         </p>
-        <Button onClick={handleAddStory} className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white">
+        <Button onClick={handleAddStory} className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white">
           <Plus className="w-4 h-4 mr-2" />
           Add User Story
         </Button>
@@ -170,10 +171,10 @@ export function UserStoriesEditor({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
             User Stories Editor
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             Edit and manage user stories before pushing to {platform === 'azure' ? 'Azure DevOps' : 'Jira'}
           </p>
         </div>
@@ -198,7 +199,7 @@ export function UserStoriesEditor({
             <Button
               onClick={handleSave}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-saramsa-brand hover:bg-saramsa-brand-hover text-white"
             >
               <Save className="w-4 h-4 mr-2" />
               Save Changes
@@ -208,15 +209,14 @@ export function UserStoriesEditor({
       </div>
 
       {/* Bulk Actions */}
-      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div className="flex items-center justify-between p-4 bg-secondary/40 dark:bg-card/95 rounded-xl">
         <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={selectedStories.size === editingStories.length && editingStories.length > 0}
-            onChange={handleSelectAll}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            onCheckedChange={() => handleSelectAll()}
+            className="border-border/60"
           />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-muted-foreground dark:text-muted-foreground">
             {selectedStories.size} of {editingStories.length} selected
           </span>
         </div>
@@ -225,7 +225,7 @@ export function UserStoriesEditor({
           <Button
             onClick={handlePushSelected}
             disabled={isLoading}
-            className="bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] text-white"
+            className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white"
           >
             <Send className="w-4 h-4 mr-2" />
             Push to {platform === 'azure' ? 'Azure DevOps' : 'Jira'} ({selectedStories.size})
@@ -242,15 +242,14 @@ export function UserStoriesEditor({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: index * 0.05 }}
           >
-            <Card className="border border-gray-200 dark:border-gray-700">
+            <Card className="border border-border/60 dark:border-border/60">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   {/* Selection Checkbox */}
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedStories.has(story.id)}
-                    onChange={() => handleSelectStory(story.id)}
-                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    onCheckedChange={() => handleSelectStory(story.id)}
+                    className="mt-1 border-border/60"
                   />
                   
                   {/* Story Content */}
@@ -274,7 +273,7 @@ export function UserStoriesEditor({
                               id={`priority-${story.id}`}
                               value={story.priority}
                               onChange={(e) => handleStoryUpdate(story.id, 'priority', e.target.value)}
-                              className="mt-1 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              className="mt-1 w-full px-3 py-2 border border-border/60 dark:border-border/60 rounded-md bg-card/90 dark:bg-secondary/40 text-foreground dark:text-foreground"
                             >
                               <option value="low">Low</option>
                               <option value="medium">Medium</option>
@@ -329,10 +328,10 @@ export function UserStoriesEditor({
                       <div className="space-y-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                            <h3 className="text-lg font-medium text-foreground dark:text-foreground">
                               {story.title}
                             </h3>
-                            <p className="text-gray-600 dark:text-gray-400 mt-1">
+                            <p className="text-muted-foreground dark:text-muted-foreground mt-1">
                               {story.description}
                             </p>
                           </div>
@@ -349,17 +348,17 @@ export function UserStoriesEditor({
                         
                         {story.acceptance_criteria && (
                           <div>
-                            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <h4 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
                               Acceptance Criteria:
                             </h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                               {story.acceptance_criteria}
                             </p>
                           </div>
                         )}
                         
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground dark:text-muted-foreground">
                             <span>Feature: {story.feature_area}</span>
                             {story.effort_estimate && (
                               <span>Effort: {story.effort_estimate}</span>

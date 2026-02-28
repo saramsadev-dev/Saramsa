@@ -19,6 +19,8 @@ import {
   ArrowLeft,
   Folder
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface JiraProject {
   id: string;
@@ -88,7 +90,7 @@ export const JiraFormPanel = ({
   const tokenSteps = [
     {
       step: 1,
-      title: "Go to Atlassian Account Settings → Security → API tokens",
+      title: "Go to Atlassian Account Settings > Security > API tokens",
       description: "Navigate to your Atlassian account security settings to manage API tokens."
     },
     {
@@ -119,97 +121,101 @@ export const JiraFormPanel = ({
           transition={{ duration: 0.6, delay: 0.2 }}
           className="flex justify-center sm:justify-start"
         >
-          <button
+          <Button
             onClick={onBack}
-            className="w-full sm:w-auto px-6 h-12 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300 rounded-md flex items-center justify-center gap-2"
+            variant="outline"
+            className="w-full sm:w-auto h-12 gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Platform Selection
-          </button>
+          </Button>
         </motion.div>
 
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-2 border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/30 transition-all duration-300 rounded-lg p-6">
+        <div className="bg-card/80 dark:bg-card/90 backdrop-blur-sm border-2 border-border/60 dark:border-border/60 hover:border-saramsa-brand/30 transition-all duration-300 rounded-xl p-6">
           {/* Show form fields only for new integrations */}
           {!isExistingIntegration && (
             <>
               {/* Email */}
               <div className="space-y-2 mb-6">
-            <label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor="email" className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               Jira Email Address
             </label>
-            <input
+            <Input
               id="email"
               type="email"
               value={config.email}
               onChange={(e) => onConfigChange('email', e.target.value)}
               placeholder="your-email@company.com"
-              className="w-full h-12 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 hover:border-[#E603EB]/50 focus:border-[#E603EB] focus:ring-2 focus:ring-[#E603EB]/20 transition-all duration-300 rounded-md px-3"
+              className="h-12 bg-background/80 border-2 border-border/60 dark:border-border/60 hover:border-saramsa-brand/50 focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 transition-all duration-300 rounded-xl px-3"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               The email address associated with your Jira account
             </p>
           </div>
 
           {/* API Token */}
           <div className="space-y-2 mb-6">
-            <label htmlFor="apiToken" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor="apiToken" className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               API Token
             </label>
             <div className="relative">
-              <input
+              <Input
                 id="apiToken"
                 type={showApiToken ? "text" : "password"}
                 value={config.apiToken}
                 onChange={(e) => onConfigChange('apiToken', e.target.value)}
                 placeholder="Enter your Jira API token"
-                className="w-full h-12 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 hover:border-[#E603EB]/50 focus:border-[#E603EB] focus:ring-2 focus:ring-[#E603EB]/20 transition-all duration-300 rounded-md px-3 pr-12"
+                className="h-12 bg-background/80 border-2 border-border/60 dark:border-border/60 hover:border-saramsa-brand/50 focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 transition-all duration-300 rounded-xl px-3 pr-12"
               />
-              <button
+              <Button
                 type="button"
                 onClick={toggleApiTokenVisibility}
-                className="absolute right-1 top-1 h-10 w-10 text-gray-400 hover:text-[#E603EB] flex items-center justify-center"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1 h-10 w-10 text-muted-foreground hover:text-saramsa-brand"
               >
                 {showApiToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+              </Button>
             </div>
           </div>
 
           {/* Domain */}
           <div className="space-y-2 mb-6">
-            <label htmlFor="domain" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor="domain" className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               Jira Domain
             </label>
-            <input
+            <Input
               id="domain"
               type="text"
               value={config.domain}
               onChange={(e) => onConfigChange('domain', e.target.value)}
               placeholder="your-domain.atlassian.net"
-              className="w-full h-12 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 hover:border-[#E603EB]/50 focus:border-[#E603EB] focus:ring-2 focus:ring-[#E603EB]/20 transition-all duration-300 rounded-md px-3"
+              className="h-12 bg-background/80 border-2 border-border/60 dark:border-border/60 hover:border-saramsa-brand/50 focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 transition-all duration-300 rounded-xl px-3"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               Your Jira cloud domain (e.g., company.atlassian.net)
             </p>
           </div>
 
           {/* API Token Generation Guide */}
           <div className="mb-6">
-            <button
+            <Button
               onClick={() => setIsTokenGuideOpen(!isTokenGuideOpen)}
-              className="w-full justify-between p-3 h-auto text-left border border-[#E603EB]/20 hover:border-[#E603EB]/40 hover:bg-[#E603EB]/5 transition-all duration-300 rounded-md flex items-center"
+              variant="outline"
+              className="w-full h-auto text-left justify-between px-3 py-3 border border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/5"
             >
               <div className="flex items-center gap-2">
-                <ExternalLink className="w-4 h-4 text-[#E603EB]" />
-                <span className="font-medium text-gray-900 dark:text-white">
+                <ExternalLink className="w-4 h-4 text-saramsa-brand" />
+                <span className="font-medium text-foreground dark:text-foreground">
                   How to generate an API token
                 </span>
               </div>
               {isTokenGuideOpen ? (
-                <ChevronUp className="w-4 h-4 text-gray-400" />
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-gray-400" />
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
               )}
-            </button>
+            </Button>
             
             <AnimatePresence>
               {isTokenGuideOpen && (
@@ -226,34 +232,34 @@ export const JiraFormPanel = ({
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.1 }}
-                      className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                      className="flex gap-3 p-3 bg-secondary/40 dark:bg-secondary/40 rounded-xl"
                     >
-                      <div className="flex-shrink-0 w-6 h-6 bg-[#E603EB] text-white rounded-full flex items-center justify-center text-xs font-bold">
+                      <div className="flex-shrink-0 w-6 h-6 bg-saramsa-brand text-white rounded-full flex items-center justify-center text-xs font-bold">
                         {step.step}
                       </div>
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        <p className="text-sm font-medium text-foreground dark:text-foreground">
                           {step.title}
                         </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                           {step.description}
                         </p>
                       </div>
                     </motion.div>
                   ))}
                   
-                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="mt-4 p-3 bg-secondary/60 rounded-xl border border-border/60">
                     <div className="flex items-start gap-2">
-                      <ExternalLink className="w-4 h-4 text-blue-600 mt-0.5" />
+                      <ExternalLink className="w-4 h-4 text-saramsa-brand mt-0.5" />
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                        <p className="text-sm font-medium text-foreground dark:text-foreground">
                           Quick Access
                         </p>
                         <a 
                           href="https://id.atlassian.com/manage-profile/security/api-tokens" 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 dark:text-blue-300 hover:underline"
+                          className="text-xs text-saramsa-brand dark:text-muted-foreground hover:underline"
                         >
                           Go directly to: https://id.atlassian.com/manage-profile/security/api-tokens
                         </a>
@@ -269,7 +275,7 @@ export const JiraFormPanel = ({
 
           {/* Show connection info for existing integrations */}
           {isExistingIntegration && (
-            <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 <div>
@@ -292,7 +298,7 @@ export const JiraFormPanel = ({
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
-                className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 mb-6"
+                className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 mb-6"
               >
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-red-600" />
@@ -313,7 +319,7 @@ export const JiraFormPanel = ({
                 transition={{ duration: 0.3 }}
                 className="space-y-4"
               >
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <p className="text-sm font-medium text-green-700 dark:text-green-400">
@@ -324,13 +330,13 @@ export const JiraFormPanel = ({
 
                 {/* Project Selection with Folder Icons */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
                     Select Jira Project
                   </label>
                   
                   {Object.keys(linkedProjects).length > 0 && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                    <div className="p-3 bg-secondary/60 rounded-xl border border-border/60">
+                      <p className="text-xs text-foreground dark:text-muted-foreground">
                         <strong>{Object.keys(linkedProjects).length}</strong> project(s) already linked. 
                         Click on a linked project to go to its dashboard.
                       </p>
@@ -346,25 +352,25 @@ export const JiraFormPanel = ({
                         return (
                           <div
                             key={project.id}
-                            className={`p-3 border rounded-lg transition-all ${
+                            className={`p-3 border rounded-xl transition-all ${
                               isAlreadyLinked
                                 ? "cursor-pointer border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700"
                                 : selectedProject === project.id
-                                ? "border-[#E603EB] bg-[#E603EB]/10 dark:bg-[#E603EB]/20 cursor-pointer"
-                                : "border-gray-200 dark:border-gray-700 hover:border-[#E603EB]/50 cursor-pointer"
+                                ? "border-saramsa-brand/60 bg-saramsa-brand/10 dark:bg-saramsa-brand/20 cursor-pointer"
+                                : "border-border/60 dark:border-border/60 hover:border-saramsa-brand/60/50 cursor-pointer"
                             }`}
                             onClick={() => isAlreadyLinked ? handleLinkedProjectClick(linkedProject.id) : onProjectSelect(project.id)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1">
                                 <div className="flex-shrink-0">
-                                  <Folder className="w-5 h-5 text-[#E603EB]" />
+                                  <Folder className="w-5 h-5 text-saramsa-brand" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-gray-900 dark:text-white">
+                                  <div className="font-medium text-foreground dark:text-foreground">
                                     {project.name}
                                   </div>
-                                  <div className="text-sm text-gray-500">
+                                  <div className="text-sm text-muted-foreground">
                                     Key: {project.key}
                                   </div>
                                   {isAlreadyLinked && (
@@ -377,7 +383,7 @@ export const JiraFormPanel = ({
                               </div>
                               <div className="flex items-center gap-2">
                                 {project.isCompanyManaged && (
-                                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded">
+                                  <span className="px-2 py-1 text-xs bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand rounded">
                                     Company
                                   </span>
                                 )}
@@ -387,7 +393,7 @@ export const JiraFormPanel = ({
                                   </span>
                                 )}
                                 {selectedProject === project.id && !isAlreadyLinked && (
-                                  <CheckCircle className="w-4 h-4 text-[#E603EB]" />
+                                  <CheckCircle className="w-4 h-4 text-saramsa-brand" />
                                 )}
                                 {isAlreadyLinked && (
                                   <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded whitespace-nowrap">
@@ -401,7 +407,7 @@ export const JiraFormPanel = ({
                       })}
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                     This project will be used to create issues from analyzed feedback
                   </p>
                 </div>
@@ -412,10 +418,11 @@ export const JiraFormPanel = ({
           {/* Action Buttons */}
           {!projects || projects.length === 0 ? (
             /* Validate Configuration Button */
-            <button
+            <Button
               onClick={onValidateConfiguration}
               disabled={(!isExistingIntegration && (!config.email || !config.apiToken || !config.domain)) || isLoading}
-              className="w-full h-12 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 group rounded-md"
+              variant="saramsa"
+              className="w-full h-12 group"
             >
               {isLoading ? (
                 <div className="flex items-center gap-3 justify-center">
@@ -428,13 +435,14 @@ export const JiraFormPanel = ({
                   <span>{isExistingIntegration ? 'Fetch Projects' : 'Validate Configuration'}</span>
                 </div>
               )}
-            </button>
+            </Button>
           ) : (
             /* Continue to Dashboard Button */
-            <button
+            <Button
               onClick={onContinue}
               disabled={!selectedProject || isCreatingProject}
-              className="w-full h-12 bg-gradient-to-r from-[#E603EB] to-[#8B5FBF] hover:from-[#E603EB]/90 hover:to-[#8B5FBF]/90 text-white font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 group rounded-md"
+              variant="saramsa"
+              className="w-full h-12 group"
             >
               <div className="flex items-center gap-3 justify-center">
                 {isCreatingProject ? (
@@ -449,7 +457,7 @@ export const JiraFormPanel = ({
                   </>
                 )}
               </div>
-            </button>
+            </Button>
           )}
 
           {/* Project selection hint */}
@@ -457,7 +465,7 @@ export const JiraFormPanel = ({
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center text-xs text-gray-500 dark:text-gray-400 mt-2"
+              className="text-center text-xs text-muted-foreground dark:text-muted-foreground mt-2"
             >
               Please select a project to continue
             </motion.p>
@@ -472,18 +480,18 @@ export const JiraFormPanel = ({
         transition={{ duration: 0.6, delay: 0.3 }}
         className="text-center space-y-2"
       >
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-border/70 to-transparent" />
         <div className="flex items-center justify-center gap-2">
-          <Shield className="w-4 h-4 text-gray-500" />
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <Shield className="w-4 h-4 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             Your credentials are encrypted and never stored without your permission.
           </p>
         </div>
       </motion.div>
 
       {/* Floating Elements */}
-      <div className="absolute -top-10 -right-10 w-20 h-20 bg-gradient-to-br from-[#E603EB]/20 to-[#8B5FBF]/20 rounded-full blur-xl animate-float" />
-      <div className="absolute -bottom-10 -left-10 w-16 h-16 bg-gradient-to-br from-[#8B5FBF]/20 to-[#E603EB]/20 rounded-full blur-xl animate-float" style={{ animationDelay: '2s' }} />
+      <div className="absolute -top-10 -right-10 w-20 h-20 bg-gradient-to-br from-saramsa-brand/20 to-saramsa-gradient-to/20 rounded-full blur-xl animate-float" />
+      <div className="absolute -bottom-10 -left-10 w-16 h-16 bg-gradient-to-br from-saramsa-gradient-to/20 to-saramsa-brand/20 rounded-full blur-xl animate-float" style={{ animationDelay: '2s' }} />
     </div>
   );
 };

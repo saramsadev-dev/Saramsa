@@ -44,20 +44,20 @@ export function KeywordCloud({
     color: string,
     bgGradient: string 
   }) => (
-    <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+    <Card className="bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60">
       <CardHeader>
         <CardTitle className={`text-lg font-semibold ${color}`}>
           {title}
         </CardTitle>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
           Display top sentiments which has a {title.toLowerCase().split(' ')[0]} tone in the feedback
         </p>
       </CardHeader>
       <CardContent>
-        <div className={`relative h-64 ${bgGradient} rounded-lg overflow-hidden`}>
+        <div className={`relative h-64 ${bgGradient} rounded-xl overflow-hidden`}>
           {words.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">No keywords</p>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">No keywords</p>
             </div>
           ) : words.map((wordItem, index) => (
             <motion.div
@@ -127,14 +127,14 @@ export function KeywordCloud({
   if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg ${className}`}
+        className={`flex items-center justify-center p-8 border-2 border-dashed border-border/60 dark:border-border/60 rounded-xl ${className}`}
       >
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 text-gray-400">💭</div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
+          <div className="w-12 h-12 mx-auto mb-4 text-muted-foreground">💭</div>
+          <p className="text-muted-foreground dark:text-muted-foreground text-sm">
             No keywords available
           </p>
-          <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+          <p className="text-muted-foreground dark:text-muted-foreground text-xs mt-1">
             Keywords will appear here after analysis
           </p>
         </div>

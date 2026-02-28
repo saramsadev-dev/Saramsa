@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Save } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import type { Project } from '@/store/features/projects/projectsSlice';
 
 interface EditProjectModalProps {
@@ -39,13 +42,15 @@ export function EditProjectModal({ project, onClose, onSave, loading = false }: 
             <h2 className="text-xl font-semibold text-foreground">
               Edit Project
             </h2>
-            <button
+            <Button
               onClick={onClose}
-              className="p-1 hover:bg-accent/60 rounded transition-colors"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 hover:bg-accent/60"
               disabled={loading}
             >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
+              <X className="w-5 h-5 text-muted-foreground" />
+            </Button>
           </div>
 
           {/* Form */}
@@ -54,12 +59,12 @@ export function EditProjectModal({ project, onClose, onSave, loading = false }: 
               <label htmlFor="project-name" className="block text-sm font-medium text-muted-foreground mb-2">
                 Project Name *
               </label>
-              <input
+              <Input
                 id="project-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground focus:ring-2 focus:ring-[#E603EB] focus:border-transparent"
+                className="w-full px-3 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground focus:ring-2 focus:ring-saramsa-brand/30 focus:border-saramsa-brand/40"
                 placeholder="Enter project name"
                 required
                 disabled={loading}
@@ -70,7 +75,7 @@ export function EditProjectModal({ project, onClose, onSave, loading = false }: 
               <label htmlFor="project-description" className="block text-sm font-medium text-muted-foreground mb-2">
                 Description
               </label>
-              <textarea
+              <Textarea
                 id="project-description"
                 value={description}
                 onChange={(e) => {
@@ -80,7 +85,7 @@ export function EditProjectModal({ project, onClose, onSave, loading = false }: 
                   }
                 }}
                 rows={3}
-                className="w-full px-3 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground focus:ring-2 focus:ring-[#E603EB] focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground focus:ring-2 focus:ring-saramsa-brand/30 focus:border-saramsa-brand/40 resize-none"
                 placeholder="Enter project description (optional)"
                 disabled={loading}
               />
@@ -93,22 +98,24 @@ export function EditProjectModal({ project, onClose, onSave, loading = false }: 
 
             {/* Actions */}
             <div className="flex gap-3 pt-4">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border border-border/60 text-muted-foreground rounded-xl hover:bg-accent/60 transition-colors"
+                className="flex-1"
                 disabled={loading}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="saramsa"
+                className="flex-1 gap-2"
                 disabled={loading || !name.trim()}
               >
                 <Save className="w-4 h-4" />
                 {loading ? 'Saving...' : 'Save Changes'}
-              </button>
+              </Button>
             </div>
           </form>
         </motion.div>

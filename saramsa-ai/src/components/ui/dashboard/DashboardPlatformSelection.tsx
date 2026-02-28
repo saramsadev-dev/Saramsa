@@ -46,7 +46,7 @@ export function DashboardPlatformSelection({
         ? "Azure DevOps integration is already configured. You can reconfigure or link to a different organization."
         : "Connect your project to Azure DevOps for seamless work item creation",
       icon: <Download className="w-8 h-8" />,
-      color: "from-[#E603EB] to-[#8B5FBF]",
+      color: "from-saramsa-gradient-from to-saramsa-gradient-to",
       features: [
         "AI-Powered Analysis",
         "Auto Work Item Creation",
@@ -83,10 +83,10 @@ export function DashboardPlatformSelection({
           transition={{ duration: 0.6 }}
           className="text-center space-y-3"
         >
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
             Choose Your Integration Platform
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
             Connect this project to Azure DevOps or Jira to enable automated work item creation and synchronization.
           </p>
         </motion.div>
@@ -106,10 +106,10 @@ export function DashboardPlatformSelection({
               transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
             >
               <div
-                className={`relative bg-white dark:bg-gray-800 border-2 rounded-xl p-5 transition-all duration-300 cursor-pointer hover:border-[#E603EB]/50 hover:shadow-lg ${
+                className={`relative bg-card/90 dark:bg-card/95 border-2 rounded-xl p-5 transition-all duration-300 cursor-pointer hover:border-saramsa-brand/40 hover:shadow-lg ${
                   platform.status === "configured"
                     ? "border-green-300 dark:border-green-600 bg-green-50/30 dark:bg-green-900/10"
-                    : "border-gray-200 dark:border-gray-700"
+                    : "border-border/60 dark:border-border/60"
                 }`}
                 onClick={() => onPlatformSelect(platform.id as "azure" | "jira")}
               >
@@ -124,17 +124,17 @@ export function DashboardPlatformSelection({
 
                 <div className="flex items-start gap-4">
                   <div
-                    className={`w-12 h-12 bg-gradient-to-br ${platform.color} rounded-lg flex items-center justify-center text-white flex-shrink-0`}
+                    className={`w-12 h-12 bg-gradient-to-br ${platform.color} rounded-xl flex items-center justify-center text-white flex-shrink-0`}
                   >
                     {platform.icon}
                   </div>
 
                   <div className="flex-1 space-y-2">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
                         {platform.name}
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                         {platform.description}
                       </p>
                     </div>
@@ -144,7 +144,7 @@ export function DashboardPlatformSelection({
                       {platform.features.map((feature) => (
                         <span
                           key={feature}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                          className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary/40 text-muted-foreground dark:bg-secondary/40 dark:text-muted-foreground"
                         >
                           {feature}
                         </span>
@@ -152,7 +152,7 @@ export function DashboardPlatformSelection({
                     </div>
                   </div>
 
-                  <ArrowRight className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" />
+                  <ArrowRight className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-1" />
                 </div>
               </div>
             </motion.div>
@@ -166,10 +166,10 @@ export function DashboardPlatformSelection({
           transition={{ duration: 0.6, delay: 0.3 }}
           className="text-center space-y-2 pt-4"
         >
-          <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
+          <div className="w-full h-px bg-gradient-to-r from-transparent via-border/70 to-transparent" />
           <div className="flex items-center justify-center gap-2">
-            <Shield className="w-4 h-4 text-gray-500" />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <Shield className="w-4 h-4 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               Your credentials are encrypted and securely stored
             </p>
           </div>

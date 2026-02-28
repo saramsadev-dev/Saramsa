@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { BaseModal } from './modals/BaseModal';
+import { Button } from './button';
 
 interface DeleteWorkItemsModalProps {
   workItemCount: number;
@@ -45,19 +46,21 @@ export function DeleteWorkItemsModal({
 
   const footer = (
     <div className="flex items-center justify-end gap-3">
-      <button
+      <Button
         type="button"
         onClick={onCancel}
         disabled={loading}
-        className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+        variant="outline"
+        className="px-4 py-2 text-muted-foreground dark:text-muted-foreground hover:bg-accent/60 dark:hover:bg-card/95"
       >
         Cancel
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={onConfirm}
         disabled={loading}
-        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg transition-colors disabled:opacity-50"
+        variant="destructive"
+        className="flex items-center gap-2 px-4 py-2"
       >
         {loading ? (
           <>
@@ -70,7 +73,7 @@ export function DeleteWorkItemsModal({
             {defaultConfirmLabel}
           </>
         )}
-      </button>
+      </Button>
     </div>
   );
 
@@ -82,14 +85,14 @@ export function DeleteWorkItemsModal({
       description={defaultDescription}
       size="sm"
       icon={
-        <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+        <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
           <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
         </div>
       }
       footer={footer}
     >
       <div className="space-y-4">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
             <div className="text-sm space-y-1">

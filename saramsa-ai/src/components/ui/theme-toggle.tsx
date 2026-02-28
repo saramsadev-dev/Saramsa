@@ -3,6 +3,7 @@
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
@@ -12,7 +13,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="w-10 h-10 rounded-lg bg-muted animate-pulse" />
+      <div className="w-10 h-10 rounded-xl bg-muted animate-pulse" />
     );
   }
 
@@ -20,16 +21,18 @@ export function ThemeToggle() {
   const isDark = theme === 'dark';
 
   return (
-    <button
+    <Button
       onClick={() => setTheme(isLight ? 'dark' : 'light')}
-      className="p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 hover:bg-white/20 dark:hover:bg-gray-800/80 transition-all duration-300 group"
+      variant="ghost"
+      size="icon"
+      className="h-11 w-11 rounded-full bg-card/10 backdrop-blur-sm border border-white/20 dark:border-border/60 hover:bg-card/20 dark:hover:bg-accent/60 transition-all duration-300 group"
       aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
     >
       {isDark ? (
         <Sun className="w-5 h-5 text-white group-hover:text-saramsa-brand transition-colors" />
       ) : (
-        <Moon className="w-5 h-5 text-gray-600 group-hover:text-saramsa-brand transition-colors" />
+        <Moon className="w-5 h-5 text-muted-foreground group-hover:text-saramsa-brand transition-colors" />
       )}
-    </button>
+    </Button>
   );
 }

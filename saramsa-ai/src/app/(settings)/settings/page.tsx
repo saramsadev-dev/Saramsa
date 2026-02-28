@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Settings, UserRound, PlugZap } from "lucide-react";
 import { apiRequest } from "@/lib/apiRequest";
 import { IntegrationsPage } from "@/components/ui/settings/IntegrationsPage";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Profile = { first_name?: string; last_name?: string; email?: string; username?: string };
 
@@ -48,7 +50,7 @@ export default function SettingsPage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="mb-8 space-y-2">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] text-white shadow-lg">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white shadow-lg">
               <Settings className="h-6 w-6" />
             </span>
             <h1 className="text-3xl font-bold text-foreground">Settings</h1>
@@ -57,7 +59,8 @@ export default function SettingsPage() {
         </div>
         
         <div className="flex gap-2 border-b border-border">
-          <button
+          <Button
+            variant="ghost"
             className={`px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === "profile" 
                 ? "border-b-2 border-primary text-foreground" 
@@ -67,7 +70,7 @@ export default function SettingsPage() {
           >
             <span className="flex items-center gap-2">
               <span
-                className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] text-white transition-opacity ${
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white transition-opacity ${
                   activeTab === "profile" ? "opacity-100" : "opacity-60"
                 }`}
               >
@@ -75,8 +78,9 @@ export default function SettingsPage() {
               </span>
               Profile
             </span>
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             className={`px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === "integrations" 
                 ? "border-b-2 border-primary text-foreground" 
@@ -86,7 +90,7 @@ export default function SettingsPage() {
           >
             <span className="flex items-center gap-2">
               <span
-                className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] text-white transition-opacity ${
+                className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white transition-opacity ${
                   activeTab === "integrations" ? "opacity-100" : "opacity-60"
                 }`}
               >
@@ -94,7 +98,7 @@ export default function SettingsPage() {
               </span>
               Integrations
             </span>
-          </button>
+          </Button>
         </div>
 
         {activeTab === "profile" && (
@@ -107,8 +111,8 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">First Name</label>
-                <input
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                <Input
+                  className="h-10 bg-background text-foreground placeholder:text-muted-foreground"
                   value={profile.first_name || ""}
                   onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
                   placeholder="Enter your first name"
@@ -116,8 +120,8 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Last Name</label>
-                <input
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                <Input
+                  className="h-10 bg-background text-foreground placeholder:text-muted-foreground"
                   value={profile.last_name || ""}
                   onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
                   placeholder="Enter your last name"
@@ -125,9 +129,9 @@ export default function SettingsPage() {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-foreground mb-2">Email</label>
-                <input
+                <Input
                   type="email"
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  className="h-10 bg-background text-foreground placeholder:text-muted-foreground"
                   value={profile.email || ""}
                   onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                   placeholder="Enter your email address"
@@ -135,13 +139,13 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="flex justify-end pt-4">
-              <button
+              <Button
                 onClick={saveProfile}
                 disabled={saving}
-                className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                className="px-6"
               >
                 {saving ? "Saving..." : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </div>
         )}

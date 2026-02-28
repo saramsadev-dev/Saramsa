@@ -63,7 +63,7 @@ export const CompactSentimentBar = ({
         className="
           absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 
           bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 
-          text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 
+          text-xs rounded-xl shadow-lg opacity-0 group-hover:opacity-100 
           transition-opacity duration-200 whitespace-nowrap z-10
         "
       >

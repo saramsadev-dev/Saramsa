@@ -2,6 +2,7 @@
 
 import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 interface ProjectSelectorProps {
   azureProjects: Array<{ id: string; name: string }>;
@@ -35,12 +36,14 @@ export function ProjectSelector({
       {needsAzureConfig && (
         <div className="flex items-center gap-3 text-xs text-amber-600 dark:text-amber-400">
           <span>Azure DevOps is not configured. Please configure it first.</span>
-          <button
+          <Button
             onClick={() => router.push('/config')}
-            className="px-3 py-1 border border-amber-300/60 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-50/70 dark:hover:bg-amber-900/20 transition-colors"
+            variant="outline"
+            size="sm"
+            className="px-3 py-1 border-amber-300/60 text-amber-700 dark:text-amber-300 hover:bg-amber-50/70 dark:hover:bg-amber-900/20"
           >
             Go to Config
-          </button>
+          </Button>
         </div>
       )}
       
@@ -48,13 +51,15 @@ export function ProjectSelector({
       {!needsAzureConfig && azureProjects.length === 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>No Azure DevOps projects found.</span>
-          <button
+          <Button
             onClick={onFetchAzureProjects}
             disabled={isFetchingAzure}
-            className="px-3 py-1 border border-border/70 rounded-lg hover:bg-accent/60 transition-colors disabled:opacity-50"
+            variant="outline"
+            size="sm"
+            className="px-3 py-1"
           >
             {isFetchingAzure ? 'Fetching...' : 'Retry'}
-          </button>
+          </Button>
           {fetchAzureError && (
             <span className="text-red-500 text-xs">{fetchAzureError}</span>
           )}

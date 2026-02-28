@@ -21,6 +21,8 @@ import {
   Calendar,
   Users
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface ImportProjectModalProps {
   provider: 'azure' | 'jira';
@@ -135,12 +137,14 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
               </p>
             </div>
           </div>
-          <button
+          <Button
             onClick={onClose}
-            className="p-2 hover:bg-accent/60 rounded-xl transition-colors"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 hover:bg-accent/60"
           >
             <X className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Account Selection */}
@@ -166,13 +170,13 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
         {/* Search */}
         <div className="p-6 border-b border-border/60">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search projects..."
-              className="w-full pl-10 pr-4 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground placeholder-gray-500 focus:ring-2 focus:ring-[#E603EB] focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-border/60 rounded-xl bg-background/80 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-saramsa-brand/30 focus:border-saramsa-brand/40"
             />
           </div>
         </div>
@@ -211,13 +215,13 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
         <div className="flex-1 overflow-y-auto max-h-96">
           {fetchingProjectsForProvider ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               <span className="ml-2 text-muted-foreground">Loading projects...</span>
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
+              <div className="w-16 h-16 bg-secondary/40 dark:bg-secondary/40 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
                 {searchTerm ? 'No projects found' : 'No projects available'}
@@ -244,7 +248,7 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
                         ? 'opacity-60 cursor-not-allowed border-border/60 bg-secondary/60'
                         : selectedProject?.id === project.id
                         ? 'border-saramsa-brand/60 bg-saramsa-brand/10 dark:bg-saramsa-brand/20 cursor-pointer'
-                        : 'border-border/60 hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer'
+                        : 'border-border/60 hover:border-border/60 dark:hover:border-border cursor-pointer'
                     }`}
                     onClick={() => !isAlreadyLinked && setSelectedProject(project)}
                   >
@@ -255,7 +259,7 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
                           {project.name}
                         </h4>
                         {project.key && (
-                          <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-xs rounded">
+                          <span className="px-2 py-1 bg-secondary/40 dark:bg-secondary/40 text-xs rounded">
                             {project.key}
                           </span>
                         )}
@@ -332,16 +336,17 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
             </div>
             
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={onClose}
-                className="px-4 py-2 border border-border/60 text-muted-foreground rounded-xl hover:bg-accent/60 transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="saramsa"
                 onClick={handleImport}
                 disabled={!selectedProject || importing || (selectedProject && !!getLinkedProject(selectedProject.id))}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:shadow-lg disabled:opacity-50 text-white rounded-xl transition-all disabled:cursor-not-allowed"
+                className="gap-2"
               >
                 {importing ? (
                   <>
@@ -354,7 +359,7 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

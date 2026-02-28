@@ -15,6 +15,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { BrandLogo } from "./brand-logo";
 import { shouldShowNavbar } from "@/lib/auth-pages";
+import { Button } from "@/components/ui/button";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -82,8 +83,9 @@ export function Navbar() {
             <div className="flex items-center gap-3 sm:gap-4">
               {isAuthenticated && currentUser && (
                 <div className="relative" ref={dropdownRef}>
-                  <button
+                  <Button
                     onClick={() => setOpen((v) => !v)}
+                    variant="outline"
                     className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card/70 px-3 py-2 text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] transition-all hover:text-foreground hover:shadow-[0_12px_30px_-20px_rgba(15,23,42,0.35)]"
                   >
                     <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-full flex items-center justify-center shadow-[0_8px_20px_-10px_rgba(230,3,235,0.7)]">
@@ -99,7 +101,7 @@ export function Navbar() {
                         open ? "rotate-180" : ""
                       }`}
                     />
-                  </button>
+                  </Button>
                   {open && (
                     <div className="absolute z-50 right-0 mt-2 w-60 rounded-2xl border border-border/60 bg-popover/95 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.7)] backdrop-blur-xl animate-in slide-in-from-top-2 duration-200">
                       <div className="px-4 py-3 border-b border-border/60 bg-gradient-to-r from-saramsa-gradient-from/10 to-saramsa-gradient-to/10">
@@ -111,23 +113,25 @@ export function Navbar() {
                         </div>
                       </div>
                       <div className="py-1">
-                        <button
+                        <Button
                           onClick={() => {
                             setOpen(false);
                             window.location.href = "/settings";
                           }}
+                          variant="ghost"
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-popover-foreground hover:bg-accent/70 transition-all duration-300 group"
                         >
                           <Settings className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
                           Settings
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={handleLogout}
+                          variant="ghost"
                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-all duration-300 group"
                         >
                           <LogOut className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
                           Logout
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}

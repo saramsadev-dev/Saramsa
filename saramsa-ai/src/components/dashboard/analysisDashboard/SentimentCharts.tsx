@@ -142,9 +142,9 @@ export function SentimentCharts({
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Feature Sentiment Bar Chart */}
-        <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+        <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
           <div className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
               Feature Sentiment Distribution
             </h3>
             <div className="h-96">
@@ -267,9 +267,9 @@ export function SentimentCharts({
         </div>
 
         {/* Pie Chart */}
-        <div className="bg-white dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+        <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
           <div className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
               {selectedFeatures.length === 0
                 ? 'Overall Sentiment Distribution'
                 : `Sentiment Distribution (${selectedFeatures.length} Feature${
@@ -331,7 +331,7 @@ export function SentimentCharts({
             </div>
 
             {selectedFeatures.length > 0 && (
-              <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                 <p className="text-sm text-green-800 dark:text-green-200">
                   <span className="font-medium">Interactive Mode:</span>{' '}
                   Chart shows aggregated sentiment for selected features only.

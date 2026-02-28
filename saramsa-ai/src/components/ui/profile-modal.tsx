@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Mail, LogOut, Settings, Shield } from 'lucide-react';
 import { useAuth } from '@/lib/useAuth';
 import * as authApi from '@/lib/auth';
+import { Button } from '@/components/ui/button';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -54,42 +55,44 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
+          className="bg-card/95 dark:bg-card/95 rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <div className="flex items-center justify-between p-6 border-b border-border/60 dark:border-border/60">
+            <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
               Profile
             </h2>
-            <button
+            <Button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
             >
               <X className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
 
           {/* Content */}
           <div className="p-6">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-gray-300 border-t-[#E603EB] rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-border/60 border-t-saramsa-brand rounded-full animate-spin" />
               </div>
             ) : (
               <div className="space-y-6">
                 {/* User Avatar */}
                 <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#E603EB] to-[#8B5FBF] rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-full flex items-center justify-center">
                     <span className="text-white font-bold text-xl">
                       {user?.username?.charAt(0).toUpperCase() || 'U'}
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
                       {user?.username || 'User'}
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       {user?.role || 'User'}
                     </p>
                   </div>
@@ -97,13 +100,13 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
                 {/* User Details */}
                 <div className="space-y-4">
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <Mail className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <div className="flex items-center space-x-3 p-3 bg-secondary/40 dark:bg-secondary/40 rounded-xl">
+                    <Mail className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      <p className="text-sm font-medium text-foreground dark:text-foreground">
                         Email
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                         {user?.email || 'No email provided'}
                       </p>
                     </div>
@@ -111,13 +114,13 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
                   {userData && (
                     <>
-                      <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <div className="flex items-center space-x-3 p-3 bg-secondary/40 dark:bg-secondary/40 rounded-xl">
+                        <User className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          <p className="text-sm font-medium text-foreground dark:text-foreground">
                             Full Name
                           </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                             {userData.first_name && userData.last_name
                               ? `${userData.first_name} ${userData.last_name}`
                               : 'Not provided'}
@@ -125,13 +128,13 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <Shield className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      <div className="flex items-center space-x-3 p-3 bg-secondary/40 dark:bg-secondary/40 rounded-xl">
+                        <Shield className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          <p className="text-sm font-medium text-foreground dark:text-foreground">
                             Role
                           </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                    <p className="text-sm text-muted-foreground dark:text-muted-foreground capitalize">
                       {userData.role || user?.role || 'User'}
                           </p>
                         </div>
@@ -141,19 +144,23 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <button className="w-full flex items-center space-x-3 p-3 text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                <div className="space-y-2 pt-4 border-t border-border/60 dark:border-border/60">
+                  <Button
+                    variant="ghost"
+                    className="w-full flex items-center space-x-3 p-3 text-left text-muted-foreground dark:text-muted-foreground hover:bg-accent/60 dark:hover:bg-accent/60 rounded-xl transition-colors"
+                  >
                     <Settings className="w-4 h-4" />
                     <span>Settings</span>
-                  </button>
+                  </Button>
                   
-                  <button
+                  <Button
                     onClick={handleLogout}
-                    className="w-full flex items-center space-x-3 p-3 text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    variant="ghost"
+                    className="w-full flex items-center space-x-3 p-3 text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     <span>Logout</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

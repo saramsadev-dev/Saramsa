@@ -242,7 +242,7 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
-            className="rounded-3xl bg-gradient-to-br from-[#E603EB]/25 via-[#8B5FBF]/15 to-transparent p-6 sm:p-8 shadow-lg ring-1 ring-[#E603EB]/10 backdrop-blur-sm"
+            className="rounded-3xl bg-gradient-to-br from-saramsa-brand/20 via-saramsa-gradient-to/15 to-transparent p-6 sm:p-8 shadow-lg ring-1 ring-saramsa-brand/20 backdrop-blur-sm"
           >
             <div className="space-y-6">
               <div className="space-y-2">
@@ -268,7 +268,7 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
                     description: "We detect existing connections and let you manage multiple Azure accounts with ease."
                   }
                 ].map((item) => (
-                  <div key={item.title} className="rounded-2xl border border-white/20 bg-white/10 p-4">
+                  <div key={item.title} className="rounded-2xl border border-white/20 bg-card/10 p-4">
                     <p className="text-sm font-medium text-white/90">{item.title}</p>
                     <p className="mt-1 text-xs text-white/70">
                       {item.description}
