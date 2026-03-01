@@ -14,6 +14,7 @@ env:
   ACR_NAME: saramsaacr
   ACR_REGISTRY: saramsaacr.azurecr.io
   IMAGE_REPO: saramsa-celery-gpu-base
+  AZURE_SUBSCRIPTION_ID: 5a3e5fc4-02fb-47dd-8f46-ed62b94c2bcb
 
 jobs:
   build-base:
@@ -36,7 +37,7 @@ jobs:
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_5D4B3D5D28E9477FAA936C6524EB3A4D }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DF861B6FC11548C7BDB03BE8989F7214 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_13ED96C692AA42E5A05EBD10D66B8BDD }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
       - name: Login to ACR
         run: az acr login --name $ACR_NAME
