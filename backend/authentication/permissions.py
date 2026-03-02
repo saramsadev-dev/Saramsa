@@ -44,7 +44,8 @@ def _get_project_id_from_request(request, view):
 _ROLE_ORDER = {
     'viewer': 1,
     'editor': 2,
-    'admin': 3
+    'admin': 3,
+    'owner': 4,
 }
 
 
@@ -93,6 +94,10 @@ class IsProjectEditor(ProjectRolePermission):
 
 class IsProjectAdmin(ProjectRolePermission):
     min_role = 'admin'
+
+
+class IsProjectOwner(ProjectRolePermission):
+    min_role = 'owner'
 
 
 class IsAdmin(permissions.BasePermission):

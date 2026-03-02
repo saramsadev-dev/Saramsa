@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
-from authentication.permissions import IsProjectAdmin, IsProjectViewer
+from authentication.permissions import IsProjectAdmin, IsProjectViewer, IsProjectOwner
 from apis.infrastructure.cosmos_service import cosmos_service
 
 from ..services import get_project_service
@@ -141,6 +141,11 @@ class ProjectListView(APIView):
 
 class ProjectDetailView(APIView):
     permission_classes = [IsProjectViewer]
+
+    def get_permissions(self):
+        if self.request and self.request.method == "DELETE":
+            return [IsProjectOwner()]
+        return [permission() for permission in self.permission_classes]
 
     @handle_service_errors
     def get(self, request, project_id: str):
@@ -336,7 +341,7 @@ class ProjectRolesView(APIView):
         if owner_id:
             role_entries.append({
                 "user_id": str(owner_id),
-                "role": "admin",
+                "role": "owner",
                 "is_owner": True
             })
 
@@ -352,7 +357,7 @@ class ProjectRolesView(APIView):
             })
 
         current_user_id = getattr(request.user, "id", None)
-        current_role = "admin" if current_user_id and owner_id and str(current_user_id) == str(owner_id) else None
+        current_role = "owner" if current_user_id and owner_id and str(current_user_id) == str(owner_id) else None
         if current_role is None and current_user_id:
             current_role = cosmos_service.get_project_role_for_user(project_id, str(current_user_id))
 
