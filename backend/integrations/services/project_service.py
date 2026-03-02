@@ -11,6 +11,7 @@ import uuid
 import logging
 
 from ..repositories import IntegrationsRepository
+from apis.infrastructure.cosmos_service import cosmos_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,18 @@ class ProjectService:
     
     def __init__(self):
         self.integrations_repo = IntegrationsRepository()
+        self.cosmos_service = cosmos_service
+
+    def _normalize_project(self, project: Dict[str, Any]) -> Dict[str, Any]:
+        if not project:
+            return project
+        if 'externalLinks' not in project:
+            project['externalLinks'] = []
+        if 'description' not in project:
+            project['description'] = ""
+        if 'status' not in project:
+            project['status'] = "active"
+        return project
     
     def _create_project_document(self, user_id: str, name: str, description: str = None, 
                                 external_links: List[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -120,7 +133,28 @@ class ProjectService:
     def get_projects_by_user(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all projects for a user."""
         try:
-            return self.integrations_repo.get_projects_by_user(user_id)
+            owned = self.integrations_repo.get_projects_by_user(user_id)
+            owned_ids = {p.get('id') for p in owned if p.get('id')}
+
+            shared_ids = self.cosmos_service.get_project_ids_for_user(user_id)
+            shared_ids = [pid for pid in shared_ids if pid not in owned_ids]
+            shared = self.cosmos_service.get_projects_by_ids(shared_ids) if shared_ids else []
+
+            all_projects = []
+            for project in owned + shared:
+                all_projects.append(self._normalize_project(project))
+
+            # De-dupe by id
+            seen = set()
+            deduped = []
+            for project in all_projects:
+                pid = project.get('id')
+                if not pid or pid in seen:
+                    continue
+                seen.add(pid)
+                deduped.append(project)
+
+            return deduped
         except Exception as e:
             logger.error(f"Error getting projects for user {user_id}: {e}")
             raise
@@ -137,7 +171,17 @@ class ProjectService:
             Project data if found and user has access, None otherwise
         """
         try:
-            return self.integrations_repo.get_project(project_id, user_id)
+            project = self.integrations_repo.get_project(project_id, user_id)
+            if project:
+                return self._normalize_project(project)
+
+            # Check project roles for shared access
+            role = self.cosmos_service.get_project_role_for_user(project_id, user_id)
+            if role:
+                project = self.cosmos_service.get_project_by_id_any(project_id)
+                return self._normalize_project(project) if project else None
+
+            return None
         except Exception as e:
             logger.error(f"Error getting project {project_id}: {e}")
             raise
@@ -242,7 +286,7 @@ class ProjectService:
             
             logger.info(f"Looking for existing project: {project_id} for user: {user_id}")
             # Try to get existing project
-            project_doc = self.integrations_repo.get_project(project_id, user_id)
+            project_doc = self.get_project(project_id, user_id)
             if project_doc:
                 logger.info(f"Found existing project: {project_id}")
                 return project_id, project_doc, False

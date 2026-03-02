@@ -86,7 +86,8 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
         
         const result = await dispatch(deleteWorkItems({ 
           workItemIds: selectedWorkItems,
-          userStoryId: userStoryId
+          userStoryId: userStoryId,
+          projectId: projectId
         })).unwrap();
         
         console.log(`Successfully deleted ${result.deletedCount} work items`);
@@ -302,7 +303,7 @@ Body: {
 }
 
 // Using Redux
-dispatch(deleteWorkItems({ workItemIds: ["work_item_id_1", "work_item_id_2"] }))`}
+dispatch(deleteWorkItems({ workItemIds: ["work_item_id_1", "work_item_id_2"], projectId: "project_123" }))`}
               </code>
             </div>
           </div>

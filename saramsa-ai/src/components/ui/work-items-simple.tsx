@@ -51,7 +51,8 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
     try {
       await dispatch(deleteWorkItems({
         workItemIds: selectedWorkItems,
-        userStoryId: userStoryWithItems.id
+        userStoryId: userStoryWithItems.id,
+        projectId: projectId
       })).unwrap();
 
       setSelectedWorkItems([]);

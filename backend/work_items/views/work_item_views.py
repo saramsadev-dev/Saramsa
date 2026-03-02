@@ -19,7 +19,7 @@ from asgiref.sync import async_to_sync
 import json
 import uuid
 
-from authentication.permissions import IsAdmin, IsAdminOrUser
+from authentication.permissions import IsAdminOrUser, IsProjectViewer, IsProjectEditor, IsProjectAdmin
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from ..services import get_devops_service, get_quality_gate_service
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class WorkItemGenerationView(APIView):
     """Generate work items from analysis data - CONSOLIDATED from feedback_analysis"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
     
     @handle_service_errors
     @async_to_sync
@@ -121,7 +121,7 @@ class WorkItemGenerationView(APIView):
 
 class WorkItemSubmissionView(APIView):
     """Submit work items to external platforms - CONSOLIDATED from feedback_analysis"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
     
     @handle_service_errors
     @async_to_sync
@@ -216,7 +216,7 @@ class WorkItemSubmissionView(APIView):
 
 class WorkItemsListView(APIView):
     """Get work items for a project - CONSOLIDATED from multiple apps"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request):
@@ -271,7 +271,7 @@ class WorkItemsListView(APIView):
 
 class WorkItemDetailView(APIView):
     """Get specific work item by ID - CONSOLIDATED from multiple apps"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request, work_item_id):
@@ -294,7 +294,7 @@ class WorkItemDetailView(APIView):
 
 class WorkItemUpdateView(APIView):
     """Update work item - CONSOLIDATED from feedback_analysis"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
     
     @handle_service_errors
     def put(self, request, work_item_id):
@@ -302,9 +302,14 @@ class WorkItemUpdateView(APIView):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
             return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
+
+        project_id = request.data.get("project_id")
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
         
         try:
-            updated_data = request.data
+            updated_data = request.data.copy()
+            updated_data.pop("project_id", None)
             
             if not updated_data.get('title'):
                 return StandardResponse.validation_error(detail="Title is required.", instance=request.path)
@@ -314,7 +319,8 @@ class WorkItemUpdateView(APIView):
             updated_work_item = devops_service.update_work_item(
                 work_item_id=work_item_id,
                 user_id=str(user_id),
-                updated_data=updated_data
+                updated_data=updated_data,
+                project_id=project_id
             )
             
             if not updated_work_item:
@@ -333,7 +339,7 @@ class WorkItemUpdateView(APIView):
 
 class WorkItemRemovalView(APIView):
     """Remove/delete work items - handles bulk deletion"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
     
     @handle_service_errors
     def put(self, request):
@@ -343,9 +349,12 @@ class WorkItemRemovalView(APIView):
             return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
         
         try:
+            project_id = request.data.get("project_id")
             ids = request.data.get('ids', [])
             user_story_id = request.data.get('user_story_id')
             
+            if not project_id:
+                return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
             if not ids:
                 return StandardResponse.validation_error(detail="IDs are required for removal.", instance=request.path)
             
@@ -354,7 +363,8 @@ class WorkItemRemovalView(APIView):
             removal_result = devops_service.remove_work_items(
                 work_item_ids=ids,
                 user_id=str(user_id),
-                user_story_id=user_story_id
+                user_story_id=user_story_id,
+                project_id=project_id
             )
             
             return StandardResponse.success(data={
@@ -404,7 +414,7 @@ class WorkItemsByPlatformView(APIView):
 
 class WorkItemQualityRulesView(APIView):
     """Get or update quality gate rules for a project."""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
 
     @handle_service_errors
     def get(self, request):
@@ -440,7 +450,7 @@ class WorkItemQualityRulesView(APIView):
 
 class WorkItemQualityCheckView(APIView):
     """Evaluate work items against quality gate rules."""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
 
     @handle_service_errors
     def post(self, request):
