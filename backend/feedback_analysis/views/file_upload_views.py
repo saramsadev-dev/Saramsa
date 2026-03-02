@@ -17,7 +17,7 @@ from asgiref.sync import async_to_sync
 import logging
 
 from ..services import get_processing_service
-from authentication.permissions import IsAdminOrUser
+from authentication.permissions import IsProjectEditor
 from apis.core.response import StandardResponse
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 @method_decorator(csrf_exempt, name='dispatch')
 class FeedbackFileUploadView(APIView):
     """Handle feedback file uploads and processing."""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
     
     def extract_comments_from_data(self, data, file_type):
         """Extract comments from uploaded data"""
