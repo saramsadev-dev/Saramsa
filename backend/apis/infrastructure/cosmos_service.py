@@ -117,7 +117,8 @@ class CosmosDBService:
             'taxonomies': '/projectId',
             'usage': '/projectId',
             'insight_rules': '/projectId',
-            'insight_reviews': '/projectId'
+            'insight_reviews': '/projectId',
+            'work_item_quality_rules': '/projectId'
         }
         partition_key = partition_keys.get(container_type, '/id')  # Default to '/id' if not specified
 
@@ -175,7 +176,8 @@ class CosmosDBService:
             'taxonomies': '/projectId',
             'usage': '/projectId',
             'insight_rules': '/projectId',
-            'insight_reviews': '/projectId'
+            'insight_reviews': '/projectId',
+            'work_item_quality_rules': '/projectId'
         }
         
         for container_type, partition_key in containers_config.items():
@@ -250,7 +252,8 @@ class CosmosDBService:
                 'taxonomies': 'projectId',
                 'usage': 'projectId',
                 'insight_rules': 'projectId',
-                'insight_reviews': 'projectId'
+                'insight_reviews': 'projectId',
+                'work_item_quality_rules': 'projectId'
             }
             
             # Get the partition key field name for this container
@@ -1292,6 +1295,28 @@ class CosmosDBService:
             return container.upsert_item(data)
         except Exception as e:
             logger.error(f"Error upserting insight review for project {project_id}: {e}")
+            return None
+
+    def get_work_item_quality_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get work item quality gate rules for a project."""
+        try:
+            container = self.get_container('work_item_quality_rules')
+            query = "SELECT TOP 1 * FROM c WHERE c.projectId = @project_id AND c.type = 'work_item_quality_rule'"
+            params = [{"name": "@project_id", "value": project_id}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return items[0] if items else None
+        except Exception as e:
+            logger.error(f"Error getting work item quality rules for project {project_id}: {e}")
+            return None
+
+    def upsert_work_item_quality_rules_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert work item quality gate rules for a project."""
+        try:
+            container = self.get_container('work_item_quality_rules')
+            data['projectId'] = project_id
+            return container.upsert_item(data)
+        except Exception as e:
+            logger.error(f"Error upserting work item quality rules for project {project_id}: {e}")
             return None
 
     def get_work_items_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:

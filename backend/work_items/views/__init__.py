@@ -13,6 +13,8 @@ from .work_item_views import (
     WorkItemUpdateView,
     WorkItemsByPlatformView,
     WorkItemRemovalView,
+    WorkItemQualityRulesView,
+    WorkItemQualityCheckView,
 )
 
 __all__ = [
