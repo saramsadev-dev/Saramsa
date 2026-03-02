@@ -15,6 +15,7 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 # Backend's own URL in production (e.g. https://saramsa-backend-xxx.centralus-01.azurewebsites.net).
 # When set, this host is added to ALLOWED_HOSTS so Azure can route to the app.
 BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', '').rstrip('/')
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', '').rstrip('/')
 
 _allowed = os.getenv("ALLOWED_HOSTS", "*").split(",")
 if BACKEND_BASE_URL:
@@ -420,3 +421,17 @@ SPECTACULAR_SETTINGS = {
         {'name': 'upload', 'description': 'File upload endpoints'},
     ],
 }
+
+# Email configuration (password reset + notifications)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND') or (
+    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@saramsa.ai')
+PASSWORD_RESET_FROM_EMAIL = os.getenv('PASSWORD_RESET_FROM_EMAIL', DEFAULT_FROM_EMAIL)
+PASSWORD_RESET_EMAIL_SUBJECT = os.getenv('PASSWORD_RESET_EMAIL_SUBJECT', 'Reset your Saramsa password')

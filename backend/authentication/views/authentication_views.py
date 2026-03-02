@@ -345,13 +345,18 @@ class ForgotPasswordView(APIView):
             # Save reset token using service layer
             auth_service.save_reset_token(email, token, expires_at)
             
-            # TODO: Send email with reset link
-            # For now, we'll return the token in the response (remove this in production)
-            # In production, send email with link like: /reset-password?token=...
-            reset_link = f"/reset-password?token={token}"
+            # Build reset link for frontend
+            frontend_base = getattr(settings, "FRONTEND_BASE_URL", "").rstrip("/")
+            if not frontend_base:
+                frontend_base = settings.BACKEND_BASE_URL or request.build_absolute_uri("/")[:-1]
+            reset_link = f"{frontend_base}/reset-password?token={token}"
             
-            # Log the reset link for development (remove in production)
-            self.logger.info(f"Password reset link for {email}: {reset_link}")
+            # Send email (log failures but do not reveal to client)
+            email_sent = auth_service.send_password_reset_email(email, reset_link)
+            if not email_sent:
+                self.logger.warning("Password reset email failed for %s", email)
+            if settings.DEBUG:
+                self.logger.info(f"Password reset link for {email}: {reset_link}")
             
             return StandardResponse.success(
                 data={
