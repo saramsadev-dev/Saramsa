@@ -19,7 +19,7 @@ import os
 import time
 
 from aiCore.services.completion_service import generate_completions
-from authentication.permissions import IsAdminOrUser
+from authentication.permissions import IsAdminOrUser, IsProjectViewer, IsProjectEditor, _get_role_from_user
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from celery.result import AsyncResult
@@ -27,6 +27,7 @@ from apis.infrastructure.cache_service import get_cache_service
 from django.http import StreamingHttpResponse
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.contrib.auth.models import AnonymousUser
+from apis.infrastructure.cosmos_service import cosmos_service
 
 from apis.prompts import getSentAnalysisPrompt
 from ..services import get_task_service
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class AnalyzeCommentsView(APIView):
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
     
     @handle_service_errors
     def post(self, request):
@@ -163,7 +164,7 @@ class AnalyzeCommentsView(APIView):
 
 
 class UpdateKeywordsView(APIView):
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
     
     @handle_service_errors
     @async_to_sync
@@ -336,6 +337,14 @@ class UpdateKeywordsView(APIView):
 class GetUserCommentsView(APIView):
     """Get user comments for regeneration"""
     permission_classes = [IsAdminOrUser]
+
+    def get_permissions(self):
+        project_id = self.request.query_params.get('project_id')
+        is_personal_param = self.request.query_params.get('is_personal')
+        explicit_personal = str(is_personal_param).lower() in ('true', '1', 'yes')
+        if project_id and not explicit_personal:
+            return [IsProjectViewer()]
+        return [permission() for permission in self.permission_classes]
     
     @handle_service_errors
     def get(self, request):
@@ -753,6 +762,13 @@ class AnalysisByIdView(APIView):
                 instance=request.path
             )
 
+        project_id = analysis.get('projectId')
+        if project_id and not self._has_project_access(request.user, project_id):
+            return StandardResponse.forbidden(
+                detail="You do not have permission to access this project.",
+                instance=request.path
+            )
+
         # Enrich with user stories and comments (mirrors latest-analysis response)
         from work_items.services import get_devops_service
         devops_service = get_devops_service()
@@ -821,4 +837,20 @@ class AnalysisByIdView(APIView):
             if item.get('submitted'):
                 logger.info(f"Work item {item.get('id')} is submitted: {item.get('submitted_to')} at {item.get('submitted_at')}")
         return work_items
+
+    def _has_project_access(self, user, project_id: str) -> bool:
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        if _get_role_from_user(user) == 'admin':
+            return True
+        user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
+        if not user_id:
+            return False
+        project = cosmos_service.get_project_by_id_any(project_id)
+        if isinstance(project, dict):
+            owner_id = project.get('owner_user_id') or project.get('userId')
+            if owner_id and str(owner_id) == str(user_id):
+                return True
+        role = cosmos_service.get_project_role_for_user(project_id, str(user_id))
+        return bool(role)
 

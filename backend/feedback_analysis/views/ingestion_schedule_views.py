@@ -3,14 +3,19 @@ Views for scheduled ingestion configuration and execution.
 """
 
 from rest_framework.views import APIView
-from authentication.permissions import IsAdminOrUser
+from authentication.permissions import IsProjectViewer, IsProjectEditor
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from ..services.ingestion_schedule_service import get_ingestion_schedule_service
 
 
 class IngestionScheduleView(APIView):
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
+
+    def get_permissions(self):
+        if self.request and self.request.method == "POST":
+            return [IsProjectEditor()]
+        return [permission() for permission in self.permission_classes]
 
     @handle_service_errors
     def get(self, request):
@@ -51,7 +56,7 @@ class IngestionScheduleView(APIView):
 
 
 class IngestionRunNowView(APIView):
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
 
     @handle_service_errors
     def post(self, request):
