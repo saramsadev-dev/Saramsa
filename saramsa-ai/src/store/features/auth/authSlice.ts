@@ -48,7 +48,7 @@ export const loginUser = createAsyncThunk<
 // Async thunk for register
 export const registerUser = createAsyncThunk<
   User,
-  { username: string; email: string; password: string; confirmPassword: string; role?: 'admin' | 'user' | 'restricted user' },
+  { username: string; email: string; password: string; confirmPassword: string; otp: string; role?: 'admin' | 'user' | 'restricted user' },
   { rejectValue: string }
 >('auth/registerUser', async (data, { rejectWithValue }) => {
   try {
@@ -57,6 +57,7 @@ export const registerUser = createAsyncThunk<
       email: data.email,
       password: data.password,
       confirmPassword: data.confirmPassword,
+      otp: data.otp,
       // Default role to admin if omitted
       role: (data.role || 'admin') as any,
     });

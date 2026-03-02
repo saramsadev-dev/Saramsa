@@ -6,11 +6,15 @@ password management, and user profile operations.
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 import bcrypt
+import hashlib
+import secrets
 from ..repositories import UserRepository
 import logging
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +122,116 @@ class AuthenticationService:
     def save_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save/update user data."""
         return self.user_repo.save_user(user_data)
+
+    # Registration OTP methods
+    def request_registration_otp(self, email: str, username: Optional[str] = None) -> Dict[str, Any]:
+        """Generate and send registration OTP to email."""
+        if self.user_repo.get_by_email(email):
+            raise ValueError("Email already exists")
+        if username and self.user_repo.get_by_username(username):
+            raise ValueError("Username already exists")
+
+        now = datetime.now(timezone.utc)
+        ttl_minutes = getattr(settings, "REGISTRATION_OTP_TTL_MINUTES", 10)
+        cooldown_seconds = getattr(settings, "REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS", 60)
+
+        existing = self.user_repo.get_registration_otp(email)
+        if existing:
+            last_sent_at = self._parse_iso_datetime(existing.get("last_sent_at"))
+            if last_sent_at:
+                elapsed = (now - last_sent_at).total_seconds()
+                if elapsed < cooldown_seconds:
+                    remaining = int(cooldown_seconds - elapsed)
+                    raise ValueError(f"Please wait {remaining} seconds before requesting a new code.")
+
+        code = f"{secrets.randbelow(1000000):06d}"
+        otp_hash = self._hash_otp(code)
+        expires_at = (now + timedelta(minutes=ttl_minutes)).isoformat()
+
+        send_count = 1
+        attempts = 0
+        if existing:
+            send_count = int(existing.get("send_count", 0)) + 1
+            attempts = int(existing.get("attempts", 0))
+
+        payload = {
+            "id": f"reg_otp:{email}",
+            "type": "registration_otp",
+            "email": email,
+            "otp_hash": otp_hash,
+            "expires_at": expires_at,
+            "attempts": attempts,
+            "max_attempts": getattr(settings, "REGISTRATION_OTP_MAX_ATTEMPTS", 5),
+            "send_count": send_count,
+            "last_sent_at": now.isoformat(),
+            "created_at": existing.get("created_at") if existing else now.isoformat(),
+            "updated_at": now.isoformat(),
+            "used": False,
+        }
+
+        self.user_repo.save_registration_otp(payload)
+        self.send_registration_otp_email(email, code, ttl_minutes)
+
+        return {
+            "email": email,
+            "expires_in_seconds": int(ttl_minutes * 60),
+            "cooldown_seconds": int(cooldown_seconds)
+        }
+
+    def verify_registration_otp(self, email: str, code: str) -> None:
+        """Verify registration OTP or raise ValueError."""
+        entry = self.user_repo.get_registration_otp(email)
+        if not entry:
+            raise ValueError("OTP not found. Please request a new code.")
+        if entry.get("used"):
+            raise ValueError("OTP already used. Please request a new code.")
+
+        now = datetime.now(timezone.utc)
+        expires_at = self._parse_iso_datetime(entry.get("expires_at"))
+        if expires_at and now > expires_at:
+            raise ValueError("OTP has expired. Please request a new code.")
+
+        max_attempts = int(entry.get("max_attempts") or getattr(settings, "REGISTRATION_OTP_MAX_ATTEMPTS", 5))
+        attempts = int(entry.get("attempts", 0))
+        if attempts >= max_attempts:
+            raise ValueError("OTP attempt limit reached. Please request a new code.")
+
+        if not secrets.compare_digest(self._hash_otp(code), entry.get("otp_hash", "")):
+            entry["attempts"] = attempts + 1
+            entry["updated_at"] = now.isoformat()
+            self.user_repo.save_registration_otp(entry)
+            raise ValueError("Invalid OTP code.")
+
+        entry["used"] = True
+        entry["used_at"] = now.isoformat()
+        entry["updated_at"] = now.isoformat()
+        self.user_repo.save_registration_otp(entry)
+
+    def send_registration_otp_email(self, email: str, code: str, ttl_minutes: int) -> bool:
+        """Send registration OTP email."""
+        subject = getattr(settings, "REGISTRATION_OTP_EMAIL_SUBJECT", "Your Saramsa registration code")
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@saramsa.ai")
+
+        text_body = (
+            "Use the code below to complete your Saramsa registration:\n\n"
+            f"{code}\n\n"
+            f"This code expires in {ttl_minutes} minutes."
+        )
+
+        html_body = (
+            "<p>Use the code below to complete your Saramsa registration:</p>"
+            f"<p style=\"font-size: 20px; font-weight: bold; letter-spacing: 2px;\">{code}</p>"
+            f"<p>This code expires in {ttl_minutes} minutes.</p>"
+        )
+
+        try:
+            message = EmailMultiAlternatives(subject, text_body, from_email, [email])
+            message.attach_alternative(html_body, "text/html")
+            message.send(fail_silently=False)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send registration OTP email to {email}: {e}")
+            return False
     
     def _hash_password(self, password: str) -> str:
         """Hash password using bcrypt."""
@@ -141,6 +255,21 @@ class AuthenticationService:
         except Exception as e:
             logger.error(f"Error verifying password: {e}")
             return False
+
+    def _hash_otp(self, code: str) -> str:
+        payload = f"{code}{settings.SECRET_KEY}".encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    def _parse_iso_datetime(self, value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(value)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except Exception:
+            return None
 
 
 # Global service instance

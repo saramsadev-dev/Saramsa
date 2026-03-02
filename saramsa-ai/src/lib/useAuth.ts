@@ -13,6 +13,7 @@ type RegisterArgs = {
   email: string;
   password: string;
   confirmPassword: string;
+  otp: string;
   role?: 'admin' | 'user' | 'restricted user';
 };
 

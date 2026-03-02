@@ -253,3 +253,13 @@ class ResetPasswordSerializer(serializers.Serializer):
             return hashed.decode('utf-8')
         except Exception as e:
             raise serializers.ValidationError(f"Password hashing failed: {str(e)}")
+
+
+class CosmosDBUserRegisterWithOtpSerializer(CosmosDBUserSerializer):
+    """Serializer for registration with OTP."""
+    otp = serializers.CharField(write_only=True, min_length=6, max_length=6)
+
+
+class RegistrationOtpRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)

@@ -120,7 +120,8 @@ class CosmosDBService:
             'insight_reviews': '/projectId',
             'work_item_quality_rules': '/projectId',
             'ingestion_schedules': '/projectId',
-            'project_roles': '/projectId'
+            'project_roles': '/projectId',
+            'registration_otps': '/email'
         }
         partition_key = partition_keys.get(container_type, '/id')  # Default to '/id' if not specified
 
@@ -181,7 +182,8 @@ class CosmosDBService:
             'insight_reviews': '/projectId',
             'work_item_quality_rules': '/projectId',
             'ingestion_schedules': '/projectId',
-            'project_roles': '/projectId'
+            'project_roles': '/projectId',
+            'registration_otps': '/email'
         }
         
         for container_type, partition_key in containers_config.items():
@@ -259,7 +261,8 @@ class CosmosDBService:
                 'insight_reviews': 'projectId',
                 'work_item_quality_rules': 'projectId',
                 'ingestion_schedules': 'projectId',
-                'project_roles': 'projectId'
+                'project_roles': 'projectId',
+                'registration_otps': 'email'
             }
             
             # Get the partition key field name for this container

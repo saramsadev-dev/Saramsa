@@ -141,3 +141,33 @@ class UserRepository:
         except Exception as e:
             logger.error(f"Error saving user: {e}")
             raise
+
+    # Registration OTP methods
+    def save_registration_otp(self, otp_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create or update registration OTP entry."""
+        try:
+            return self.cosmos_service.update_document(
+                'registration_otps',
+                otp_data['id'],
+                otp_data['email'],  # partition_key
+                otp_data
+            )
+        except Exception as e:
+            logger.error(f"Error saving registration OTP: {e}")
+            raise
+
+    def get_registration_otp(self, email: str) -> Optional[Dict[str, Any]]:
+        """Get registration OTP entry by email."""
+        try:
+            return self.cosmos_service.get_document('registration_otps', f"reg_otp:{email}", email)
+        except Exception as e:
+            logger.error(f"Error getting registration OTP for {email}: {e}")
+            return None
+
+    def delete_registration_otp(self, email: str) -> bool:
+        """Delete registration OTP entry by email."""
+        try:
+            return self.cosmos_service.delete_document('registration_otps', f"reg_otp:{email}", email)
+        except Exception as e:
+            logger.error(f"Error deleting registration OTP for {email}: {e}")
+            return False
