@@ -16,6 +16,7 @@ import json
 import uuid
 import logging
 import os
+import time
 
 from aiCore.services.completion_service import generate_completions
 from authentication.permissions import IsAdminOrUser
@@ -23,6 +24,9 @@ from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from celery.result import AsyncResult
 from apis.infrastructure.cache_service import get_cache_service
+from django.http import StreamingHttpResponse
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.contrib.auth.models import AnonymousUser
 
 from apis.prompts import getSentAnalysisPrompt
 from ..services import get_task_service
@@ -41,6 +45,7 @@ class AnalyzeCommentsView(APIView):
         
         comments = request.data.get("comments")
         incoming_project_id = request.data.get("project_id")
+        file_name = request.data.get("file_name")
 
         if not comments or not isinstance(comments, list):
             return StandardResponse.validation_error(
@@ -122,7 +127,26 @@ class AnalyzeCommentsView(APIView):
                 )
             raise
 
-        cache.set(f"task_start:{task.id}", datetime.now().isoformat(), ttl=3600)
+        started_at = datetime.now().isoformat()
+        cache.set(f"task_start:{task.id}", started_at, ttl=3600)
+        # Track task history (max 15) per user
+        try:
+            tasks_key = f"tasks:{user_id_str}"
+            existing = cache.get(tasks_key, default=[])
+            if not isinstance(existing, list):
+                existing = []
+            # Remove any duplicate entries for this task
+            existing = [t for t in existing if t.get("task_id") != task.id]
+            existing.insert(0, {
+                "task_id": task.id,
+                "analysis_id": analysis_id,
+                "project_id": project_id,
+                "file_name": file_name,
+                "started_at": started_at,
+            })
+            cache.set(tasks_key, existing[:15], ttl=86400)
+        except Exception as e:
+            logger.warning(f"Failed to record task history: {e}")
         hour_key = datetime.now().strftime("%Y-%m-%d-%H")
         cache.incr(f"analyses_hour:{project_id}:{hour_key}", 1, ttl=3600)
         
@@ -591,6 +615,121 @@ class TaskStatusView(APIView):
             response_data["pipeline_health"] = pipeline_health
                 
         return StandardResponse.success(data=response_data)
+
+
+class TaskListView(APIView):
+    """List recent Celery tasks for the current user (max 15)."""
+    permission_classes = [IsAdminOrUser]
+
+    def get(self, request):
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        if not user_id:
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
+
+        user_id_str = str(user_id)
+        cache = get_cache_service()
+        tasks_key = f"tasks:{user_id_str}"
+        tasks = cache.get(tasks_key, default=[])
+        if not isinstance(tasks, list):
+            tasks = []
+
+        def map_status(raw: str) -> str:
+            if raw in ("PENDING", "STARTED"):
+                return "RUNNING"
+            if raw == "SUCCESS":
+                return "SUCCESS"
+            if raw == "FAILURE":
+                return "FAILED"
+            return "UNKNOWN"
+
+        enriched = []
+        for item in tasks[:15]:
+            task_id = item.get("task_id")
+            if not task_id:
+                continue
+            res = AsyncResult(task_id)
+            enriched.append({
+                "task_id": task_id,
+                "analysis_id": item.get("analysis_id"),
+                "project_id": item.get("project_id"),
+                "file_name": item.get("file_name"),
+                "started_at": item.get("started_at"),
+                "status": map_status(res.status),
+                "ready": res.ready(),
+            })
+
+        return StandardResponse.success(data={"tasks": enriched})
+
+
+class TaskStreamView(APIView):
+    """Stream recent task updates via Server-Sent Events (SSE)."""
+    permission_classes = []
+
+    def get(self, request):
+        token = request.query_params.get("token")
+        if token:
+            try:
+                jwt_auth = JWTAuthentication()
+                validated = jwt_auth.get_validated_token(token)
+                user = jwt_auth.get_user(validated)
+                request.user = user
+                request.auth = validated
+            except Exception:
+                request.user = AnonymousUser()
+
+        if not hasattr(request, "user") or not request.user.is_authenticated:
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
+
+        if not IsAdminOrUser().has_permission(request, self):
+            return StandardResponse.forbidden(detail="Permission denied.", instance=request.path)
+
+        user_id = request.user.id
+        if not user_id:
+            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
+
+        user_id_str = str(user_id)
+        cache = get_cache_service()
+
+        def map_status(raw: str) -> str:
+            if raw in ("PENDING", "STARTED"):
+                return "RUNNING"
+            if raw == "SUCCESS":
+                return "SUCCESS"
+            if raw == "FAILURE":
+                return "FAILED"
+            return "UNKNOWN"
+
+        def event_stream():
+            while True:
+                tasks_key = f"tasks:{user_id_str}"
+                tasks = cache.get(tasks_key, default=[])
+                if not isinstance(tasks, list):
+                    tasks = []
+
+                enriched = []
+                for item in tasks[:15]:
+                    task_id = item.get("task_id")
+                    if not task_id:
+                        continue
+                    res = AsyncResult(task_id)
+                    enriched.append({
+                        "task_id": task_id,
+                        "analysis_id": item.get("analysis_id"),
+                        "project_id": item.get("project_id"),
+                        "file_name": item.get("file_name"),
+                        "started_at": item.get("started_at"),
+                        "status": map_status(res.status),
+                        "ready": res.ready(),
+                    })
+
+                payload = json.dumps({"tasks": enriched}, default=str)
+                yield f"event: tasks\ndata: {payload}\n\n"
+                time.sleep(5)
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
 
 class AnalysisByIdView(APIView):

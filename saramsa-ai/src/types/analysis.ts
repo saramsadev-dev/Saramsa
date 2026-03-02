@@ -31,12 +31,19 @@ export type AnalysisData = {
   createdAt: string;
   analysisType: string;
   rawLlm: any;
+  insights?: string[];
   analysisData: {
     overall: SentimentBreakdown;
     counts: { total: number; positive: number; negative: number; neutral: number };
     features: FeatureSentiment[];
     positive_keywords: Array<{ keyword: string; sentiment: number }>;
     negative_keywords: Array<{ keyword: string; sentiment: number }>;
+    pipeline_metadata?: {
+      processing_time?: number;
+      model_info?: any;
+      unmapped_percentage?: number;
+      confidence_distribution?: Record<string, number>;
+    } | null;
   };
   deepAnalysis?: {
     work_items?: any[];

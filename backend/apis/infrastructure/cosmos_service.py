@@ -115,7 +115,9 @@ class CosmosDBService:
             'insights': '/id',
             'comment_extractions': '/project_id',  # Partition by project_id for efficient queries
             'taxonomies': '/projectId',
-            'usage': '/projectId'
+            'usage': '/projectId',
+            'insight_rules': '/projectId',
+            'insight_reviews': '/projectId'
         }
         partition_key = partition_keys.get(container_type, '/id')  # Default to '/id' if not specified
 
@@ -171,7 +173,9 @@ class CosmosDBService:
             'insights': '/id',
             'comment_extractions': '/project_id',  # Partition by project_id for efficient queries
             'taxonomies': '/projectId',
-            'usage': '/projectId'
+            'usage': '/projectId',
+            'insight_rules': '/projectId',
+            'insight_reviews': '/projectId'
         }
         
         for container_type, partition_key in containers_config.items():
@@ -244,7 +248,9 @@ class CosmosDBService:
                 'insights': 'id',
                 'comment_extractions': 'project_id',
                 'taxonomies': 'projectId',
-                'usage': 'projectId'
+                'usage': 'projectId',
+                'insight_rules': 'projectId',
+                'insight_reviews': 'projectId'
             }
             
             # Get the partition key field name for this container
@@ -1243,6 +1249,49 @@ class CosmosDBService:
             return item
         except Exception as e:
             logger.error(f"Error getting insight: {e}")
+            return None
+
+    def get_insight_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get insight auto-rule configuration for a project."""
+        try:
+            container = self.get_container('insight_rules')
+            query = "SELECT TOP 1 * FROM c WHERE c.projectId = @project_id AND c.type = 'insight_rule'"
+            params = [{"name": "@project_id", "value": project_id}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return items[0] if items else None
+        except Exception as e:
+            logger.error(f"Error getting insight rules for project {project_id}: {e}")
+            return None
+
+    def upsert_insight_rules_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert insight auto-rule configuration for a project."""
+        try:
+            container = self.get_container('insight_rules')
+            data['projectId'] = project_id
+            return container.upsert_item(data)
+        except Exception as e:
+            logger.error(f"Error upserting insight rules for project {project_id}: {e}")
+            return None
+
+    def get_insight_reviews_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get insight review statuses for a project."""
+        try:
+            container = self.get_container('insight_reviews')
+            query = "SELECT * FROM c WHERE c.projectId = @project_id AND c.type = 'insight_review'"
+            params = [{"name": "@project_id", "value": project_id}]
+            return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+        except Exception as e:
+            logger.error(f"Error getting insight reviews for project {project_id}: {e}")
+            return []
+
+    def upsert_insight_review(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert a single insight review status."""
+        try:
+            container = self.get_container('insight_reviews')
+            data['projectId'] = project_id
+            return container.upsert_item(data)
+        except Exception as e:
+            logger.error(f"Error upserting insight review for project {project_id}: {e}")
             return None
 
     def get_work_items_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:

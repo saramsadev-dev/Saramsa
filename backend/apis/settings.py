@@ -162,7 +162,9 @@ COSMOS_DB_CONFIG = {
         'comment_extractions': os.getenv('COSMOS_DB_COMMENT_EXTRACTIONS_CONTAINER', 'comment_extractions'),
         'taxonomies': os.getenv('COSMOS_DB_TAXONOMIES_CONTAINER', 'taxonomies'),
         'usage': os.getenv('COSMOS_DB_USAGE_CONTAINER', 'usage'),
-    }
+        'insight_rules': os.getenv('COSMOS_DB_INSIGHT_RULES_CONTAINER', 'insight_rules'),
+        'insight_reviews': os.getenv('COSMOS_DB_INSIGHT_REVIEWS_CONTAINER', 'insight_reviews'),
+    } 
 }
 
 

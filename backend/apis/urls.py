@@ -5,7 +5,8 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 from .views import health_check, performance_metrics, reset_performance_stats
-from feedback_analysis.views import UserStoriesView, AnalyzeCommentsView, TaskStatusView, GetUserCommentsView, FeedbackFileUploadView
+from feedback_analysis.views import UserStoriesView, AnalyzeCommentsView, TaskStatusView, TaskListView, TaskStreamView, GetUserCommentsView, FeedbackFileUploadView
+from feedback_analysis.views import InsightReviewListView, InsightReviewUpdateView, InsightRulesView, InsightRulesApplyView
 from work_items.views import WorkItemGenerationView, WorkItemSubmissionView, WorkItemUpdateView, WorkItemRemovalView
 
 urlpatterns = [
@@ -23,6 +24,8 @@ urlpatterns = [
     # Insights endpoints (aliased from feedback_analysis and work_items for frontend compatibility)
     path('api/insights/analyze/', AnalyzeCommentsView.as_view(), name='insights_analyze'),
     path('api/insights/task-status/<str:task_id>/', TaskStatusView.as_view(), name='insights_task_status'),
+    path('api/insights/tasks/', TaskListView.as_view(), name='insights_tasks'),
+    path('api/insights/tasks/stream/', TaskStreamView.as_view(), name='insights_tasks_stream'),
     path('api/insights/comments/', GetUserCommentsView.as_view(), name='insights_comments'),
     path('api/insights/upload/', FeedbackFileUploadView.as_view(), name='insights_upload'),
     path('api/insights/user-story-creation/', WorkItemGenerationView.as_view(), name='insights_user_story_creation'),
@@ -31,6 +34,10 @@ urlpatterns = [
     path('api/insights/user-stories/all/', UserStoriesView.as_view(), name='insights_user_stories_all'),
     path('api/insights/user-stories/remove-work-items/', WorkItemRemovalView.as_view(), name='insights_remove_work_items'),
     path('api/insights/work-items/<str:work_item_id>/update/', WorkItemUpdateView.as_view(), name='insights_work_item_update'),
+    path('api/insights/review/', InsightReviewListView.as_view(), name='insights_review'),
+    path('api/insights/review/update/', InsightReviewUpdateView.as_view(), name='insights_review_update'),
+    path('api/insights/rules/', InsightRulesView.as_view(), name='insights_rules'),
+    path('api/insights/rules/apply/', InsightRulesApplyView.as_view(), name='insights_rules_apply'),
     
     # Additional aliases without /api prefix for frontend compatibility
     path('insights/comments/', GetUserCommentsView.as_view(), name='insights_comments_no_api'),

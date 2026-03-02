@@ -240,6 +240,38 @@ class AnalysisService:
         except Exception as e:
             logger.error(f"Error getting insights by type: {e}")
             raise
+
+    def get_insight_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get insight auto-rule configuration for a project."""
+        try:
+            return self.analysis_repo.get_insight_rules_for_project(project_id)
+        except Exception as e:
+            logger.error(f"Error getting insight rules for project: {e}")
+            return None
+
+    def upsert_insight_rules_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert insight auto-rule configuration for a project."""
+        try:
+            return self.analysis_repo.upsert_insight_rules_for_project(project_id, data)
+        except Exception as e:
+            logger.error(f"Error upserting insight rules for project: {e}")
+            return None
+
+    def get_insight_reviews_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get insight review statuses for a project."""
+        try:
+            return self.analysis_repo.get_insight_reviews_for_project(project_id)
+        except Exception as e:
+            logger.error(f"Error getting insight reviews for project: {e}")
+            return []
+
+    def upsert_insight_review(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert insight review status."""
+        try:
+            return self.analysis_repo.upsert_insight_review(project_id, data)
+        except Exception as e:
+            logger.error(f"Error upserting insight review: {e}")
+            return None
     
     # Analysis Data Methods
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:

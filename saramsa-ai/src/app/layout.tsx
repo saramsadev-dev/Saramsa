@@ -6,6 +6,7 @@ import StoreProvider from "@/store/StoreProvider";
 import { Navbar } from "@/components/ui/navbar";
 import { Providers } from "@/components/providers/providers";
 import { Toaster } from "sonner";
+import { PipelineStatusWidget } from "@/components/ui/pipeline-status-widget";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -39,6 +40,7 @@ export default function RootLayout({
           <StoreProvider>
             <Navbar/>
             <main className="flex-1 overflow-hidden">{children}</main>
+            <PipelineStatusWidget />
             <Toaster 
               position="top-right" 
               richColors 

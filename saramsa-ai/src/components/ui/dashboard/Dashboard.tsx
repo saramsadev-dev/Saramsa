@@ -25,7 +25,8 @@ import {
 
 import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
-import { Sparkles } from 'lucide-react';
+import { getRelatedWorkItemsForInsight } from '@/lib/insightTraceability';
+import { Sparkles, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { AnalysisProjectSelector } from './AnalysisProjectSelector';
 import { UploadPanel } from './UploadPanel';
 import { MetricsCards } from './MetricsCards';
@@ -109,6 +110,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     loadedComments,
     latestAnalysis,
     projectContext,
+    analysisStatus,
   } = useSelector((state: RootState) => state.analysis);
   
   const { analysis: jiraAnalysis, isAnalyzing: isJiraAnalyzing } = useSelector((state: RootState) => state.jira);
@@ -127,12 +129,32 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const [currentProjectId, setCurrentProjectId] = useState<string>("");
   const [personalProjectId, setPersonalProjectId] = useState<string>('');
   const [isGeneratingUserStories, setIsGeneratingUserStories] = useState<boolean>(false);
+  const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [reviewInsights, setReviewInsights] = useState<any[]>([]);
+  const [reviewLoading, setReviewLoading] = useState<boolean>(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [selectedInsightKeys, setSelectedInsightKeys] = useState<Set<string>>(new Set());
+  const [rulesLoading, setRulesLoading] = useState<boolean>(false);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+  const [rules, setRules] = useState<any>({
+    auto_approve: {
+      min_confidence_level: "MEDIUM",
+      min_evidence_count: 20,
+      require_feature_match: false,
+    },
+    auto_ignore: {
+      max_confidence_level: "LOW",
+    },
+  });
   
   // Declare all refs at the top to prevent recreation on every render
   const didInitRef = useRef(false);
   const hasConsolidatedFetchRef = useRef(false);
   const lastFetchedProjectRef = useRef<string | null>(null);
   const lastProcessedAnalysisIdRef = useRef<string | null>(null);
+  const lastHistoryProjectRef = useRef<string | null>(null);
   useEffect(() => {
     const contextProjectId = projectContext?.project_id;
     if (!contextProjectId) return;
@@ -161,6 +183,147 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     const provider = proj?.externalLinks?.[0]?.provider;
     return provider === 'jira' ? 'jira' : provider === 'azure' ? 'azure' : null;
   }, [projects, currentProjectId, projectId]);
+
+  useEffect(() => {
+    const rawProjectId = currentProjectId || projectId || '';
+    if (!rawProjectId) {
+      setAnalysisHistory([]);
+      return;
+    }
+
+    if (lastHistoryProjectRef.current === rawProjectId) return;
+    lastHistoryProjectRef.current = rawProjectId;
+
+    let isActive = true;
+    const candidateIds = Array.from(new Set([
+      rawProjectId,
+      rawProjectId.startsWith('project_') ? rawProjectId.replace('project_', '') : `project_${rawProjectId}`,
+    ]));
+
+    const fetchHistory = async () => {
+      setHistoryLoading(true);
+      setHistoryError(null);
+      let lastError: string | null = null;
+
+      for (const candidate of candidateIds) {
+        try {
+          const response = await apiRequest('get', `/feedback/history/?project_id=${candidate}`, undefined, true);
+          const payload = response?.data?.data;
+          const analyses = payload?.analyses || payload?.analyses_history || [];
+          if (isActive) {
+            if (Array.isArray(analyses) && analyses.length > 0) {
+              setAnalysisHistory(analyses);
+              setHistoryLoading(false);
+              return;
+            }
+            if (candidate === candidateIds[candidateIds.length - 1]) {
+              setAnalysisHistory(Array.isArray(analyses) ? analyses : []);
+            }
+          }
+        } catch (err: any) {
+          lastError =
+            err?.response?.data?.detail ||
+            err?.response?.data?.message ||
+            err?.message ||
+            'Failed to load analysis history.';
+        }
+      }
+
+      if (isActive) {
+        setHistoryError(lastError);
+        setHistoryLoading(false);
+      }
+    };
+
+    fetchHistory();
+    return () => {
+      isActive = false;
+    };
+  }, [currentProjectId, projectId]);
+
+  useEffect(() => {
+    const rawProjectId = currentProjectId || projectId || '';
+    if (!rawProjectId) {
+      setReviewInsights([]);
+      setSelectedInsightKeys(new Set());
+      return;
+    }
+
+    let isActive = true;
+    const candidateIds = Array.from(new Set([
+      rawProjectId,
+      rawProjectId.startsWith('project_') ? rawProjectId.replace('project_', '') : `project_${rawProjectId}`,
+    ]));
+
+    const fetchReviewList = async () => {
+      setReviewLoading(true);
+      setReviewError(null);
+      let lastError: string | null = null;
+
+      for (const candidate of candidateIds) {
+        try {
+          const response = await apiRequest('get', `/insights/review/?project_id=${candidate}`, undefined, true);
+          const payload = response?.data?.data;
+          const list = payload?.insights || [];
+          if (isActive) {
+            setReviewInsights(Array.isArray(list) ? list : []);
+          }
+          setReviewLoading(false);
+          return;
+        } catch (err: any) {
+          lastError =
+            err?.response?.data?.detail ||
+            err?.response?.data?.message ||
+            err?.message ||
+            'Failed to load insight review list.';
+        }
+      }
+
+      if (isActive) {
+        setReviewError(lastError);
+        setReviewLoading(false);
+      }
+    };
+
+    const fetchRules = async () => {
+      setRulesLoading(true);
+      setRulesError(null);
+      let lastError: string | null = null;
+
+      for (const candidate of candidateIds) {
+        try {
+          const response = await apiRequest('get', `/insights/rules/?project_id=${candidate}`, undefined, true);
+          const payload = response?.data?.data || response?.data;
+          if (isActive && payload) {
+            setRules({
+              auto_approve: payload.auto_approve || rules.auto_approve,
+              auto_ignore: payload.auto_ignore || rules.auto_ignore,
+            });
+          }
+          setRulesLoading(false);
+          return;
+        } catch (err: any) {
+          lastError =
+            err?.response?.data?.detail ||
+            err?.response?.data?.message ||
+            err?.message ||
+            'Failed to load insight rules.';
+        }
+      }
+
+      if (isActive) {
+        setRulesError(lastError);
+        setRulesLoading(false);
+      }
+    };
+
+    fetchReviewList();
+    fetchRules();
+
+    return () => {
+      isActive = false;
+    };
+  }, [currentProjectId, projectId]);
   // Handle keyword updates
   const handleKeywordsUpdate = (featureName: string, keywords: string[]) => {
     setEditedKeywords(prev => ({
@@ -241,6 +404,81 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       dispatch(clearAnalysisData());
       setEditedKeywords({});
       console.log('All stored data cleared');
+    }
+  };
+
+  const toggleInsightSelection = (insightKey: string) => {
+    setSelectedInsightKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(insightKey)) {
+        next.delete(insightKey);
+      } else {
+        next.add(insightKey);
+      }
+      return next;
+    });
+  };
+
+  const updateInsightStatuses = async (status: 'approved' | 'ignored' | 'pending') => {
+    const rawProjectId = currentProjectId || projectId || '';
+    if (!rawProjectId) return;
+    if (selectedInsightKeys.size === 0) return;
+
+    try {
+      const updates = reviewInsights
+        .filter((item) => selectedInsightKeys.has(item.insight_key))
+        .map((item) => ({
+          insight_key: item.insight_key,
+          insight_text: item.insight_text,
+          status,
+        }));
+
+      await apiRequest('post', '/insights/review/update/', {
+        project_id: rawProjectId,
+        updates,
+      }, true);
+
+      const refreshed = await apiRequest('get', `/insights/review/?project_id=${rawProjectId}`, undefined, true);
+      setReviewInsights(refreshed?.data?.data?.insights || []);
+      setSelectedInsightKeys(new Set());
+    } catch (err: any) {
+      setReviewError(err?.message || 'Failed to update insights.');
+    }
+  };
+
+  const handleSaveRules = async () => {
+    const rawProjectId = currentProjectId || projectId || '';
+    if (!rawProjectId) return;
+    setRulesLoading(true);
+    setRulesError(null);
+    try {
+      await apiRequest('post', '/insights/rules/', {
+        project_id: rawProjectId,
+        rules,
+      }, true);
+    } catch (err: any) {
+      setRulesError(err?.message || 'Failed to save insight rules.');
+    } finally {
+      setRulesLoading(false);
+    }
+  };
+
+  const handleApplyRules = async () => {
+    const rawProjectId = currentProjectId || projectId || '';
+    if (!rawProjectId) return;
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      await apiRequest('post', '/insights/rules/apply/', {
+        project_id: rawProjectId,
+      }, true);
+      const refreshed = await apiRequest('get', `/insights/review/?project_id=${rawProjectId}`, undefined, true);
+      setReviewInsights(refreshed?.data?.data?.insights || []);
+      setSelectedInsightKeys(new Set());
+    } catch (err: any) {
+      setReviewError(err?.message || 'Failed to apply insight rules.');
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -1140,6 +1378,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         createdAt: input.createdAt || new Date().toISOString(),
         analysisType: input.analysisType || 'commentSentiment',
         rawLlm: input.rawLlm || {},
+        insights: input.pipeline_insights || input.insights || input.pipelineInsights || [],
         analysisData: {
           overall: {
             positive: toNum(input.analysisData.overall?.positive),
@@ -1166,6 +1405,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           })),
           positive_keywords: input.analysisData.positive_keywords || [],
           negative_keywords: input.analysisData.negative_keywords || [],
+          pipeline_metadata: input.analysisData.pipeline_metadata || input.analysisData.pipelineMetadata || input.pipeline_metadata || null,
         },
         deepAnalysis: input.deepAnalysis,
       } as AnalysisData;
@@ -1185,6 +1425,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         createdAt: new Date().toISOString(),
         analysisType: 'commentSentiment',
         rawLlm: input.raw_llm || {},
+        insights: input.pipeline_insights || input.insights || input.pipelineInsights || [],
         analysisData: {
           overall: {
             positive: toNum(input.overall.positive),
@@ -1211,6 +1452,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           })),
           positive_keywords: input.positive_keywords || [],
           negative_keywords: input.negative_keywords || [],
+          pipeline_metadata: input.pipeline_metadata || null,
         },
         deepAnalysis: input.deepAnalysis,
       } as AnalysisData;
@@ -1251,6 +1493,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       createdAt: new Date().toISOString(),
       analysisType: 'commentSentiment',
       rawLlm: input.raw_llm || {},
+      insights: input.pipeline_insights || input.insights || input.pipelineInsights || [],
       analysisData: {
         overall: {
           positive: toNum(sentiments.positive),
@@ -1298,6 +1541,167 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     keywords: feature.keywords || [],
     comment_count: feature.comment_count
   }));
+
+  const pipelineMetadata = activeAnalysisData?.analysisData?.pipeline_metadata || null;
+  const confidenceDistribution = pipelineMetadata?.confidence_distribution || null;
+  const sampleSize = Number(activeAnalysisData?.analysisData?.counts?.total ?? 0);
+  const insights = Array.isArray(activeAnalysisData?.insights)
+    ? activeAnalysisData?.insights
+    : [];
+  const traceableWorkItems = useMemo(() => {
+    const source =
+      (deepAnalysis?.work_items && deepAnalysis.work_items.length > 0)
+        ? deepAnalysis.work_items
+        : (currentProjectUserStories && currentProjectUserStories.length > 0
+          ? currentProjectUserStories[0]?.work_items
+          : []);
+
+    if (!Array.isArray(source)) return [];
+    return source.map((item: any, idx: number) => ({
+      id: item.id || `work_item_${idx}`,
+      title: item.title || '',
+      description: item.description || '',
+      tags: item.tags || item.labels || [],
+      featureArea: item.feature_area || item.featureArea || item.feature || item.feature_name || '',
+    }));
+  }, [deepAnalysis, currentProjectUserStories]);
+
+  const relatedWorkItemsByInsight = useMemo(() => {
+    const map = new Map<string, { titles: string[]; count: number }>();
+    if (!insights.length || traceableWorkItems.length === 0) return map;
+    insights.forEach((insight) => {
+      const matches = getRelatedWorkItemsForInsight(traceableWorkItems, insight, 3);
+      map.set(insight, {
+        titles: matches.map((match) => match.item.title || 'Untitled'),
+        count: matches.length,
+      });
+    });
+    return map;
+  }, [insights, traceableWorkItems]);
+
+  const historySnapshots = useMemo(() => {
+    const snapshots = (analysisHistory || []).map((item: any, idx: number) => {
+      const raw = item?.analysisData || item?.result || item || {};
+      const counts =
+        raw?.counts ||
+        raw?.analysisData?.counts ||
+        raw?.result?.counts ||
+        item?.counts ||
+        {};
+      const features =
+        raw?.features ||
+        raw?.featureasba ||
+        raw?.analysisData?.features ||
+        raw?.result?.features ||
+        [];
+      const sentiment =
+        raw?.overall ||
+        raw?.sentimentsummary ||
+        raw?.analysisData?.overall ||
+        raw?.result?.overall ||
+        {};
+
+      const createdAt =
+        item?.createdAt ||
+        item?.analysis_date ||
+        raw?.analysis_date ||
+        raw?.createdAt ||
+        item?.updatedAt ||
+        '';
+      const timestamp = createdAt ? Date.parse(String(createdAt)) : 0;
+
+      return {
+        id: item?.id || `analysis_${idx}`,
+        createdAt,
+        timestamp,
+        totalComments: Number(counts?.total ?? 0),
+        featureCount: Array.isArray(features) ? features.length : 0,
+        sentiment: {
+          positive: Number(sentiment?.positive ?? 0),
+          negative: Number(sentiment?.negative ?? 0),
+          neutral: Number(sentiment?.neutral ?? 0),
+        },
+        quarter: item?.quarter || raw?.quarter || '',
+      };
+    });
+
+    return snapshots
+      .filter((snap) => snap.totalComments > 0 || snap.featureCount > 0)
+      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  }, [analysisHistory]);
+
+  const trendDelta = useMemo(() => {
+    if (historySnapshots.length < 2) return null;
+    const previous = historySnapshots[historySnapshots.length - 2];
+    const latest = historySnapshots[historySnapshots.length - 1];
+    return {
+      previous,
+      latest,
+      commentChange: latest.totalComments - previous.totalComments,
+      featureChange: latest.featureCount - previous.featureCount,
+      sentimentChange: {
+        positive: latest.sentiment.positive - previous.sentiment.positive,
+        negative: latest.sentiment.negative - previous.sentiment.negative,
+        neutral: latest.sentiment.neutral - previous.sentiment.neutral,
+      },
+    };
+  }, [historySnapshots]);
+
+  const formatDelta = (value: number) => (value > 0 ? `+${value}` : String(value));
+  const evidenceSamples = useMemo(() => {
+    const pool = Array.isArray(loadedComments) ? loadedComments : [];
+    const cleaned = pool
+      .map((text) => String(text || "").trim())
+      .filter((text) => text.length > 0);
+    return cleaned.slice(0, 3);
+  }, [loadedComments]);
+
+  const confidenceLabel = useMemo(() => {
+    if (!confidenceDistribution) return "MEDIUM";
+    const entries = Object.entries(confidenceDistribution);
+    if (entries.length === 0) return "MEDIUM";
+    const top = entries.sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+    return String(top[0]).toUpperCase();
+  }, [confidenceDistribution]);
+
+  const timelineSteps = useMemo(() => {
+    const running = analysisStatus === 'pending' || analysisStatus === 'processing' || isProjectAnalyzing;
+    const hasWorkItems = (currentProjectUserStories && currentProjectUserStories.length > 0) || false;
+    return [
+      {
+        label: 'Ingestion',
+        detail: 'Upload + parsing',
+        status: hasAnalysisResults ? 'success' : (running ? 'running' : 'idle'),
+      },
+      {
+        label: 'Processing',
+        detail: 'Sentiment + topics',
+        status:
+          analysisStatus === 'processing'
+            ? 'running'
+            : analysisStatus === 'success'
+            ? 'success'
+            : analysisStatus === 'failure'
+            ? 'error'
+            : 'idle',
+      },
+      {
+        label: 'Synthesis',
+        detail: 'Insights + summary',
+        status:
+          analysisStatus === 'success'
+            ? 'success'
+            : analysisStatus === 'processing'
+            ? 'pending'
+            : 'idle',
+      },
+      {
+        label: 'Work Items',
+        detail: 'DevOps/Jira push',
+        status: hasWorkItems ? 'success' : analysisStatus === 'success' ? 'pending' : 'idle',
+      },
+    ];
+  }, [analysisStatus, hasAnalysisResults, isProjectAnalyzing, currentProjectUserStories]);
 
   console.log('Feature sentiment data:---?', featureSentimentData);
   console.log('Analysis data for features:', activeAnalysisData?.analysisData?.features);
@@ -1579,6 +1983,449 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                       <>No analysis data available yet. Upload a file above to get started.</>
                     )}
                   </div>
+
+                  {hasAnalysisResults && (
+                    <div className="rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                            Primary Insights
+                          </p>
+                          <h3 className="mt-2 text-xl font-semibold text-foreground">
+                            What matters most right now
+                          </h3>
+                        </div>
+                        <span className="rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                          Confidence {confidenceLabel}
+                        </span>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                        {insights.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+                            Insights will appear after your first analysis run.
+                          </div>
+                        ) : (
+                          insights.slice(0, 6).map((insight: string, idx: number) => (
+                            <div key={`${idx}-${insight.slice(0, 10)}`} className="rounded-xl border border-border/50 bg-muted/30 p-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                                  Insight {idx + 1}
+                                </span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  Sample size {sampleSize}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm font-semibold text-foreground">
+                                {insight}
+                              </p>
+                              {(() => {
+                                const related = relatedWorkItemsByInsight.get(insight);
+                                if (!related || related.count === 0) return null;
+                                return (
+                                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                    <span className="rounded-full border border-border/60 bg-background/70 px-2 py-1 text-[11px] font-medium">
+                                      Related work items {related.count}
+                                    </span>
+                                    {related.titles.slice(0, 2).map((title, titleIdx) => (
+                                      <span
+                                        key={`${idx}-related-${titleIdx}`}
+                                        className="rounded-full border border-border/50 bg-muted/20 px-2 py-1 text-[11px]"
+                                      >
+                                        {title.length > 40 ? `${title.slice(0, 40)}...` : title}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                              <div className="mt-3 space-y-2">
+                                {evidenceSamples.length > 0 ? (
+                                  evidenceSamples.map((sample, sampleIdx) => (
+                                    <div key={`${idx}-${sampleIdx}`} className="rounded-lg border border-border/40 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+                                      “{sample.length > 120 ? `${sample.slice(0, 120)}…` : sample}”
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    Evidence samples will show after comments are loaded.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {hasAnalysisResults && (
+                    <div className="rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                            Insight Review
+                          </p>
+                          <h3 className="mt-2 text-xl font-semibold text-foreground">
+                            Approve or ignore insights
+                          </h3>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleApplyRules}
+                            disabled={rulesLoading || reviewLoading}
+                          >
+                            Apply rules
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSaveRules}
+                            disabled={rulesLoading}
+                          >
+                            Save rules
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                        <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                              Auto-approve rules
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs text-muted-foreground">Min confidence</label>
+                            <select
+                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                              value={rules.auto_approve?.min_confidence_level || "MEDIUM"}
+                              onChange={(e) => setRules((prev: any) => ({
+                                ...prev,
+                                auto_approve: {
+                                  ...prev.auto_approve,
+                                  min_confidence_level: e.target.value,
+                                },
+                              }))}
+                            >
+                              <option value="LOW">LOW</option>
+                              <option value="MEDIUM">MEDIUM</option>
+                              <option value="HIGH">HIGH</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs text-muted-foreground">Min evidence count</label>
+                            <input
+                              type="number"
+                              min={0}
+                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                              value={rules.auto_approve?.min_evidence_count ?? 0}
+                              onChange={(e) => setRules((prev: any) => ({
+                                ...prev,
+                                auto_approve: {
+                                  ...prev.auto_approve,
+                                  min_evidence_count: Number(e.target.value),
+                                },
+                              }))}
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={!!rules.auto_approve?.require_feature_match}
+                              onChange={(e) => setRules((prev: any) => ({
+                                ...prev,
+                                auto_approve: {
+                                  ...prev.auto_approve,
+                                  require_feature_match: e.target.checked,
+                                },
+                              }))}
+                            />
+                            Require feature match
+                          </label>
+
+                          <div className="pt-2">
+                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                              Auto-ignore rules
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs text-muted-foreground">Max confidence</label>
+                            <select
+                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                              value={rules.auto_ignore?.max_confidence_level || "LOW"}
+                              onChange={(e) => setRules((prev: any) => ({
+                                ...prev,
+                                auto_ignore: {
+                                  ...prev.auto_ignore,
+                                  max_confidence_level: e.target.value,
+                                },
+                              }))}
+                            >
+                              <option value="LOW">LOW</option>
+                              <option value="MEDIUM">MEDIUM</option>
+                              <option value="HIGH">HIGH</option>
+                            </select>
+                          </div>
+
+                          {rulesError && (
+                            <p className="text-xs text-rose-600">{rulesError}</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateInsightStatuses('approved')}
+                              disabled={selectedInsightKeys.size === 0 || reviewLoading}
+                            >
+                              Approve selected
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateInsightStatuses('ignored')}
+                              disabled={selectedInsightKeys.size === 0 || reviewLoading}
+                            >
+                              Ignore selected
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedInsightKeys(new Set())}
+                              disabled={selectedInsightKeys.size === 0 || reviewLoading}
+                            >
+                              Clear selection
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                              {selectedInsightKeys.size} selected
+                            </span>
+                          </div>
+
+                          {reviewLoading && (
+                            <p className="text-sm text-muted-foreground">Loading insights...</p>
+                          )}
+                          {reviewError && (
+                            <p className="text-sm text-rose-600">{reviewError}</p>
+                          )}
+
+                          {!reviewLoading && reviewInsights.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              No insights available for review yet.
+                            </p>
+                          )}
+
+                          {!reviewLoading && reviewInsights.length > 0 && (
+                            <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
+                              {reviewInsights.map((item: any) => (
+                                <div key={item.insight_key} className="rounded-xl border border-border/50 bg-muted/30 p-3">
+                                  <div className="flex items-start gap-3">
+                                    <input
+                                      type="checkbox"
+                                      className="mt-1"
+                                      checked={selectedInsightKeys.has(item.insight_key)}
+                                      onChange={() => toggleInsightSelection(item.insight_key)}
+                                    />
+                                    <div className="flex-1 space-y-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-sm font-semibold text-foreground">
+                                          {item.insight_text}
+                                        </p>
+                                        <span className="text-[11px] rounded-full border border-border/60 px-2 py-1 text-muted-foreground uppercase">
+                                          {item.status || 'pending'}
+                                        </span>
+                                      </div>
+                                      {item.updated_at && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Updated {new Date(item.updated_at).toLocaleString()}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasAnalysisResults && (
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                      <div className="rounded-2xl border border-border/60 bg-card/90 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                              Trust & Quality
+                            </p>
+                            <h3 className="mt-2 text-lg font-semibold text-foreground">
+                              Confidence & Evidence
+                            </h3>
+                          </div>
+                          <span className="rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                            Sample size {sampleSize}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                          <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                              Confidence
+                            </p>
+                            {confidenceDistribution ? (
+                              <div className="mt-3 space-y-2 text-sm text-foreground">
+                                {Object.entries(confidenceDistribution).map(([level, count]) => (
+                                  <div key={level} className="flex items-center justify-between">
+                                    <span className="font-medium">{level}</span>
+                                    <span className="text-muted-foreground">
+                                      {count} ({sampleSize ? Math.round((Number(count) / sampleSize) * 100) : 0}%)
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-sm text-muted-foreground">
+                                Confidence data not available yet.
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                              Evidence samples
+                            </p>
+                            {evidenceSamples.length > 0 ? (
+                              <div className="mt-3 space-y-2 text-sm text-foreground">
+                                {evidenceSamples.map((sample, idx) => (
+                                  <div key={`${idx}-${sample.slice(0, 10)}`} className="rounded-lg border border-border/40 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                                    “{sample.length > 140 ? `${sample.slice(0, 140)}…` : sample}”
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-sm text-muted-foreground">
+                                Upload feedback to surface evidence samples.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="rounded-2xl border border-border/60 bg-card/90 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
+                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                            Pipeline Timeline
+                          </p>
+                          <h3 className="mt-2 text-lg font-semibold text-foreground">
+                            End-to-end Status
+                          </h3>
+                          <div className="mt-4 space-y-3">
+                            {timelineSteps.map((step) => {
+                              const statusTone =
+                                step.status === 'success'
+                                  ? 'text-emerald-600'
+                                  : step.status === 'running'
+                                  ? 'text-sky-600'
+                                  : step.status === 'pending'
+                                  ? 'text-amber-600'
+                                  : step.status === 'error'
+                                  ? 'text-rose-600'
+                                  : 'text-muted-foreground';
+                              return (
+                                <div key={step.label} className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
+                                  <div>
+                                    <p className="text-sm font-semibold text-foreground">{step.label}</p>
+                                    <p className="text-xs text-muted-foreground">{step.detail}</p>
+                                  </div>
+                                  <span className={`text-xs font-medium ${statusTone}`}>
+                                    {step.status}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-border/60 bg-card/90 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
+                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                            Trends & Delta
+                          </p>
+                          <h3 className="mt-2 text-lg font-semibold text-foreground">
+                            Latest vs Previous
+                          </h3>
+                          <div className="mt-4 space-y-3">
+                            {historyLoading && (
+                              <p className="text-sm text-muted-foreground">Loading trend history...</p>
+                            )}
+                            {!historyLoading && historyError && (
+                              <p className="text-sm text-rose-600">{historyError}</p>
+                            )}
+                            {!historyLoading && !historyError && !trendDelta && (
+                              <p className="text-sm text-muted-foreground">
+                                Run at least two analyses to see trend deltas.
+                              </p>
+                            )}
+                            {!historyLoading && trendDelta && (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
+                                  <div>
+                                    <p className="text-sm font-semibold text-foreground">Comments</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {trendDelta.previous.totalComments} -> {trendDelta.latest.totalComments}
+                                    </p>
+                                  </div>
+                                  <span className="flex items-center gap-1 text-xs font-medium text-foreground">
+                                    {trendDelta.commentChange > 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : trendDelta.commentChange < 0 ? <TrendingDown className="h-4 w-4 text-rose-600" /> : <Minus className="h-4 w-4 text-muted-foreground" />}
+                                    {formatDelta(trendDelta.commentChange)}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
+                                  <div>
+                                    <p className="text-sm font-semibold text-foreground">Feature Count</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {trendDelta.previous.featureCount} -> {trendDelta.latest.featureCount}
+                                    </p>
+                                  </div>
+                                  <span className="flex items-center gap-1 text-xs font-medium text-foreground">
+                                    {trendDelta.featureChange > 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : trendDelta.featureChange < 0 ? <TrendingDown className="h-4 w-4 text-rose-600" /> : <Minus className="h-4 w-4 text-muted-foreground" />}
+                                    {formatDelta(trendDelta.featureChange)}
+                                  </span>
+                                </div>
+
+                                <div className="rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
+                                  <p className="text-sm font-semibold text-foreground">Sentiment Shift</p>
+                                  <div className="mt-2 grid gap-2 text-xs text-muted-foreground">
+                                    <div className="flex items-center justify-between">
+                                      <span>Positive</span>
+                                      <span>{formatDelta(trendDelta.sentimentChange.positive)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span>Negative</span>
+                                      <span>{formatDelta(trendDelta.sentimentChange.negative)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span>Neutral</span>
+                                      <span>{formatDelta(trendDelta.sentimentChange.neutral)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-xs text-muted-foreground">
+                                  Compared {trendDelta.previous.createdAt ? new Date(trendDelta.previous.createdAt).toLocaleDateString() : 'previous run'} to{' '}
+                                  {trendDelta.latest.createdAt ? new Date(trendDelta.latest.createdAt).toLocaleDateString() : 'latest run'}.
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Metrics Cards */}
                   {hasAnalysisResults && <MetricsCards metrics={metrics} />}

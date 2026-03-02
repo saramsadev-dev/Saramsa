@@ -5,6 +5,8 @@ from .views import (
     UpdateKeywordsView,
     GetUserCommentsView,
     TaskStatusView,
+    TaskListView,
+    TaskStreamView,
     AnalysisByIdView,
     # Insights views
     InsightsListView,
@@ -15,6 +17,10 @@ from .views import (
     CumulativeAnalysisView,
     AnalysisComparisonView,
     UserStoriesView,
+    InsightReviewListView,
+    InsightReviewUpdateView,
+    InsightRulesView,
+    InsightRulesApplyView,
     # File upload views
     FeedbackFileUploadView,
 )
@@ -23,6 +29,8 @@ urlpatterns = [
     # Core analysis endpoints
     path('analyze/', AnalyzeCommentsView.as_view(), name='analyze_comments'),
     path('task-status/<str:task_id>/', TaskStatusView.as_view(), name='task_status'),
+    path('tasks/', TaskListView.as_view(), name='task_list'),
+    path('tasks/stream/', TaskStreamView.as_view(), name='task_stream'),
     path('analysis/<str:analysis_id>/', AnalysisByIdView.as_view(), name='analysis_by_id'),
     path('keywords/update/', UpdateKeywordsView.as_view(), name='update_keywords'),
     path('comments/', GetUserCommentsView.as_view(), name='get_user_comments'),
@@ -33,6 +41,10 @@ urlpatterns = [
     path('insights/type/<str:analysis_type>/', InsightsByTypeView.as_view(), name='insights_by_type'),
     path('insights/user-stories/', UserStoriesView.as_view(), name='user_stories'),
     path('insights/user-stories/all/', UserStoriesView.as_view(), name='user_stories_all'),
+    path('insights/review/', InsightReviewListView.as_view(), name='insight_review_list'),
+    path('insights/review/update/', InsightReviewUpdateView.as_view(), name='insight_review_update'),
+    path('insights/rules/', InsightRulesView.as_view(), name='insight_rules'),
+    path('insights/rules/apply/', InsightRulesApplyView.as_view(), name='insight_rules_apply'),
     
     # Analysis history endpoints
     path('history/', AnalysisHistoryView.as_view(), name='analysis_history'),

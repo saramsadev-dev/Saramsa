@@ -18,6 +18,8 @@ from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 
 from ..services import get_analysis_service
+from datetime import datetime, timezone
+import hashlib
 
 
 class InsightsListView(APIView):
@@ -227,6 +229,300 @@ class AnalysisComparisonView(APIView):
             "negative_change": sentiment2.get('negative', 0) - sentiment1.get('negative', 0),
             "neutral_change": sentiment2.get('neutral', 0) - sentiment1.get('neutral', 0)
         }
+
+
+class InsightReviewListView(APIView):
+    """Get insights for review with current approve/ignore status."""
+    permission_classes = [IsAdminOrUser]
+
+    def _build_insight_key(self, project_id: str, insight_text: str) -> str:
+        base = f"{project_id}:{insight_text}".encode("utf-8")
+        return hashlib.sha1(base).hexdigest()
+
+    @handle_service_errors
+    def get(self, request):
+        project_id = request.query_params.get('project_id')
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+
+        analysis_service = get_analysis_service()
+        latest = analysis_service.get_latest_project_analysis(project_id)
+
+        if not latest:
+            return StandardResponse.success(data={
+                "project_id": project_id,
+                "insights": [],
+                "count": 0
+            }, message="No insights available for this project.")
+
+        insights = (
+            latest.get('pipeline_insights')
+            or latest.get('analysisData', {}).get('insights')
+            or latest.get('analysisData', {}).get('pipeline_insights')
+            or latest.get('result', {}).get('insights')
+            or latest.get('insights')
+            or []
+        )
+
+        if not isinstance(insights, list):
+            insights = []
+
+        reviews = analysis_service.get_insight_reviews_for_project(project_id)
+        review_map = {r.get('insightKey'): r for r in reviews}
+
+        enriched = []
+        for insight in insights:
+            insight_text = str(insight).strip()
+            if not insight_text:
+                continue
+            insight_key = self._build_insight_key(project_id, insight_text)
+            review = review_map.get(insight_key, {})
+            enriched.append({
+                "insight_key": insight_key,
+                "insight_text": insight_text,
+                "status": review.get("status", "pending"),
+                "updated_at": review.get("updatedAt"),
+            })
+
+        return StandardResponse.success(data={
+            "project_id": project_id,
+            "insights": enriched,
+            "count": len(enriched)
+        }, message="Insight review list retrieved successfully.")
+
+
+class InsightReviewUpdateView(APIView):
+    """Update insight review status (batch)."""
+    permission_classes = [IsAdminOrUser]
+
+    @handle_service_errors
+    def post(self, request):
+        project_id = request.data.get('project_id')
+        updates = request.data.get('updates') or []
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+        if not isinstance(updates, list) or len(updates) == 0:
+            return StandardResponse.validation_error(detail="Updates list is required.", instance=request.path)
+
+        user_id = getattr(request.user, "id", None) or getattr(request.user, "user_id", None)
+        analysis_service = get_analysis_service()
+        updated = 0
+        now = datetime.now(timezone.utc).isoformat()
+
+        for item in updates:
+            insight_key = item.get('insight_key')
+            insight_text = item.get('insight_text', '')
+            status = item.get('status')
+            if not insight_key or status not in ("approved", "ignored", "pending"):
+                continue
+
+            data = {
+                "id": f"insight_review:{project_id}:{insight_key}",
+                "type": "insight_review",
+                "projectId": project_id,
+                "insightKey": insight_key,
+                "insightText": insight_text,
+                "status": status,
+                "updatedAt": now,
+                "updatedBy": str(user_id) if user_id else None,
+            }
+            if analysis_service.upsert_insight_review(project_id, data):
+                updated += 1
+
+        return StandardResponse.success(data={
+            "project_id": project_id,
+            "updated": updated
+        }, message="Insight review statuses updated successfully.")
+
+
+class InsightRulesView(APIView):
+    """Get or update insight auto-approve/ignore rules."""
+    permission_classes = [IsAdminOrUser]
+
+    @handle_service_errors
+    def get(self, request):
+        project_id = request.query_params.get('project_id')
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+
+        analysis_service = get_analysis_service()
+        rules = analysis_service.get_insight_rules_for_project(project_id)
+
+        if not rules:
+            rules = {
+                "project_id": project_id,
+                "auto_approve": {
+                    "min_confidence_level": "MEDIUM",
+                    "min_evidence_count": 20,
+                    "require_feature_match": False
+                },
+                "auto_ignore": {
+                    "max_confidence_level": "LOW"
+                }
+            }
+
+        return StandardResponse.success(data=rules, message="Insight rules retrieved successfully.")
+
+    @handle_service_errors
+    def post(self, request):
+        project_id = request.data.get('project_id')
+        rules = request.data.get('rules') or {}
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+
+        user_id = getattr(request.user, "id", None) or getattr(request.user, "user_id", None)
+        now = datetime.now(timezone.utc).isoformat()
+
+        payload = {
+            "id": f"insight_rule:{project_id}",
+            "type": "insight_rule",
+            "projectId": project_id,
+            "auto_approve": rules.get("auto_approve", {}),
+            "auto_ignore": rules.get("auto_ignore", {}),
+            "updatedAt": now,
+            "updatedBy": str(user_id) if user_id else None,
+        }
+
+        analysis_service = get_analysis_service()
+        saved = analysis_service.upsert_insight_rules_for_project(project_id, payload)
+        if not saved:
+            return StandardResponse.server_error(detail="Failed to save insight rules.", instance=request.path)
+
+        return StandardResponse.success(data=saved, message="Insight rules updated successfully.")
+
+
+class InsightRulesApplyView(APIView):
+    """Apply auto-approve/ignore rules to the latest analysis insights."""
+    permission_classes = [IsAdminOrUser]
+
+    def _build_insight_key(self, project_id: str, insight_text: str) -> str:
+        base = f"{project_id}:{insight_text}".encode("utf-8")
+        return hashlib.sha1(base).hexdigest()
+
+    def _confidence_rank(self, level: str) -> int:
+        order = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
+        return order.get(level.upper(), 2)
+
+    def _feature_match(self, insight_text: str, features: list) -> bool:
+        if not features:
+            return False
+        insight_lower = insight_text.lower()
+        for feature in features:
+            name = str(feature.get('name') or feature.get('feature') or feature.get('insight') or '').strip()
+            if name and name.lower() in insight_lower:
+                return True
+        return False
+
+    @handle_service_errors
+    def post(self, request):
+        project_id = request.data.get('project_id')
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+
+        analysis_service = get_analysis_service()
+        latest = analysis_service.get_latest_project_analysis(project_id)
+        if not latest:
+            return StandardResponse.success(data={
+                "project_id": project_id,
+                "approved": 0,
+                "ignored": 0,
+                "skipped": 0
+            }, message="No insights available for this project.")
+
+        insights = (
+            latest.get('pipeline_insights')
+            or latest.get('analysisData', {}).get('insights')
+            or latest.get('analysisData', {}).get('pipeline_insights')
+            or latest.get('result', {}).get('insights')
+            or latest.get('insights')
+            or []
+        )
+        if not isinstance(insights, list):
+            insights = []
+
+        features = (
+            latest.get('analysisData', {}).get('features')
+            or latest.get('result', {}).get('features')
+            or latest.get('features')
+            or []
+        )
+
+        pipeline_metadata = latest.get('analysisData', {}).get('pipeline_metadata') or latest.get('pipeline_metadata') or {}
+        confidence_distribution = pipeline_metadata.get('confidence_distribution', {})
+        if confidence_distribution:
+            confidence_label = max(confidence_distribution.items(), key=lambda x: x[1])[0].upper()
+        else:
+            confidence_label = "MEDIUM"
+
+        counts = latest.get('analysisData', {}).get('counts') or latest.get('counts') or {}
+        evidence_count = int(counts.get('total', 0))
+
+        rules_doc = analysis_service.get_insight_rules_for_project(project_id) or {}
+        auto_approve = rules_doc.get("auto_approve", {})
+        auto_ignore = rules_doc.get("auto_ignore", {})
+
+        approve_min_conf = self._confidence_rank(auto_approve.get("min_confidence_level", "MEDIUM"))
+        ignore_max_conf = self._confidence_rank(auto_ignore.get("max_confidence_level", "LOW"))
+        min_evidence = int(auto_approve.get("min_evidence_count", 0))
+        require_feature_match = bool(auto_approve.get("require_feature_match", False))
+
+        existing_reviews = analysis_service.get_insight_reviews_for_project(project_id)
+        existing_map = {r.get('insightKey'): r for r in existing_reviews}
+
+        user_id = getattr(request.user, "id", None) or getattr(request.user, "user_id", None)
+        now = datetime.now(timezone.utc).isoformat()
+
+        approved = 0
+        ignored = 0
+        skipped = 0
+
+        for insight in insights:
+            insight_text = str(insight).strip()
+            if not insight_text:
+                continue
+            insight_key = self._build_insight_key(project_id, insight_text)
+            existing = existing_map.get(insight_key, {})
+            if existing.get("status") in ("approved", "ignored"):
+                skipped += 1
+                continue
+
+            feature_match = self._feature_match(insight_text, features)
+            confidence_ok = self._confidence_rank(confidence_label) >= approve_min_conf
+            evidence_ok = evidence_count >= min_evidence
+            feature_ok = (feature_match if require_feature_match else True)
+
+            status = None
+            if confidence_ok and evidence_ok and feature_ok:
+                status = "approved"
+            elif self._confidence_rank(confidence_label) <= ignore_max_conf:
+                status = "ignored"
+
+            if not status:
+                skipped += 1
+                continue
+
+            data = {
+                "id": f"insight_review:{project_id}:{insight_key}",
+                "type": "insight_review",
+                "projectId": project_id,
+                "insightKey": insight_key,
+                "insightText": insight_text,
+                "status": status,
+                "updatedAt": now,
+                "updatedBy": str(user_id) if user_id else None,
+            }
+            if analysis_service.upsert_insight_review(project_id, data):
+                if status == "approved":
+                    approved += 1
+                else:
+                    ignored += 1
+
+        return StandardResponse.success(data={
+            "project_id": project_id,
+            "approved": approved,
+            "ignored": ignored,
+            "skipped": skipped
+        }, message="Insight rules applied successfully.")
 
 
 class UserStoriesView(APIView):

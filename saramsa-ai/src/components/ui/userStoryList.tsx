@@ -16,6 +16,7 @@ import type { UserStory } from "@/store/features/userStories/userStoriesSlice";
 import { deleteWorkItems, fetchUserStoriesByProject, setCurrentProjectUserStories } from "@/store/features/userStories/userStoriesSlice";
 import { DeleteWorkItemsModal } from './DeleteWorkItemsModal';
 import { DashboardIntegrationModal } from './dashboard/DashboardIntegrationModal';
+import { WorkItemReviewModal } from './WorkItemReviewModal';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import type {
@@ -38,6 +39,7 @@ import { Card, CardContent } from "./card";
 import { Checkbox } from "./checkbox";
 import { EditActionDrawer } from "./edit-action-drawer";
 import apiRequest from "@/lib/apiRequest";
+import { getRelatedInsightsForWorkItem } from "@/lib/insightTraceability";
 
 interface WorkItem {
   id: string;
@@ -75,7 +77,7 @@ export const UserStoryList = ({
   const dispatch = useAppDispatch();
   const router = useRouter();
   const { selectedActions, actionItems, features, loading, error } = useAppSelector((state) => state.workItems);
-  const { loading: analysisLoading, projectContext } = useAppSelector((state) => state.analysis);
+  const { loading: analysisLoading, projectContext, analysisData } = useAppSelector((state) => state.analysis);
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentProjectUserStories } = useAppSelector((state) => state.userStories);
   const { projects } = useAppSelector((state) => state.projects);
@@ -105,6 +107,35 @@ export const UserStoryList = ({
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Record<string, boolean>>({});
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  const insightsList = useMemo(() => {
+    const rawInsights =
+      analysisData?.insights ||
+      analysisData?.analysisData?.insights ||
+      analysisData?.analysisData?.pipeline_insights ||
+      analysisData?.analysisData?.pipelineInsights ||
+      [];
+    return Array.isArray(rawInsights)
+      ? rawInsights.map((insight) => String(insight)).filter(Boolean)
+      : [];
+  }, [analysisData]);
+
+  const relatedInsightsByActionId = useMemo(() => {
+    if (!insightsList.length || actionItems.length === 0) return new Map<string, string[]>();
+    const map = new Map<string, string[]>();
+    actionItems.forEach((action) => {
+      const matches = getRelatedInsightsForWorkItem(insightsList, {
+        id: action.id,
+        title: action.title,
+        description: action.description,
+        tags: action.tags,
+        featureArea: action.featureArea,
+      });
+      map.set(action.id, matches.map((match) => match.item));
+    });
+    return map;
+  }, [actionItems, insightsList]);
 
   const toggleDescription = (id: string) => {
     setExpandedDescriptionIds((prev) => ({
@@ -147,6 +178,21 @@ export const UserStoryList = ({
             {isExpanded ? "See less" : "See more"}
           </Button>
         )}
+      </div>
+    );
+  };
+
+  const renderRelatedInsights = (actionId: string) => {
+    const related = relatedInsightsByActionId.get(actionId) || [];
+    if (related.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        {related.slice(0, 2).map((insight, idx) => (
+          <Badge key={`${actionId}-insight-${idx}`} variant="outline" className="text-xs">
+            Insight: {insight}
+          </Badge>
+        ))}
       </div>
     );
   };
@@ -214,6 +260,7 @@ export const UserStoryList = ({
           updatedAt: new Date().toISOString(),
           tags: item.tags || item.labels || [],
           acceptance: item.acceptancecriteria || item.acceptance_criteria || item.acceptance || '',
+          featureArea: item.feature_area || item.featureArea || item.feature || item.feature_name || '',
         };
         console.log(`🔍 UserStoryList - Dispatching action item ${index}:`, actionItem);
         dispatch(addActionItem(actionItem));
@@ -360,15 +407,7 @@ export const UserStoryList = ({
 
     console.log('🔍 Final userId being sent:', userId);
 
-    // Get selected items from both features and actionItems
-    const selectedFromFeatures = features
-      .flatMap((feature: Feature) => feature.actions)
-      .filter((action: ActionItem) => selectedActions.includes(action.id));
-    
-    const selectedFromActionItems = actionItems
-      .filter((action: ActionItem) => selectedActions.includes(action.id));
-    
-    const selectedItems = [...selectedFromFeatures, ...selectedFromActionItems];
+    const selectedItems = getSelectedItems();
 
     if (selectedItems.length === 0) {
       alert("No selected items found");
@@ -527,6 +566,17 @@ export const UserStoryList = ({
       console.error('Failed to submit user stories:', error);
       alert(`Failed to submit user stories: ${error}`);
     }
+  };
+
+  const getSelectedItems = () => {
+    const selectedFromFeatures = features
+      .flatMap((feature: Feature) => feature.actions)
+      .filter((action: ActionItem) => selectedActions.includes(action.id));
+
+    const selectedFromActionItems = actionItems
+      .filter((action: ActionItem) => selectedActions.includes(action.id));
+
+    return [...selectedFromFeatures, ...selectedFromActionItems];
   };
 
   const handleDeleteSelected = () => {
@@ -794,6 +844,7 @@ export const UserStoryList = ({
                       ))}
                     </div>
                   )}
+                  {renderRelatedInsights(actionItem.id)}
                 </div>
                 <Button
                   variant="ghost"
@@ -939,6 +990,7 @@ export const UserStoryList = ({
                                 )}
                               </div>
                             )}
+                            {renderRelatedInsights(action.id)}
                           </div>
                         </CardContent>
                       </Card>
@@ -980,6 +1032,7 @@ export const UserStoryList = ({
                       <Badge variant="outline">{workItem.type}</Badge>
                     </div>
                     {renderDescription(workItem.description, `submitted-${workItem.id}`)}
+                    {renderRelatedInsights(workItem.id)}
                     <div className="flex items-center gap-4 text-xs text-muted-foreground dark:text-muted-foreground">
                       <span>
                         <strong>Submitted:</strong> {new Date(workItem.submittedAt).toLocaleDateString()} at {new Date(workItem.submittedAt).toLocaleTimeString()}
@@ -1030,7 +1083,7 @@ export const UserStoryList = ({
         )}
 
         <Button
-          onClick={handlePushActionItems}
+          onClick={() => setShowReviewModal(true)}
           disabled={selectedActions.length === 0 || isPushing}
           className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white px-6"
         >
@@ -1045,7 +1098,7 @@ export const UserStoryList = ({
               <span>
                 {isDraftProject 
                   ? "Configure Integration to Push" 
-                  : `Push to ${getPlatformDisplayName()}`
+                  : `Review & Push`
                 }
               </span>
             </div>
@@ -1093,6 +1146,18 @@ export const UserStoryList = ({
         isOpen={showIntegrationModal}
         onClose={() => setShowIntegrationModal(false)}
         projectId={projectId || ''}
+      />
+
+      <WorkItemReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        onConfirm={() => {
+          setShowReviewModal(false);
+          handlePushActionItems();
+        }}
+        items={getSelectedItems()}
+        platformLabel={getPlatformDisplayName()}
+        isSubmitting={isPushing}
       />
     </div>
   );

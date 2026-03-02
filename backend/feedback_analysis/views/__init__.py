@@ -13,6 +13,8 @@ from .analysis_views import (
     UpdateKeywordsView,
     GetUserCommentsView,
     TaskStatusView,
+    TaskListView,
+    TaskStreamView,
     AnalysisByIdView,
 )
 from .insights_views import (
@@ -24,6 +26,10 @@ from .insights_views import (
     CumulativeAnalysisView,
     AnalysisComparisonView,
     UserStoriesView,
+    InsightReviewListView,
+    InsightReviewUpdateView,
+    InsightRulesView,
+    InsightRulesApplyView,
 )
 from .file_upload_views import (
     FeedbackFileUploadView,
@@ -35,6 +41,8 @@ __all__ = [
     'UpdateKeywordsView',
     'GetUserCommentsView',
     'TaskStatusView',
+    'TaskListView',
+    'TaskStreamView',
     'AnalysisByIdView',
     # Insights views
     'InsightsListView',

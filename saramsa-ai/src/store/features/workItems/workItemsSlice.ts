@@ -16,6 +16,7 @@ export interface ActionItem {
   acceptance?: string;
   isCompleted?: boolean;
   featureId?: string;
+  featureArea?: string;
   submitted?: boolean;
   submittedAt?: string;
   externalWorkItemId?: string | number;
