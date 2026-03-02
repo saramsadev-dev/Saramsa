@@ -240,15 +240,16 @@ export const deleteUserStories = createAsyncThunk<
 // Async thunk for bulk deleting work items
 export const deleteWorkItems = createAsyncThunk<
   { deletedCount: number; userStoryId: string },
-  { workItemIds: string[]; userStoryId: string },
+  { workItemIds: string[]; userStoryId: string; projectId?: string },
   { rejectValue: string }
 >('userStories/deleteWorkItems', async (params, { rejectWithValue }) => {
-  try {
-    // Use PUT method for updating user story (removing work items)
-    const response = await apiRequest('put', '/insights/user-stories/remove-work-items/', {
-      ids: params.workItemIds,
-      user_story_id: params.userStoryId
-    }, true);
+    try {
+      // Use PUT method for updating user story (removing work items)
+      const response = await apiRequest('put', '/insights/user-stories/remove-work-items/', {
+        ids: params.workItemIds,
+        user_story_id: params.userStoryId,
+        project_id: params.projectId
+      }, true);
     
     return {
       deletedCount: response.data.data.deleted || 0,

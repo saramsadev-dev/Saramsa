@@ -18,6 +18,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
+from authentication.permissions import IsProjectAdmin, IsProjectViewer, IsProjectOwner
+from apis.infrastructure.cosmos_service import cosmos_service
 
 from ..services import get_project_service
 
@@ -138,7 +140,12 @@ class ProjectListView(APIView):
 
 
 class ProjectDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectViewer]
+
+    def get_permissions(self):
+        if self.request and self.request.method == "DELETE":
+            return [IsProjectOwner()]
+        return [permission() for permission in self.permission_classes]
 
     @handle_service_errors
     def get(self, request, project_id: str):
@@ -191,7 +198,7 @@ class ProjectDetailView(APIView):
 
 
 class LatestAnalysisView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectViewer]
 
     @handle_service_errors
     def get(self, request, project_id: str):
@@ -292,7 +299,7 @@ class LatestAnalysisView(APIView):
 
 
 class ProjectTrendsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectViewer]
 
     @handle_service_errors
     def get(self, request, project_id: str):
@@ -304,7 +311,7 @@ class ProjectTrendsView(APIView):
 
 
 class ProjectAspectTrendView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsProjectViewer]
 
     @handle_service_errors
     def get(self, request, project_id: str, aspect_key: str):
@@ -313,3 +320,124 @@ class ProjectAspectTrendView(APIView):
         trend_service = get_trend_service()
         data = trend_service.get_aspect_trend(project_id, aspect_key, limit=limit)
         return StandardResponse.success(data=data, message="Aspect trend retrieved successfully")
+
+
+class ProjectRolesView(APIView):
+    permission_classes = [IsProjectAdmin]
+
+    @handle_service_errors
+    def get(self, request, project_id: str):
+        project = cosmos_service.get_project_by_id_any(project_id)
+        if not project:
+            return StandardResponse.not_found(
+                detail=f"Project with ID '{project_id}' was not found",
+                instance=request.path
+            )
+
+        owner_id = project.get("owner_user_id") or project.get("userId")
+        roles = cosmos_service.get_project_roles_for_project(project_id)
+        role_entries = []
+
+        if owner_id:
+            role_entries.append({
+                "user_id": str(owner_id),
+                "role": "owner",
+                "is_owner": True
+            })
+
+        for role in roles:
+            user_id = role.get("userId")
+            if not user_id or str(user_id) == str(owner_id):
+                continue
+            role_entries.append({
+                "user_id": str(user_id),
+                "role": role.get("role"),
+                "is_owner": False,
+                "updated_at": role.get("updatedAt")
+            })
+
+        current_user_id = getattr(request.user, "id", None)
+        current_role = "owner" if current_user_id and owner_id and str(current_user_id) == str(owner_id) else None
+        if current_role is None and current_user_id:
+            current_role = cosmos_service.get_project_role_for_user(project_id, str(current_user_id))
+
+        return StandardResponse.success(
+            data={
+                "project_id": project_id,
+                "roles": role_entries,
+                "current_user_role": current_role
+            },
+            message="Project roles retrieved successfully"
+        )
+
+    @handle_service_errors
+    def post(self, request, project_id: str):
+        user_id = request.data.get("user_id")
+        role = request.data.get("role")
+
+        if not user_id or role not in ("viewer", "editor", "admin"):
+            return StandardResponse.validation_error(
+                detail="user_id and a valid role (viewer/editor/admin) are required.",
+                instance=request.path
+            )
+
+        project = cosmos_service.get_project_by_id_any(project_id)
+        if not project:
+            return StandardResponse.not_found(
+                detail=f"Project with ID '{project_id}' was not found",
+                instance=request.path
+            )
+
+        owner_id = project.get("owner_user_id") or project.get("userId")
+        if owner_id and str(owner_id) == str(user_id):
+            return StandardResponse.validation_error(
+                detail="Owner role cannot be modified.",
+                instance=request.path
+            )
+
+        actor_id = getattr(request.user, "id", None)
+        saved = cosmos_service.upsert_project_role(project_id, str(user_id), role, actor_id=str(actor_id) if actor_id else None)
+        if not saved:
+            return StandardResponse.internal_server_error(
+                detail="Failed to save project role.",
+                instance=request.path
+            )
+
+        return StandardResponse.success(
+            data=saved,
+            message="Project role updated successfully"
+        )
+
+    @handle_service_errors
+    def delete(self, request, project_id: str):
+        user_id = request.data.get("user_id") or request.query_params.get("user_id")
+        if not user_id:
+            return StandardResponse.validation_error(
+                detail="user_id is required.",
+                instance=request.path
+            )
+
+        project = cosmos_service.get_project_by_id_any(project_id)
+        if not project:
+            return StandardResponse.not_found(
+                detail=f"Project with ID '{project_id}' was not found",
+                instance=request.path
+            )
+
+        owner_id = project.get("owner_user_id") or project.get("userId")
+        if owner_id and str(owner_id) == str(user_id):
+            return StandardResponse.validation_error(
+                detail="Owner role cannot be removed.",
+                instance=request.path
+            )
+
+        if not cosmos_service.delete_project_role(project_id, str(user_id)):
+            return StandardResponse.not_found(
+                detail="Project role not found.",
+                instance=request.path
+            )
+
+        return StandardResponse.success(
+            data={},
+            message="Project role removed successfully"
+        )

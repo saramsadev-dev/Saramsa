@@ -90,22 +90,22 @@ class WorkItemRepository:
             logger.error(f"Error deleting work item {work_item_id}: {e}")
             return False
     
-    def update_embedded_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_embedded_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any], project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Update embedded work item within a user story document."""
         try:
             # This method handles updating individual work items within the work_items array
             # of a user story document - moved from analysis service
-            return self.cosmos_service.update_embedded_work_item(work_item_id, user_id, updated_data)
+            return self.cosmos_service.update_embedded_work_item(work_item_id, user_id, updated_data, project_id=project_id)
         except Exception as e:
             logger.error(f"Error updating embedded work item {work_item_id}: {e}")
             return None
     
-    def remove_embedded_work_item(self, work_item_id: str, user_id: str) -> bool:
+    def remove_embedded_work_item(self, work_item_id: str, user_id: str, project_id: Optional[str] = None) -> bool:
         """Remove embedded work item from a user story document."""
         try:
             # This method handles removing individual work items from the work_items array
             # of a user story document
-            return self.cosmos_service.remove_embedded_work_item(work_item_id, user_id)
+            return self.cosmos_service.remove_embedded_work_item(work_item_id, user_id, project_id=project_id)
         except Exception as e:
             logger.error(f"Error removing embedded work item {work_item_id}: {e}")
             return False
@@ -125,6 +125,14 @@ class WorkItemRepository:
         except Exception as e:
             logger.error(f"Error getting work items by project {project_id}: {e}")
             return None
+
+    def get_quality_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get work item quality gate rules for a project."""
+        return self.cosmos_service.get_work_item_quality_rules_for_project(project_id)
+
+    def upsert_quality_rules_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert work item quality gate rules for a project."""
+        return self.cosmos_service.upsert_work_item_quality_rules_for_project(project_id, data)
     
     def get_deep_analysis_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
         """Get deep analysis by project."""

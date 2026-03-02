@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import {
   Calendar, 
   BarChart3, 
@@ -14,11 +15,13 @@ import {
   Clock,
   ArrowRight,
   Edit,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import type { Project } from '@/store/features/projects/projectsSlice';
 import { DeleteProjectModal } from './DeleteProjectModal';
 import { Button } from '@/components/ui/button';
+import { encryptProjectId } from '@/lib/encryption';
 
 interface ProjectCardProps {
   project: Project;
@@ -36,6 +39,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   
   const hasExternalLinks = project.externalLinks && project.externalLinks.length > 0;
   
@@ -94,6 +98,16 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const navigateToSettings = () => {
+    try {
+      const encryptedId = encryptProjectId(project.id);
+      router.push(`/projects/${encryptedId}/settings`);
+    } catch (error) {
+      console.error('Failed to navigate to project settings:', error);
+      router.push(`/projects/${project.id}/settings`);
+    }
   };
 
   return (
@@ -168,6 +182,18 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                     Sync with {project.externalLinks[0].provider === 'azure' ? 'Azure' : 'Jira'}
                   </Button>
                 )}
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    navigateToSettings();
+                  }}
+                  variant="ghost"
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent/60 transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </Button>
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();

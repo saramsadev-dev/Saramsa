@@ -165,6 +165,10 @@ COSMOS_DB_CONFIG = {
         'usage': os.getenv('COSMOS_DB_USAGE_CONTAINER', 'usage'),
         'insight_rules': os.getenv('COSMOS_DB_INSIGHT_RULES_CONTAINER', 'insight_rules'),
         'insight_reviews': os.getenv('COSMOS_DB_INSIGHT_REVIEWS_CONTAINER', 'insight_reviews'),
+        'work_item_quality_rules': os.getenv('COSMOS_DB_WORK_ITEM_QUALITY_RULES_CONTAINER', 'work_item_quality_rules'),
+        'ingestion_schedules': os.getenv('COSMOS_DB_INGESTION_SCHEDULES_CONTAINER', 'ingestion_schedules'),
+        'project_roles': os.getenv('COSMOS_DB_PROJECT_ROLES_CONTAINER', 'project_roles'),
+        'registration_otps': os.getenv('COSMOS_DB_REGISTRATION_OTPS_CONTAINER', 'registration_otps'),
     } 
 }
 
@@ -422,7 +426,7 @@ SPECTACULAR_SETTINGS = {
     ],
 }
 
-# Email configuration (password reset + notifications)
+# Email configuration (password reset + registration OTP)
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND') or (
     'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
 )
@@ -435,3 +439,7 @@ EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@saramsa.ai')
 PASSWORD_RESET_FROM_EMAIL = os.getenv('PASSWORD_RESET_FROM_EMAIL', DEFAULT_FROM_EMAIL)
 PASSWORD_RESET_EMAIL_SUBJECT = os.getenv('PASSWORD_RESET_EMAIL_SUBJECT', 'Reset your Saramsa password')
+REGISTRATION_OTP_EMAIL_SUBJECT = os.getenv('REGISTRATION_OTP_EMAIL_SUBJECT', 'Your Saramsa registration code')
+REGISTRATION_OTP_TTL_MINUTES = int(os.getenv('REGISTRATION_OTP_TTL_MINUTES', '10'))
+REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv('REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS', '60'))
+REGISTRATION_OTP_MAX_ATTEMPTS = int(os.getenv('REGISTRATION_OTP_MAX_ATTEMPTS', '5'))

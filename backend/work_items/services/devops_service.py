@@ -234,15 +234,15 @@ class DevOpsService:
         """Get work items for a user."""
         return self.work_item_repo.get_by_user(user_id)
     
-    def update_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any], project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Update embedded work item - consolidated from analysis service."""
         try:
-            return self.work_item_repo.update_embedded_work_item(work_item_id, user_id, updated_data)
+            return self.work_item_repo.update_embedded_work_item(work_item_id, user_id, updated_data, project_id=project_id)
         except Exception as e:
             logger.error(f"Error updating work item {work_item_id}: {e}")
             return None
     
-    def remove_work_items(self, work_item_ids: List[str], user_id: str, user_story_id: str = None) -> Dict[str, Any]:
+    def remove_work_items(self, work_item_ids: List[str], user_id: str, user_story_id: str = None, project_id: Optional[str] = None) -> Dict[str, Any]:
         """Remove/delete work items by IDs."""
         try:
             removed_count = 0
@@ -251,7 +251,7 @@ class DevOpsService:
             for work_item_id in work_item_ids:
                 try:
                     # Try to remove the work item from the repository
-                    success = self.work_item_repo.remove_embedded_work_item(work_item_id, user_id)
+                    success = self.work_item_repo.remove_embedded_work_item(work_item_id, user_id, project_id=project_id)
                     if success:
                         removed_count += 1
                     else:

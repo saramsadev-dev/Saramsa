@@ -11,15 +11,34 @@ import uuid
 import logging
 
 from ..repositories import IntegrationsRepository
+from apis.infrastructure.cosmos_service import cosmos_service
 
 logger = logging.getLogger(__name__)
 
 
 class ProjectService:
     """Service for project business logic."""
-    
+
+    _ROLE_ORDER = {
+        "viewer": 1,
+        "editor": 2,
+        "admin": 3,
+        "owner": 4,
+    }
     def __init__(self):
         self.integrations_repo = IntegrationsRepository()
+        self.cosmos_service = cosmos_service
+
+    def _normalize_project(self, project: Dict[str, Any]) -> Dict[str, Any]:
+        if not project:
+            return project
+        if 'externalLinks' not in project:
+            project['externalLinks'] = []
+        if 'description' not in project:
+            project['description'] = ""
+        if 'status' not in project:
+            project['status'] = "active"
+        return project
     
     def _create_project_document(self, user_id: str, name: str, description: str = None, 
                                 external_links: List[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -109,7 +128,20 @@ class ProjectService:
             # Validate the document
             self._validate_project(document)
             
-            return self.integrations_repo.create_project(document)
+            project = self.integrations_repo.create_project(document)
+            try:
+                owner_id = project.get("owner_user_id") or project.get("userId") or user_id
+                if owner_id:
+                    self.cosmos_service.upsert_project_role(
+                        project.get("id"),
+                        str(owner_id),
+                        "owner",
+                        actor_id=str(owner_id)
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to create owner role for project {project.get('id')}: {e}")
+
+            return project
             
         except ValueError:
             raise
@@ -120,7 +152,28 @@ class ProjectService:
     def get_projects_by_user(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all projects for a user."""
         try:
-            return self.integrations_repo.get_projects_by_user(user_id)
+            owned = self.integrations_repo.get_projects_by_user(user_id)
+            owned_ids = {p.get('id') for p in owned if p.get('id')}
+
+            shared_ids = self.cosmos_service.get_project_ids_for_user(user_id)
+            shared_ids = [pid for pid in shared_ids if pid not in owned_ids]
+            shared = self.cosmos_service.get_projects_by_ids(shared_ids) if shared_ids else []
+
+            all_projects = []
+            for project in owned + shared:
+                all_projects.append(self._normalize_project(project))
+
+            # De-dupe by id
+            seen = set()
+            deduped = []
+            for project in all_projects:
+                pid = project.get('id')
+                if not pid or pid in seen:
+                    continue
+                seen.add(pid)
+                deduped.append(project)
+
+            return deduped
         except Exception as e:
             logger.error(f"Error getting projects for user {user_id}: {e}")
             raise
@@ -137,7 +190,17 @@ class ProjectService:
             Project data if found and user has access, None otherwise
         """
         try:
-            return self.integrations_repo.get_project(project_id, user_id)
+            project = self.integrations_repo.get_project(project_id, user_id)
+            if project:
+                return self._normalize_project(project)
+
+            # Check project roles for shared access
+            role = self.cosmos_service.get_project_role_for_user(project_id, user_id)
+            if role:
+                project = self.cosmos_service.get_project_by_id_any(project_id)
+                return self._normalize_project(project) if project else None
+
+            return None
         except Exception as e:
             logger.error(f"Error getting project {project_id}: {e}")
             raise
@@ -159,9 +222,13 @@ class ProjectService:
         """
         try:
             # Get existing project
-            project = self.integrations_repo.get_project(project_id, user_id)
+            project = self.get_project(project_id, user_id)
             if not project:
                 raise ValueError(f"Project with ID '{project_id}' not found or access denied")
+
+            role = self._get_project_role(project_id, user_id, project)
+            if not self._has_min_role(role, "admin"):
+                raise ValueError("You do not have permission to update this project")
             
             # Update allowed fields
             allowed_fields = ['name', 'description', 'status', 'externalLinks']
@@ -191,10 +258,31 @@ class ProjectService:
             True if deleted successfully, False if not found
         """
         try:
+            project = self.get_project(project_id, user_id)
+            if not project:
+                return False
+            role = self._get_project_role(project_id, user_id, project)
+            if role != "owner":
+                return False
             return self.integrations_repo.delete_project(project_id, user_id)
         except Exception as e:
             logger.error(f"Error deleting project {project_id}: {e}")
             raise
+
+    def _get_project_role(self, project_id: str, user_id: str, project: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        if project is None:
+            project = self.cosmos_service.get_project_by_id_any(project_id)
+        owner_id = None
+        if isinstance(project, dict):
+            owner_id = project.get("owner_user_id") or project.get("userId")
+        if owner_id and str(owner_id) == str(user_id):
+            return "owner"
+        return self.cosmos_service.get_project_role_for_user(project_id, str(user_id))
+
+    def _has_min_role(self, role: Optional[str], required: str) -> bool:
+        if not role:
+            return False
+        return self._ROLE_ORDER.get(role, 0) >= self._ROLE_ORDER.get(required, 0)
     
     def get_projects_by_provider(self, user_id: str, provider: str) -> List[Dict[str, Any]]:
         """
@@ -242,7 +330,7 @@ class ProjectService:
             
             logger.info(f"Looking for existing project: {project_id} for user: {user_id}")
             # Try to get existing project
-            project_doc = self.integrations_repo.get_project(project_id, user_id)
+            project_doc = self.get_project(project_id, user_id)
             if project_doc:
                 logger.info(f"Found existing project: {project_id}")
                 return project_id, project_doc, False

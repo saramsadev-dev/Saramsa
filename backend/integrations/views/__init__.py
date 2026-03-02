@@ -21,6 +21,7 @@ from .project_views import (
     LatestAnalysisView,
     ProjectTrendsView,
     ProjectAspectTrendView,
+    ProjectRolesView,
 )
 from .external_views import (
     get_azure_projects,
@@ -45,6 +46,7 @@ __all__ = [
     'LatestAnalysisView',
     'ProjectTrendsView',
     'ProjectAspectTrendView',
+    'ProjectRolesView',
     # External views
     'get_azure_projects',
     'get_jira_projects',

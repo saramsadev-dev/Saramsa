@@ -27,10 +27,12 @@ import secrets
 from django.conf import settings
 from ..serializers import (
     CosmosDBUserSerializer, 
+    CosmosDBUserRegisterWithOtpSerializer,
     CosmosDBTokenObtainPairSerializer,
     CosmosDBTokenRefreshSerializer,
     ForgotPasswordSerializer,
-    ResetPasswordSerializer
+    ResetPasswordSerializer,
+    RegistrationOtpRequestSerializer
 )
 from ..authentication import CosmosDBJWTAuthentication, CosmosDBUser
 import bcrypt
@@ -38,7 +40,7 @@ import bcrypt
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [NoAuthentication]
-    serializer_class = CosmosDBUserSerializer
+    serializer_class = CosmosDBUserRegisterWithOtpSerializer
     logger = logging.getLogger(__name__)
     
     def get(self, request):
@@ -59,6 +61,16 @@ class RegisterView(generics.CreateAPIView):
 
         # Use authentication service to create user
         auth_service = get_authentication_service()
+
+        # Verify OTP before creating user
+        otp_code = serializer.validated_data.get('otp')
+        try:
+            auth_service.verify_registration_otp(
+                email=serializer.validated_data['email'],
+                code=otp_code
+            )
+        except ValueError as e:
+            return StandardResponse.validation_error(detail=str(e), instance=request.path)
         
         user_data = auth_service.create_user(
             username=serializer.validated_data['username'],
@@ -86,6 +98,30 @@ class RegisterView(generics.CreateAPIView):
             },
             message="User created successfully",
             instance=f"/api/auth/users/{user_data['id']}"
+        )
+
+
+class RegisterOtpRequestView(APIView):
+    permission_classes = [NoAuthentication]
+    logger = logging.getLogger(__name__)
+
+    @handle_service_errors
+    def post(self, request):
+        serializer = RegistrationOtpRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        auth_service = get_authentication_service()
+        email = serializer.validated_data['email']
+        username = serializer.validated_data.get('username') or None
+
+        try:
+            result = auth_service.request_registration_otp(email=email, username=username)
+        except ValueError as e:
+            return StandardResponse.validation_error(detail=str(e), instance=request.path)
+
+        return StandardResponse.success(
+            data=result,
+            message="Registration code sent successfully"
         )
 
 

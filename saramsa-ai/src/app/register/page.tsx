@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 const registerSchema = z.object({
   username: z.string().min(2, 'User name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
+  otp: z.string().min(6, 'Enter the 6-digit code').max(6, 'Enter the 6-digit code'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -46,6 +47,10 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpMessage, setOtpMessage] = useState<string | null>(null);
+  const [otpCooldown, setOtpCooldown] = useState(0);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
   const router = useRouter();
   const { register: registerUser } = useAuth();
@@ -60,6 +65,7 @@ export default function RegisterPage() {
   });
 
   const watchedUsername = watch('username');
+  const watchedEmail = watch('email');
 
   // Check username availability when username changes
   useEffect(() => {
@@ -81,6 +87,34 @@ export default function RegisterPage() {
     return () => clearTimeout(timeoutId);
   }, [watchedUsername]);
 
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setOtpCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [otpCooldown]);
+
+  const handleSendOtp = async () => {
+    if (!watchedEmail) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    setOtpSending(true);
+    setError(null);
+    setOtpMessage(null);
+    try {
+      const result = await authApi.requestRegistrationOtp(watchedEmail, watchedUsername);
+      setOtpSent(true);
+      setOtpCooldown(result.cooldown_seconds || 60);
+      setOtpMessage('Code sent. Check your email.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to send code.');
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     setError(null);
@@ -89,6 +123,7 @@ export default function RegisterPage() {
       const result = await registerUser({
         username: data.username,
         email: data.email,
+        otp: data.otp,
         password: data.password,
         confirmPassword: data.confirmPassword,
       });
@@ -307,6 +342,40 @@ export default function RegisterPage() {
                 </div>
                 {errors.email && (
                   <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.email.message}</p>
+                )}
+              </div>
+
+              {/* OTP */}
+              <div>
+                <label htmlFor="otp" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
+                  Verification code
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    {...register('otp')}
+                    id="otp"
+                    type="text"
+                    placeholder="6-digit code"
+                    className="w-full bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={otpSending || otpCooldown > 0}
+                    variant="outline"
+                    className="whitespace-nowrap"
+                  >
+                    {otpSending ? 'Sending...' : otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Send code'}
+                  </Button>
+                </div>
+                {errors.otp && (
+                  <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.otp.message}</p>
+                )}
+                {otpMessage && (
+                  <p className="mt-1 text-xs sm:text-sm text-green-600">{otpMessage}</p>
+                )}
+                {otpSent && !otpMessage && (
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">Check your inbox for the code.</p>
                 )}
               </div>
 

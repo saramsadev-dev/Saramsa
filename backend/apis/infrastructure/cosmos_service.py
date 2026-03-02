@@ -117,7 +117,11 @@ class CosmosDBService:
             'taxonomies': '/projectId',
             'usage': '/projectId',
             'insight_rules': '/projectId',
-            'insight_reviews': '/projectId'
+            'insight_reviews': '/projectId',
+            'work_item_quality_rules': '/projectId',
+            'ingestion_schedules': '/projectId',
+            'project_roles': '/projectId',
+            'registration_otps': '/email'
         }
         partition_key = partition_keys.get(container_type, '/id')  # Default to '/id' if not specified
 
@@ -175,7 +179,11 @@ class CosmosDBService:
             'taxonomies': '/projectId',
             'usage': '/projectId',
             'insight_rules': '/projectId',
-            'insight_reviews': '/projectId'
+            'insight_reviews': '/projectId',
+            'work_item_quality_rules': '/projectId',
+            'ingestion_schedules': '/projectId',
+            'project_roles': '/projectId',
+            'registration_otps': '/email'
         }
         
         for container_type, partition_key in containers_config.items():
@@ -250,7 +258,11 @@ class CosmosDBService:
                 'taxonomies': 'projectId',
                 'usage': 'projectId',
                 'insight_rules': 'projectId',
-                'insight_reviews': 'projectId'
+                'insight_reviews': 'projectId',
+                'work_item_quality_rules': 'projectId',
+                'ingestion_schedules': 'projectId',
+                'project_roles': 'projectId',
+                'registration_otps': 'email'
             }
             
             # Get the partition key field name for this container
@@ -767,15 +779,17 @@ class CosmosDBService:
             logger.error(f"Error updating user story: {e}")
             return None
 
-    def update_embedded_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_embedded_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any], project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Update a single embedded work item inside a user_story document."""
         try:
             container = self.get_container('user_stories')
-            # Find the parent collection that contains the work item for this user
-            query = (
-                "SELECT * FROM c WHERE c.type = 'user_story' AND c.userId = @user_id"
-            )
-            params = [{"name": "@user_id", "value": user_id}]
+            # Find the parent collection that contains the work item
+            if project_id:
+                query = "SELECT * FROM c WHERE c.type = 'user_story' AND c.projectId = @project_id"
+                params = [{"name": "@project_id", "value": project_id}]
+            else:
+                query = "SELECT * FROM c WHERE c.type = 'user_story' AND c.userId = @user_id"
+                params = [{"name": "@user_id", "value": user_id}]
             items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
             for item in items:
                 work_items = item.get('work_items', [])
@@ -792,26 +806,27 @@ class CosmosDBService:
             logger.error(f"Error updating embedded work item: {e}")
             return None
 
-    def remove_embedded_work_item(self, work_item_id: str, user_id: str) -> bool:
+    def remove_embedded_work_item(self, work_item_id: str, user_id: str, project_id: Optional[str] = None) -> bool:
         """Remove a single embedded work item from user_story documents."""
         try:
-            result = self.delete_embedded_work_items([work_item_id], user_id)
+            result = self.delete_embedded_work_items([work_item_id], user_id, project_id=project_id)
             return result > 0
         except Exception as e:
             logger.error(f"Error removing embedded work item: {e}")
             return False
 
-    def delete_embedded_work_items(self, work_item_ids: List[str], user_id: str) -> int:
+    def delete_embedded_work_items(self, work_item_ids: List[str], user_id: str, project_id: Optional[str] = None) -> int:
         """Delete one or more embedded work items by id from user_story documents. Returns count deleted."""
         try:
             container = self.get_container('user_stories')
             
             # Query for user_story documents
-            query = (
-                "SELECT * FROM c WHERE c.type = 'user_story' "
-                "AND c.userId = @user_id"
-            )
-            params = [{"name": "@user_id", "value": user_id}]
+            if project_id:
+                query = "SELECT * FROM c WHERE c.type = 'user_story' AND c.projectId = @project_id"
+                params = [{"name": "@project_id", "value": project_id}]
+            else:
+                query = "SELECT * FROM c WHERE c.type = 'user_story' AND c.userId = @user_id"
+                params = [{"name": "@user_id", "value": user_id}]
             items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
             
             deleted_count = 0
@@ -1108,6 +1123,122 @@ class CosmosDBService:
             logger.error(f"Error listing projects: {e}")
             return []
 
+    def get_project_by_id_any(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get project by ID across partitions (owner or shared)."""
+        try:
+            self.create_container_if_not_exists('projects', '/id')
+            container = self.get_container('projects')
+            query = "SELECT * FROM c WHERE c.id = @project_id"
+            params = [{"name": "@project_id", "value": project_id}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return items[0] if items else None
+        except Exception as e:
+            logger.error(f"Error getting project by id {project_id}: {e}")
+            return None
+
+    def get_project_roles_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get all project role entries for a project."""
+        try:
+            query = "SELECT * FROM c WHERE c.projectId = @project_id AND c.type = 'project_role'"
+            params = [{"name": "@project_id", "value": project_id}]
+            return self.query_documents('project_roles', query, params)
+        except Exception as e:
+            logger.error(f"Error getting project roles for project {project_id}: {e}")
+            return []
+
+    def get_project_role_for_user(self, project_id: str, user_id: str) -> Optional[str]:
+        """Get a user's role for a project (viewer/editor/admin)."""
+        try:
+            query = (
+                "SELECT TOP 1 * FROM c WHERE c.projectId = @project_id "
+                "AND c.userId = @user_id AND c.type = 'project_role'"
+            )
+            params = [
+                {"name": "@project_id", "value": project_id},
+                {"name": "@user_id", "value": str(user_id)},
+            ]
+            items = self.query_documents('project_roles', query, params)
+            if not items:
+                return None
+            return items[0].get('role')
+        except Exception as e:
+            logger.error(f"Error getting project role for user {user_id}: {e}")
+            return None
+
+    def upsert_project_role(self, project_id: str, user_id: str, role: str, actor_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Create or update a project role entry."""
+        try:
+            now = self._now()
+            role_id = f"project_role:{project_id}:{user_id}"
+            payload = {
+                "id": role_id,
+                "type": "project_role",
+                "projectId": project_id,
+                "userId": str(user_id),
+                "role": role,
+                "updatedAt": now,
+                "updatedBy": str(actor_id) if actor_id else None,
+            }
+
+            existing = self.get_document('project_roles', role_id, project_id)
+            if existing and isinstance(existing, dict):
+                payload["createdAt"] = existing.get("createdAt", now)
+                payload["createdBy"] = existing.get("createdBy")
+            else:
+                payload["createdAt"] = now
+                payload["createdBy"] = str(actor_id) if actor_id else None
+
+            return self.update_document('project_roles', role_id, project_id, payload)
+        except Exception as e:
+            logger.error(f"Error upserting project role: {e}")
+            return None
+
+    def delete_project_role(self, project_id: str, user_id: str) -> bool:
+        """Delete a project role entry."""
+        try:
+            role_id = f"project_role:{project_id}:{user_id}"
+            return self.delete_document('project_roles', role_id, project_id)
+        except Exception as e:
+            logger.error(f"Error deleting project role {project_id}:{user_id}: {e}")
+            return False
+
+    def get_project_ids_for_user(self, user_id: str) -> List[str]:
+        """Get project IDs the user has an explicit role for."""
+        try:
+            query = "SELECT c.projectId FROM c WHERE c.userId = @user_id AND c.type = 'project_role'"
+            params = [{"name": "@user_id", "value": str(user_id)}]
+            items = self.query_documents('project_roles', query, params)
+            return list({item.get('projectId') for item in items if item.get('projectId')})
+        except Exception as e:
+            logger.error(f"Error getting project ids for user {user_id}: {e}")
+            return []
+
+    def get_projects_by_ids(self, project_ids: List[str]) -> List[Dict[str, Any]]:
+        """Fetch projects by ID across partitions."""
+        if not project_ids:
+            return []
+
+        unique_ids = list(dict.fromkeys(project_ids))
+        try:
+            self.create_container_if_not_exists('projects', '/id')
+            container = self.get_container('projects')
+            items: List[Dict[str, Any]] = []
+            chunk_size = 20
+            for i in range(0, len(unique_ids), chunk_size):
+                chunk = unique_ids[i:i + chunk_size]
+                in_params = ", ".join([f"@id{i + idx}" for idx in range(len(chunk))])
+                query = f"SELECT * FROM c WHERE c.id IN ({in_params})"
+                params = [{"name": f"@id{i + idx}", "value": pid} for idx, pid in enumerate(chunk)]
+                items.extend(list(container.query_items(
+                    query=query,
+                    parameters=params,
+                    enable_cross_partition_query=True
+                )))
+            return items
+        except Exception as e:
+            logger.error(f"Error getting projects by ids: {e}")
+            return []
+
     def update_project_last_analysis(self, project_id: str, analysis_id: str) -> bool:
         """Update project's last_analysis_id"""
         try:
@@ -1293,6 +1424,60 @@ class CosmosDBService:
         except Exception as e:
             logger.error(f"Error upserting insight review for project {project_id}: {e}")
             return None
+
+    def get_work_item_quality_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get work item quality gate rules for a project."""
+        try:
+            container = self.get_container('work_item_quality_rules')
+            query = "SELECT TOP 1 * FROM c WHERE c.projectId = @project_id AND c.type = 'work_item_quality_rule'"
+            params = [{"name": "@project_id", "value": project_id}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return items[0] if items else None
+        except Exception as e:
+            logger.error(f"Error getting work item quality rules for project {project_id}: {e}")
+            return None
+
+    def upsert_work_item_quality_rules_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert work item quality gate rules for a project."""
+        try:
+            container = self.get_container('work_item_quality_rules')
+            data['projectId'] = project_id
+            return container.upsert_item(data)
+        except Exception as e:
+            logger.error(f"Error upserting work item quality rules for project {project_id}: {e}")
+            return None
+
+    def get_ingestion_schedule_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get ingestion schedule for a project."""
+        try:
+            container = self.get_container('ingestion_schedules')
+            query = "SELECT TOP 1 * FROM c WHERE c.projectId = @project_id AND c.type = 'ingestion_schedule'"
+            params = [{"name": "@project_id", "value": project_id}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return items[0] if items else None
+        except Exception as e:
+            logger.error(f"Error getting ingestion schedule for project {project_id}: {e}")
+            return None
+
+    def upsert_ingestion_schedule_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert ingestion schedule for a project."""
+        try:
+            container = self.get_container('ingestion_schedules')
+            data['projectId'] = project_id
+            return container.upsert_item(data)
+        except Exception as e:
+            logger.error(f"Error upserting ingestion schedule for project {project_id}: {e}")
+            return None
+
+    def get_enabled_ingestion_schedules(self) -> List[Dict[str, Any]]:
+        """Get all enabled ingestion schedules."""
+        try:
+            container = self.get_container('ingestion_schedules')
+            query = "SELECT * FROM c WHERE c.type = 'ingestion_schedule' AND c.enabled = true"
+            return list(container.query_items(query=query, enable_cross_partition_query=True))
+        except Exception as e:
+            logger.error(f"Error getting enabled ingestion schedules: {e}")
+            return []
 
     def get_work_items_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
         """Get work items by project - placeholder implementation"""

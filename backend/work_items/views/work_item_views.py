@@ -19,17 +19,17 @@ from asgiref.sync import async_to_sync
 import json
 import uuid
 
-from authentication.permissions import IsAdmin, IsAdminOrUser
+from authentication.permissions import IsAdminOrUser, IsProjectViewer, IsProjectEditor, IsProjectAdmin
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
-from ..services import get_devops_service
+from ..services import get_devops_service, get_quality_gate_service
 
 logger = logging.getLogger(__name__)
 
 
 class WorkItemGenerationView(APIView):
     """Generate work items from analysis data - CONSOLIDATED from feedback_analysis"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
     
     @handle_service_errors
     @async_to_sync
@@ -121,7 +121,7 @@ class WorkItemGenerationView(APIView):
 
 class WorkItemSubmissionView(APIView):
     """Submit work items to external platforms - CONSOLIDATED from feedback_analysis"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
     
     @handle_service_errors
     @async_to_sync
@@ -173,6 +173,18 @@ class WorkItemSubmissionView(APIView):
                 instance=request.path
             )
         
+        # Quality gate validation (project-level rules)
+        quality_gate = get_quality_gate_service()
+        rules = quality_gate.get_rules_for_project(project_id)
+        quality_report = quality_gate.evaluate_work_items(work_items, rules)
+
+        if quality_report["items_with_issues"] > 0 and not rules.get("allow_push_with_warnings", False):
+            return StandardResponse.validation_error(
+                detail="Work items failed quality gate checks.",
+                errors=quality_report["issues"],
+                instance=request.path
+            )
+
         # Submit work items using DevOps service
         try:
             devops_service = get_devops_service()
@@ -183,6 +195,10 @@ class WorkItemSubmissionView(APIView):
                 project_config=project_config
             )
             
+            if quality_report["items_with_issues"] > 0:
+                submission_result["quality_gate"] = quality_report
+                submission_result["quality_gate"]["allow_push_with_warnings"] = True
+
             return StandardResponse.success(
                 data=submission_result, 
                 message=f"Work items submitted to {platform.title()} successfully"
@@ -200,7 +216,7 @@ class WorkItemSubmissionView(APIView):
 
 class WorkItemsListView(APIView):
     """Get work items for a project - CONSOLIDATED from multiple apps"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request):
@@ -255,7 +271,7 @@ class WorkItemsListView(APIView):
 
 class WorkItemDetailView(APIView):
     """Get specific work item by ID - CONSOLIDATED from multiple apps"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request, work_item_id):
@@ -278,7 +294,7 @@ class WorkItemDetailView(APIView):
 
 class WorkItemUpdateView(APIView):
     """Update work item - CONSOLIDATED from feedback_analysis"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
     
     @handle_service_errors
     def put(self, request, work_item_id):
@@ -286,9 +302,14 @@ class WorkItemUpdateView(APIView):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
             return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
+
+        project_id = request.data.get("project_id")
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
         
         try:
-            updated_data = request.data
+            updated_data = request.data.copy()
+            updated_data.pop("project_id", None)
             
             if not updated_data.get('title'):
                 return StandardResponse.validation_error(detail="Title is required.", instance=request.path)
@@ -298,7 +319,8 @@ class WorkItemUpdateView(APIView):
             updated_work_item = devops_service.update_work_item(
                 work_item_id=work_item_id,
                 user_id=str(user_id),
-                updated_data=updated_data
+                updated_data=updated_data,
+                project_id=project_id
             )
             
             if not updated_work_item:
@@ -317,7 +339,7 @@ class WorkItemUpdateView(APIView):
 
 class WorkItemRemovalView(APIView):
     """Remove/delete work items - handles bulk deletion"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
     
     @handle_service_errors
     def put(self, request):
@@ -327,9 +349,12 @@ class WorkItemRemovalView(APIView):
             return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
         
         try:
+            project_id = request.data.get("project_id")
             ids = request.data.get('ids', [])
             user_story_id = request.data.get('user_story_id')
             
+            if not project_id:
+                return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
             if not ids:
                 return StandardResponse.validation_error(detail="IDs are required for removal.", instance=request.path)
             
@@ -338,7 +363,8 @@ class WorkItemRemovalView(APIView):
             removal_result = devops_service.remove_work_items(
                 work_item_ids=ids,
                 user_id=str(user_id),
-                user_story_id=user_story_id
+                user_story_id=user_story_id,
+                project_id=project_id
             )
             
             return StandardResponse.success(data={
@@ -384,3 +410,59 @@ class WorkItemsByPlatformView(APIView):
                 detail=f"Failed to retrieve work items for {platform}", 
                 instance=request.path
             )
+
+
+class WorkItemQualityRulesView(APIView):
+    """Get or update quality gate rules for a project."""
+    permission_classes = [IsProjectAdmin]
+
+    @handle_service_errors
+    def get(self, request):
+        project_id = request.query_params.get("project_id")
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+
+        quality_gate = get_quality_gate_service()
+        rules = quality_gate.get_rules_for_project(project_id)
+        return StandardResponse.success(data={
+            "project_id": project_id,
+            "rules": rules
+        }, message="Quality gate rules retrieved successfully")
+
+    @handle_service_errors
+    def post(self, request):
+        project_id = request.data.get("project_id")
+        rules = request.data.get("rules") or {}
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        quality_gate = get_quality_gate_service()
+        saved = quality_gate.save_rules_for_project(project_id, rules, str(user_id) if user_id else None)
+        if not saved:
+            return StandardResponse.internal_server_error(detail="Failed to save quality gate rules.", instance=request.path)
+
+        return StandardResponse.success(data={
+            "project_id": project_id,
+            "rules": quality_gate.get_rules_for_project(project_id)
+        }, message="Quality gate rules updated successfully")
+
+
+class WorkItemQualityCheckView(APIView):
+    """Evaluate work items against quality gate rules."""
+    permission_classes = [IsProjectAdmin]
+
+    @handle_service_errors
+    def post(self, request):
+        project_id = request.data.get("project_id")
+        work_items = request.data.get("work_items", [])
+        if not project_id:
+            return StandardResponse.validation_error(detail="Project ID is required.", instance=request.path)
+        if not isinstance(work_items, list) or len(work_items) == 0:
+            return StandardResponse.validation_error(detail="work_items list is required.", instance=request.path)
+
+        quality_gate = get_quality_gate_service()
+        rules = quality_gate.get_rules_for_project(project_id)
+        report = quality_gate.evaluate_work_items(work_items, rules)
+        report["allow_push_with_warnings"] = rules.get("allow_push_with_warnings", False)
+        return StandardResponse.success(data=report, message="Quality gate evaluation completed")
