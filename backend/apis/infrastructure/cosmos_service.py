@@ -118,7 +118,8 @@ class CosmosDBService:
             'usage': '/projectId',
             'insight_rules': '/projectId',
             'insight_reviews': '/projectId',
-            'work_item_quality_rules': '/projectId'
+            'work_item_quality_rules': '/projectId',
+            'ingestion_schedules': '/projectId'
         }
         partition_key = partition_keys.get(container_type, '/id')  # Default to '/id' if not specified
 
@@ -177,7 +178,8 @@ class CosmosDBService:
             'usage': '/projectId',
             'insight_rules': '/projectId',
             'insight_reviews': '/projectId',
-            'work_item_quality_rules': '/projectId'
+            'work_item_quality_rules': '/projectId',
+            'ingestion_schedules': '/projectId'
         }
         
         for container_type, partition_key in containers_config.items():
@@ -253,7 +255,8 @@ class CosmosDBService:
                 'usage': 'projectId',
                 'insight_rules': 'projectId',
                 'insight_reviews': 'projectId',
-                'work_item_quality_rules': 'projectId'
+                'work_item_quality_rules': 'projectId',
+                'ingestion_schedules': 'projectId'
             }
             
             # Get the partition key field name for this container
@@ -1318,6 +1321,38 @@ class CosmosDBService:
         except Exception as e:
             logger.error(f"Error upserting work item quality rules for project {project_id}: {e}")
             return None
+
+    def get_ingestion_schedule_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get ingestion schedule for a project."""
+        try:
+            container = self.get_container('ingestion_schedules')
+            query = "SELECT TOP 1 * FROM c WHERE c.projectId = @project_id AND c.type = 'ingestion_schedule'"
+            params = [{"name": "@project_id", "value": project_id}]
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return items[0] if items else None
+        except Exception as e:
+            logger.error(f"Error getting ingestion schedule for project {project_id}: {e}")
+            return None
+
+    def upsert_ingestion_schedule_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert ingestion schedule for a project."""
+        try:
+            container = self.get_container('ingestion_schedules')
+            data['projectId'] = project_id
+            return container.upsert_item(data)
+        except Exception as e:
+            logger.error(f"Error upserting ingestion schedule for project {project_id}: {e}")
+            return None
+
+    def get_enabled_ingestion_schedules(self) -> List[Dict[str, Any]]:
+        """Get all enabled ingestion schedules."""
+        try:
+            container = self.get_container('ingestion_schedules')
+            query = "SELECT * FROM c WHERE c.type = 'ingestion_schedule' AND c.enabled = true"
+            return list(container.query_items(query=query, enable_cross_partition_query=True))
+        except Exception as e:
+            logger.error(f"Error getting enabled ingestion schedules: {e}")
+            return []
 
     def get_work_items_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
         """Get work items by project - placeholder implementation"""

@@ -21,6 +21,8 @@ from .views import (
     InsightReviewUpdateView,
     InsightRulesView,
     InsightRulesApplyView,
+    IngestionScheduleView,
+    IngestionRunNowView,
     # File upload views
     FeedbackFileUploadView,
 )
@@ -54,6 +56,10 @@ urlpatterns = [
     
     # File upload endpoints
     path('upload/', FeedbackFileUploadView.as_view(), name='feedback-file-upload'),
+
+    # Ingestion schedule endpoints
+    path('ingestion/schedule/', IngestionScheduleView.as_view(), name='ingestion_schedule'),
+    path('ingestion/run-now/', IngestionRunNowView.as_view(), name='ingestion_run_now'),
 ]
 
 # NOTE: User story endpoints have been moved to /work_items/ app

@@ -26,6 +26,13 @@ celery_proc = subprocess.Popen(
     cwd=workdir
 )
 
+# Start Celery beat scheduler
+logger.info("Starting Celery beat...")
+celery_beat_proc = subprocess.Popen(
+    [sys.executable, "-m", "celery", "-A", "apis", "beat", "--loglevel=info"],
+    cwd=workdir
+)
+
 # Start Celery Ops on port 8000 (Azure's expected port)
 try:
     from celery_ops.cli import _load_celery_app

@@ -31,6 +31,10 @@ from .insights_views import (
     InsightRulesView,
     InsightRulesApplyView,
 )
+from .ingestion_schedule_views import (
+    IngestionScheduleView,
+    IngestionRunNowView,
+)
 from .file_upload_views import (
     FeedbackFileUploadView,
 )
