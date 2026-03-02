@@ -17,6 +17,7 @@ import { deleteWorkItems, fetchUserStoriesByProject, setCurrentProjectUserStorie
 import { DeleteWorkItemsModal } from './DeleteWorkItemsModal';
 import { DashboardIntegrationModal } from './dashboard/DashboardIntegrationModal';
 import { WorkItemReviewModal } from './WorkItemReviewModal';
+import { WorkItemQualityGateModal } from './WorkItemQualityGateModal';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import type {
@@ -40,6 +41,7 @@ import { Checkbox } from "./checkbox";
 import { EditActionDrawer } from "./edit-action-drawer";
 import apiRequest from "@/lib/apiRequest";
 import { getRelatedInsightsForWorkItem } from "@/lib/insightTraceability";
+import { DEFAULT_QUALITY_RULES, evaluateWorkItems, type QualityReport, type QualityRules } from "@/lib/workItemQuality";
 
 interface WorkItem {
   id: string;
@@ -108,6 +110,10 @@ export const UserStoryList = ({
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   const [expandedDescriptionIds, setExpandedDescriptionIds] = useState<Record<string, boolean>>({});
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showQualityModal, setShowQualityModal] = useState(false);
+  const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
+  const [qualityRules, setQualityRules] = useState<QualityRules>(DEFAULT_QUALITY_RULES);
+  const [qualityLoading, setQualityLoading] = useState(false);
 
   const insightsList = useMemo(() => {
     const rawInsights =
@@ -566,6 +572,47 @@ export const UserStoryList = ({
       console.error('Failed to submit user stories:', error);
       alert(`Failed to submit user stories: ${error}`);
     }
+  };
+
+  const fetchQualityRules = async () => {
+    if (!projectId) return DEFAULT_QUALITY_RULES;
+    try {
+      const response = await apiRequest('get', `/work-items/quality-rules/?project_id=${projectId}`, undefined, true);
+      const rules = response?.data?.data?.rules;
+      if (rules) {
+        setQualityRules(rules);
+        return rules as QualityRules;
+      }
+    } catch (error) {
+      // Fall back to default rules if API fails
+    }
+    setQualityRules(DEFAULT_QUALITY_RULES);
+    return DEFAULT_QUALITY_RULES;
+  };
+
+  const handleReviewClick = async () => {
+    if (selectedActions.length === 0) {
+      alert("Please select user stories to push");
+      return;
+    }
+
+    setQualityLoading(true);
+    const rules = await fetchQualityRules();
+    const selectedItems = getSelectedItems();
+    const report = evaluateWorkItems(selectedItems, rules);
+    report.allow_push_with_warnings = rules.allow_push_with_warnings;
+
+    setQualityReport(report);
+    setQualityLoading(false);
+
+    if (report.items_with_issues > 0) {
+      setShowQualityModal(true);
+      if (!rules.allow_push_with_warnings) {
+        return;
+      }
+    }
+
+    setShowReviewModal(true);
   };
 
   const getSelectedItems = () => {
@@ -1083,14 +1130,14 @@ export const UserStoryList = ({
         )}
 
         <Button
-          onClick={() => setShowReviewModal(true)}
-          disabled={selectedActions.length === 0 || isPushing}
+          onClick={handleReviewClick}
+          disabled={selectedActions.length === 0 || isPushing || qualityLoading}
           className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white px-6"
         >
-          {isPushing ? (
+          {isPushing || qualityLoading ? (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Pushing...</span>
+              <span>{qualityLoading ? "Checking..." : "Pushing..."}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -1158,6 +1205,17 @@ export const UserStoryList = ({
         items={getSelectedItems()}
         platformLabel={getPlatformDisplayName()}
         isSubmitting={isPushing}
+      />
+
+      <WorkItemQualityGateModal
+        isOpen={showQualityModal}
+        onClose={() => setShowQualityModal(false)}
+        onProceed={() => {
+          setShowQualityModal(false);
+          setShowReviewModal(true);
+        }}
+        report={qualityReport}
+        allowProceed={!!qualityReport?.allow_push_with_warnings}
       />
     </div>
   );

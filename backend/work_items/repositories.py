@@ -125,6 +125,14 @@ class WorkItemRepository:
         except Exception as e:
             logger.error(f"Error getting work items by project {project_id}: {e}")
             return None
+
+    def get_quality_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get work item quality gate rules for a project."""
+        return self.cosmos_service.get_work_item_quality_rules_for_project(project_id)
+
+    def upsert_quality_rules_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Upsert work item quality gate rules for a project."""
+        return self.cosmos_service.upsert_work_item_quality_rules_for_project(project_id, data)
     
     def get_deep_analysis_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
         """Get deep analysis by project."""
