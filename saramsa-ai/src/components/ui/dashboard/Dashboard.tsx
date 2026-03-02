@@ -2602,7 +2602,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                                   <div>
                                     <p className="text-sm font-semibold text-foreground">Comments</p>
                                     <p className="text-xs text-muted-foreground">
-                                      {trendDelta.previous.totalComments} -> {trendDelta.latest.totalComments}
+                                      {trendDelta.previous.totalComments} {'→'} {trendDelta.latest.totalComments}
                                     </p>
                                   </div>
                                   <span className="flex items-center gap-1 text-xs font-medium text-foreground">
@@ -2615,7 +2615,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                                   <div>
                                     <p className="text-sm font-semibold text-foreground">Feature Count</p>
                                     <p className="text-xs text-muted-foreground">
-                                      {trendDelta.previous.featureCount} -> {trendDelta.latest.featureCount}
+                                      {trendDelta.previous.featureCount} {'→'} {trendDelta.latest.featureCount}
                                     </p>
                                   </div>
                                   <span className="flex items-center gap-1 text-xs font-medium text-foreground">
