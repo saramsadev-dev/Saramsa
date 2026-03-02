@@ -15,6 +15,7 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 # Backend's own URL in production (e.g. https://saramsa-backend-xxx.centralus-01.azurewebsites.net).
 # When set, this host is added to ALLOWED_HOSTS so Azure can route to the app.
 BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', '').rstrip('/')
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', '').rstrip('/')
 
 _allowed = os.getenv("ALLOWED_HOSTS", "*").split(",")
 if BACKEND_BASE_URL:

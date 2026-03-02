@@ -123,6 +123,32 @@ class AuthenticationService:
         """Save/update user data."""
         return self.user_repo.save_user(user_data)
 
+    def send_password_reset_email(self, email: str, reset_link: str) -> bool:
+        """Send password reset email with a secure link."""
+        subject = getattr(settings, "PASSWORD_RESET_EMAIL_SUBJECT", "Reset your Saramsa password")
+        from_email = getattr(settings, "PASSWORD_RESET_FROM_EMAIL", settings.DEFAULT_FROM_EMAIL)
+
+        text_body = (
+            "You requested a password reset for your Saramsa account.\n\n"
+            f"Reset your password using this link:\n{reset_link}\n\n"
+            "If you did not request this, you can ignore this email."
+        )
+
+        html_body = (
+            "<p>You requested a password reset for your Saramsa account.</p>"
+            f"<p><a href=\"{reset_link}\">Reset your password</a></p>"
+            "<p>If you did not request this, you can ignore this email.</p>"
+        )
+
+        try:
+            message = EmailMultiAlternatives(subject, text_body, from_email, [email])
+            message.attach_alternative(html_body, "text/html")
+            message.send(fail_silently=False)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send password reset email to {email}: {e}")
+            return False
+
     # Registration OTP methods
     def request_registration_otp(self, email: str, username: Optional[str] = None) -> Dict[str, Any]:
         """Generate and send registration OTP to email."""
