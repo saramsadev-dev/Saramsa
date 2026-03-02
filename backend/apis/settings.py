@@ -165,6 +165,7 @@ COSMOS_DB_CONFIG = {
         'insight_rules': os.getenv('COSMOS_DB_INSIGHT_RULES_CONTAINER', 'insight_rules'),
         'insight_reviews': os.getenv('COSMOS_DB_INSIGHT_REVIEWS_CONTAINER', 'insight_reviews'),
         'work_item_quality_rules': os.getenv('COSMOS_DB_WORK_ITEM_QUALITY_RULES_CONTAINER', 'work_item_quality_rules'),
+        'ingestion_schedules': os.getenv('COSMOS_DB_INGESTION_SCHEDULES_CONTAINER', 'ingestion_schedules'),
     } 
 }
 

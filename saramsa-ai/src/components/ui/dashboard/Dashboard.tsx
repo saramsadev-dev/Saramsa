@@ -148,6 +148,16 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       max_confidence_level: "LOW",
     },
   });
+  const [schedule, setSchedule] = useState<any>({
+    enabled: false,
+    cadence: "daily",
+    hour_utc: 2,
+    day_of_week: 0,
+    last_run_at: null,
+    next_run_at: null,
+  });
+  const [scheduleLoading, setScheduleLoading] = useState<boolean>(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   
   // Declare all refs at the top to prevent recreation on every render
   const didInitRef = useRef(false);
@@ -317,8 +327,56 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       }
     };
 
+    const fetchSchedule = async () => {
+      setScheduleLoading(true);
+      setScheduleError(null);
+      let lastError: string | null = null;
+
+      for (const candidate of candidateIds) {
+        try {
+          const response = await apiRequest('get', `/insights/ingestion/schedule/?project_id=${candidate}`, undefined, true);
+          const payload = response?.data?.data;
+          const scheduleDoc = payload?.schedule;
+          if (isActive) {
+            if (scheduleDoc) {
+              setSchedule({
+                enabled: !!scheduleDoc.enabled,
+                cadence: scheduleDoc.cadence || "daily",
+                hour_utc: scheduleDoc.hour_utc ?? 2,
+                day_of_week: scheduleDoc.day_of_week ?? 0,
+                last_run_at: scheduleDoc.last_run_at || null,
+                next_run_at: scheduleDoc.next_run_at || null,
+              });
+            } else {
+              setSchedule((prev: any) => ({
+                ...prev,
+                enabled: false,
+                cadence: "daily",
+                hour_utc: 2,
+                day_of_week: 0,
+              }));
+            }
+          }
+          setScheduleLoading(false);
+          return;
+        } catch (err: any) {
+          lastError =
+            err?.response?.data?.detail ||
+            err?.response?.data?.message ||
+            err?.message ||
+            'Failed to load ingestion schedule.';
+        }
+      }
+
+      if (isActive) {
+        setScheduleError(lastError);
+        setScheduleLoading(false);
+      }
+    };
+
     fetchReviewList();
     fetchRules();
+    fetchSchedule();
 
     return () => {
       isActive = false;
@@ -479,6 +537,69 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       setReviewError(err?.message || 'Failed to apply insight rules.');
     } finally {
       setReviewLoading(false);
+    }
+  };
+
+  const handleSaveSchedule = async () => {
+    const rawProjectId = currentProjectId || projectId || '';
+    if (!rawProjectId) return;
+    setScheduleLoading(true);
+    setScheduleError(null);
+    try {
+      await apiRequest('post', '/insights/ingestion/schedule/', {
+        project_id: rawProjectId,
+        schedule: {
+          enabled: schedule.enabled,
+          cadence: schedule.cadence,
+          hour_utc: Number(schedule.hour_utc),
+          day_of_week: schedule.cadence === "weekly" ? Number(schedule.day_of_week) : null,
+        },
+      }, true);
+
+      const refreshed = await apiRequest('get', `/insights/ingestion/schedule/?project_id=${rawProjectId}`, undefined, true);
+      const scheduleDoc = refreshed?.data?.data?.schedule;
+      if (scheduleDoc) {
+        setSchedule({
+          enabled: !!scheduleDoc.enabled,
+          cadence: scheduleDoc.cadence || "daily",
+          hour_utc: scheduleDoc.hour_utc ?? 2,
+          day_of_week: scheduleDoc.day_of_week ?? 0,
+          last_run_at: scheduleDoc.last_run_at || null,
+          next_run_at: scheduleDoc.next_run_at || null,
+        });
+      }
+    } catch (err: any) {
+      setScheduleError(err?.message || 'Failed to save schedule.');
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
+  const handleRunNow = async () => {
+    const rawProjectId = currentProjectId || projectId || '';
+    if (!rawProjectId) return;
+    setScheduleLoading(true);
+    setScheduleError(null);
+    try {
+      await apiRequest('post', '/insights/ingestion/run-now/', {
+        project_id: rawProjectId,
+      }, true);
+      const refreshed = await apiRequest('get', `/insights/ingestion/schedule/?project_id=${rawProjectId}`, undefined, true);
+      const scheduleDoc = refreshed?.data?.data?.schedule;
+      if (scheduleDoc) {
+        setSchedule({
+          enabled: !!scheduleDoc.enabled,
+          cadence: scheduleDoc.cadence || "daily",
+          hour_utc: scheduleDoc.hour_utc ?? 2,
+          day_of_week: scheduleDoc.day_of_week ?? 0,
+          last_run_at: scheduleDoc.last_run_at || null,
+          next_run_at: scheduleDoc.next_run_at || null,
+        });
+      }
+    } catch (err: any) {
+      setScheduleError(err?.message || 'Failed to trigger ingestion.');
+    } finally {
+      setScheduleLoading(false);
     }
   };
 
@@ -2054,6 +2175,112 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                             </div>
                           ))
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {hasAnalysisResults && (
+                    <div className="rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                            Scheduled Ingestion
+                          </p>
+                          <h3 className="mt-2 text-xl font-semibold text-foreground">
+                            Auto-run feedback analysis
+                          </h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRunNow}
+                            disabled={scheduleLoading}
+                          >
+                            Run now
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSaveSchedule}
+                            disabled={scheduleLoading}
+                          >
+                            Save schedule
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                        <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-3">
+                          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={!!schedule.enabled}
+                              onChange={(e) => setSchedule((prev: any) => ({ ...prev, enabled: e.target.checked }))}
+                            />
+                            Enable scheduled runs
+                          </label>
+                          <div className="space-y-2">
+                            <label className="text-xs text-muted-foreground">Cadence</label>
+                            <select
+                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                              value={schedule.cadence}
+                              onChange={(e) => setSchedule((prev: any) => ({ ...prev, cadence: e.target.value }))}
+                            >
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                            </select>
+                          </div>
+                          {schedule.cadence === "weekly" && (
+                            <div className="space-y-2">
+                              <label className="text-xs text-muted-foreground">Day of week (UTC)</label>
+                              <select
+                                className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                                value={schedule.day_of_week}
+                                onChange={(e) => setSchedule((prev: any) => ({ ...prev, day_of_week: Number(e.target.value) }))}
+                              >
+                                <option value={0}>Monday</option>
+                                <option value={1}>Tuesday</option>
+                                <option value={2}>Wednesday</option>
+                                <option value={3}>Thursday</option>
+                                <option value={4}>Friday</option>
+                                <option value={5}>Saturday</option>
+                                <option value={6}>Sunday</option>
+                              </select>
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <label className="text-xs text-muted-foreground">Hour (UTC)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={23}
+                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
+                              value={schedule.hour_utc}
+                              onChange={(e) => setSchedule((prev: any) => ({ ...prev, hour_utc: Number(e.target.value) }))}
+                            />
+                          </div>
+                          {scheduleError && (
+                            <p className="text-xs text-rose-600">{scheduleError}</p>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-2 text-sm text-muted-foreground">
+                          {scheduleLoading && <p>Updating schedule...</p>}
+                          {!scheduleLoading && (
+                            <>
+                              <p>
+                                Next run: {schedule.next_run_at ? new Date(schedule.next_run_at).toLocaleString() : "Not scheduled"}
+                              </p>
+                              <p>
+                                Last run: {schedule.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : "Not run yet"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Runs use the latest stored comments for this project.
+                              </p>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}

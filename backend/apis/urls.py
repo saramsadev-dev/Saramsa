@@ -7,6 +7,7 @@ from drf_spectacular.views import (
 from .views import health_check, performance_metrics, reset_performance_stats
 from feedback_analysis.views import UserStoriesView, AnalyzeCommentsView, TaskStatusView, TaskListView, TaskStreamView, GetUserCommentsView, FeedbackFileUploadView
 from feedback_analysis.views import InsightReviewListView, InsightReviewUpdateView, InsightRulesView, InsightRulesApplyView
+from feedback_analysis.views import IngestionScheduleView, IngestionRunNowView
 from work_items.views import WorkItemGenerationView, WorkItemSubmissionView, WorkItemUpdateView, WorkItemRemovalView
 
 urlpatterns = [
@@ -38,6 +39,8 @@ urlpatterns = [
     path('api/insights/review/update/', InsightReviewUpdateView.as_view(), name='insights_review_update'),
     path('api/insights/rules/', InsightRulesView.as_view(), name='insights_rules'),
     path('api/insights/rules/apply/', InsightRulesApplyView.as_view(), name='insights_rules_apply'),
+    path('api/insights/ingestion/schedule/', IngestionScheduleView.as_view(), name='insights_ingestion_schedule'),
+    path('api/insights/ingestion/run-now/', IngestionRunNowView.as_view(), name='insights_ingestion_run_now'),
     
     # Additional aliases without /api prefix for frontend compatibility
     path('insights/comments/', GetUserCommentsView.as_view(), name='insights_comments_no_api'),
