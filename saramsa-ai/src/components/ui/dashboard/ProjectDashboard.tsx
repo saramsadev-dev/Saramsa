@@ -143,12 +143,11 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
   const handleSaveEdit = async (projectId: string, name: string, description?: string) => {
     try {
       await dispatch(updateProject({ id: projectId, name, description })).unwrap();
-      setShowEditModal(false);
-      setEditingProject(null);
       toast.success('Project updated successfully');
     } catch (err: any) {
       console.error('Failed to update project:', err);
       toast.error(err?.message || 'Failed to update project. Please try again.');
+      throw err;
     }
   };
 

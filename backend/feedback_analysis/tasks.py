@@ -1,11 +1,23 @@
 """
-Celery tasks for feedback_analysis.
-
-Autodiscover loads this module; tasks are defined in services.task_service.
-Import here so they are registered with the Celery app.
+Celery tasks for feedback analysis.
 """
 
-from .services.task_service import process_feedback_task  # noqa: F401
-from .services.ingestion_scheduler_task import run_scheduled_ingestions  # noqa: F401
+import logging
+from celery import shared_task
 
-__all__ = ("process_feedback_task", "run_scheduled_ingestions")
+from .services.ingestion_schedule_service import get_ingestion_schedule_service
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task(name="feedback_analysis.run_scheduled_ingestions")
+def run_scheduled_ingestions():
+    service = get_ingestion_schedule_service()
+    results = service.run_due_schedules()
+    logger.info(
+        "Scheduled ingestion run completed: due=%s started=%s skipped=%s",
+        results.get("due"),
+        results.get("started"),
+        results.get("skipped"),
+    )
+    return results

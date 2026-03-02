@@ -13,7 +13,7 @@ Contains views for insights and reporting:
 """
 
 from rest_framework.views import APIView
-from authentication.permissions import IsAdmin, IsAdminOrUser
+from authentication.permissions import IsAdmin, IsProjectViewer, IsProjectEditor, IsProjectAdmin
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 
@@ -74,7 +74,7 @@ class InsightsByTypeView(APIView):
 
 class AnalysisHistoryView(APIView):
     """Get analysis history for a project"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request):
@@ -98,7 +98,7 @@ class AnalysisHistoryView(APIView):
 
 class AnalysisByQuarterView(APIView):
     """Get analysis for a specific quarter"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request):
@@ -131,7 +131,7 @@ class AnalysisByQuarterView(APIView):
 
 class CumulativeAnalysisView(APIView):
     """Get cumulative analysis combining all historical data"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request):
@@ -159,7 +159,7 @@ class CumulativeAnalysisView(APIView):
 
 class AnalysisComparisonView(APIView):
     """Compare analyses between quarters"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
 
     @handle_service_errors
     def get(self, request):
@@ -233,7 +233,7 @@ class AnalysisComparisonView(APIView):
 
 class InsightReviewListView(APIView):
     """Get insights for review with current approve/ignore status."""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
 
     def _build_insight_key(self, project_id: str, insight_text: str) -> str:
         base = f"{project_id}:{insight_text}".encode("utf-8")
@@ -293,7 +293,7 @@ class InsightReviewListView(APIView):
 
 class InsightReviewUpdateView(APIView):
     """Update insight review status (batch)."""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectEditor]
 
     @handle_service_errors
     def post(self, request):
@@ -337,7 +337,7 @@ class InsightReviewUpdateView(APIView):
 
 class InsightRulesView(APIView):
     """Get or update insight auto-approve/ignore rules."""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
 
     @handle_service_errors
     def get(self, request):
@@ -393,7 +393,7 @@ class InsightRulesView(APIView):
 
 class InsightRulesApplyView(APIView):
     """Apply auto-approve/ignore rules to the latest analysis insights."""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectAdmin]
 
     def _build_insight_key(self, project_id: str, insight_text: str) -> str:
         base = f"{project_id}:{insight_text}".encode("utf-8")
@@ -527,7 +527,7 @@ class InsightRulesApplyView(APIView):
 
 class UserStoriesView(APIView):
     """Get user stories by project and user"""
-    permission_classes = [IsAdminOrUser]
+    permission_classes = [IsProjectViewer]
     
     @handle_service_errors
     def get(self, request):

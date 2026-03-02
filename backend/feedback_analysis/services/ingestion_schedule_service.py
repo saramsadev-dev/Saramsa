@@ -123,10 +123,28 @@ class IngestionScheduleService:
 
         try:
             analysis_service = get_analysis_service()
-            user_data = analysis_service.get_user_data_by_project(str(user_id), project_id)
             comments = []
+
+            user_data = analysis_service.get_user_data_by_project(str(user_id), project_id)
             if user_data:
-                comments = user_data.get("comments") or user_data.get("original_comments") or []
+                comments = (
+                    user_data.get("comments")
+                    or user_data.get("feedback")
+                    or user_data.get("original_comments")
+                    or []
+                )
+
+            if not comments:
+                latest_analysis = analysis_service.get_latest_analysis_by_project(project_id, str(user_id))
+                if latest_analysis:
+                    comments = (
+                        latest_analysis.get("original_comments")
+                        or latest_analysis.get("feedback")
+                        or latest_analysis.get("analysisData", {}).get("original_comments")
+                        or latest_analysis.get("analysisData", {}).get("feedback")
+                        or latest_analysis.get("comments")
+                        or []
+                    )
 
             if not comments:
                 logger.info("No comments found for scheduled ingestion project %s", project_id)
@@ -145,6 +163,16 @@ class IngestionScheduleService:
             return False
         finally:
             self.release_run_lock(project_id)
+
+    def run_due_schedules(self) -> Dict[str, int]:
+        due = self.get_due_schedules()
+        results = {"due": len(due), "started": 0, "skipped": 0}
+        for schedule in due:
+            if self.run_schedule(schedule):
+                results["started"] += 1
+            else:
+                results["skipped"] += 1
+        return results
 
 
 _ingestion_schedule_service = None

@@ -12,6 +12,7 @@ interface WorkItemDeleteTestProps {
   userStoryData: {
     id: string;
     userId: string;
+    projectId?: string;
     work_items: Array<{
       id: string;
       title: string;
@@ -51,7 +52,8 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
       // Test the API call directly using PUT method (correct for updates)
       const response = await apiRequest('put', '/insights/user-stories/remove-work-items/', {
         ids: selectedWorkItems,
-        user_story_id: userStoryData.id  // Required: specify which user story
+        user_story_id: userStoryData.id,  // Required: specify which user story
+        project_id: userStoryData.projectId
       }, true);
 
       setResult({
@@ -79,6 +81,7 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
         <div className="text-sm text-muted-foreground dark:text-muted-foreground">
           <div><strong>User Story ID:</strong> {userStoryData.id}</div>
           <div><strong>User ID:</strong> {userStoryData.userId}</div>
+          {userStoryData.projectId && <div><strong>Project ID:</strong> {userStoryData.projectId}</div>}
           <div><strong>Total Work Items:</strong> {userStoryData.work_items.length}</div>
         </div>
       </CardHeader>

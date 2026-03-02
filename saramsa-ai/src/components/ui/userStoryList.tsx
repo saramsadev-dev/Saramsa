@@ -310,6 +310,7 @@ export const UserStoryList = ({
           type: updatedAction.type,
           tags: updatedAction.tags,
           status: updatedAction.status,
+          project_id: projectId,
         },
         true
       );
@@ -658,7 +659,8 @@ export const UserStoryList = ({
       // Use the proper Redux action for deleting work items
       await dispatch(deleteWorkItems({ 
         workItemIds: toDelete,
-        userStoryId: userStoryId
+        userStoryId: userStoryId,
+        projectId: projectId
       })).unwrap();
 
       // Remove deleted items from action items list to reflect immediately

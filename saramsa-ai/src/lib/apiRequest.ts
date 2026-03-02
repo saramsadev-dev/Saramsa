@@ -167,7 +167,7 @@ export async function apiRequest(
 
   // Only set Content-Type when not sending FormData; letting the browser/axios set
   // the boundary automatically is safer for multipart requests
-  if (!isMultipart && (method === 'post' || method === 'put' || method === 'patch')) {
+  if (!isMultipart && (method === 'post' || method === 'put' || method === 'patch' || method === 'delete')) {
     headers['Content-Type'] = 'application/json';
   }
   if (isMultipart) {

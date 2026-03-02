@@ -17,6 +17,7 @@ from .views import (
     LatestAnalysisView,
     ProjectTrendsView,
     ProjectAspectTrendView,
+    ProjectRolesView,
     # External views
     get_azure_projects,
     get_jira_projects,
@@ -45,6 +46,7 @@ urlpatterns = [
     path('projects/<str:project_id>/analysis/latest/', LatestAnalysisView.as_view(), name='project_latest_analysis'),
     path('projects/<str:project_id>/trends/', ProjectTrendsView.as_view(), name='project_trends'),
     path('projects/<str:project_id>/trends/aspects/<str:aspect_key>/', ProjectAspectTrendView.as_view(), name='project_aspect_trends'),
+    path('projects/<str:project_id>/roles/', ProjectRolesView.as_view(), name='project_roles'),
     path('projects/<str:project_id>/', ProjectDetailView.as_view(), name='project_detail'),
     path('projects/', ProjectListView.as_view(), name='project_list_root'),  # Changed to list for GET requests
     
