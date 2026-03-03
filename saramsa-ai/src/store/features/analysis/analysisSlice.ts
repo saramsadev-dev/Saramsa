@@ -99,7 +99,8 @@ export const analyzeComments = createAsyncThunk<
         try {
           const statusResult = await dispatch(pollTaskStatus(taskId)).unwrap();
 
-          if (statusResult.status === 'SUCCESS') {
+          const terminalStatus = statusResult.status;
+          if (terminalStatus === 'SUCCESS' || terminalStatus === 'PARTIAL') {
             clearInterval(pollInterval);
             const taskResult = statusResult.result;
 
@@ -136,7 +137,7 @@ export const analyzeComments = createAsyncThunk<
               analysisData: rawData
             };
             resolve(wrappedData);
-          } else if (statusResult.status === 'FAILURE') {
+          } else if (terminalStatus === 'FAILURE' || terminalStatus === 'FAILED') {
             clearInterval(pollInterval);
             reject(statusResult.error || 'Analysis failed');
           }
@@ -373,7 +374,7 @@ const analysisSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(analyzeComments.pending, (state) => {
+      .addCase(analyzeComments.pending, (state, action) => {
         state.loading = true;
         state.error = null;
         state.isAnalyzing = true;

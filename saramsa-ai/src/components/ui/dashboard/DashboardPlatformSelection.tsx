@@ -46,7 +46,7 @@ export function DashboardPlatformSelection({
         ? "Azure DevOps integration is already configured. You can reconfigure or link to a different organization."
         : "Connect your project to Azure DevOps for seamless work item creation",
       icon: <Download className="w-8 h-8" />,
-      color: "from-saramsa-gradient-from to-saramsa-gradient-to",
+      color: "bg-secondary/70",
       features: [
         "AI-Powered Analysis",
         "Auto Work Item Creation",
@@ -62,7 +62,7 @@ export function DashboardPlatformSelection({
         ? "Jira integration is already configured. You can reconfigure or link to a different workspace."
         : "Integrate your project with Jira for comprehensive project management",
       icon: <Globe className="w-8 h-8" />,
-      color: "from-saramsa-gradient-from to-saramsa-gradient-to",
+      color: "bg-secondary/70",
       features: [
         "Dynamic Project Detection",
         "AI-Powered Issue Classification",
@@ -106,16 +106,16 @@ export function DashboardPlatformSelection({
               transition={{ duration: 0.4, delay: 0.2 + index * 0.1 }}
             >
               <div
-                className={`relative bg-card/90 dark:bg-card/95 border-2 rounded-xl p-5 transition-all duration-300 cursor-pointer hover:border-saramsa-brand/40 hover:shadow-lg ${
+                className={`relative bg-card/80 border-2 rounded-xl p-5 transition-all duration-300 cursor-pointer hover:border-border/70 hover:shadow-sm ${
                   platform.status === "configured"
-                    ? "border-green-300 dark:border-green-600 bg-green-50/30 dark:bg-green-900/10"
-                    : "border-border/60 dark:border-border/60"
+                    ? "border-border/70 bg-secondary/40"
+                    : "border-border/60"
                 }`}
                 onClick={() => onPlatformSelect(platform.id as "azure" | "jira")}
               >
                 {platform.status === "configured" && (
                   <div className="absolute top-3 right-3">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary/70 text-foreground">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Configured
                     </span>
@@ -124,7 +124,7 @@ export function DashboardPlatformSelection({
 
                 <div className="flex items-start gap-4">
                   <div
-                    className={`w-12 h-12 bg-gradient-to-br ${platform.color} rounded-xl flex items-center justify-center text-white flex-shrink-0`}
+                    className={`w-12 h-12 ${platform.color} border border-border/60 rounded-xl flex items-center justify-center text-foreground flex-shrink-0`}
                   >
                     {platform.icon}
                   </div>
@@ -166,7 +166,7 @@ export function DashboardPlatformSelection({
           transition={{ duration: 0.6, delay: 0.3 }}
           className="text-center space-y-2 pt-4"
         >
-          <div className="w-full h-px bg-gradient-to-r from-transparent via-border/70 to-transparent" />
+          <div className="w-full h-px bg-border/70" />
           <div className="flex items-center justify-center gap-2">
             <Shield className="w-4 h-4 text-muted-foreground" />
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">

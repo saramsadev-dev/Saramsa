@@ -65,6 +65,9 @@ class SentimentAggregationService:
         # Step 6: Calculate aspect coverage (% of comments with at least one aspect)
         aspect_coverage = self._calculate_aspect_coverage(extracted_comments, total_comments)
         
+        # Step 7: Confidence distribution (HIGH/MEDIUM/LOW)
+        confidence_distribution = self._count_confidence(extracted_comments)
+        
         # Build "overall" summary (frontend expects this)
         overall_summary = {
             "positive": sentiment_percentages.get("positive", 0.0),
@@ -85,11 +88,13 @@ class SentimentAggregationService:
                 "negative": f"{sentiment_percentages.get('negative', 0):.2f}%",
                 "neutral": f"{sentiment_percentages.get('neutral', 0):.2f}%",
             },
-            "features": filtered_aspects,  # Use "features" for frontend (alias for aspects)
-            "feature_asba": filtered_aspects,  # Keep legacy field name for compatibility
+            "features": filtered_aspects,
             "positive_keywords": keyword_aggregations["positive"],
             "negative_keywords": keyword_aggregations["negative"],
             "aspect_coverage": aspect_coverage,  # New: % of comments with aspects
+            "pipeline_metadata": {
+                "confidence_distribution": confidence_distribution
+            },
         }
     
     def _count_sentiments(self, extracted_comments: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -126,6 +131,16 @@ class SentimentAggregationService:
             "negative": (counts.get("negative", 0) / total) * 100,
             "neutral": (counts.get("neutral", 0) / total) * 100,
         }
+
+    def _count_confidence(self, extracted_comments: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Count comments by confidence level (HIGH/MEDIUM/LOW)."""
+        counts = Counter()
+        for comment in extracted_comments:
+            confidence = str(comment.get("confidence", "MEDIUM")).upper()
+            if confidence not in ("HIGH", "MEDIUM", "LOW"):
+                confidence = "MEDIUM"
+            counts[confidence] += 1
+        return dict(counts)
     
     def _aggregate_aspects(self, extracted_comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -235,10 +250,10 @@ class SentimentAggregationService:
                         break
             
             aspect_summaries.append({
-                "feature": original_aspect_name,  # Keep field name "feature" for frontend compatibility
+                "name": original_aspect_name,
                 "description": description,
                 "sentiment": sentiment_percentages,
-                "keywords": list(data["all_keywords"])[:20],  # Limit to top 20 keywords
+                "keywords": list(data["all_keywords"])[:20],
                 "comment_count": comment_count,
             })
         
@@ -393,7 +408,6 @@ class SentimentAggregationService:
             "counts": {"total": 0, "positive": 0, "negative": 0, "neutral": 0},
             "sentiment_summary": {"positive": "0%", "negative": "0%", "neutral": "0%"},
             "features": [],
-            "feature_asba": [],
             "positive_keywords": [],
             "negative_keywords": [],
             "aspect_coverage": 0.0,

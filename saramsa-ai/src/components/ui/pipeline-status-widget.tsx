@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/rootReducer";
-import { apiRequest } from "@/lib/apiRequest";
+import { apiRequest, buildApiUrl } from "@/lib/apiRequest";
 import { getValidAccessToken } from "@/lib/auth";
 import {
   Activity,
@@ -13,6 +13,10 @@ import {
   ChevronUp,
   Clock,
   Loader2,
+  Upload,
+  Cpu,
+  Sparkles,
+  Wrench,
 } from "lucide-react";
 import { cn } from "./utils";
 
@@ -29,6 +33,14 @@ type TaskItem = {
   label: string;
   detail: string;
   status: StageStatus;
+  statusLabel?: string;
+  statusTone?: string;
+  pipelineHealth?: {
+    status?: string;
+    errors?: Record<string, string>;
+  };
+  commentCount?: number | null;
+  durationSeconds?: number | null;
   updatedAt: number;
 };
 
@@ -60,6 +72,12 @@ export function PipelineStatusWidget() {
   const analysisStatus = useSelector(
     (state: RootState) => state.analysis.analysisStatus
   );
+  const loadedComments = useSelector(
+    (state: RootState) => state.analysis.loadedComments
+  );
+  const analysisData = useSelector(
+    (state: RootState) => state.analysis.analysisData
+  );
   const taskId = useSelector((state: RootState) => state.analysis.taskId);
   const projectContext = useSelector(
     (state: RootState) => state.analysis.projectContext
@@ -73,7 +91,7 @@ export function PipelineStatusWidget() {
     }
 
     const label = projectContext?.project_id
-      ? `Analysis • ${projectContext.project_id.slice(0, 8)}`
+      ? `Analysis - ${projectContext.project_id.slice(0, 8)}`
       : "Feedback analysis";
 
     const statusMap: Record<string, StageStatus> = {
@@ -110,33 +128,60 @@ export function PipelineStatusWidget() {
   useEffect(() => {
     let isMounted = true;
     let eventSource: EventSource | null = null;
-    const mapApiStatus = (raw: string): StageStatus => {
-      if (raw === "RUNNING") return "running";
-      if (raw === "SUCCESS") return "success";
-      if (raw === "FAILED") return "error";
-      return "pending";
+    const mapApiTask = (task: any): TaskItem => {
+      const raw = String(task?.status || "").toUpperCase();
+      if (raw === "PARTIAL") {
+        return {
+          id: task.task_id,
+          label: toLabel(task.project_id, task.file_name),
+          detail: "Sentiment + synthesis pipeline",
+          status: "error",
+          statusLabel: "Partial",
+          statusTone: "text-amber-600",
+          pipelineHealth: task.pipeline_health,
+          commentCount: task.comment_count ?? null,
+          durationSeconds: task.duration_seconds ?? null,
+          updatedAt: Date.now(),
+        };
+      }
+      const status: StageStatus =
+        raw === "RUNNING"
+          ? "running"
+          : raw === "SUCCESS"
+          ? "success"
+          : raw === "FAILED"
+          ? "error"
+          : "pending";
+      return {
+        id: task.task_id,
+        label: toLabel(task.project_id, task.file_name),
+        detail: "Sentiment + synthesis pipeline",
+        status,
+        pipelineHealth: task.pipeline_health,
+        commentCount: task.comment_count ?? null,
+        durationSeconds: task.duration_seconds ?? null,
+        updatedAt: Date.now(),
+      };
     };
 
     const toLabel = (projectId?: string, fileName?: string) => {
       if (fileName) return fileName;
-      if (projectId) return `Analysis • ${projectId.slice(0, 8)}`;
+      if (projectId) return `Analysis - ${projectId.slice(0, 8)}`;
       return "Feedback analysis";
     };
 
     const fetchTasks = async () => {
       try {
+        const token = getValidAccessToken();
+        if (!token) {
+          return;
+        }
         const response = await apiRequest("get", "/insights/tasks/", undefined, true);
         const list = response.data?.data?.tasks ?? [];
         if (!isMounted || !Array.isArray(list)) {
           return;
         }
-        const mapped = list.slice(0, 15).map((task: any) => ({
-          id: task.task_id,
-          label: toLabel(task.project_id, task.file_name),
-          detail: "Sentiment + synthesis pipeline",
-          status: mapApiStatus(task.status),
-          updatedAt: Date.now(),
-        }));
+        const mapped = list.slice(0, 15).map((task: any) => mapApiTask(task));
         setApiTasks(mapped);
       } catch {
         // Keep local fallback
@@ -147,22 +192,18 @@ export function PipelineStatusWidget() {
       if (typeof window === "undefined") return;
       try {
         const token = getValidAccessToken();
-        const url = token
-          ? `/api/insights/tasks/stream/?token=${encodeURIComponent(token)}`
-          : "/api/insights/tasks/stream/";
+        if (!token) {
+          return;
+        }
+        const baseUrl = buildApiUrl("/insights/tasks/stream/");
+        const url = `${baseUrl}?token=${encodeURIComponent(token)}`;
         eventSource = new EventSource(url);
         eventSource.addEventListener("tasks", (event) => {
           try {
             const payload = JSON.parse((event as MessageEvent).data);
             const list = payload?.tasks ?? [];
             if (!isMounted || !Array.isArray(list)) return;
-            const mapped = list.slice(0, 15).map((task: any) => ({
-              id: task.task_id,
-              label: toLabel(task.project_id, task.file_name),
-              detail: "Sentiment + synthesis pipeline",
-              status: mapApiStatus(task.status),
-              updatedAt: Date.now(),
-            }));
+            const mapped = list.slice(0, 15).map((task: any) => mapApiTask(task));
             setApiTasks(mapped);
           } catch {
             // ignore
@@ -178,7 +219,11 @@ export function PipelineStatusWidget() {
       }
     };
 
-    startStream();
+    const token = getValidAccessToken();
+    if (token) {
+      startStream();
+      fetchTasks();
+    }
     const interval = setInterval(fetchTasks, 30000);
     return () => {
       isMounted = false;
@@ -233,19 +278,71 @@ export function PipelineStatusWidget() {
     }
   }, [analysisStatus]);
 
+  const stageIcons = [
+    <Upload className="h-3.5 w-3.5" />,
+    <Cpu className="h-3.5 w-3.5" />,
+    <Sparkles className="h-3.5 w-3.5" />,
+    <Wrench className="h-3.5 w-3.5" />,
+  ];
+
+  const commentCount = Array.isArray(loadedComments)
+    ? loadedComments.length
+    : analysisData?.analysisData?.comments_count ??
+      analysisData?.comments_count ??
+      analysisData?.analysisData?.counts?.total ??
+      analysisData?.counts?.total ??
+      null;
+
+  const processingSeconds =
+    analysisData?.analysisData?.processing_time ??
+    analysisData?.processing_time ??
+    null;
+
+  const processingMinutes =
+    typeof processingSeconds === "number"
+      ? Math.max(1, Math.round(processingSeconds / 60))
+      : null;
+
   const overallCopy = statusCopy[overall];
   const taskSource = apiTasks.length > 0 ? apiTasks : tasks;
-  const activeTasks = taskSource
-    .filter((task) => task.status === "pending" || task.status === "running")
-    .slice(0, 3);
-  const historyTasks = taskSource
-    .filter((task) => task.status !== "pending" && task.status !== "running")
-    .slice(0, 15);
+  const activeTasks = taskSource.filter(
+    (task) => task.status === "pending" || task.status === "running"
+  );
+  const historyTasks = taskSource.filter(
+    (task) => task.status !== "pending" && task.status !== "running"
+  );
+  const orderedTasks = [...activeTasks, ...historyTasks].slice(0, 15);
+  const topTasks = orderedTasks.slice(0, 3);
+  const remainingTasks = orderedTasks.slice(3);
+
+  const buildHealthTooltip = (task: TaskItem) => {
+    const errors = task.pipelineHealth?.errors;
+    if (!errors) return undefined;
+    const entries = Object.entries(errors);
+    if (!entries.length) return undefined;
+    return entries.map(([key, value]) => `${key}: ${value}`).join(" | ");
+  };
+
+  const statusLabelForTask = (task: TaskItem) =>
+    task.statusLabel ?? statusCopy[task.status].label;
+  const statusToneForTask = (task: TaskItem) =>
+    task.statusTone ?? statusCopy[task.status].tone;
+  const formatTaskMeta = (task: TaskItem) => {
+    const parts: string[] = [];
+    if (typeof task.commentCount === "number") {
+      parts.push(`${task.commentCount} comments`);
+    }
+    if (typeof task.durationSeconds === "number") {
+      const minutes = Math.max(1, Math.round(task.durationSeconds / 60));
+      parts.push(`${minutes} min`);
+    }
+    return parts.join(" · ");
+  };
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {open && (
-        <div className="mb-4 w-[320px] rounded-2xl border border-border/70 bg-background/95 p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
+        <div className="mb-4 w-[380px] rounded-2xl border border-border/70 bg-background/95 p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
@@ -255,9 +352,7 @@ export function PipelineStatusWidget() {
                 <span className={cn("text-sm font-semibold", overallCopy.tone)}>
                   {overallCopy.label}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  · Live view
-                </span>
+                <span className="text-xs text-muted-foreground">- Live view</span>
               </div>
             </div>
             <button
@@ -269,40 +364,75 @@ export function PipelineStatusWidget() {
             </button>
           </div>
 
-          <div className="mt-4 space-y-3">
-            {stages.map((stage) => (
-              <div
-                key={stage.label}
-                className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 px-3 py-2"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60">
-                  {iconForStatus(stage.status)}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    {stage.label}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{stage.detail}</p>
-                </div>
-                <span className={cn("text-xs font-medium", statusCopy[stage.status].tone)}>
-                  {statusCopy[stage.status].label}
-                </span>
+            <div className="mt-4">
+              <div className="flex items-center gap-2">
+                {stages.map((stage) => (
+                  <div key={`${stage.label}-bar`} className="flex-1">
+                    <div className="h-2 rounded-full bg-secondary/40 overflow-hidden border border-border/60">
+                      <div
+                        className={cn(
+                          "h-full transition-all duration-500",
+                          stage.status === "success"
+                            ? "w-full bg-foreground"
+                            : stage.status === "running"
+                            ? "w-3/4 bg-saramsa-brand/60"
+                            : stage.status === "error"
+                            ? "w-full bg-muted-foreground/40"
+                            : "w-1/5 bg-secondary/60"
+                        )}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-muted-foreground">
+              {stages.map((stage, index) => (
+                <div
+                  key={`${stage.label}-icon`}
+                  className={cn(
+                    "group relative flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted-foreground",
+                    stage.status === "success"
+                      ? "text-foreground"
+                      : stage.status === "running"
+                      ? "text-saramsa-brand"
+                      : stage.status === "error"
+                      ? "text-muted-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {stageIcons[index] ?? <Activity className="h-3.5 w-3.5" />}
+                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-border/60 bg-background/95 px-2 py-1 text-[10px] font-medium text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                    {stage.label} · {statusCopy[stage.status].label}
+                  </span>
+                </div>
+              ))}
+              {(commentCount || processingMinutes) && (
+                <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+                  {commentCount ? (
+                    <span>{commentCount} comments</span>
+                  ) : null}
+                  {commentCount && processingMinutes ? <span>·</span> : null}
+                  {processingMinutes ? (
+                    <span>{processingMinutes} min</span>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-5">
             <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              <span>Active Tasks</span>
-              <span>{activeTasks.length}/3</span>
+              <span>Tasks</span>
+              <span>{orderedTasks.length}/15</span>
             </div>
+
             <div className="mt-3 space-y-2">
-              {activeTasks.length === 0 ? (
+              {topTasks.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/60 px-3 py-3 text-xs text-muted-foreground">
-                  No active tasks right now.
+                  No tasks yet.
                 </div>
               ) : (
-                activeTasks.map((task) => (
+                topTasks.map((task) => (
                   <div
                     key={task.id}
                     className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2"
@@ -318,32 +448,21 @@ export function PipelineStatusWidget() {
                         {task.detail}
                       </p>
                     </div>
-                    <span
-                      className={cn(
-                        "text-xs font-medium",
-                        statusCopy[task.status].tone
+                    <div className="text-right">
+                      {formatTaskMeta(task) && (
+                        <p className="text-[11px] text-muted-foreground" title={buildHealthTooltip(task)}>
+                          {formatTaskMeta(task)}
+                        </p>
                       )}
-                    >
-                      {statusCopy[task.status].label}
-                    </span>
+                    </div>
                   </div>
                 ))
               )}
             </div>
-          </div>
 
-          <div className="mt-5">
-            <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              <span>History</span>
-              <span>Max 15</span>
-            </div>
-            <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
-              {historyTasks.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border/60 px-3 py-3 text-xs text-muted-foreground">
-                  No completed tasks yet.
-                </div>
-              ) : (
-                historyTasks.map((task) => (
+            {remainingTasks.length > 0 && (
+              <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-1">
+                {remainingTasks.map((task) => (
                   <div
                     key={task.id}
                     className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 px-3 py-2"
@@ -359,18 +478,17 @@ export function PipelineStatusWidget() {
                         {task.detail}
                       </p>
                     </div>
-                    <span
-                      className={cn(
-                        "text-xs font-medium",
-                        statusCopy[task.status].tone
+                    <div className="text-right">
+                      {formatTaskMeta(task) && (
+                        <p className="text-[11px] text-muted-foreground" title={buildHealthTooltip(task)}>
+                          {formatTaskMeta(task)}
+                        </p>
                       )}
-                    >
-                      {statusCopy[task.status].label}
-                    </span>
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

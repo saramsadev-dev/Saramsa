@@ -59,8 +59,7 @@ def validate_narration_output(
                 "aspect_key": aspect_key,
                 "description": str(f.get("description") or "").strip(),
             })
-        elif aspect_key:
-            errors.append(f"Unexpected aspect_key: {aspect_key}")
+        # Ignore unexpected aspect keys instead of failing the whole narration
 
     normalized_work_items = []
     for wi in work_items:
@@ -73,8 +72,7 @@ def validate_narration_output(
                 "title": str(wi.get("title") or "").strip(),
                 "description": str(wi.get("description") or "").strip(),
             })
-        elif candidate_id:
-            errors.append(f"Unexpected candidate_id: {candidate_id}")
+        # Ignore unexpected candidate ids instead of failing the whole narration
 
     if errors:
         logger.warning("Narration schema validation errors: %s", errors)

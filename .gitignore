@@ -82,6 +82,7 @@ dist/
 # Temporary files
 *.tmp
 *.temp
+.pre-push-prompt.txt
 
 # Local JSON DB (temporary Cosmos replacement)
 backend/local_db/

@@ -113,31 +113,31 @@ export const FeatureSentimentsTable = ({
 
   const getSentimentIcon = (positive: number, negative: number, neutral: number) => {
     const max = Math.max(positive, negative, neutral);
-    if (max === positive) return <TrendingUp className="w-4 h-4 text-green-500" />;
-    if (max === negative) return <TrendingDown className="w-4 h-4 text-red-500" />;
-    return <Minus className="w-4 h-4 text-slate-500" />;
+    if (max === positive) return <TrendingUp className="w-4 h-4 text-saramsa-brand" />;
+    if (max === negative) return <TrendingDown className="w-4 h-4 text-saramsa-gradient-to" />;
+    return <Minus className="w-4 h-4 text-muted-foreground" />;
   };
 
   const getSentimentColor = (positive: number, negative: number, neutral: number) => {
     const max = Math.max(positive, negative, neutral);
-    if (max === positive) return 'text-green-600';
-    if (max === negative) return 'text-red-600';
-    return 'text-slate-600';
+    if (max === positive) return 'text-saramsa-brand';
+    if (max === negative) return 'text-saramsa-gradient-to';
+    return 'text-muted-foreground';
   };
 
   const hasEditedFeaturesLocal = features.some(f => f.isEdited);
 
   if (!features || features.length === 0) {
     return (
-      <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">
           Feature Level Sentiments
         </h3>
-        <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-            <RefreshCw className="w-8 h-8 text-slate-400" />
+        <div className="text-center py-8 border border-dashed border-border/60 rounded-2xl bg-background/60">
+          <div className="w-14 h-14 mx-auto mb-4 bg-secondary/60 rounded-full flex items-center justify-center">
+            <RefreshCw className="w-7 h-7 text-muted-foreground" />
           </div>
-          <p className="text-slate-500 dark:text-slate-400">
+          <p className="text-muted-foreground">
             No feature sentiment data available.
           </p>
         </div>
@@ -146,48 +146,48 @@ export const FeatureSentimentsTable = ({
   }
 
   return (
-    <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 relative z-[900]">
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground">
-              Feature Level Sentiments
-            </h3>
-            <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse"></div>
-          </div>
-          {hasEditedFeaturesProp && onRegenerateAnalysis && (
-            <Button
-              onClick={onRegenerateAnalysis}
-              className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Regenerate Analysis
-            </Button>
-          )}
-          {hasEditedFeaturesProp && !hasComments && (
-            <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 text-sm">
-              <AlertCircle className="w-4 h-4" />
-              <span>Comments not available for regeneration</span>
-            </div>
-          )}
+    <div className="relative z-[900] space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold text-foreground">
+            Feature Level Sentiments
+          </h3>
+          <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse"></div>
         </div>
-        
-        <div className="overflow-hidden">
+        {hasEditedFeaturesProp && onRegenerateAnalysis && (
+          <Button
+            onClick={onRegenerateAnalysis}
+            variant="outline"
+            className="border-border/70 text-foreground hover:bg-secondary/60"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Regenerate Analysis
+          </Button>
+        )}
+        {hasEditedFeaturesProp && !hasComments && (
+          <div className="flex items-center gap-2 text-saramsa-gradient-to text-sm">
+            <AlertCircle className="w-4 h-4" />
+            <span>Comments not available for regeneration</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="overflow-hidden">
           {/* Table Header */}
-          <div className="grid grid-cols-6 gap-4 pb-4 border-b border-slate-200 dark:border-slate-700">
-            <div className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+          <div className="grid grid-cols-6 gap-4 pb-4 border-b border-border/70">
+            <div className="text-sm font-semibold text-muted-foreground">
               Select
             </div>
-            <div className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+            <div className="text-sm font-semibold text-muted-foreground">
               Feature
             </div>
-            <div className="text-sm font-semibold text-slate-600 dark:text-slate-400 col-span-2">
+            <div className="text-sm font-semibold text-muted-foreground col-span-2">
               Description
             </div>
-            <div className="text-sm font-semibold text-center text-slate-600 dark:text-slate-400">
+            <div className="text-sm font-semibold text-center text-muted-foreground">
               Sentiment
             </div>
-            <div className="text-sm font-semibold text-center text-slate-600 dark:text-slate-400">
+            <div className="text-sm font-semibold text-center text-muted-foreground">
               Actions
             </div>
           </div>
@@ -199,8 +199,8 @@ export const FeatureSentimentsTable = ({
                 key={index} 
                 className={`grid grid-cols-6 gap-4 py-4 rounded-xl transition-all duration-200 ${
                   selectedFeatures.includes(feature.name)
-                    ? 'bg-saramsa-accent/10 dark:bg-saramsa-accent/20 border border-saramsa-brand/30 dark:border-saramsa-brand/50'
-                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-transparent'
+                    ? 'bg-secondary/60 border border-border/70'
+                    : 'hover:bg-secondary/40 border border-transparent'
                 }`}
               >
                 {/* Checkbox Column */}
@@ -211,8 +211,8 @@ export const FeatureSentimentsTable = ({
                     size="icon"
                     className={`h-5 w-5 rounded-full border-2 transition-all duration-200 ${
                       selectedFeatures.includes(feature.name)
-                        ? 'bg-saramsa-brand border-saramsa-brand text-white'
-                        : 'border-slate-300 dark:border-slate-600 hover:border-saramsa-brand/50'
+                        ? 'bg-foreground border-foreground text-background'
+                        : 'border-border/70 hover:border-saramsa-brand/50'
                     }`}
                   >
                     {selectedFeatures.includes(feature.name) && (
@@ -222,16 +222,16 @@ export const FeatureSentimentsTable = ({
                 </div>
                 
                 {/* Feature Name Column */}
-                <div className="text-sm text-slate-900 dark:text-foreground">
+                <div className="text-sm text-foreground">
                   <div className="font-medium">
                     {feature.name}
                     {feature.comment_count && (
-                      <span className="text-slate-500 dark:text-slate-400 font-normal ml-1">
+                      <span className="text-muted-foreground font-normal ml-1">
                         ({feature.comment_count})
                       </span>
                     )}
                     {feature.isEdited && (
-                      <Badge className="ml-2 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-xs">
+                      <Badge className="ml-2 bg-secondary/70 text-foreground text-xs">
                         Edited
                       </Badge>
                     )}
@@ -239,7 +239,7 @@ export const FeatureSentimentsTable = ({
                 </div>
                 
                 {/* Description Column - Expanded */}
-                <div className="text-sm text-slate-600 dark:text-slate-400 col-span-2">
+                <div className="text-sm text-muted-foreground col-span-2">
                   <p className="line-clamp-3 leading-relaxed">
                     {feature.description}
                   </p>
@@ -248,13 +248,13 @@ export const FeatureSentimentsTable = ({
                       {feature.keywords.slice(0, 4).map((keyword: string, i: number) => (
                         <span 
                           key={i} 
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-secondary/70 text-foreground"
                         >
                           {keyword}
                         </span>
                       ))}
                       {feature.keywords.length > 4 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-slate-800 text-slate-500">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-secondary/70 text-muted-foreground">
                           +{feature.keywords.length - 4}
                         </span>
                       )}
@@ -277,7 +277,7 @@ export const FeatureSentimentsTable = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => handleEditKeywords(feature)}
-                    className="text-saramsa-brand hover:text-saramsa-brand/95 hover:bg-saramsa-brand/10"
+                    className="text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Edit
@@ -286,42 +286,41 @@ export const FeatureSentimentsTable = ({
               </div>
             ))}
           </div>
-        </div>
+      </div>
 
-        {/* Selection Status */}
-        {selectedFeatures.length > 0 && (
-          <div className="mt-6 p-4 bg-saramsa-accent/10 dark:bg-saramsa-accent/20 rounded-xl border border-saramsa-brand/30 dark:border-saramsa-brand/50">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-saramsa-brand rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-saramsa-brand dark:text-saramsa-brand">
-                  Selected for Interactive Charts
-                </p>
-                <p className="text-xs text-saramsa-brand/70 dark:text-saramsa-brand/95">
-                  {selectedFeatures.join(', ')}
-                </p>
-              </div>
+      {/* Selection Status */}
+      {selectedFeatures.length > 0 && (
+        <div className="p-4 bg-secondary/60 rounded-xl border border-border/70">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-background" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Selected for Interactive Charts
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {selectedFeatures.join(', ')}
+              </p>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Keywords Edit Modal - full-screen overlay, always centered */}
       {isDialogOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[1000] px-4"
+          className="fixed inset-0 bg-slate-950/40 flex items-center justify-center z-[1000] px-4"
           onClick={handleBackdropClick}
         >
           <div
-            className="bg-slate-950/95 dark:bg-slate-950/95 text-white p-6 md:p-8 rounded-2xl shadow-2xl max-w-5xl w-full mx-4 border border-slate-800"
+            className="bg-background/95 text-foreground p-6 md:p-8 rounded-2xl shadow-2xl max-w-5xl w-full mx-4 border border-border/70"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="space-y-1">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   Feature Keyword Editing
                 </p>
                 <h3 className="text-xl font-semibold">
@@ -332,7 +331,7 @@ export const FeatureSentimentsTable = ({
                 onClick={handleCancelEdit}
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full border border-slate-700 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white"
+                className="h-9 w-9 rounded-full border border-border/70 bg-background/80 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -341,13 +340,13 @@ export const FeatureSentimentsTable = ({
             {/* Main Layout: central options panel anchored near top */}
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)] gap-6 md:gap-8 items-start">
               {/* Center options panel */}
-              <div className="bg-slate-900/80 rounded-xl border border-slate-800 p-5 md:p-6 space-y-5">
+              <div className="bg-card/90 rounded-xl border border-border/70 p-5 md:p-6 space-y-5">
                 <div className="flex items-center justify-between mb-1">
-                  <h4 className="text-sm font-semibold tracking-wide text-slate-100">
+                  <h4 className="text-sm font-semibold tracking-wide text-foreground">
                     Options
                   </h4>
                   {editingKeywords.length > 0 && (
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                       {editingKeywords.length} keyword{editingKeywords.length > 1 ? 's' : ''} selected
                     </span>
                   )}
@@ -355,22 +354,22 @@ export const FeatureSentimentsTable = ({
 
                 {/* Current Keywords */}
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-[0.16em] text-slate-400">
+                  <Label className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                     Current Keywords
                   </Label>
-                  <div className="flex flex-wrap gap-2 min-h-[48px] px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <div className="flex flex-wrap gap-2 min-h-[48px] px-3 py-2 rounded-xl bg-background/80 border border-border/70">
                     {editingKeywords.map((keyword, index) => (
                       <Badge
                         key={index}
                         variant="outline"
-                        className="text-xs bg-slate-900/80 border-saramsa-brand/40 text-slate-100 cursor-pointer hover:bg-red-500/10 hover:border-red-500/60 transition-colors"
+                        className="text-xs bg-saramsa-brand/10 border-saramsa-brand/40 text-saramsa-brand cursor-pointer hover:bg-saramsa-gradient-to/10 hover:border-saramsa-gradient-to/60 transition-colors"
                         onClick={() => handleRemoveKeyword(keyword)}
                       >
                         {keyword} x
                       </Badge>
                     ))}
                     {editingKeywords.length === 0 && (
-                      <span className="text-slate-500 text-sm">
+                      <span className="text-muted-foreground text-sm">
                         No keywords added yet. Start by adding a few below.
                       </span>
                     )}
@@ -379,7 +378,7 @@ export const FeatureSentimentsTable = ({
 
                 {/* Add New Keyword */}
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-[0.16em] text-slate-400">
+                  <Label className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                     Add New Keyword
                   </Label>
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -388,13 +387,13 @@ export const FeatureSentimentsTable = ({
                       onChange={(e) => setNewKeyword(e.target.value)}
                       placeholder="Enter keyword..."
                       onKeyPress={(e) => e.key === 'Enter' && handleAddKeyword()}
-                      className="bg-slate-950/80 border-slate-800 text-slate-100 placeholder:text-slate-500"
+                      className="bg-background/80 border-border/70 text-foreground placeholder:text-muted-foreground"
                     />
                     <Button
                       onClick={handleAddKeyword}
                       disabled={!newKeyword.trim()}
                       size="sm"
-                      className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                      className="bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
                     >
                       Add Keyword
                     </Button>
@@ -406,13 +405,13 @@ export const FeatureSentimentsTable = ({
                   <Button
                     variant="outline"
                     onClick={handleCancelEdit}
-                    className="border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white"
+                    className="border-border/70 text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleSaveKeywords}
-                    className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white shadow-lg shadow-[0_18px_40px_-24px_rgba(230,3,235,0.6)]"
+                    className="bg-foreground text-background hover:bg-foreground/90"
                   >
                     Save Changes
                   </Button>

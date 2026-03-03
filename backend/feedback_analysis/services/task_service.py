@@ -171,7 +171,7 @@ class TaskService:
             'analysis_date': datetime.now().isoformat(),
             'createdAt': datetime.now().isoformat(),
             'run_id': run_id,
-            'result': normalized_result,
+            'analysisData': normalized_result,
             'status': 'complete',
             'original_comments': comments,
             'feedback': comments,
@@ -180,7 +180,7 @@ class TaskService:
             'processing_method': 'local_ml_pipeline',
             'model_info': pipeline_result.model_info,
             'processing_time': pipeline_result.processing_time,
-            'pipeline_insights': pipeline_result.insights,
+            'insights': pipeline_result.insights,
             'pipeline_work_items': pipeline_result.work_items
         }
         
@@ -305,8 +305,8 @@ class TaskService:
             'analysis_type': 'sentiment_analysis',
             'analysis_date': datetime.now().isoformat(),
             'createdAt': datetime.now().isoformat(),
-            'run_id': run_id,  # Unique identifier for this analysis run
-            'result': normalized,
+            'run_id': run_id,
+            'analysisData': normalized,
             'status': 'complete',
             # Store original comments for retrieval (NEVER overwrite)
             'original_comments': comments,
@@ -705,7 +705,7 @@ class TaskService:
             total_neu += counts.get('neutral', 0)
             
             # Collect features
-            features = parsed.get('feature_asba') or parsed.get('featureasba') or []
+            features = parsed.get('features') or parsed.get('feature_asba') or parsed.get('featureasba') or []
             all_features.extend(features)
             
             # Collect keywords
@@ -725,7 +725,7 @@ class TaskService:
                 'negative': (total_neg / total_count * 100) if total_count > 0 else 0,
                 'neutral': (total_neu / total_count * 100) if total_count > 0 else 0,
             },
-            'feature_asba': all_features,
+            'features': all_features,
             'positive_keywords': all_pos_keywords,
             'negative_keywords': all_neg_keywords,
         }, comments)
@@ -745,7 +745,7 @@ class TaskService:
 
         sentiments = parsed.get('sentimentsummary') or parsed.get('sentiment_summary') or {}
         counts = parsed.get('counts') or {}
-        features_input = parsed.get('feature_asba') or parsed.get('featureasba') or []
+        features_input = parsed.get('features') or parsed.get('feature_asba') or parsed.get('featureasba') or []
         pos_keys = parsed.get('positive_keywords') or parsed.get('positivekeywords') or []
         neg_keys = parsed.get('negative_keywords') or parsed.get('negativekeywords') or []
 

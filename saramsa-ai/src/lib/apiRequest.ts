@@ -125,6 +125,10 @@ function buildUrl(pathOrUrl: string): string {
   return `${API_BASE}${path}`;
 }
 
+export function buildApiUrl(pathOrUrl: string): string {
+  return buildUrl(pathOrUrl);
+}
+
 function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   return getValidAccessToken();

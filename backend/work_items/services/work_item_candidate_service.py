@@ -194,7 +194,7 @@ class WorkItemCandidateService:
             return []
         for source in (analysis, analysis.get("analysisData"), analysis.get("result")):
             if isinstance(source, dict):
-                feats = source.get("features") or source.get("featureasba") or source.get("feature_asba")
+                feats = source.get("features") or source.get("feature_asba") or source.get("featureasba")
                 if isinstance(feats, list):
                     return feats
         return []

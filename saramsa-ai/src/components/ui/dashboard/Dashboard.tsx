@@ -731,26 +731,23 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         allKeys: Object.keys(a)
       });
       
-      // The backend now returns data in the new format (analysisData field)
-      // Check if data is already in the correct frontend format
+      // Check if data has analysisData (new format) or result (legacy Cosmos)
       if (a.analysisData) {
-        // Data is already in the new format, use it directly
-        console.log('🔍 Dashboard: Using new format data directly from consolidated fetch');
-        console.log('🔍 Dashboard: Setting analysisData with structure:', {
-          id: a.id,
-          hasAnalysisData: !!a.analysisData,
-          counts: a.analysisData.counts,
-          featuresCount: a.analysisData.features?.length,
-          overall: a.analysisData.overall
-        });
-        dispatch(setAnalysisData(a));
+        console.log('🔍 Dashboard: Using analysisData field, normalizing from consolidated fetch');
+        const normalized = normalizeAnalysis(a);
+        if (normalized) {
+          normalized.id = a.id || normalized.id;
+          normalized.projectId = a.projectId || normalized.projectId;
+          normalized.userId = a.userId || normalized.userId;
+          normalized.createdAt = a.createdAt || a.analysis_date || normalized.createdAt;
+          normalized.analysisType = a.analysis_type || normalized.analysisType;
+        }
+        dispatch(setAnalysisData(normalized));
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
-        lastProcessedAnalysisIdRef.current = a.id;
+        lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
       } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
-        // Data is nested under result field - normalize it and merge metadata
-        console.log('🔍 Dashboard: Using result field data, normalizing from consolidated fetch');
+        console.log('🔍 Dashboard: Using legacy result field, normalizing from consolidated fetch');
         const normalized = normalizeAnalysis(a.result);
-        // Merge metadata from the analysis object
         if (normalized) {
           normalized.id = a.id || normalized.id;
           normalized.projectId = a.projectId || normalized.projectId;
@@ -1016,18 +1013,21 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           const a = result.analysis; // Extract the nested analysis data
           console.log('Analysis data from backend:', a);
           
-          // The backend now returns data in the new format (analysisData field)
-          // Check if data is already in the correct frontend format
           if (a.analysisData) {
-            // Data is already in the new format, use it directly
-            console.log('Using new format data directly');
-            dispatch(setAnalysisData(a));
+            console.log('Using analysisData field, normalizing');
+            const normalized = normalizeAnalysis(a);
+            if (normalized) {
+              normalized.id = a.id || normalized.id;
+              normalized.projectId = a.projectId || normalized.projectId;
+              normalized.userId = a.userId || normalized.userId;
+              normalized.createdAt = a.createdAt || a.analysis_date || normalized.createdAt;
+              normalized.analysisType = a.analysis_type || normalized.analysisType;
+            }
+            dispatch(setAnalysisData(normalized));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
-            // Data is nested under result field - normalize it and merge metadata
-            console.log('Using result field data, normalizing');
+            console.log('Using legacy result field, normalizing');
             const normalized = normalizeAnalysis(a.result);
-            // Merge metadata from the analysis object
             if (normalized) {
               normalized.id = a.id || normalized.id;
               normalized.projectId = a.projectId || normalized.projectId;
@@ -1038,17 +1038,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             dispatch(setAnalysisData(normalized));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.sentimentsummary && a.counts && a.featureasba !== undefined) {
-            // Data is in the old format, normalize it
             console.log('Using old format data, normalizing');
             dispatch(setAnalysisData(normalizeAnalysis(a)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.overall && a.counts && a.features !== undefined) {
-            // Fallback: data is in the old format, normalize it
             console.log('Using old format data, normalizing');
             dispatch(setAnalysisData(normalizeAnalysis(a)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.commentAnalysis) {
-            // Fallback: use commentAnalysis if available
             console.log('Using commentAnalysis as fallback');
             const ca = Array.isArray(a.commentAnalysis)
               ? (typeof a.commentAnalysis[0] === 'string' ? JSON.parse(a.commentAnalysis[0]) : a.commentAnalysis[0])
@@ -1499,7 +1496,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         createdAt: input.createdAt || new Date().toISOString(),
         analysisType: input.analysisType || 'commentSentiment',
         rawLlm: input.rawLlm || {},
-        insights: input.pipeline_insights || input.insights || input.pipelineInsights || [],
+        insights: input.insights || input.pipeline_insights || input.pipelineInsights || [],
         analysisData: {
           overall: {
             positive: toNum(input.analysisData.overall?.positive),
@@ -1546,7 +1543,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         createdAt: new Date().toISOString(),
         analysisType: 'commentSentiment',
         rawLlm: input.raw_llm || {},
-        insights: input.pipeline_insights || input.insights || input.pipelineInsights || [],
+        insights: input.insights || input.pipeline_insights || input.pipelineInsights || [],
         analysisData: {
           overall: {
             positive: toNum(input.overall.positive),
@@ -1585,7 +1582,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     // Handle old format or commentAnalysis format
     const toNum = (v: any) => (typeof v === 'number' ? v : Number(v ?? 0));
     const sentiments = input.sentimentsummary || input.sentiment_summary || input.overall || {};
-    const features = input.featureasba || input.feature_asba || input.features || [];
+    const features = input.features || input.feature_asba || input.featureasba || [];
     const negatives = input.negativesummary || input.negative_summary || [];
     const emojis = input.emojianalysis || input.emoji_analysis || undefined;
     const posKeys = input.positivekeywords || input.positive_keywords || [];
@@ -1614,7 +1611,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       createdAt: new Date().toISOString(),
       analysisType: 'commentSentiment',
       rawLlm: input.raw_llm || {},
-      insights: input.pipeline_insights || input.insights || input.pipelineInsights || [],
+      insights: input.insights || input.pipeline_insights || input.pipelineInsights || [],
       analysisData: {
         overall: {
           positive: toNum(sentiments.positive),
@@ -1628,8 +1625,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           neutral: toNum(counts.neutral || 0),
         },
         features: (features || []).map((f: any) => ({
-          featureId: f.featureId || f.id || f.name,
-          name: f.feature || f.name,
+          featureId: f.featureId || f.id || f.name || f.feature,
+          name: f.name || f.feature,
           description: f.description || '',
           sentiment: {
             positive: toNum(f.sentiment?.positive ?? f.sentiment_positive),
@@ -1711,9 +1708,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         {};
       const features =
         raw?.features ||
-        raw?.featureasba ||
         raw?.analysisData?.features ||
         raw?.result?.features ||
+        raw?.featureasba ||
         [];
       const sentiment =
         raw?.overall ||
@@ -2105,7 +2102,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     )}
                   </div>
 
-                  {hasAnalysisResults && (
+                  {hasAnalysisResults && confidenceDistribution && (
                     <div className="rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
                       <div className="flex items-start justify-between gap-4">
                         <div>

@@ -23,11 +23,11 @@ export const CompactSentimentBar = ({
   return (
     <div className="group relative">
       {/* Stacked Capsule Bar */}
-      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-full h-6 w-20 overflow-hidden border border-slate-200 dark:border-slate-700">
+      <div className="flex items-center bg-secondary/60 rounded-full h-6 w-20 overflow-hidden border border-border/60">
         {/* Positive segment */}
         {positivePercent > 0 && (
           <motion.div
-            className="bg-green-500 h-full"
+            className="bg-saramsa-brand/70 h-full"
             initial={{ width: 0 }}
             animate={{ width: `${positivePercent}%` }}
             transition={{ duration: 0.8, delay: 0.1 }}
@@ -38,7 +38,7 @@ export const CompactSentimentBar = ({
         {/* Negative segment */}
         {negativePercent > 0 && (
           <motion.div
-            className="bg-red-500 h-full"
+            className="bg-saramsa-gradient-to/70 h-full"
             initial={{ width: 0 }}
             animate={{ width: `${negativePercent}%` }}
             transition={{ duration: 0.8, delay: 0.2 }}
@@ -49,7 +49,7 @@ export const CompactSentimentBar = ({
         {/* Neutral segment */}
         {neutralPercent > 0 && (
           <motion.div
-            className="bg-slate-400 h-full"
+            className="bg-muted-foreground/50 h-full"
             initial={{ width: 0 }}
             animate={{ width: `${neutralPercent}%` }}
             transition={{ duration: 0.8, delay: 0.3 }}
@@ -62,26 +62,26 @@ export const CompactSentimentBar = ({
       <div
         className="
           absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 
-          bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 
+          bg-background/95 text-foreground 
           text-xs rounded-xl shadow-lg opacity-0 group-hover:opacity-100 
           transition-opacity duration-200 whitespace-nowrap z-10
         "
       >
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-green-500 rounded-full" />
+            <div className="w-2 h-2 bg-saramsa-brand rounded-full" />
             <span>{positivePercent.toFixed(1)}%</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-red-500 rounded-full" />
+            <div className="w-2 h-2 bg-saramsa-gradient-to rounded-full" />
             <span>{negativePercent.toFixed(1)}%</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-slate-400 rounded-full" />
+            <div className="w-2 h-2 bg-muted-foreground/60 rounded-full" />
             <span>{neutralPercent.toFixed(1)}%</span>
           </div>
         </div>
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900 dark:border-t-slate-100" />
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-background/95" />
       </div>
     </div>
   );

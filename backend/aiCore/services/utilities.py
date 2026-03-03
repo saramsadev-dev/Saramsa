@@ -225,7 +225,7 @@ def validate_json_structure(cleaned_json: str, validation_type: int = 0) -> Opti
         
         # Define the expected schema structures
         sentiment_required_fields = [
-            "sentiment_summary", "feature_asba", "emoji_analysis", 
+            "sentiment_summary", "features", "emoji_analysis", 
             "positive_keywords", "negative_keywords"
         ]
         deep_analysis_required_fields = [
@@ -234,8 +234,11 @@ def validate_json_structure(cleaned_json: str, validation_type: int = 0) -> Opti
         
         required_fields = sentiment_required_fields if validation_type == 0 else deep_analysis_required_fields
         
-        # Validate root-level fields
-        missing_fields = [field for field in required_fields if field not in parsed_json]
+        # Validate root-level fields (accept legacy 'feature_asba' as alias for 'features')
+        missing_fields = [
+            field for field in required_fields
+            if field not in parsed_json and not (field == "features" and ("feature_asba" in parsed_json or "featureasba" in parsed_json))
+        ]
         if missing_fields:
             logger.warning(f"Missing required root-level fields: {missing_fields}")
             return None
@@ -248,9 +251,10 @@ def validate_json_structure(cleaned_json: str, validation_type: int = 0) -> Opti
                 logger.warning("Invalid sentiment_summary structure")
                 return None
 
-            # Validate feature_asba structure
-            if "feature_asba" in parsed_json:
-                for i, feature in enumerate(parsed_json["feature_asba"]):
+            # Validate features structure (with fallback to legacy key)
+            features_data = parsed_json.get("features") or parsed_json.get("feature_asba")
+            if features_data:
+                for i, feature in enumerate(features_data):
                     if not isinstance(feature, dict):
                         continue
                     required_feature_keys = ["feature", "sentiment", "keywords", "explanations"]

@@ -197,14 +197,14 @@ class AnalysisComparisonView(APIView):
                 "quarter": quarter1,
                 "analysis": analysis1,
                 "sentiment_summary": analysis1.get('sentimentsummary', {}),
-                "feature_count": len(analysis1.get('featureasba', [])),
+                "feature_count": len(analysis1.get('features') or analysis1.get('feature_asba') or analysis1.get('featureasba') or []),
                 "total_comments": analysis1.get('counts', {}).get('total', 0)
             },
             "quarter2": {
                 "quarter": quarter2,
                 "analysis": analysis2,
                 "sentiment_summary": analysis2.get('sentimentsummary', {}),
-                "feature_count": len(analysis2.get('featureasba', [])),
+                "feature_count": len(analysis2.get('features') or analysis2.get('feature_asba') or analysis2.get('featureasba') or []),
                 "total_comments": analysis2.get('counts', {}).get('total', 0)
             },
             "comparison": {
@@ -212,7 +212,7 @@ class AnalysisComparisonView(APIView):
                     analysis1.get('sentimentsummary', {}),
                     analysis2.get('sentimentsummary', {})
                 ),
-                "feature_change": len(analysis2.get('featureasba', [])) - len(analysis1.get('featureasba', [])),
+                "feature_change": len(analysis2.get('features') or analysis2.get('feature_asba') or analysis2.get('featureasba') or []) - len(analysis1.get('features') or analysis1.get('feature_asba') or analysis1.get('featureasba') or []),
                 "comment_change": analysis2.get('counts', {}).get('total', 0) - analysis1.get('counts', {}).get('total', 0)
             }
         }
@@ -256,11 +256,11 @@ class InsightReviewListView(APIView):
             }, message="No insights available for this project.")
 
         insights = (
-            latest.get('pipeline_insights')
+            latest.get('insights')
+            or latest.get('pipeline_insights')
             or latest.get('analysisData', {}).get('insights')
             or latest.get('analysisData', {}).get('pipeline_insights')
             or latest.get('result', {}).get('insights')
-            or latest.get('insights')
             or []
         )
 
@@ -430,11 +430,11 @@ class InsightRulesApplyView(APIView):
             }, message="No insights available for this project.")
 
         insights = (
-            latest.get('pipeline_insights')
+            latest.get('insights')
+            or latest.get('pipeline_insights')
             or latest.get('analysisData', {}).get('insights')
             or latest.get('analysisData', {}).get('pipeline_insights')
             or latest.get('result', {}).get('insights')
-            or latest.get('insights')
             or []
         )
         if not isinstance(insights, list):

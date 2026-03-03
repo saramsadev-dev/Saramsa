@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../card";
 
 interface KeywordCloudProps {
@@ -14,50 +15,65 @@ export function KeywordCloud({
   negativeKeywords,
   className = "",
 }: KeywordCloudProps) {
-  // Use actual keywords from props; no placeholders when empty
-  const positiveWords = positiveKeywords.length > 0
-    ? positiveKeywords.slice(0, 9).map((word, index) => ({
-        word,
-        size: Math.max(10, 32 - index * 2),
-        x: Math.random() * 80 + 10,
-        y: Math.random() * 80 + 10,
-      }))
-    : [];
+  const seededPosition = (seed: string) => {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    }
+    const x = ((hash % 8000) / 100) + 10;
+    const y = (((hash / 97) % 8000) / 100) + 10;
+    return { x, y };
+  };
 
-  const negativeWords = negativeKeywords.length > 0
-    ? negativeKeywords.slice(0, 9).map((word, index) => ({
+  const positiveWords = useMemo(() => {
+    if (positiveKeywords.length === 0) return [];
+    return positiveKeywords.slice(0, 9).map((word, index) => {
+      const pos = seededPosition(`pos:${word}:${index}`);
+      return {
         word,
         size: Math.max(10, 32 - index * 2),
-        x: Math.random() * 80 + 10,
-        y: Math.random() * 80 + 10,
-      }))
-    : [];
+        x: pos.x,
+        y: pos.y,
+      };
+    });
+  }, [positiveKeywords]);
+
+  const negativeWords = useMemo(() => {
+    if (negativeKeywords.length === 0) return [];
+    return negativeKeywords.slice(0, 9).map((word, index) => {
+      const pos = seededPosition(`neg:${word}:${index}`);
+      return {
+        word,
+        size: Math.max(10, 32 - index * 2),
+        x: pos.x,
+        y: pos.y,
+      };
+    });
+  }, [negativeKeywords]);
 
   const WordCloud = ({ 
     words, 
     title, 
-    color, 
-    bgGradient 
+    color
   }: { 
     words: any[], 
     title: string, 
-    color: string,
-    bgGradient: string 
+    color: string
   }) => (
-    <Card className="bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60">
+    <Card className="bg-card/80 border border-border/60">
       <CardHeader>
-        <CardTitle className={`text-lg font-semibold ${color}`}>
+        <CardTitle className="text-lg font-semibold text-foreground">
           {title}
         </CardTitle>
-        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Display top sentiments which has a {title.toLowerCase().split(' ')[0]} tone in the feedback
         </p>
       </CardHeader>
       <CardContent>
-        <div className={`relative h-64 ${bgGradient} rounded-xl overflow-hidden`}>
+        <div className="relative h-64 bg-secondary/40 rounded-xl overflow-hidden">
           {words.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">No keywords</p>
+              <p className="text-sm text-muted-foreground">No keywords</p>
             </div>
           ) : words.map((wordItem, index) => (
             <motion.div
@@ -97,28 +113,6 @@ export function KeywordCloud({
             </motion.div>
           ))}
 
-          {/* Floating Particles - only when there are words */}
-          {words.length > 0 && Array.from({ length: 4 }, (_, i) => (
-            <motion.div
-              key={i}
-              className={`absolute w-2 h-2 ${color.includes('green') ? 'bg-green-400' : 'bg-red-400'} rounded-full opacity-30`}
-              style={{ 
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`
-              }}
-              animate={{
-                y: [0, -10, 0],
-                x: [0, 5, -5, 0],
-                opacity: [0.3, 0.7, 0.3]
-              }}
-              transition={{
-                duration: 3 + Math.random() * 2,
-                repeat: Infinity,
-                delay: i * 0.5,
-                ease: "easeInOut"
-              }}
-            />
-          ))}
         </div>
       </CardContent>
     </Card>
@@ -147,14 +141,12 @@ export function KeywordCloud({
       <WordCloud
         words={positiveWords}
         title="Positive Sentiments"
-        color="text-green-600 dark:text-green-400"
-        bgGradient="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10"
+        color="text-saramsa-brand"
       />
       <WordCloud
         words={negativeWords}
         title="Negative Sentiments"
-        color="text-red-600 dark:text-red-400"
-        bgGradient="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/10 dark:to-rose-900/10"
+        color="text-saramsa-gradient-to"
       />
     </div>
   );

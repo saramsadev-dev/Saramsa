@@ -1,0 +1,14 @@
+{
+  "comments": [
+    "The dashboard loads really fast now and the UI is super clean. Love the new dark mode toggle!",
+    "I keep getting a 500 error when I try to upload CSV files larger than 5MB. This is really frustrating.",
+    "Sentiment analysis results are mostly accurate but sometimes classifies sarcastic comments as positive.",
+    "It would be great if you could add Jira integration so we can push user stories directly from the analysis.",
+    "The keyword cloud visualization is beautiful and helps me quickly spot recurring themes in feedback.",
+    "Export to PDF is broken - it just downloads an empty file every time I try.",
+    "The onboarding flow was straightforward. I had my first analysis running within 5 minutes of signing up.",
+    "Could you add support for analyzing feedback in Spanish and Portuguese? We have a LATAM user base.",
+    "The analysis takes too long for large datasets. 10,000 comments shouldn't take over 30 minutes.",
+    "Overall the product is decent. The feature sentiment breakdown is useful but the action items feel generic."
+  ]
+}

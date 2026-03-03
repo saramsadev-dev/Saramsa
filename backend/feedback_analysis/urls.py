@@ -1,14 +1,7 @@
 from django.urls import path
 from .views import (
-    # Analysis views
-    AnalyzeCommentsView,
-    UpdateKeywordsView,
-    GetUserCommentsView,
-    TaskStatusView,
-    TaskListView,
-    TaskStreamView,
     AnalysisByIdView,
-    # Insights views
+    UpdateKeywordsView,
     InsightsListView,
     InsightDetailView,
     InsightsByTypeView,
@@ -16,52 +9,27 @@ from .views import (
     AnalysisByQuarterView,
     CumulativeAnalysisView,
     AnalysisComparisonView,
-    UserStoriesView,
-    InsightReviewListView,
-    InsightReviewUpdateView,
-    InsightRulesView,
-    InsightRulesApplyView,
-    IngestionScheduleView,
-    IngestionRunNowView,
-    # File upload views
-    FeedbackFileUploadView,
 )
 
 urlpatterns = [
-    # Core analysis endpoints
-    path('analyze/', AnalyzeCommentsView.as_view(), name='analyze_comments'),
-    path('task-status/<str:task_id>/', TaskStatusView.as_view(), name='task_status'),
-    path('tasks/', TaskListView.as_view(), name='task_list'),
-    path('tasks/stream/', TaskStreamView.as_view(), name='task_stream'),
+    # Analysis by ID (unique to /api/feedback/)
     path('analysis/<str:analysis_id>/', AnalysisByIdView.as_view(), name='analysis_by_id'),
     path('keywords/update/', UpdateKeywordsView.as_view(), name='update_keywords'),
-    path('comments/', GetUserCommentsView.as_view(), name='get_user_comments'),
-    
-    # Insights endpoints (analysis results)
+
+    # Insights list/detail (unique to /api/feedback/)
     path('insights/', InsightsListView.as_view(), name='insights_list'),
     path('insights/<str:insight_id>/', InsightDetailView.as_view(), name='insight_detail'),
     path('insights/type/<str:analysis_type>/', InsightsByTypeView.as_view(), name='insights_by_type'),
-    path('insights/user-stories/', UserStoriesView.as_view(), name='user_stories'),
-    path('insights/user-stories/all/', UserStoriesView.as_view(), name='user_stories_all'),
-    path('insights/review/', InsightReviewListView.as_view(), name='insight_review_list'),
-    path('insights/review/update/', InsightReviewUpdateView.as_view(), name='insight_review_update'),
-    path('insights/rules/', InsightRulesView.as_view(), name='insight_rules'),
-    path('insights/rules/apply/', InsightRulesApplyView.as_view(), name='insight_rules_apply'),
-    
-    # Analysis history endpoints
+
+    # Analysis history (unique to /api/feedback/)
     path('history/', AnalysisHistoryView.as_view(), name='analysis_history'),
     path('history/quarter/', AnalysisByQuarterView.as_view(), name='analysis_by_quarter'),
     path('history/cumulative/', CumulativeAnalysisView.as_view(), name='cumulative_analysis'),
     path('history/compare/', AnalysisComparisonView.as_view(), name='analysis_comparison'),
-    
-    # File upload endpoints
-    path('upload/', FeedbackFileUploadView.as_view(), name='feedback-file-upload'),
-
-    # Ingestion schedule endpoints
-    path('ingestion/schedule/', IngestionScheduleView.as_view(), name='ingestion_schedule'),
-    path('ingestion/run-now/', IngestionRunNowView.as_view(), name='ingestion_run_now'),
 ]
 
-# NOTE: User story endpoints have been moved to /work_items/ app
-# NOTE: Integration endpoints have been moved to /integrations/ app
-# This eliminates duplication and follows proper Django app separation
+# Endpoints moved to /api/insights/ aliases in apis/urls.py:
+#   analyze, task-status, tasks, tasks/stream, comments, upload,
+#   user-stories, review, rules, ingestion
+# Work item endpoints: /api/work-items/
+# Integration endpoints: /api/integrations/

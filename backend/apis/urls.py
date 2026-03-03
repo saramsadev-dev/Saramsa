@@ -19,8 +19,7 @@ urlpatterns = [
     # App-specific API endpoints
     path('api/feedback/', include('feedback_analysis.urls')),
     path('api/work-items/', include('work_items.urls')),
-    path('api/auth/', include('authentication.urls')), 
-    path('api/projects/', include('integrations.urls')),  # Projects now handled by integrations
+    path('api/auth/', include('authentication.urls')),
     path('api/integrations/', include('integrations.urls')),
     # Insights endpoints (aliased from feedback_analysis and work_items for frontend compatibility)
     path('api/insights/analyze/', AnalyzeCommentsView.as_view(), name='insights_analyze'),
@@ -41,10 +40,6 @@ urlpatterns = [
     path('api/insights/rules/apply/', InsightRulesApplyView.as_view(), name='insights_rules_apply'),
     path('api/insights/ingestion/schedule/', IngestionScheduleView.as_view(), name='insights_ingestion_schedule'),
     path('api/insights/ingestion/run-now/', IngestionRunNowView.as_view(), name='insights_ingestion_run_now'),
-    
-    # Additional aliases without /api prefix for frontend compatibility
-    path('insights/comments/', GetUserCommentsView.as_view(), name='insights_comments_no_api'),
-    path('insights/upload/', FeedbackFileUploadView.as_view(), name='insights_upload_no_api'),
     
     # Swagger/OpenAPI URLs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

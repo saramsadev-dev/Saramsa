@@ -71,22 +71,22 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
   const getProviderColor = (provider: 'azure' | 'jira') => {
     switch (provider) {
       case 'azure':
-        return 'bg-saramsa-brand';
+        return 'bg-secondary/80 text-foreground border border-border/60';
       case 'jira':
-        return 'bg-saramsa-brand';
+        return 'bg-secondary/80 text-foreground border border-border/60';
       default:
-        return 'bg-muted';
+        return 'bg-secondary/60 text-foreground border border-border/60';
     }
   };
 
   const getStatusIcon = (status?: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-foreground" />;
       case 'pending':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <Clock className="w-4 h-4 text-muted-foreground" />;
       case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
+        return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
       default:
         return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
@@ -112,11 +112,11 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      className={`relative bg-card/90 rounded-2xl border transition-all duration-200 cursor-pointer group flex flex-col shadow-[0_20px_60px_-40px_rgba(15,23,42,0.6)] ${
+      whileHover={{ y: -1 }}
+      className={`relative bg-card/80 rounded-2xl border transition-all duration-200 cursor-pointer group flex flex-col shadow-sm ${
         isSelected 
-          ? 'border-saramsa-brand/60 shadow-[0_22px_60px_-36px_rgba(230,3,235,0.5)]' 
-          : 'border-border/60 hover:border-border hover:shadow-[0_24px_70px_-40px_rgba(15,23,42,0.65)]'
+          ? 'border-border/70' 
+          : 'border-border/60 hover:border-border'
       }`}
       onClick={onClick}
     >
@@ -151,7 +151,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
             </Button>
             
             {showMenu && (
-              <div className="absolute right-0 top-8 bg-popover/95 border border-border/60 rounded-xl shadow-[0_24px_60px_-40px_rgba(15,23,42,0.7)] z-10 min-w-[160px] py-1 backdrop-blur-xl">
+              <div className="absolute right-0 top-8 bg-popover/95 border border-border/60 rounded-xl shadow-md z-10 min-w-[160px] py-1">
                 {onEdit && (
                   <Button
                     onClick={(e) => {
@@ -176,8 +176,8 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                     }}
                     disabled={syncLoading}
                     variant="ghost"
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-saramsa-brand hover:bg-saramsa-brand/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-secondary/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                     <RefreshCw className={`w-4 h-4 ${syncLoading ? 'animate-spin' : ''}`} />
                     Sync with {project.externalLinks[0].provider === 'azure' ? 'Azure' : 'Jira'}
                   </Button>
@@ -201,7 +201,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                     setShowDeleteModal(true);
                   }}
                   variant="ghost"
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-muted-foreground hover:bg-secondary/60 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -217,7 +217,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
             project.externalLinks.map((link, index) => (
               <span
                 key={index}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 ${getProviderColor(link.provider)} text-white text-xs rounded-full h-5`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 ${getProviderColor(link.provider)} text-xs rounded-full h-5`}
               >
                 {getProviderIcon(link.provider)}
                 <span>{link.provider === 'azure' ? 'Azure DevOps' : 'Jira'}</span>

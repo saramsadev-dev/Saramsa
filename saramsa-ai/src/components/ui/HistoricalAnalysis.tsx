@@ -26,7 +26,7 @@ interface AnalysisData {
     negative: number;
     neutral: number;
   };
-  featureasba?: Array<{
+  features?: Array<{
     name: string;
     sentiment: {
       positive: number;

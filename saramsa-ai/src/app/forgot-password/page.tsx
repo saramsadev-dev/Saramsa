@@ -36,6 +36,7 @@ export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [resetLink, setResetLink] = useState<string | null>(null);
 
   // Handle component mount
   useEffect(() => {
@@ -59,6 +60,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
     setError(null);
     setSuccess(false);
+    setResetLink(null);
     
     try {
       const result = await apiRequest(
@@ -71,8 +73,11 @@ export default function ForgotPasswordPage() {
       if (result.data?.success || result.status === 200) {
         setSuccess(true);
         // In development, log the reset link if provided
-        if (result.data?.reset_link && typeof window !== 'undefined') {
-          console.log('Reset link:', result.data.reset_link);
+        if (result.data?.reset_link) {
+          setResetLink(result.data.reset_link);
+          if (typeof window !== 'undefined') {
+            console.log('Reset link:', result.data.reset_link);
+          }
         }
       } else {
         setError(result.data?.error || 'Failed to send reset email. Please try again.');
@@ -187,11 +192,37 @@ export default function ForgotPasswordPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-green-50/80 dark:bg-green-900/20 border border-green-200/70 dark:border-green-800/60 rounded-2xl p-4"
+              className="bg-secondary/60 border border-border/60 rounded-2xl p-4"
             >
-              <p className="text-sm text-green-600 dark:text-green-400">
+              <p className="text-sm text-muted-foreground">
                 If an account exists with this email, you will receive a password reset link shortly.
               </p>
+              {resetLink && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Development link:
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      value={resetLink}
+                      readOnly
+                      className="text-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.open(resetLink, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                    >
+                      Open Link
+                    </Button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -200,9 +231,9 @@ export default function ForgotPasswordPage() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50/80 dark:bg-red-900/20 border border-red-200/70 dark:border-red-800/60 rounded-2xl p-4"
+              className="bg-secondary/60 border border-border/60 rounded-2xl p-4"
             >
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
             </motion.div>
           )}
 

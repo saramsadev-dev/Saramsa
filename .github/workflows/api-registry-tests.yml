@@ -1,0 +1,49 @@
+name: API Registry Tests
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - '.github/workflows/api-registry-tests.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/api-registry-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  api-registry-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Sync registry from Swagger
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: |
+          python scripts/sync_api_registry_from_swagger.py
+
+      - name: Run API registry tests (notify Slack on failures)
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
+          LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python scripts/test_api_registry.py --notify-slack

@@ -547,7 +547,7 @@ class ProcessingService:
 
     def _process_features_legacy(self, data, feature_map):
         """Process and merge features from analysis data (legacy method)."""
-        features_list = data.get('feature_asba') or data.get('featureasba') or []
+        features_list = data.get('features') or data.get('feature_asba') or data.get('featureasba') or []
         for feat in features_list:
             name = (feat.get('feature') or '').strip()
             if not name:

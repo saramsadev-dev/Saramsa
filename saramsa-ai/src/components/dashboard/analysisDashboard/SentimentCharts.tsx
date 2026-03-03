@@ -35,9 +35,9 @@ interface SentimentChartsProps {
 }
 
 const COLORS = {
-  positive: '#8b5cf6',
-  negative: '#ef4444',
-  neutral: '#64748b',
+  positive: 'rgba(230, 3, 235, 0.65)',
+  negative: 'rgba(139, 95, 191, 0.65)',
+  neutral: 'rgba(100, 116, 139, 0.6)',
 } as const;
 
 const SENTIMENT_COLOR_MAP: Record<string, string> = {
@@ -62,9 +62,9 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4 shadow-2xl">
+    <div className="bg-background/95 border border-border/70 rounded-xl p-4 shadow-md">
       {label !== undefined && (
-        <p className="text-white font-medium mb-2 whitespace-nowrap">
+        <p className="text-foreground font-medium mb-2 whitespace-nowrap">
           {label}
         </p>
       )}
@@ -72,10 +72,10 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
         <div key={index} className="flex items-center gap-2 text-sm">
           <div
             className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: entry.color ?? '#64748b' }}
+            style={{ backgroundColor: entry.color ?? 'var(--muted-foreground)' }}
           />
-          <span className="text-slate-300">{entry.name}:</span>
-          <span className="text-white font-medium">
+          <span className="text-muted-foreground">{entry.name}:</span>
+          <span className="text-foreground font-medium">
             {entry.value ?? 0}
           </span>
         </div>
@@ -142,7 +142,7 @@ export function SentimentCharts({
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Feature Sentiment Bar Chart */}
-        <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+        <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden">
           <div className="p-6">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
               Feature Sentiment Distribution
@@ -153,75 +153,18 @@ export function SentimentCharts({
                   data={featureSentimentData}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
-                  <defs>
-                    <linearGradient
-                      id="positiveGradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="0%"
-                      y2="100%"
-                    >
-                      <stop
-                        offset="0%"
-                        stopColor={COLORS.positive}
-                        stopOpacity={0.8}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor={COLORS.positive}
-                        stopOpacity={1}
-                      />
-                    </linearGradient>
-                    <linearGradient
-                      id="negativeGradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="0%"
-                      y2="100%"
-                    >
-                      <stop
-                        offset="0%"
-                        stopColor={COLORS.negative}
-                        stopOpacity={0.8}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor={COLORS.negative}
-                        stopOpacity={1}
-                      />
-                    </linearGradient>
-                    <linearGradient
-                      id="neutralGradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="0%"
-                      y2="100%"
-                    >
-                      <stop
-                        offset="0%"
-                        stopColor={COLORS.neutral}
-                        stopOpacity={0.8}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor={COLORS.neutral}
-                        stopOpacity={1}
-                      />
-                    </linearGradient>
-                  </defs>
-
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="#374151"
-                    opacity={0.3}
+                    stroke="var(--border)"
+                    opacity={0.35}
                   />
                   <XAxis
                     dataKey="name"
                     angle={-45}
                     textAnchor="end"
                     height={80}
-                    tick={{ fontSize: 12, fill: '#6B7280' }}
-                    stroke="#6B7280"
+                    tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+                    stroke="var(--muted-foreground)"
                   />
                   <YAxis
                     label={{
@@ -230,32 +173,32 @@ export function SentimentCharts({
                       position: 'insideLeft',
                       style: {
                         textAnchor: 'middle',
-                        fill: '#6B7280',
+                        fill: 'var(--muted-foreground)',
                         fontSize: 12,
                       },
                     }}
-                    tick={{ fontSize: 12, fill: '#6B7280' }}
-                    stroke="#6B7280"
+                    tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
+                    stroke="var(--muted-foreground)"
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   <Bar
                     dataKey="positive"
-                    fill="url(#positiveGradient)"
+                    fill={COLORS.positive}
                     name="Positive"
                     radius={[4, 4, 0, 0]}
                     animationDuration={800}
                   />
                   <Bar
                     dataKey="negative"
-                    fill="url(#negativeGradient)"
+                    fill={COLORS.negative}
                     name="Negative"
                     radius={[4, 4, 0, 0]}
                     animationDuration={800}
                   />
                   <Bar
                     dataKey="neutral"
-                    fill="url(#neutralGradient)"
+                    fill={COLORS.neutral}
                     name="Neutral"
                     radius={[4, 4, 0, 0]}
                     animationDuration={800}
@@ -267,7 +210,7 @@ export function SentimentCharts({
         </div>
 
         {/* Pie Chart */}
-        <div className="bg-card/90 dark:bg-slate-900/50 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+        <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden">
           <div className="p-6">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
               {selectedFeatures.length === 0
@@ -280,27 +223,14 @@ export function SentimentCharts({
             <div className="h-64 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <defs>
-                    <filter id="glow">
-                      <feGaussianBlur
-                        stdDeviation="3"
-                        result="coloredBlur"
-                      />
-                      <feMerge>
-                        <feMergeNode in="coloredBlur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
                   <Pie
                     data={aggregatedSentimentData}
                     cx="50%"
                     cy="50%"
                     innerRadius={40}
                     outerRadius={80}
-                    paddingAngle={3}
+                    paddingAngle={2}
                     dataKey="value"
-                    filter="url(#glow)"
                     animationDuration={800}
                   >
                     {aggregatedSentimentData.map((entry, index) => (
@@ -319,20 +249,20 @@ export function SentimentCharts({
 
               {/* Center floating stats */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-slate-800/60 backdrop-blur-md rounded-full p-4 border border-saramsa-brand/30">
+                <div className="bg-background/80 rounded-full p-4 border border-border/70">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-white">
+                    <div className="text-2xl font-bold text-foreground">
                       {totalSentiment}
                     </div>
-                    <div className="text-xs text-slate-300">Total</div>
+                    <div className="text-xs text-muted-foreground">Total</div>
                   </div>
                 </div>
               </div>
             </div>
 
             {selectedFeatures.length > 0 && (
-              <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                <p className="text-sm text-green-800 dark:text-green-200">
+              <div className="mt-4 p-3 bg-secondary/50 rounded-xl border border-border/60">
+                <p className="text-sm text-muted-foreground">
                   <span className="font-medium">Interactive Mode:</span>{' '}
                   Chart shows aggregated sentiment for selected features only.
                 </p>

@@ -144,6 +144,7 @@ class AnalyzeCommentsView(APIView):
                 "project_id": project_id,
                 "file_name": file_name,
                 "started_at": started_at,
+                "comment_count": len(comments),
             })
             cache.set(tasks_key, existing[:15], ttl=86400)
         except Exception as e:
@@ -225,7 +226,7 @@ class UpdateKeywordsView(APIView):
 
         sentiments = parsed.get('sentimentsummary') or parsed.get('sentiment_summary') or {}
         counts = parsed.get('counts') or {}
-        features_input = parsed.get('feature_asba') or parsed.get('featureasba') or []
+        features_input = parsed.get('features') or parsed.get('feature_asba') or parsed.get('featureasba') or []
         pos_keys = parsed.get('positive_keywords') or parsed.get('positivekeywords') or []
         neg_keys = parsed.get('negative_keywords') or parsed.get('negativekeywords') or []
 
@@ -642,7 +643,13 @@ class TaskListView(APIView):
         if not isinstance(tasks, list):
             tasks = []
 
-        def map_status(raw: str) -> str:
+        def map_status(raw: str, health=None) -> str:
+            if health:
+                health_status = str(health.get("status") or "").upper()
+                if health_status in ("DEGRADED", "PARTIAL"):
+                    return "PARTIAL"
+                if health_status in ("FAILED", "FAILURE"):
+                    return "FAILED"
             if raw in ("PENDING", "STARTED"):
                 return "RUNNING"
             if raw == "SUCCESS":
@@ -657,14 +664,29 @@ class TaskListView(APIView):
             if not task_id:
                 continue
             res = AsyncResult(task_id)
+            pipeline_health = cache.get(f"pipeline_health:{task_id}") if cache else None
+            duration_seconds = None
+            if pipeline_health:
+                try:
+                    started = pipeline_health.get("started_at")
+                    updated = pipeline_health.get("updated_at")
+                    if started and updated:
+                        started_dt = datetime.fromisoformat(str(started))
+                        updated_dt = datetime.fromisoformat(str(updated))
+                        duration_seconds = (updated_dt - started_dt).total_seconds()
+                except Exception:
+                    duration_seconds = None
             enriched.append({
                 "task_id": task_id,
                 "analysis_id": item.get("analysis_id"),
                 "project_id": item.get("project_id"),
                 "file_name": item.get("file_name"),
                 "started_at": item.get("started_at"),
-                "status": map_status(res.status),
+                "status": map_status(res.status, pipeline_health),
                 "ready": res.ready(),
+                "comment_count": item.get("comment_count"),
+                "duration_seconds": duration_seconds,
+                "pipeline_health": pipeline_health,
             })
 
         return StandardResponse.success(data={"tasks": enriched})
@@ -699,7 +721,13 @@ class TaskStreamView(APIView):
         user_id_str = str(user_id)
         cache = get_cache_service()
 
-        def map_status(raw: str) -> str:
+        def map_status(raw: str, health=None) -> str:
+            if health:
+                health_status = str(health.get("status") or "").upper()
+                if health_status in ("DEGRADED", "PARTIAL"):
+                    return "PARTIAL"
+                if health_status in ("FAILED", "FAILURE"):
+                    return "FAILED"
             if raw in ("PENDING", "STARTED"):
                 return "RUNNING"
             if raw == "SUCCESS":
@@ -721,14 +749,29 @@ class TaskStreamView(APIView):
                     if not task_id:
                         continue
                     res = AsyncResult(task_id)
+                    pipeline_health = cache.get(f"pipeline_health:{task_id}") if cache else None
+                    duration_seconds = None
+                    if pipeline_health:
+                        try:
+                            started = pipeline_health.get("started_at")
+                            updated = pipeline_health.get("updated_at")
+                            if started and updated:
+                                started_dt = datetime.fromisoformat(str(started))
+                                updated_dt = datetime.fromisoformat(str(updated))
+                                duration_seconds = (updated_dt - started_dt).total_seconds()
+                        except Exception:
+                            duration_seconds = None
                     enriched.append({
                         "task_id": task_id,
                         "analysis_id": item.get("analysis_id"),
                         "project_id": item.get("project_id"),
                         "file_name": item.get("file_name"),
                         "started_at": item.get("started_at"),
-                        "status": map_status(res.status),
+                        "status": map_status(res.status, pipeline_health),
                         "ready": res.ready(),
+                        "comment_count": item.get("comment_count"),
+                        "duration_seconds": duration_seconds,
+                        "pipeline_health": pipeline_health,
                     })
 
                 payload = json.dumps({"tasks": enriched}, default=str)

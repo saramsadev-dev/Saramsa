@@ -92,15 +92,15 @@ export function ImportProjectModal({ provider, onClose, onSuccess }: ImportProje
       case 'azure':
         return {
           name: 'Azure DevOps',
-          color: 'bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to',
-          icon: <Cloud className="w-5 h-5 text-white" />,
+          color: 'bg-secondary/70 border border-border/60',
+          icon: <Cloud className="w-5 h-5 text-foreground" />,
           baseUrl: 'https://dev.azure.com'
         };
       case 'jira':
         return {
           name: 'Jira',
-          color: 'bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to',
-          icon: <span className="text-white font-bold">J</span>,
+          color: 'bg-secondary/70 border border-border/60',
+          icon: <span className="text-foreground font-bold">J</span>,
           baseUrl: 'https://atlassian.net'
         };
     }

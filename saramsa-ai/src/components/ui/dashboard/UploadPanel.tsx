@@ -38,6 +38,7 @@ export function UploadPanel({
 }: UploadPanelProps) {
   const [activeTab, setActiveTab] = useState("file");
   const [isConnected, setIsConnected] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isCloudEnabled = false;
 
@@ -61,6 +62,30 @@ export function UploadPanel({
 
   const handleFileSelect = (file: File | null) => {
     onFileSelect(file);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+    const file = event.dataTransfer.files?.[0] ?? null;
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isDragging) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
   };
 
   const removeFile = () => {
@@ -121,14 +146,14 @@ export function UploadPanel({
       <CardContent className="space-y-6">
         {/* Input Options */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-md grid-cols-2 rounded-xl overflow-hidden border border-border/70 bg-secondary/60 p-0">
             <TabsTrigger
               value="file"
               className={`${
                 activeTab === "file"
-                  ? "bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white shadow-[0_10px_24px_-16px_rgba(230,3,235,0.65)]"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/70"
-              }`}
+                  ? "bg-secondary/80 text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+              } rounded-none border-l border-border/60 first:border-l-0`}
             >
               <Upload className="w-4 h-4 mr-2" />
               Choose File
@@ -142,9 +167,9 @@ export function UploadPanel({
               }}
               className={`${
                 activeTab === "cloud"
-                  ? "bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white shadow-[0_10px_24px_-16px_rgba(230,3,235,0.65)]"
-                  : "text-muted-foreground/70 cursor-not-allowed"
-              }`}
+                  ? "bg-secondary/80 text-foreground"
+                  : "text-muted-foreground/60 cursor-not-allowed"
+              } rounded-none border-l border-border/60 first:border-l-0`}
               aria-disabled={!isCloudEnabled}
             >
               <Cloud className="w-4 h-4 mr-2" />
@@ -158,24 +183,48 @@ export function UploadPanel({
           </TabsList>
 
           <TabsContent value="file" className="space-y-4 mt-6">
-            {/* Single Full-Width Upload Area */}
             <div className="space-y-4">
               {!topFile ? (
-                <div 
-                  className="border border-dashed border-border/70 rounded-2xl p-12 text-center hover:border-saramsa-brand/40 transition-colors cursor-pointer bg-background/60"
+                <div
+                  className={`border rounded-2xl p-6 sm:p-8 transition-colors bg-background/60 ${
+                    isDragging ? "border-saramsa-brand/40 bg-secondary/60" : "border-border/70"
+                  }`}
                   onClick={() => document.getElementById("file-upload")?.click()}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      document.getElementById("file-upload")?.click();
+                    }
+                  }}
                 >
-                  <Upload className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="file-upload"
-                      className="text-foreground cursor-pointer hover:text-foreground/80 text-lg"
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-secondary/80 border border-border/60 flex items-center justify-center">
+                      <Upload className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Drop a CSV or JSON file here
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Or click to browse from your device
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="border-border/70 hover:bg-accent/60"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        document.getElementById("file-upload")?.click();
+                      }}
                     >
-                      Choose a file to upload
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      CSV and JSON files
-                    </p>
+                      <FolderOpen className="w-4 h-4" />
+                      Browse
+                    </Button>
                   </div>
                   <Input
                     id="file-upload"
@@ -189,20 +238,12 @@ export function UploadPanel({
                     }}
                     className="hidden"
                   />
-                  <Button
-                    variant="outline"
-                    className="mt-6 border-border/70 hover:bg-accent/60"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      document.getElementById("file-upload")?.click();
-                    }}
-                  >
-                    <FolderOpen className="w-5 h-5" />
-                  </Button>
                 </div>
               ) : (
-                <div className="flex flex-row items-center gap-3 p-4 bg-secondary/60 rounded-2xl border border-border/60">
-                  <FileText className="w-8 h-8 text-saramsa-brand" />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-secondary/60 rounded-2xl border border-border/60">
+                  <div className="w-10 h-10 rounded-xl bg-background/80 border border-border/60 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-muted-foreground" />
+                  </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">
                       {topFile.name}
@@ -211,30 +252,29 @@ export function UploadPanel({
                       {(topFile.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300"
-                  >
+                  <Badge variant="secondary" className="bg-secondary/80 text-foreground">
                     Ready
                   </Badge>
-                  <Button
-                    onClick={onAnalyze}
-                    disabled={topUploading}
-                    className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to disabled:opacity-50 gap-2 px-4"
-                    title={topUploading ? "Analyzing..." : "Analyze"}
-                  >
-                    <BarChart3 className="w-5 h-5 shrink-0" />
-                    <span className="hidden sm:inline">{topUploading ? "Analyzing..." : "Analyze"}</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="bg-red-500 hover:bg-red-600 text-white border-red-500 w-10 h-10 p-0"
-                    onClick={removeFile}
-                    title="Delete file"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </Button>
+                  <div className="flex items-center gap-2 sm:ml-auto">
+                    <Button
+                      onClick={onAnalyze}
+                      disabled={topUploading || !canAnalyze}
+                      className="bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 gap-2 px-4"
+                      title={topUploading ? "Analyzing..." : "Analyze"}
+                    >
+                      <BarChart3 className="w-4 h-4 shrink-0" />
+                      <span>{topUploading ? "Analyzing..." : "Analyze"}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-border/70 hover:bg-accent/60"
+                      onClick={removeFile}
+                      title="Remove file"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -312,7 +352,7 @@ export function UploadPanel({
                   <Button
                     onClick={onAnalyze}
                     disabled={topUploading}
-                    className="w-full bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to disabled:opacity-50"
+                    className="w-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
                   >
                     <BarChart3 className="w-4 h-4 mr-2" />
                     {topUploading ? "Analyzing..." : "Analyze"}

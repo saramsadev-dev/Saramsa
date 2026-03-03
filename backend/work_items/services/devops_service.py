@@ -132,10 +132,10 @@ class DevOpsService:
             # Try to get features from nested analysisData
             nested_data = analysis_data.get('analysisData', {})
             if isinstance(nested_data, dict):
-                features = nested_data.get('features', []) or nested_data.get('featureasba', [])
+                features = nested_data.get('features', []) or nested_data.get('feature_asba', []) or nested_data.get('featureasba', [])
             else:
                 # Try direct keys
-                features = analysis_data.get('features', []) or analysis_data.get('featureasba', [])
+                features = analysis_data.get('features', []) or analysis_data.get('feature_asba', []) or analysis_data.get('featureasba', [])
         
         for feature in features:
             feature_name = feature.get('name', 'Unknown Feature')
@@ -603,7 +603,7 @@ class DevOpsService:
         for source in (analysis_data, analysis_data.get("analysisData") if isinstance(analysis_data, dict) else None):
             if not isinstance(source, dict):
                 continue
-            feats = source.get("features") or source.get("featureasba") or source.get("feature_asba") or []
+            feats = source.get("features") or source.get("feature_asba") or source.get("featureasba") or []
             for f in feats:
                 if not isinstance(f, dict):
                     continue

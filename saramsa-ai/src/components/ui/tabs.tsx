@@ -51,7 +51,7 @@ function TabsList({ className, children }: TabsListProps) {
   return (
     <div
       className={cn(
-        "flex h-10 w-fit items-center justify-center rounded-2xl border border-border/60 bg-secondary/60 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] backdrop-blur-sm",
+        "flex h-10 w-fit items-center justify-center rounded-2xl border border-border/60 bg-secondary/60 p-1",
         className,
       )}
     >
@@ -65,10 +65,10 @@ function TabsTrigger({ value, className, children, isActive, onClick }: TabsTrig
     <button
       data-state={isActive ? "active" : "inactive"}
       className={cn(
-        "flex h-full flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent px-4 py-2 text-sm font-semibold whitespace-nowrap transition-[transform,box-shadow,background-color,color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/40 disabled:pointer-events-none disabled:opacity-50",
+        "flex h-full flex-1 items-center justify-center gap-1.5 rounded-xl border border-transparent px-4 py-2 text-sm font-semibold whitespace-nowrap transition-[background-color,color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/30 disabled:pointer-events-none disabled:opacity-50",
         isActive 
-          ? "bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to text-white shadow-[0_10px_24px_-16px_rgba(230,3,235,0.65)] border-white/20 -translate-y-0.5" 
-          : "text-muted-foreground hover:text-foreground hover:bg-background/80 hover:shadow-[0_8px_20px_-18px_rgba(15,23,42,0.35)]",
+          ? "bg-secondary/80 text-foreground border-border/70" 
+          : "text-muted-foreground hover:text-foreground hover:bg-background/80",
         className,
       )}
       onClick={onClick}

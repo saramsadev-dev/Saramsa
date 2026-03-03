@@ -179,7 +179,8 @@ class FeedbackFileUploadView(APIView):
                         "counts": result.get("counts", {}),
                         "features": result.get("features", []),
                         "positive_keywords": result.get("positive_keywords", []),
-                        "negative_keywords": result.get("negative_keywords", [])
+                        "negative_keywords": result.get("negative_keywords", []),
+                        "pipeline_metadata": result.get("pipeline_metadata", {})
                     },
                     "aspectSuggestions": aspect_suggestions,  # Include aspect suggestions
                     "context": project_context,
@@ -242,18 +243,39 @@ class FeedbackFileUploadView(APIView):
             )
             
             # Format CSV response in the new structure
-            formatted = {
-                "success": True,
-                "id": f"analysis_{str(uuid.uuid4())}",
-                "projectId": project_id if project_id else 'unknown',
-                "userId": user_id if user_id else 'anonymous',
-                "createdAt": datetime.now().isoformat(),
-                "analysisType": "commentSentiment",
-                "rawLlm": result,
-                "analysisData": result.get("analysisData", {}),
-                "aspectSuggestions": aspect_suggestions,  # Include aspect suggestions
-                "context": project_context,
-            }
+            if isinstance(result, dict) and (result.get('overall') is not None or result.get('features') is not None):
+                formatted = {
+                    "success": True,
+                    "id": f"analysis_{str(uuid.uuid4())}",
+                    "projectId": project_id if project_id else 'unknown',
+                    "userId": user_id if user_id else 'anonymous',
+                    "createdAt": datetime.now().isoformat(),
+                    "analysisType": "commentSentiment",
+                    "rawLlm": result.get("raw_llm", {}),
+                    "analysisData": {
+                        "overall": result.get("overall", {}),
+                        "counts": result.get("counts", {}),
+                        "features": result.get("features", []),
+                        "positive_keywords": result.get("positive_keywords", []),
+                        "negative_keywords": result.get("negative_keywords", []),
+                        "pipeline_metadata": result.get("pipeline_metadata", {})
+                    },
+                    "aspectSuggestions": aspect_suggestions,  # Include aspect suggestions
+                    "context": project_context,
+                }
+            else:
+                formatted = {
+                    "success": True,
+                    "id": f"analysis_{str(uuid.uuid4())}",
+                    "projectId": project_id if project_id else 'unknown',
+                    "userId": user_id if user_id else 'anonymous',
+                    "createdAt": datetime.now().isoformat(),
+                    "analysisType": "commentSentiment",
+                    "rawLlm": result,
+                    "analysisData": result.get("analysisData", {}),
+                    "aspectSuggestions": aspect_suggestions,  # Include aspect suggestions
+                    "context": project_context,
+                }
             
             # Save CSV analysis data to Cosmos DB (includes aspect suggestions)
             await self._save_analysis_data(
