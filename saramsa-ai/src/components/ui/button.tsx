@@ -20,7 +20,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent/60 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         saramsa:
-          "bg-secondary/80 text-foreground hover:bg-secondary/90",
+          "bg-saramsa-brand text-white hover:bg-saramsa-brand-hover",
       },
       size: {
         default: "h-10 px-5",

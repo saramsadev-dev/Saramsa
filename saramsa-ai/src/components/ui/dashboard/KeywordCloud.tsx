@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useMemo } from "react";
+import { MessageSquare } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../card";
 
 interface KeywordCloudProps {
@@ -121,14 +122,16 @@ export function KeywordCloud({
   if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center p-8 border-2 border-dashed border-border/60 dark:border-border/60 rounded-xl ${className}`}
+        className={`flex items-center justify-center p-8 border border-dashed border-border/60 rounded-2xl bg-background/60 ${className}`}
       >
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 text-muted-foreground">💭</div>
-          <p className="text-muted-foreground dark:text-muted-foreground text-sm">
+          <div className="w-14 h-14 mx-auto mb-4 bg-secondary/60 rounded-full flex items-center justify-center">
+            <MessageSquare className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground text-sm">
             No keywords available
           </p>
-          <p className="text-muted-foreground dark:text-muted-foreground text-xs mt-1">
+          <p className="text-muted-foreground text-xs mt-1">
             Keywords will appear here after analysis
           </p>
         </div>

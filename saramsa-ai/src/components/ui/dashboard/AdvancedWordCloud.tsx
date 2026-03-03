@@ -49,20 +49,20 @@ export function AdvancedWordCloud({
               frequency: Math.max(50, 150 - index * 10),
               x: pos.x,
               y: pos.y,
-              color: ['rgba(230, 3, 235, 0.7)', 'rgba(230, 3, 235, 0.55)', 'rgba(230, 3, 235, 0.45)', 'rgba(230, 3, 235, 0.6)'][index % 4]
+              color: ['rgba(139, 95, 191, 0.7)', 'rgba(139, 95, 191, 0.55)', 'rgba(139, 95, 191, 0.45)', 'rgba(139, 95, 191, 0.6)'][index % 4]
             };
           })
         : [
-            { word: 'amazing', size: 40, frequency: 145, x: 20, y: 30, color: 'rgba(230, 3, 235, 0.7)' },
-            { word: 'excellent', size: 32, frequency: 120, x: 60, y: 15, color: 'rgba(230, 3, 235, 0.55)' },
-            { word: 'love', size: 36, frequency: 134, x: 15, y: 65, color: 'rgba(230, 3, 235, 0.45)' },
-            { word: 'fantastic', size: 28, frequency: 98, x: 70, y: 50, color: 'rgba(230, 3, 235, 0.6)' },
-            { word: 'great', size: 35, frequency: 128, x: 45, y: 40, color: 'rgba(230, 3, 235, 0.7)' },
-            { word: 'perfect', size: 30, frequency: 105, x: 25, y: 80, color: 'rgba(230, 3, 235, 0.55)' },
-            { word: 'helpful', size: 26, frequency: 89, x: 80, y: 25, color: 'rgba(230, 3, 235, 0.45)' },
-            { word: 'smooth', size: 24, frequency: 76, x: 55, y: 75, color: 'rgba(230, 3, 235, 0.6)' },
-            { word: 'intuitive', size: 22, frequency: 67, x: 10, y: 45, color: 'rgba(230, 3, 235, 0.7)' },
-            { word: 'fast', size: 20, frequency: 58, x: 85, y: 60, color: 'rgba(230, 3, 235, 0.55)' }
+            { word: 'amazing', size: 40, frequency: 145, x: 20, y: 30, color: 'rgba(139, 95, 191, 0.7)' },
+            { word: 'excellent', size: 32, frequency: 120, x: 60, y: 15, color: 'rgba(139, 95, 191, 0.55)' },
+            { word: 'love', size: 36, frequency: 134, x: 15, y: 65, color: 'rgba(139, 95, 191, 0.45)' },
+            { word: 'fantastic', size: 28, frequency: 98, x: 70, y: 50, color: 'rgba(139, 95, 191, 0.6)' },
+            { word: 'great', size: 35, frequency: 128, x: 45, y: 40, color: 'rgba(139, 95, 191, 0.7)' },
+            { word: 'perfect', size: 30, frequency: 105, x: 25, y: 80, color: 'rgba(139, 95, 191, 0.55)' },
+            { word: 'helpful', size: 26, frequency: 89, x: 80, y: 25, color: 'rgba(139, 95, 191, 0.45)' },
+            { word: 'smooth', size: 24, frequency: 76, x: 55, y: 75, color: 'rgba(139, 95, 191, 0.6)' },
+            { word: 'intuitive', size: 22, frequency: 67, x: 10, y: 45, color: 'rgba(139, 95, 191, 0.7)' },
+            { word: 'fast', size: 20, frequency: 58, x: 85, y: 60, color: 'rgba(139, 95, 191, 0.55)' }
           ],
       neutral: [
         { word: 'okay', size: 32, frequency: 156, x: 25, y: 35, color: 'rgba(100, 116, 139, 0.8)' },
@@ -85,20 +85,20 @@ export function AdvancedWordCloud({
               frequency: Math.max(30, 100 - index * 8),
               x: pos.x,
               y: pos.y,
-              color: ['rgba(139, 95, 191, 0.7)', 'rgba(139, 95, 191, 0.55)', 'rgba(139, 95, 191, 0.45)', 'rgba(139, 95, 191, 0.6)'][index % 4]
+              color: ['rgba(90, 55, 134, 0.7)', 'rgba(90, 55, 134, 0.55)', 'rgba(90, 55, 134, 0.45)', 'rgba(90, 55, 134, 0.6)'][index % 4]
             };
           })
         : [
-            { word: 'terrible', size: 38, frequency: 87, x: 30, y: 25, color: 'rgba(139, 95, 191, 0.7)' },
-            { word: 'slow', size: 34, frequency: 76, x: 15, y: 60, color: 'rgba(139, 95, 191, 0.55)' },
-            { word: 'confusing', size: 32, frequency: 71, x: 70, y: 40, color: 'rgba(139, 95, 191, 0.45)' },
-            { word: 'broken', size: 30, frequency: 65, x: 50, y: 70, color: 'rgba(139, 95, 191, 0.6)' },
-            { word: 'frustrating', size: 28, frequency: 59, x: 20, y: 80, color: 'rgba(139, 95, 191, 0.7)' },
-            { word: 'difficult', size: 26, frequency: 54, x: 80, y: 15, color: 'rgba(139, 95, 191, 0.55)' },
-            { word: 'buggy', size: 24, frequency: 48, x: 10, y: 40, color: 'rgba(139, 95, 191, 0.45)' },
-            { word: 'annoying', size: 22, frequency: 42, x: 65, y: 75, color: 'rgba(139, 95, 191, 0.6)' },
-            { word: 'complicated', size: 20, frequency: 38, x: 45, y: 30, color: 'rgba(139, 95, 191, 0.7)' },
-            { word: 'disappointing', size: 18, frequency: 34, x: 85, y: 55, color: 'rgba(139, 95, 191, 0.55)' }
+            { word: 'terrible', size: 38, frequency: 87, x: 30, y: 25, color: 'rgba(90, 55, 134, 0.7)' },
+            { word: 'slow', size: 34, frequency: 76, x: 15, y: 60, color: 'rgba(90, 55, 134, 0.55)' },
+            { word: 'confusing', size: 32, frequency: 71, x: 70, y: 40, color: 'rgba(90, 55, 134, 0.45)' },
+            { word: 'broken', size: 30, frequency: 65, x: 50, y: 70, color: 'rgba(90, 55, 134, 0.6)' },
+            { word: 'frustrating', size: 28, frequency: 59, x: 20, y: 80, color: 'rgba(90, 55, 134, 0.7)' },
+            { word: 'difficult', size: 26, frequency: 54, x: 80, y: 15, color: 'rgba(90, 55, 134, 0.55)' },
+            { word: 'buggy', size: 24, frequency: 48, x: 10, y: 40, color: 'rgba(90, 55, 134, 0.45)' },
+            { word: 'annoying', size: 22, frequency: 42, x: 65, y: 75, color: 'rgba(90, 55, 134, 0.6)' },
+            { word: 'complicated', size: 20, frequency: 38, x: 45, y: 30, color: 'rgba(90, 55, 134, 0.7)' },
+            { word: 'disappointing', size: 18, frequency: 34, x: 85, y: 55, color: 'rgba(90, 55, 134, 0.55)' }
           ]
     };
   }, [positiveKeywords, negativeKeywords]);
@@ -136,14 +136,16 @@ export function AdvancedWordCloud({
   if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center p-8 border-2 border-dashed border-border/60 dark:border-border/60 rounded-xl ${className}`}
+        className={`flex items-center justify-center p-8 border border-dashed border-border/60 rounded-2xl bg-background/60 ${className}`}
       >
         <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 text-muted-foreground">...</div>
-          <p className="text-muted-foreground dark:text-muted-foreground text-sm">
+          <div className="w-14 h-14 mx-auto mb-4 bg-secondary/60 rounded-full flex items-center justify-center">
+            <Meh className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground text-sm">
             No keywords available
           </p>
-          <p className="text-muted-foreground dark:text-muted-foreground text-xs mt-1">
+          <p className="text-muted-foreground text-xs mt-1">
             Keywords will appear here after analysis
           </p>
         </div>
@@ -156,10 +158,10 @@ export function AdvancedWordCloud({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-foreground dark:text-foreground">
+            <CardTitle className="text-foreground">
               Sentiment Word Analysis
             </CardTitle>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Most frequently mentioned words by sentiment
             </p>
           </div>
@@ -251,12 +253,12 @@ export function AdvancedWordCloud({
               
               {/* Hover Tooltip */}
               <motion.div
-                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-background dark:bg-secondary/40 text-white dark:text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10"
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-foreground text-background text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10"
                 initial={{ opacity: 0, y: 5 }}
                 whileHover={{ opacity: 1, y: 0 }}
               >
                 {wordItem.frequency} mentions
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-foreground dark:border-b-foreground" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-foreground" />
               </motion.div>
             </motion.div>
           ))}
@@ -267,7 +269,7 @@ export function AdvancedWordCloud({
               key={i}
               className="absolute w-2 h-2 rounded-full opacity-20"
               style={{ 
-                backgroundColor: currentWords[i % currentWords.length]?.color || '#6B7280',
+                backgroundColor: currentWords[i % currentWords.length]?.color || 'var(--muted-foreground)',
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`
               }}
@@ -304,7 +306,7 @@ export function AdvancedWordCloud({
 
         {/* Top Words List */}
         <div>
-          <h4 className="font-medium text-foreground dark:text-foreground mb-3">
+          <h4 className="font-medium text-foreground mb-3">
             Top 5 Words ({currentConfig.label})
           </h4>
           <div className="grid grid-cols-5 gap-2">
@@ -314,7 +316,7 @@ export function AdvancedWordCloud({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="text-center p-2 bg-secondary/40 dark:bg-secondary/40/50 rounded-xl"
+                className="text-center p-2 bg-secondary/40 rounded-xl"
               >
                 <div 
                   className="text-lg font-semibold mb-1"
@@ -322,7 +324,7 @@ export function AdvancedWordCloud({
                 >
                   {wordItem.word}
                 </div>
-                <div className="text-xs text-muted-foreground dark:text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   {wordItem.frequency}
                 </div>
               </motion.div>

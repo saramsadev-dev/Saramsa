@@ -140,7 +140,7 @@ export default function ForgotPasswordPage() {
                   transition={{ duration: 0.8, delay: 1 + index * 0.2 }}
                   className="flex items-center gap-3"
                 >
-                  <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse-glow shadow-[0_0_16px_rgba(230,3,235,0.45)] flex-shrink-0" />
+                  <div className="w-2 h-2 bg-saramsa-brand rounded-full animate-pulse-glow shadow-[0_0_16px_rgba(139,95,191,0.45)] flex-shrink-0" />
                   <span className="text-sm md:text-base xl:text-xs text-muted-foreground">{feature}</span>
                 </motion.div>
               ))}

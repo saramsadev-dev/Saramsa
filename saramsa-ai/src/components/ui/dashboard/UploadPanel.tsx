@@ -99,7 +99,7 @@ export function UploadPanel({
     (activeTab === "file" && topFile) || (activeTab === "cloud" && isConnected);
 
   return (
-    <Card className="bg-card/80 rounded-3xl border border-border/60 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.6)]">
+    <Card className="bg-card/80 rounded-2xl border border-border/60 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.6)]">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -298,7 +298,7 @@ export function UploadPanel({
 
               {!isCloudEnabled ? (
                 <div className="p-4 bg-secondary/60 rounded-lg text-sm text-muted-foreground dark:text-muted-foreground">
-                  We’re working on cloud integrations. Stay tuned!
+                  We're working on cloud integrations. Stay tuned!
                 </div>
               ) : !isConnected ? (
                 <div className="space-y-3">

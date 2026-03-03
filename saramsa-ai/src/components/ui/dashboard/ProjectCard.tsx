@@ -298,7 +298,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
       {/* Selection Indicator */}
       {isSelected && (
         <div className="absolute top-4 right-4">
-          <div className="w-3 h-3 bg-saramsa-brand rounded-full shadow-[0_0_10px_rgba(230,3,235,0.7)]"></div>
+          <div className="w-3 h-3 bg-saramsa-brand rounded-full shadow-[0_0_10px_rgba(139,95,191,0.7)]"></div>
         </div>
       )}
       

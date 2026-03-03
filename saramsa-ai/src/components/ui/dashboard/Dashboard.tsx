@@ -23,10 +23,10 @@ import {
 } from '../../../store/features/userStories/userStoriesSlice';
 
 
-import type { AnalysisData } from '@/types/analysis';
+import type { AnalysisData } from '../../../lib/uploadService';
+import { uploadService } from '@/lib/uploadService';
 import { apiRequest } from '@/lib/apiRequest';
-import { getRelatedWorkItemsForInsight } from '@/lib/insightTraceability';
-import { Sparkles, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { AnalysisProjectSelector } from './AnalysisProjectSelector';
 import { UploadPanel } from './UploadPanel';
 import { MetricsCards } from './MetricsCards';
@@ -38,7 +38,6 @@ import { AdvancedWordCloud } from './AdvancedWordCloud';
 import { UserStoryList } from '../userStoryList';
 
 import { LoaderForDashboard } from '@/components/dashboard/analysisDashboard/LoaderForDashboard';
-import { Button } from '@/components/ui/button';
 
 // Local interface for the component
 interface LocalFeatureSentiment {
@@ -61,43 +60,6 @@ interface DashboardProps {
   skipBootstrapFetches?: boolean; // when true, parent handles projects/integrations fetching
 }
 
-type ValidationResult = { isValid: true } | { isValid: false; error: string };
-
-const MAX_SIZE_BYTES: Record<string, number> = {
-  'text/csv': 250 * 1024 * 1024,
-  'application/json': 250 * 1024 * 1024,
-  'audio/mpeg': 500 * 1024 * 1024,
-};
-
-const ACCEPTED_TYPES = new Set(Object.keys(MAX_SIZE_BYTES));
-
-function isAcceptedType(type: string): boolean {
-  return ACCEPTED_TYPES.has(type) || type.includes('csv') || type.includes('json');
-}
-
-function acceptedByFileName(name: string): boolean {
-  const lower = name.toLowerCase();
-  return lower.endsWith('.csv') || lower.endsWith('.json');
-}
-
-function validateFile(file: File): ValidationResult {
-  const typeOk = isAcceptedType(file.type) || acceptedByFileName(file.name);
-  if (!typeOk) {
-    return { isValid: false, error: 'Unsupported file type. Use CSV or JSON.' };
-  }
-
-  const typeForLimit =
-    file.type && isAcceptedType(file.type)
-      ? file.type
-      : (file.name.toLowerCase().endsWith('.json') ? 'application/json' : 'text/csv');
-  const limit = MAX_SIZE_BYTES[typeForLimit];
-  if (limit && file.size > limit) {
-    return { isValid: false, error: 'File is too large. Maximum size is 250 MB for CSV and JSON.' };
-  }
-
-  return { isValid: true };
-}
-
 export function DashboardComponent({ data, onProjectSelect, initialProjectId, skipBootstrapFetches = false }: DashboardProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { 
@@ -105,12 +67,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     deepAnalysis, 
     loading, 
     error, 
-    isAnalyzing,
-    analyzingByProject,
+    isAnalyzing, 
+    analyzingProjectId,
     loadedComments,
     latestAnalysis,
     projectContext,
-    analysisStatus,
   } = useSelector((state: RootState) => state.analysis);
   
   const { analysis: jiraAnalysis, isAnalyzing: isJiraAnalyzing } = useSelector((state: RootState) => state.jira);
@@ -129,42 +90,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const [currentProjectId, setCurrentProjectId] = useState<string>("");
   const [personalProjectId, setPersonalProjectId] = useState<string>('');
   const [isGeneratingUserStories, setIsGeneratingUserStories] = useState<boolean>(false);
-  const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);
-  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [reviewInsights, setReviewInsights] = useState<any[]>([]);
-  const [reviewLoading, setReviewLoading] = useState<boolean>(false);
-  const [reviewError, setReviewError] = useState<string | null>(null);
-  const [selectedInsightKeys, setSelectedInsightKeys] = useState<Set<string>>(new Set());
-  const [rulesLoading, setRulesLoading] = useState<boolean>(false);
-  const [rulesError, setRulesError] = useState<string | null>(null);
-  const [rules, setRules] = useState<any>({
-    auto_approve: {
-      min_confidence_level: "MEDIUM",
-      min_evidence_count: 20,
-      require_feature_match: false,
-    },
-    auto_ignore: {
-      max_confidence_level: "LOW",
-    },
-  });
-  const [schedule, setSchedule] = useState<any>({
-    enabled: false,
-    cadence: "daily",
-    hour_utc: 2,
-    day_of_week: 0,
-    last_run_at: null,
-    next_run_at: null,
-  });
-  const [scheduleLoading, setScheduleLoading] = useState<boolean>(false);
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
   
   // Declare all refs at the top to prevent recreation on every render
   const didInitRef = useRef(false);
   const hasConsolidatedFetchRef = useRef(false);
   const lastFetchedProjectRef = useRef<string | null>(null);
   const lastProcessedAnalysisIdRef = useRef<string | null>(null);
-  const lastHistoryProjectRef = useRef<string | null>(null);
   useEffect(() => {
     const contextProjectId = projectContext?.project_id;
     if (!contextProjectId) return;
@@ -184,8 +115,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const [wordCloudView, setWordCloudView] = useState<'split' | 'advanced'>('split');
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
-  const analyzingKey = currentProjectId || projectId || 'personal';
-  const isProjectAnalyzing = !!analyzingByProject[analyzingKey] || false;
+  const isProjectAnalyzing = isAnalyzing && analyzingProjectId === (currentProjectId || projectId || null);
   const selectedPlatform = useMemo((): 'azure' | 'jira' | null => {
     if (!projects || !projects.length) return null;
     const pid = currentProjectId || projectId || '';
@@ -193,195 +123,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     const provider = proj?.externalLinks?.[0]?.provider;
     return provider === 'jira' ? 'jira' : provider === 'azure' ? 'azure' : null;
   }, [projects, currentProjectId, projectId]);
-
-  useEffect(() => {
-    const rawProjectId = currentProjectId || projectId || '';
-    if (!rawProjectId) {
-      setAnalysisHistory([]);
-      return;
-    }
-
-    if (lastHistoryProjectRef.current === rawProjectId) return;
-    lastHistoryProjectRef.current = rawProjectId;
-
-    let isActive = true;
-    const candidateIds = Array.from(new Set([
-      rawProjectId,
-      rawProjectId.startsWith('project_') ? rawProjectId.replace('project_', '') : `project_${rawProjectId}`,
-    ]));
-
-    const fetchHistory = async () => {
-      setHistoryLoading(true);
-      setHistoryError(null);
-      let lastError: string | null = null;
-
-      for (const candidate of candidateIds) {
-        try {
-          const response = await apiRequest('get', `/feedback/history/?project_id=${candidate}`, undefined, true);
-          const payload = response?.data?.data;
-          const analyses = payload?.analyses || payload?.analyses_history || [];
-          if (isActive) {
-            if (Array.isArray(analyses) && analyses.length > 0) {
-              setAnalysisHistory(analyses);
-              setHistoryLoading(false);
-              return;
-            }
-            if (candidate === candidateIds[candidateIds.length - 1]) {
-              setAnalysisHistory(Array.isArray(analyses) ? analyses : []);
-            }
-          }
-        } catch (err: any) {
-          lastError =
-            err?.response?.data?.detail ||
-            err?.response?.data?.message ||
-            err?.message ||
-            'Failed to load analysis history.';
-        }
-      }
-
-      if (isActive) {
-        setHistoryError(lastError);
-        setHistoryLoading(false);
-      }
-    };
-
-    fetchHistory();
-    return () => {
-      isActive = false;
-    };
-  }, [currentProjectId, projectId]);
-
-  useEffect(() => {
-    const rawProjectId = currentProjectId || projectId || '';
-    if (!rawProjectId) {
-      setReviewInsights([]);
-      setSelectedInsightKeys(new Set());
-      return;
-    }
-
-    let isActive = true;
-    const candidateIds = Array.from(new Set([
-      rawProjectId,
-      rawProjectId.startsWith('project_') ? rawProjectId.replace('project_', '') : `project_${rawProjectId}`,
-    ]));
-
-    const fetchReviewList = async () => {
-      setReviewLoading(true);
-      setReviewError(null);
-      let lastError: string | null = null;
-
-      for (const candidate of candidateIds) {
-        try {
-          const response = await apiRequest('get', `/insights/review/?project_id=${candidate}`, undefined, true);
-          const payload = response?.data?.data;
-          const list = payload?.insights || [];
-          if (isActive) {
-            setReviewInsights(Array.isArray(list) ? list : []);
-          }
-          setReviewLoading(false);
-          return;
-        } catch (err: any) {
-          lastError =
-            err?.response?.data?.detail ||
-            err?.response?.data?.message ||
-            err?.message ||
-            'Failed to load insight review list.';
-        }
-      }
-
-      if (isActive) {
-        setReviewError(lastError);
-        setReviewLoading(false);
-      }
-    };
-
-    const fetchRules = async () => {
-      setRulesLoading(true);
-      setRulesError(null);
-      let lastError: string | null = null;
-
-      for (const candidate of candidateIds) {
-        try {
-          const response = await apiRequest('get', `/insights/rules/?project_id=${candidate}`, undefined, true);
-          const payload = response?.data?.data || response?.data;
-          if (isActive && payload) {
-            setRules({
-              auto_approve: payload.auto_approve || rules.auto_approve,
-              auto_ignore: payload.auto_ignore || rules.auto_ignore,
-            });
-          }
-          setRulesLoading(false);
-          return;
-        } catch (err: any) {
-          lastError =
-            err?.response?.data?.detail ||
-            err?.response?.data?.message ||
-            err?.message ||
-            'Failed to load insight rules.';
-        }
-      }
-
-      if (isActive) {
-        setRulesError(lastError);
-        setRulesLoading(false);
-      }
-    };
-
-    const fetchSchedule = async () => {
-      setScheduleLoading(true);
-      setScheduleError(null);
-      let lastError: string | null = null;
-
-      for (const candidate of candidateIds) {
-        try {
-          const response = await apiRequest('get', `/insights/ingestion/schedule/?project_id=${candidate}`, undefined, true);
-          const payload = response?.data?.data;
-          const scheduleDoc = payload?.schedule;
-          if (isActive) {
-            if (scheduleDoc) {
-              setSchedule({
-                enabled: !!scheduleDoc.enabled,
-                cadence: scheduleDoc.cadence || "daily",
-                hour_utc: scheduleDoc.hour_utc ?? 2,
-                day_of_week: scheduleDoc.day_of_week ?? 0,
-                last_run_at: scheduleDoc.last_run_at || null,
-                next_run_at: scheduleDoc.next_run_at || null,
-              });
-            } else {
-              setSchedule((prev: any) => ({
-                ...prev,
-                enabled: false,
-                cadence: "daily",
-                hour_utc: 2,
-                day_of_week: 0,
-              }));
-            }
-          }
-          setScheduleLoading(false);
-          return;
-        } catch (err: any) {
-          lastError =
-            err?.response?.data?.detail ||
-            err?.response?.data?.message ||
-            err?.message ||
-            'Failed to load ingestion schedule.';
-        }
-      }
-
-      if (isActive) {
-        setScheduleError(lastError);
-        setScheduleLoading(false);
-      }
-    };
-
-    fetchReviewList();
-    fetchRules();
-    fetchSchedule();
-
-    return () => {
-      isActive = false;
-    };
-  }, [currentProjectId, projectId]);
   // Handle keyword updates
   const handleKeywordsUpdate = (featureName: string, keywords: string[]) => {
     setEditedKeywords(prev => ({
@@ -434,7 +175,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
     try {
       // Call the new backend endpoint for keyword updates and regeneration
-      const response = await apiRequest('post', '/insights/keywords/update/', {
+      const response = await apiRequest('post', '/feedback/keywords/update/', {
         project_id: currentProjectId || personalProjectId || undefined,
         updated_keywords: editedKeywords,
         comments: loadedComments
@@ -462,144 +203,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       dispatch(clearAnalysisData());
       setEditedKeywords({});
       console.log('All stored data cleared');
-    }
-  };
-
-  const toggleInsightSelection = (insightKey: string) => {
-    setSelectedInsightKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(insightKey)) {
-        next.delete(insightKey);
-      } else {
-        next.add(insightKey);
-      }
-      return next;
-    });
-  };
-
-  const updateInsightStatuses = async (status: 'approved' | 'ignored' | 'pending') => {
-    const rawProjectId = currentProjectId || projectId || '';
-    if (!rawProjectId) return;
-    if (selectedInsightKeys.size === 0) return;
-
-    try {
-      const updates = reviewInsights
-        .filter((item) => selectedInsightKeys.has(item.insight_key))
-        .map((item) => ({
-          insight_key: item.insight_key,
-          insight_text: item.insight_text,
-          status,
-        }));
-
-      await apiRequest('post', '/insights/review/update/', {
-        project_id: rawProjectId,
-        updates,
-      }, true);
-
-      const refreshed = await apiRequest('get', `/insights/review/?project_id=${rawProjectId}`, undefined, true);
-      setReviewInsights(refreshed?.data?.data?.insights || []);
-      setSelectedInsightKeys(new Set());
-    } catch (err: any) {
-      setReviewError(err?.message || 'Failed to update insights.');
-    }
-  };
-
-  const handleSaveRules = async () => {
-    const rawProjectId = currentProjectId || projectId || '';
-    if (!rawProjectId) return;
-    setRulesLoading(true);
-    setRulesError(null);
-    try {
-      await apiRequest('post', '/insights/rules/', {
-        project_id: rawProjectId,
-        rules,
-      }, true);
-    } catch (err: any) {
-      setRulesError(err?.message || 'Failed to save insight rules.');
-    } finally {
-      setRulesLoading(false);
-    }
-  };
-
-  const handleApplyRules = async () => {
-    const rawProjectId = currentProjectId || projectId || '';
-    if (!rawProjectId) return;
-    setReviewLoading(true);
-    setReviewError(null);
-    try {
-      await apiRequest('post', '/insights/rules/apply/', {
-        project_id: rawProjectId,
-      }, true);
-      const refreshed = await apiRequest('get', `/insights/review/?project_id=${rawProjectId}`, undefined, true);
-      setReviewInsights(refreshed?.data?.data?.insights || []);
-      setSelectedInsightKeys(new Set());
-    } catch (err: any) {
-      setReviewError(err?.message || 'Failed to apply insight rules.');
-    } finally {
-      setReviewLoading(false);
-    }
-  };
-
-  const handleSaveSchedule = async () => {
-    const rawProjectId = currentProjectId || projectId || '';
-    if (!rawProjectId) return;
-    setScheduleLoading(true);
-    setScheduleError(null);
-    try {
-      await apiRequest('post', '/insights/ingestion/schedule/', {
-        project_id: rawProjectId,
-        schedule: {
-          enabled: schedule.enabled,
-          cadence: schedule.cadence,
-          hour_utc: Number(schedule.hour_utc),
-          day_of_week: schedule.cadence === "weekly" ? Number(schedule.day_of_week) : null,
-        },
-      }, true);
-
-      const refreshed = await apiRequest('get', `/insights/ingestion/schedule/?project_id=${rawProjectId}`, undefined, true);
-      const scheduleDoc = refreshed?.data?.data?.schedule;
-      if (scheduleDoc) {
-        setSchedule({
-          enabled: !!scheduleDoc.enabled,
-          cadence: scheduleDoc.cadence || "daily",
-          hour_utc: scheduleDoc.hour_utc ?? 2,
-          day_of_week: scheduleDoc.day_of_week ?? 0,
-          last_run_at: scheduleDoc.last_run_at || null,
-          next_run_at: scheduleDoc.next_run_at || null,
-        });
-      }
-    } catch (err: any) {
-      setScheduleError(err?.message || 'Failed to save schedule.');
-    } finally {
-      setScheduleLoading(false);
-    }
-  };
-
-  const handleRunNow = async () => {
-    const rawProjectId = currentProjectId || projectId || '';
-    if (!rawProjectId) return;
-    setScheduleLoading(true);
-    setScheduleError(null);
-    try {
-      await apiRequest('post', '/insights/ingestion/run-now/', {
-        project_id: rawProjectId,
-      }, true);
-      const refreshed = await apiRequest('get', `/insights/ingestion/schedule/?project_id=${rawProjectId}`, undefined, true);
-      const scheduleDoc = refreshed?.data?.data?.schedule;
-      if (scheduleDoc) {
-        setSchedule({
-          enabled: !!scheduleDoc.enabled,
-          cadence: scheduleDoc.cadence || "daily",
-          hour_utc: scheduleDoc.hour_utc ?? 2,
-          day_of_week: scheduleDoc.day_of_week ?? 0,
-          last_run_at: scheduleDoc.last_run_at || null,
-          next_run_at: scheduleDoc.next_run_at || null,
-        });
-      }
-    } catch (err: any) {
-      setScheduleError(err?.message || 'Failed to trigger ingestion.');
-    } finally {
-      setScheduleLoading(false);
     }
   };
 
@@ -731,23 +334,26 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         allKeys: Object.keys(a)
       });
       
-      // Check if data has analysisData (new format) or result (legacy Cosmos)
+      // The backend now returns data in the new format (analysisData field)
+      // Check if data is already in the correct frontend format
       if (a.analysisData) {
-        console.log('🔍 Dashboard: Using analysisData field, normalizing from consolidated fetch');
-        const normalized = normalizeAnalysis(a);
-        if (normalized) {
-          normalized.id = a.id || normalized.id;
-          normalized.projectId = a.projectId || normalized.projectId;
-          normalized.userId = a.userId || normalized.userId;
-          normalized.createdAt = a.createdAt || a.analysis_date || normalized.createdAt;
-          normalized.analysisType = a.analysis_type || normalized.analysisType;
-        }
-        dispatch(setAnalysisData(normalized));
+        // Data is already in the new format, use it directly
+        console.log('🔍 Dashboard: Using new format data directly from consolidated fetch');
+        console.log('🔍 Dashboard: Setting analysisData with structure:', {
+          id: a.id,
+          hasAnalysisData: !!a.analysisData,
+          counts: a.analysisData.counts,
+          featuresCount: a.analysisData.features?.length,
+          overall: a.analysisData.overall
+        });
+        dispatch(setAnalysisData(a));
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
-        lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
+        lastProcessedAnalysisIdRef.current = a.id;
       } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
-        console.log('🔍 Dashboard: Using legacy result field, normalizing from consolidated fetch');
+        // Data is nested under result field - normalize it and merge metadata
+        console.log('🔍 Dashboard: Using result field data, normalizing from consolidated fetch');
         const normalized = normalizeAnalysis(a.result);
+        // Merge metadata from the analysis object
         if (normalized) {
           normalized.id = a.id || normalized.id;
           normalized.projectId = a.projectId || normalized.projectId;
@@ -1013,21 +619,18 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           const a = result.analysis; // Extract the nested analysis data
           console.log('Analysis data from backend:', a);
           
+          // The backend now returns data in the new format (analysisData field)
+          // Check if data is already in the correct frontend format
           if (a.analysisData) {
-            console.log('Using analysisData field, normalizing');
-            const normalized = normalizeAnalysis(a);
-            if (normalized) {
-              normalized.id = a.id || normalized.id;
-              normalized.projectId = a.projectId || normalized.projectId;
-              normalized.userId = a.userId || normalized.userId;
-              normalized.createdAt = a.createdAt || a.analysis_date || normalized.createdAt;
-              normalized.analysisType = a.analysis_type || normalized.analysisType;
-            }
-            dispatch(setAnalysisData(normalized));
+            // Data is already in the new format, use it directly
+            console.log('Using new format data directly');
+            dispatch(setAnalysisData(a));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
-            console.log('Using legacy result field, normalizing');
+            // Data is nested under result field - normalize it and merge metadata
+            console.log('Using result field data, normalizing');
             const normalized = normalizeAnalysis(a.result);
+            // Merge metadata from the analysis object
             if (normalized) {
               normalized.id = a.id || normalized.id;
               normalized.projectId = a.projectId || normalized.projectId;
@@ -1038,14 +641,17 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             dispatch(setAnalysisData(normalized));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.sentimentsummary && a.counts && a.featureasba !== undefined) {
+            // Data is in the old format, normalize it
             console.log('Using old format data, normalizing');
             dispatch(setAnalysisData(normalizeAnalysis(a)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.overall && a.counts && a.features !== undefined) {
+            // Fallback: data is in the old format, normalize it
             console.log('Using old format data, normalizing');
             dispatch(setAnalysisData(normalizeAnalysis(a)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.commentAnalysis) {
+            // Fallback: use commentAnalysis if available
             console.log('Using commentAnalysis as fallback');
             const ca = Array.isArray(a.commentAnalysis)
               ? (typeof a.commentAnalysis[0] === 'string' ? JSON.parse(a.commentAnalysis[0]) : a.commentAnalysis[0])
@@ -1074,23 +680,19 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
   // Analyze loaded comments using the backend analyze endpoint
   async function handleTopAnalyze() {
-    setTopError(null);
-    dispatch(clearError());
     if (!topFile) {
       setTopError('Please select a file first');
       return;
     }
-    const effectiveProjectId = currentProjectId || personalProjectId || undefined;
-    if (!effectiveProjectId) {
-      setTopError('Please select a project before analyzing.');
-      return;
-    }
-    const validation = validateFile(topFile);
+    const validation = uploadService.validateFile(topFile);
     if (!validation.isValid) {
       setTopError(validation.error);
       return;
     }
     try {
+      setTopError(null);
+      dispatch(clearError());
+
       // Load file data first
       const text = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -1167,11 +769,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       dispatch(setLoadedComments(comments));
       
       // Use Redux action to analyze comments
-        const result = await dispatch(analyzeComments({ 
-          comments, 
-          projectId: effectiveProjectId,
-          fileName: topFile.name 
-        })).unwrap();
+      const effectiveProjectId = currentProjectId || personalProjectId || undefined;
+      const result = await dispatch(analyzeComments({ 
+        comments, 
+        projectId: effectiveProjectId,
+        fileName: topFile.name 
+      })).unwrap();
       
 
       // Extract analysis data from the result
@@ -1211,7 +814,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     } catch (e: any) {
       const data = e?.response?.data;
       const message =
-        (typeof e === 'string' && e) ||
         (typeof data?.message === 'string' && data.message) ||
         (typeof data?.error === 'string' && data.error) ||
         (typeof data?.detail === 'string' && data.detail) ||
@@ -1496,7 +1098,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         createdAt: input.createdAt || new Date().toISOString(),
         analysisType: input.analysisType || 'commentSentiment',
         rawLlm: input.rawLlm || {},
-        insights: input.insights || input.pipeline_insights || input.pipelineInsights || [],
         analysisData: {
           overall: {
             positive: toNum(input.analysisData.overall?.positive),
@@ -1523,7 +1124,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           })),
           positive_keywords: input.analysisData.positive_keywords || [],
           negative_keywords: input.analysisData.negative_keywords || [],
-          pipeline_metadata: input.analysisData.pipeline_metadata || input.analysisData.pipelineMetadata || input.pipeline_metadata || null,
         },
         deepAnalysis: input.deepAnalysis,
       } as AnalysisData;
@@ -1543,7 +1143,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         createdAt: new Date().toISOString(),
         analysisType: 'commentSentiment',
         rawLlm: input.raw_llm || {},
-        insights: input.insights || input.pipeline_insights || input.pipelineInsights || [],
         analysisData: {
           overall: {
             positive: toNum(input.overall.positive),
@@ -1570,7 +1169,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           })),
           positive_keywords: input.positive_keywords || [],
           negative_keywords: input.negative_keywords || [],
-          pipeline_metadata: input.pipeline_metadata || null,
         },
         deepAnalysis: input.deepAnalysis,
       } as AnalysisData;
@@ -1582,7 +1180,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     // Handle old format or commentAnalysis format
     const toNum = (v: any) => (typeof v === 'number' ? v : Number(v ?? 0));
     const sentiments = input.sentimentsummary || input.sentiment_summary || input.overall || {};
-    const features = input.features || input.feature_asba || input.featureasba || [];
+    const features = input.featureasba || input.feature_asba || input.features || [];
     const negatives = input.negativesummary || input.negative_summary || [];
     const emojis = input.emojianalysis || input.emoji_analysis || undefined;
     const posKeys = input.positivekeywords || input.positive_keywords || [];
@@ -1611,7 +1209,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       createdAt: new Date().toISOString(),
       analysisType: 'commentSentiment',
       rawLlm: input.raw_llm || {},
-      insights: input.insights || input.pipeline_insights || input.pipelineInsights || [],
       analysisData: {
         overall: {
           positive: toNum(sentiments.positive),
@@ -1625,8 +1222,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           neutral: toNum(counts.neutral || 0),
         },
         features: (features || []).map((f: any) => ({
-          featureId: f.featureId || f.id || f.name || f.feature,
-          name: f.name || f.feature,
+          featureId: f.featureId || f.id || f.name,
+          name: f.feature || f.name,
           description: f.description || '',
           sentiment: {
             positive: toNum(f.sentiment?.positive ?? f.sentiment_positive),
@@ -1659,167 +1256,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     keywords: feature.keywords || [],
     comment_count: feature.comment_count
   }));
-
-  const pipelineMetadata = activeAnalysisData?.analysisData?.pipeline_metadata || null;
-  const confidenceDistribution = pipelineMetadata?.confidence_distribution || null;
-  const sampleSize = Number(activeAnalysisData?.analysisData?.counts?.total ?? 0);
-  const insights = Array.isArray(activeAnalysisData?.insights)
-    ? activeAnalysisData?.insights
-    : [];
-  const traceableWorkItems = useMemo(() => {
-    const source =
-      (deepAnalysis?.work_items && deepAnalysis.work_items.length > 0)
-        ? deepAnalysis.work_items
-        : (currentProjectUserStories && currentProjectUserStories.length > 0
-          ? currentProjectUserStories[0]?.work_items
-          : []);
-
-    if (!Array.isArray(source)) return [];
-    return source.map((item: any, idx: number) => ({
-      id: item.id || `work_item_${idx}`,
-      title: item.title || '',
-      description: item.description || '',
-      tags: item.tags || item.labels || [],
-      featureArea: item.feature_area || item.featureArea || item.feature || item.feature_name || '',
-    }));
-  }, [deepAnalysis, currentProjectUserStories]);
-
-  const relatedWorkItemsByInsight = useMemo(() => {
-    const map = new Map<string, { titles: string[]; count: number }>();
-    if (!insights.length || traceableWorkItems.length === 0) return map;
-    insights.forEach((insight) => {
-      const matches = getRelatedWorkItemsForInsight(traceableWorkItems, insight, 3);
-      map.set(insight, {
-        titles: matches.map((match) => match.item.title || 'Untitled'),
-        count: matches.length,
-      });
-    });
-    return map;
-  }, [insights, traceableWorkItems]);
-
-  const historySnapshots = useMemo(() => {
-    const snapshots = (analysisHistory || []).map((item: any, idx: number) => {
-      const raw = item?.analysisData || item?.result || item || {};
-      const counts =
-        raw?.counts ||
-        raw?.analysisData?.counts ||
-        raw?.result?.counts ||
-        item?.counts ||
-        {};
-      const features =
-        raw?.features ||
-        raw?.analysisData?.features ||
-        raw?.result?.features ||
-        raw?.featureasba ||
-        [];
-      const sentiment =
-        raw?.overall ||
-        raw?.sentimentsummary ||
-        raw?.analysisData?.overall ||
-        raw?.result?.overall ||
-        {};
-
-      const createdAt =
-        item?.createdAt ||
-        item?.analysis_date ||
-        raw?.analysis_date ||
-        raw?.createdAt ||
-        item?.updatedAt ||
-        '';
-      const timestamp = createdAt ? Date.parse(String(createdAt)) : 0;
-
-      return {
-        id: item?.id || `analysis_${idx}`,
-        createdAt,
-        timestamp,
-        totalComments: Number(counts?.total ?? 0),
-        featureCount: Array.isArray(features) ? features.length : 0,
-        sentiment: {
-          positive: Number(sentiment?.positive ?? 0),
-          negative: Number(sentiment?.negative ?? 0),
-          neutral: Number(sentiment?.neutral ?? 0),
-        },
-        quarter: item?.quarter || raw?.quarter || '',
-      };
-    });
-
-    return snapshots
-      .filter((snap) => snap.totalComments > 0 || snap.featureCount > 0)
-      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-  }, [analysisHistory]);
-
-  const trendDelta = useMemo(() => {
-    if (historySnapshots.length < 2) return null;
-    const previous = historySnapshots[historySnapshots.length - 2];
-    const latest = historySnapshots[historySnapshots.length - 1];
-    return {
-      previous,
-      latest,
-      commentChange: latest.totalComments - previous.totalComments,
-      featureChange: latest.featureCount - previous.featureCount,
-      sentimentChange: {
-        positive: latest.sentiment.positive - previous.sentiment.positive,
-        negative: latest.sentiment.negative - previous.sentiment.negative,
-        neutral: latest.sentiment.neutral - previous.sentiment.neutral,
-      },
-    };
-  }, [historySnapshots]);
-
-  const formatDelta = (value: number) => (value > 0 ? `+${value}` : String(value));
-  const evidenceSamples = useMemo(() => {
-    const pool = Array.isArray(loadedComments) ? loadedComments : [];
-    const cleaned = pool
-      .map((text) => String(text || "").trim())
-      .filter((text) => text.length > 0);
-    return cleaned.slice(0, 3);
-  }, [loadedComments]);
-
-  const confidenceLabel = useMemo(() => {
-    if (!confidenceDistribution) return "MEDIUM";
-    const entries = Object.entries(confidenceDistribution);
-    if (entries.length === 0) return "MEDIUM";
-    const top = entries.sort((a, b) => Number(b[1]) - Number(a[1]))[0];
-    return String(top[0]).toUpperCase();
-  }, [confidenceDistribution]);
-
-  const timelineSteps = useMemo(() => {
-    const running = analysisStatus === 'pending' || analysisStatus === 'processing' || isProjectAnalyzing;
-    const hasWorkItems = (currentProjectUserStories && currentProjectUserStories.length > 0) || false;
-    return [
-      {
-        label: 'Ingestion',
-        detail: 'Upload + parsing',
-        status: hasAnalysisResults ? 'success' : (running ? 'running' : 'idle'),
-      },
-      {
-        label: 'Processing',
-        detail: 'Sentiment + topics',
-        status:
-          analysisStatus === 'processing'
-            ? 'running'
-            : analysisStatus === 'success'
-            ? 'success'
-            : analysisStatus === 'failure'
-            ? 'error'
-            : 'idle',
-      },
-      {
-        label: 'Synthesis',
-        detail: 'Insights + summary',
-        status:
-          analysisStatus === 'success'
-            ? 'success'
-            : analysisStatus === 'processing'
-            ? 'pending'
-            : 'idle',
-      },
-      {
-        label: 'Work Items',
-        detail: 'DevOps/Jira push',
-        status: hasWorkItems ? 'success' : analysisStatus === 'success' ? 'pending' : 'idle',
-      },
-    ];
-  }, [analysisStatus, hasAnalysisResults, isProjectAnalyzing, currentProjectUserStories]);
 
   console.log('Feature sentiment data:---?', featureSentimentData);
   console.log('Analysis data for features:', activeAnalysisData?.analysisData?.features);
@@ -1862,7 +1298,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             <div className="flex items-center justify-between">
               {/* Unified Project Selector */}
               <div>
-                <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Select Project
                 </label>
                 <AnalysisProjectSelector
@@ -1876,29 +1312,27 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               </div>
 
               {/* Navigation Tabs - Inlined */}
-              <div className="flex bg-secondary/70 rounded-xl p-1">
-                <Button
+              <div className="flex bg-secondary/60 rounded-xl p-1">
+                <button
                   onClick={() => setActiveView('dashboard')}
-                  variant="ghost"
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     activeView === 'dashboard' 
-                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
-                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Dashboard
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={() => setActiveView('user-stories')}
-                  variant="ghost"
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     activeView === 'user-stories' 
-                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
-                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   User Stories
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -1910,7 +1344,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                   topFile={topFile}
                   topError={error || topError}
                   loadedComments={loadedComments}
-                  topUploading={isProjectAnalyzing}
+                  topUploading={isAnalyzing}
                   onFileSelect={setTopFile}
                   onAnalyze={handleTopAnalyze}
                   onCloudConnect={handleCloudConnect}
@@ -1918,24 +1352,24 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               </>
             ) : activeView === 'user-stories' ? (
               /* User Stories View Loading */
-              <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
+              <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
                 <div className="animate-pulse">
-                  <div className="h-6 bg-secondary/60 rounded-xl w-1/4 mb-4"></div>
+                  <div className="h-6 bg-muted rounded w-1/4 mb-4"></div>
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-16 bg-secondary/60 rounded-xl"></div>
+                      <div key={i} className="h-16 bg-muted rounded"></div>
                     ))}
                   </div>
                 </div>
               </div>
             ) : (
               /* Jira Integration View Loading */
-              <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
+              <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
                 <div className="animate-pulse">
-                  <div className="h-6 bg-secondary/60 rounded-xl w-1/4 mb-4"></div>
+                  <div className="h-6 bg-muted rounded w-1/4 mb-4"></div>
                   <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-16 bg-secondary/60 rounded-xl"></div>
+                      <div key={i} className="h-16 bg-muted rounded"></div>
                     ))}
                   </div>
                 </div>
@@ -1956,7 +1390,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           <div className="flex items-center justify-between">
             {/* Unified Project Selector */}
             <div>
-              <label className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Select Project
               </label>
               <AnalysisProjectSelector
@@ -1971,22 +1405,20 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
             {/* Navigation Tabs - Inlined */}
             <div className="flex gap-4 items-center">
-              <div className="flex bg-secondary/70 rounded-xl p-1">
-                <Button
+              <div className="flex bg-secondary/60 rounded-xl p-1">
+                <button
                   onClick={() => setActiveView('dashboard')}
-                  variant="ghost"
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/50 focus-visible:ring-offset-1 ${
                     activeView === 'dashboard' 
-                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
-                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Dashboard
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={() => {
                     setActiveView('user-stories');
-                    // Fetch user stories when switching to the user stories tab
                     const effectiveProjectId = currentProjectId || personalProjectId;
                     if (effectiveProjectId && user?.id) {
                       console.log('🔄 Fetching user stories on tab switch...');
@@ -2004,29 +1436,27 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                       }));
                     }
                   }}
-                  variant="ghost"
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/50 focus-visible:ring-offset-1 ${
                     activeView === 'user-stories' 
-                      ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
-                      : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
+                      ? 'bg-background/90 text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   User Stories
-                </Button>
+                </button>
               </div>
               
               {/* Projects Button */}
-              <Button
+              <button
                 onClick={() => {
                   if (typeof window !== 'undefined') {
                     window.location.href = '/projects';
                   }
                 }}
-                variant="saramsa"
-                className="px-4 py-2 text-sm font-medium"
+                className="px-4 py-2 bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-all duration-200 text-sm font-medium"
               >
                 Projects
-              </Button>
+              </button>
             </div>
           </div>
 
@@ -2038,7 +1468,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 topFile={topFile}
                 topError={error || topError}
                 loadedComments={loadedComments}
-                topUploading={isProjectAnalyzing}
+                topUploading={isAnalyzing}
                 onFileSelect={setTopFile}
                 onAnalyze={handleTopAnalyze}
                 onCloudConnect={handleCloudConnect}
@@ -2050,29 +1480,27 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                   <p className="text-sm text-red-700 dark:text-red-300 flex-1">
                     {error || topError}
                   </p>
-                  <Button
+                  <button
                     type="button"
                     onClick={() => {
                       setTopError(null);
                       dispatch(clearError());
                     }}
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0 h-9 w-9 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30"
+                    className="shrink-0 p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                     aria-label="Dismiss error"
                   >
-                    <span className="text-lg leading-none">x</span>
-                  </Button>
+                    <span className="text-lg leading-none">×</span>
+                  </button>
                 </div>
               )}
 
               {/* Analysis Results Section */}
-              {(isProjectAnalyzing || loading) ? (
+              {(isAnalyzing || loading) ? (
                 <LoaderForDashboard />
               ) : (
                 <>
                   {/* Summary Info */}
-                  <div className="text-sm text-muted-foreground dark:text-muted-foreground">
+                  <div className="text-sm text-muted-foreground">
                     {hasAnalysisResults ? (
                       <>Current file summary based on the data uploaded as of {
                         (() => {
@@ -2102,555 +1530,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     )}
                   </div>
 
-                  {hasAnalysisResults && confidenceDistribution && (
-                    <div className="rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                            Primary Insights
-                          </p>
-                          <h3 className="mt-2 text-xl font-semibold text-foreground">
-                            What matters most right now
-                          </h3>
-                        </div>
-                        <span className="rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-                          Confidence {confidenceLabel}
-                        </span>
-                      </div>
-
-                      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                        {insights.length === 0 ? (
-                          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
-                            Insights will appear after your first analysis run.
-                          </div>
-                        ) : (
-                          insights.slice(0, 6).map((insight: string, idx: number) => (
-                            <div key={`${idx}-${insight.slice(0, 10)}`} className="rounded-xl border border-border/50 bg-muted/30 p-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                                  Insight {idx + 1}
-                                </span>
-                                <span className="text-xs font-medium text-muted-foreground">
-                                  Sample size {sampleSize}
-                                </span>
-                              </div>
-                              <p className="mt-2 text-sm font-semibold text-foreground">
-                                {insight}
-                              </p>
-                              {(() => {
-                                const related = relatedWorkItemsByInsight.get(insight);
-                                if (!related || related.count === 0) return null;
-                                return (
-                                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                    <span className="rounded-full border border-border/60 bg-background/70 px-2 py-1 text-[11px] font-medium">
-                                      Related work items {related.count}
-                                    </span>
-                                    {related.titles.slice(0, 2).map((title, titleIdx) => (
-                                      <span
-                                        key={`${idx}-related-${titleIdx}`}
-                                        className="rounded-full border border-border/50 bg-muted/20 px-2 py-1 text-[11px]"
-                                      >
-                                        {title.length > 40 ? `${title.slice(0, 40)}...` : title}
-                                      </span>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
-                              <div className="mt-3 space-y-2">
-                                {evidenceSamples.length > 0 ? (
-                                  evidenceSamples.map((sample, sampleIdx) => (
-                                    <div key={`${idx}-${sampleIdx}`} className="rounded-lg border border-border/40 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-                                      “{sample.length > 120 ? `${sample.slice(0, 120)}…` : sample}”
-                                    </div>
-                                  ))
-                                ) : (
-                                  <p className="text-xs text-muted-foreground">
-                                    Evidence samples will show after comments are loaded.
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasAnalysisResults && (
-                    <div className="rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                            Scheduled Ingestion
-                          </p>
-                          <h3 className="mt-2 text-xl font-semibold text-foreground">
-                            Auto-run feedback analysis
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRunNow}
-                            disabled={scheduleLoading}
-                          >
-                            Run now
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSaveSchedule}
-                            disabled={scheduleLoading}
-                          >
-                            Save schedule
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                        <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-3">
-                          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <input
-                              type="checkbox"
-                              checked={!!schedule.enabled}
-                              onChange={(e) => setSchedule((prev: any) => ({ ...prev, enabled: e.target.checked }))}
-                            />
-                            Enable scheduled runs
-                          </label>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Cadence</label>
-                            <select
-                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-                              value={schedule.cadence}
-                              onChange={(e) => setSchedule((prev: any) => ({ ...prev, cadence: e.target.value }))}
-                            >
-                              <option value="daily">Daily</option>
-                              <option value="weekly">Weekly</option>
-                            </select>
-                          </div>
-                          {schedule.cadence === "weekly" && (
-                            <div className="space-y-2">
-                              <label className="text-xs text-muted-foreground">Day of week (UTC)</label>
-                              <select
-                                className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-                                value={schedule.day_of_week}
-                                onChange={(e) => setSchedule((prev: any) => ({ ...prev, day_of_week: Number(e.target.value) }))}
-                              >
-                                <option value={0}>Monday</option>
-                                <option value={1}>Tuesday</option>
-                                <option value={2}>Wednesday</option>
-                                <option value={3}>Thursday</option>
-                                <option value={4}>Friday</option>
-                                <option value={5}>Saturday</option>
-                                <option value={6}>Sunday</option>
-                              </select>
-                            </div>
-                          )}
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Hour (UTC)</label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={23}
-                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-                              value={schedule.hour_utc}
-                              onChange={(e) => setSchedule((prev: any) => ({ ...prev, hour_utc: Number(e.target.value) }))}
-                            />
-                          </div>
-                          {scheduleError && (
-                            <p className="text-xs text-rose-600">{scheduleError}</p>
-                          )}
-                        </div>
-
-                        <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-2 text-sm text-muted-foreground">
-                          {scheduleLoading && <p>Updating schedule...</p>}
-                          {!scheduleLoading && (
-                            <>
-                              <p>
-                                Next run: {schedule.next_run_at ? new Date(schedule.next_run_at).toLocaleString() : "Not scheduled"}
-                              </p>
-                              <p>
-                                Last run: {schedule.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : "Not run yet"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Runs use the latest stored comments for this project.
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {hasAnalysisResults && (
-                    <div className="rounded-2xl border border-border/60 bg-card/90 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                            Insight Review
-                          </p>
-                          <h3 className="mt-2 text-xl font-semibold text-foreground">
-                            Approve or ignore insights
-                          </h3>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleApplyRules}
-                            disabled={rulesLoading || reviewLoading}
-                          >
-                            Apply rules
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSaveRules}
-                            disabled={rulesLoading}
-                          >
-                            Save rules
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                        <div className="rounded-xl border border-border/50 bg-muted/30 p-4 space-y-4">
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                              Auto-approve rules
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Min confidence</label>
-                            <select
-                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-                              value={rules.auto_approve?.min_confidence_level || "MEDIUM"}
-                              onChange={(e) => setRules((prev: any) => ({
-                                ...prev,
-                                auto_approve: {
-                                  ...prev.auto_approve,
-                                  min_confidence_level: e.target.value,
-                                },
-                              }))}
-                            >
-                              <option value="LOW">LOW</option>
-                              <option value="MEDIUM">MEDIUM</option>
-                              <option value="HIGH">HIGH</option>
-                            </select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Min evidence count</label>
-                            <input
-                              type="number"
-                              min={0}
-                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-                              value={rules.auto_approve?.min_evidence_count ?? 0}
-                              onChange={(e) => setRules((prev: any) => ({
-                                ...prev,
-                                auto_approve: {
-                                  ...prev.auto_approve,
-                                  min_evidence_count: Number(e.target.value),
-                                },
-                              }))}
-                            />
-                          </div>
-                          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <input
-                              type="checkbox"
-                              checked={!!rules.auto_approve?.require_feature_match}
-                              onChange={(e) => setRules((prev: any) => ({
-                                ...prev,
-                                auto_approve: {
-                                  ...prev.auto_approve,
-                                  require_feature_match: e.target.checked,
-                                },
-                              }))}
-                            />
-                            Require feature match
-                          </label>
-
-                          <div className="pt-2">
-                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                              Auto-ignore rules
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Max confidence</label>
-                            <select
-                              className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm"
-                              value={rules.auto_ignore?.max_confidence_level || "LOW"}
-                              onChange={(e) => setRules((prev: any) => ({
-                                ...prev,
-                                auto_ignore: {
-                                  ...prev.auto_ignore,
-                                  max_confidence_level: e.target.value,
-                                },
-                              }))}
-                            >
-                              <option value="LOW">LOW</option>
-                              <option value="MEDIUM">MEDIUM</option>
-                              <option value="HIGH">HIGH</option>
-                            </select>
-                          </div>
-
-                          {rulesError && (
-                            <p className="text-xs text-rose-600">{rulesError}</p>
-                          )}
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateInsightStatuses('approved')}
-                              disabled={selectedInsightKeys.size === 0 || reviewLoading}
-                            >
-                              Approve selected
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateInsightStatuses('ignored')}
-                              disabled={selectedInsightKeys.size === 0 || reviewLoading}
-                            >
-                              Ignore selected
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setSelectedInsightKeys(new Set())}
-                              disabled={selectedInsightKeys.size === 0 || reviewLoading}
-                            >
-                              Clear selection
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                              {selectedInsightKeys.size} selected
-                            </span>
-                          </div>
-
-                          {reviewLoading && (
-                            <p className="text-sm text-muted-foreground">Loading insights...</p>
-                          )}
-                          {reviewError && (
-                            <p className="text-sm text-rose-600">{reviewError}</p>
-                          )}
-
-                          {!reviewLoading && reviewInsights.length === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              No insights available for review yet.
-                            </p>
-                          )}
-
-                          {!reviewLoading && reviewInsights.length > 0 && (
-                            <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
-                              {reviewInsights.map((item: any) => (
-                                <div key={item.insight_key} className="rounded-xl border border-border/50 bg-muted/30 p-3">
-                                  <div className="flex items-start gap-3">
-                                    <input
-                                      type="checkbox"
-                                      className="mt-1"
-                                      checked={selectedInsightKeys.has(item.insight_key)}
-                                      onChange={() => toggleInsightSelection(item.insight_key)}
-                                    />
-                                    <div className="flex-1 space-y-2">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <p className="text-sm font-semibold text-foreground">
-                                          {item.insight_text}
-                                        </p>
-                                        <span className="text-[11px] rounded-full border border-border/60 px-2 py-1 text-muted-foreground uppercase">
-                                          {item.status || 'pending'}
-                                        </span>
-                                      </div>
-                                      {item.updated_at && (
-                                        <p className="text-xs text-muted-foreground">
-                                          Updated {new Date(item.updated_at).toLocaleString()}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {hasAnalysisResults && (
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                      <div className="rounded-2xl border border-border/60 bg-card/90 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                              Trust & Quality
-                            </p>
-                            <h3 className="mt-2 text-lg font-semibold text-foreground">
-                              Confidence & Evidence
-                            </h3>
-                          </div>
-                          <span className="rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-                            Sample size {sampleSize}
-                          </span>
-                        </div>
-
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
-                          <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                              Confidence
-                            </p>
-                            {confidenceDistribution ? (
-                              <div className="mt-3 space-y-2 text-sm text-foreground">
-                                {Object.entries(confidenceDistribution).map(([level, count]) => (
-                                  <div key={level} className="flex items-center justify-between">
-                                    <span className="font-medium">{level}</span>
-                                    <span className="text-muted-foreground">
-                                      {count} ({sampleSize ? Math.round((Number(count) / sampleSize) * 100) : 0}%)
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="mt-3 text-sm text-muted-foreground">
-                                Confidence data not available yet.
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
-                            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                              Evidence samples
-                            </p>
-                            {evidenceSamples.length > 0 ? (
-                              <div className="mt-3 space-y-2 text-sm text-foreground">
-                                {evidenceSamples.map((sample, idx) => (
-                                  <div key={`${idx}-${sample.slice(0, 10)}`} className="rounded-lg border border-border/40 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                                    “{sample.length > 140 ? `${sample.slice(0, 140)}…` : sample}”
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="mt-3 text-sm text-muted-foreground">
-                                Upload feedback to surface evidence samples.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="rounded-2xl border border-border/60 bg-card/90 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
-                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                            Pipeline Timeline
-                          </p>
-                          <h3 className="mt-2 text-lg font-semibold text-foreground">
-                            End-to-end Status
-                          </h3>
-                          <div className="mt-4 space-y-3">
-                            {timelineSteps.map((step) => {
-                              const statusTone =
-                                step.status === 'success'
-                                  ? 'text-emerald-600'
-                                  : step.status === 'running'
-                                  ? 'text-sky-600'
-                                  : step.status === 'pending'
-                                  ? 'text-amber-600'
-                                  : step.status === 'error'
-                                  ? 'text-rose-600'
-                                  : 'text-muted-foreground';
-                              return (
-                                <div key={step.label} className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
-                                  <div>
-                                    <p className="text-sm font-semibold text-foreground">{step.label}</p>
-                                    <p className="text-xs text-muted-foreground">{step.detail}</p>
-                                  </div>
-                                  <span className={`text-xs font-medium ${statusTone}`}>
-                                    {step.status}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-border/60 bg-card/90 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)]">
-                          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                            Trends & Delta
-                          </p>
-                          <h3 className="mt-2 text-lg font-semibold text-foreground">
-                            Latest vs Previous
-                          </h3>
-                          <div className="mt-4 space-y-3">
-                            {historyLoading && (
-                              <p className="text-sm text-muted-foreground">Loading trend history...</p>
-                            )}
-                            {!historyLoading && historyError && (
-                              <p className="text-sm text-rose-600">{historyError}</p>
-                            )}
-                            {!historyLoading && !historyError && !trendDelta && (
-                              <p className="text-sm text-muted-foreground">
-                                Run at least two analyses to see trend deltas.
-                              </p>
-                            )}
-                            {!historyLoading && trendDelta && (
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
-                                  <div>
-                                    <p className="text-sm font-semibold text-foreground">Comments</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {trendDelta.previous.totalComments} {'→'} {trendDelta.latest.totalComments}
-                                    </p>
-                                  </div>
-                                  <span className="flex items-center gap-1 text-xs font-medium text-foreground">
-                                    {trendDelta.commentChange > 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : trendDelta.commentChange < 0 ? <TrendingDown className="h-4 w-4 text-rose-600" /> : <Minus className="h-4 w-4 text-muted-foreground" />}
-                                    {formatDelta(trendDelta.commentChange)}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
-                                  <div>
-                                    <p className="text-sm font-semibold text-foreground">Feature Count</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {trendDelta.previous.featureCount} {'→'} {trendDelta.latest.featureCount}
-                                    </p>
-                                  </div>
-                                  <span className="flex items-center gap-1 text-xs font-medium text-foreground">
-                                    {trendDelta.featureChange > 0 ? <TrendingUp className="h-4 w-4 text-emerald-600" /> : trendDelta.featureChange < 0 ? <TrendingDown className="h-4 w-4 text-rose-600" /> : <Minus className="h-4 w-4 text-muted-foreground" />}
-                                    {formatDelta(trendDelta.featureChange)}
-                                  </span>
-                                </div>
-
-                                <div className="rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
-                                  <p className="text-sm font-semibold text-foreground">Sentiment Shift</p>
-                                  <div className="mt-2 grid gap-2 text-xs text-muted-foreground">
-                                    <div className="flex items-center justify-between">
-                                      <span>Positive</span>
-                                      <span>{formatDelta(trendDelta.sentimentChange.positive)}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                      <span>Negative</span>
-                                      <span>{formatDelta(trendDelta.sentimentChange.negative)}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                      <span>Neutral</span>
-                                      <span>{formatDelta(trendDelta.sentimentChange.neutral)}</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="text-xs text-muted-foreground">
-                                  Compared {trendDelta.previous.createdAt ? new Date(trendDelta.previous.createdAt).toLocaleDateString() : 'previous run'} to{' '}
-                                  {trendDelta.latest.createdAt ? new Date(trendDelta.latest.createdAt).toLocaleDateString() : 'latest run'}.
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Metrics Cards */}
                   {hasAnalysisResults && <MetricsCards metrics={metrics} />}
 
@@ -2658,7 +1537,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     <>
                       {/* Feature Sentiments Table */}
                       {hasAnalysisResults && (
-                        <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
+                        <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
                           <FeatureSentimentsTable
                             features={transformedFeatures}
                             selectedFeatures={selectedFeatures}
@@ -2690,30 +1569,30 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     <div className="space-y-4">
                       {/* Word Cloud View Toggle */}
                       <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
+                        <h3 className="text-lg font-semibold text-foreground">
                           Word Cloud Analysis
                         </h3>
-                        {/* <div className="flex bg-secondary/70 rounded-xl p-1">
-                          <Button
+                        {/* <div className="flex bg-secondary/60 rounded-xl p-1">
+                          <button
                             onClick={() => setWordCloudView('split')}
                             className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
                               wordCloudView === 'split' 
-                                ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
-                                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
+                                ? 'bg-background/90 text-foreground shadow-sm' 
+                                : 'text-muted-foreground hover:text-foreground'
                             }`}
                           >
                             Split View
-                          </Button>
-                          <Button
+                          </button>
+                          <button
                             onClick={() => setWordCloudView('advanced')}
                             className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
                               wordCloudView === 'advanced' 
-                                ? 'bg-background/90 text-foreground dark:text-foreground shadow-[0_12px_30px_-24px_rgba(15,23,42,0.5)]' 
-                                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-white'
+                                ? 'bg-background/90 text-foreground shadow-sm' 
+                                : 'text-muted-foreground hover:text-foreground'
                             }`}
                           >
                             Advanced View
-                          </Button>
+                          </button>
                         </div> */}
                       </div>
 
@@ -2752,11 +1631,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             </>
           ) : activeView === 'user-stories' ? (
             /* User Stories View */
-            <div className="bg-card/90 dark:bg-card/95 rounded-2xl shadow-xl border border-border/60 dark:border-border/60 p-6">
+            <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
               {isGeneratingUserStories ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <LoaderForDashboard />
-                  <p className="mt-4 text-muted-foreground dark:text-muted-foreground">Generating user stories from analysis...</p>
+                  <p className="mt-4 text-muted-foreground">Generating user stories from analysis...</p>
                 </div>
               ) : selectedPlatform === 'jira' ? (
                 /* Jira User Stories View */
@@ -2888,16 +1767,16 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                       })()
                     ) : (
                       <div className="text-center py-8">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-                          <Sparkles className="w-8 h-8 text-slate-400" />
+                        <div className="w-16 h-16 mx-auto mb-4 bg-secondary/60 rounded-full flex items-center justify-center">
+                          <Sparkles className="w-8 h-8 text-muted-foreground" />
                         </div>
-                        <h3 className="text-lg font-medium text-slate-900 dark:text-foreground mb-2">
+                        <h3 className="text-lg font-medium text-foreground mb-2">
                           No User Stories Generated
                         </h3>
-                        <p className="text-slate-500 dark:text-slate-400 mb-4">
+                        <p className="text-muted-foreground mb-4">
                           User stories will be automatically generated after you analyze feedback data.
                         </p>
-                        <p className="text-sm text-slate-400 dark:text-slate-500">
+                        <p className="text-sm text-muted-foreground/70">
                           Go to the Dashboard tab, upload feedback data, and click "Analyze" to generate user stories.
                         </p>
                       </div>
@@ -2913,20 +1792,20 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                   />
                 ) : (
                   <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-                      <Sparkles className="w-8 h-8 text-slate-400" />
+                    <div className="w-16 h-16 mx-auto mb-4 bg-secondary/60 rounded-full flex items-center justify-center">
+                      <Sparkles className="w-8 h-8 text-muted-foreground" />
                     </div>
-                    <h3 className="text-lg font-medium text-slate-900 dark:text-foreground mb-2">
+                    <h3 className="text-lg font-medium text-foreground mb-2">
                       No User Stories Found
                     </h3>
-                    <p className="text-slate-500 dark:text-slate-400 mb-4">
+                    <p className="text-muted-foreground mb-4">
                       {loadedComments && loadedComments.length > 0 
                         ? "User stories should have been generated. Try refreshing or check the console for errors."
                         : "No comments available. Please upload feedback data to use Jira integration."
                       }
                     </p>
                     {process.env.NODE_ENV === 'development' && (
-                      <Button
+                      <button
                         onClick={() => {
                           const effectiveProjectId = currentProjectId || personalProjectId;
                           if (effectiveProjectId && user?.id) {
@@ -2938,11 +1817,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                             }));
                           }
                         }}
-                        variant="saramsa"
-                        className="mt-4 px-4 py-2 text-sm"
+                        className="mt-4 px-4 py-2 bg-saramsa-brand text-white rounded-lg hover:bg-saramsa-brand-hover transition-colors text-sm"
                       >
                         Refresh user stories
-                      </Button>
+                      </button>
                     )}
                   </div>
                 )
@@ -2993,7 +1871,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                     />
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground dark:text-muted-foreground">
+                      <p className="text-muted-foreground">
                         No deep analysis data available. Please upload feedback data to generate user stories.
                       </p>
                     </div>

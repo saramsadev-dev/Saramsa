@@ -141,7 +141,7 @@ export function PlatformSelectionScreen({
                     <div
                       className={`relative bg-card/80 dark:bg-card/90 backdrop-blur-sm border-2 rounded-2xl p-6 transition-all duration-300 ${
                         selectedPlatform === platform.id
-                          ? "border-saramsa-brand/60 shadow-[0_20px_50px_-35px_rgba(230,3,235,0.5)]"
+                          ? "border-saramsa-brand/60 shadow-[0_20px_50px_-35px_rgba(139,95,191,0.5)]"
                           : platform.status === "configured"
                           ? "border-green-300/70 dark:border-green-600/60 bg-green-50/60 dark:bg-green-900/20"
                           : platform.comingSoon

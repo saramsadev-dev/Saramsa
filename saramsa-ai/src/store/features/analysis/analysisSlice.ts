@@ -109,7 +109,7 @@ export const analyzeComments = createAsyncThunk<
               try {
                 const analysisRes = await apiRequest(
                   'get',
-                  `/insights/analysis/${taskResult.insight_id}/`,
+                  `/feedback/analysis/${taskResult.insight_id}/`,
                   undefined,
                   true
                 );
@@ -176,8 +176,7 @@ export const getLatestAnalysis = createAsyncThunk<
   { rejectValue: string }
 >('analysis/getLatestAnalysis', async (projectId, { rejectWithValue }) => {
   try {
-    const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, { refresh: Date.now() }, true);
-    // StandardResponse format: response.data.data contains the actual data
+    const response = await apiRequest('get', `/integrations/projects/${projectId}/analysis/latest/`, { refresh: Date.now() }, true);
     return response.data.data;
   } catch (err: any) {
     let errorMessage = 'Failed to load latest analysis.';
@@ -201,8 +200,7 @@ export const getConsolidatedDashboardData = createAsyncThunk<
   { rejectValue: string }
 >('analysis/getConsolidatedDashboardData', async (projectId, { rejectWithValue }) => {
   try {
-    // This single call now returns: analysis + user stories + comments + submission status
-    const response = await apiRequest('get', `/projects/${projectId}/analysis/latest/`, { refresh: Date.now() }, true);
+    const response = await apiRequest('get', `/integrations/projects/${projectId}/analysis/latest/`, { refresh: Date.now() }, true);
     return response.data.data;
   } catch (err: any) {
     let errorMessage = 'Failed to load dashboard data.';

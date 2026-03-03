@@ -35,8 +35,8 @@ interface SentimentChartsProps {
 }
 
 const COLORS = {
-  positive: 'rgba(230, 3, 235, 0.65)',
-  negative: 'rgba(139, 95, 191, 0.65)',
+  positive: 'rgba(139, 95, 191, 0.75)',
+  negative: 'rgba(90, 55, 134, 0.7)',
   neutral: 'rgba(100, 116, 139, 0.6)',
 } as const;
 
@@ -89,7 +89,6 @@ export function SentimentCharts({
   sentimentData,
   selectedFeatures = [],
 }: SentimentChartsProps) {
-  // Aggregated sentiment for selected features (or fallback to overall data)
   const aggregatedSentimentData = useMemo(() => {
     if (selectedFeatures.length > 0) {
       const filtered = featureSentimentData.filter((feature) =>
@@ -123,7 +122,6 @@ export function SentimentCharts({
       }));
     }
 
-    // No selection: ensure each item has a color
     return sentimentData.map((item) => ({
       ...item,
       color:
@@ -144,7 +142,7 @@ export function SentimentCharts({
         {/* Feature Sentiment Bar Chart */}
         <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden">
           <div className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               Feature Sentiment Distribution
             </h3>
             <div className="h-96">
@@ -212,7 +210,7 @@ export function SentimentCharts({
         {/* Pie Chart */}
         <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden">
           <div className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground mb-4">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               {selectedFeatures.length === 0
                 ? 'Overall Sentiment Distribution'
                 : `Sentiment Distribution (${selectedFeatures.length} Feature${

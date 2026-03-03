@@ -62,7 +62,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
       setLoading(true);
       setError(null);
       
-      const response = await apiRequest('get', `/insights/analysis/history/?project_id=${projectId}`, undefined, true);
+      const response = await apiRequest('get', `/feedback/history/?project_id=${projectId}`, undefined, true);
       
       if (response.data.success) {
         setAnalyses(response.data.analyses);
@@ -82,7 +82,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
       setLoading(true);
       setError(null);
       
-      const response = await apiRequest('get', `/insights/analysis/cumulative/?project_id=${projectId}`, undefined, true);
+      const response = await apiRequest('get', `/feedback/history/cumulative/?project_id=${projectId}`, undefined, true);
       
       if (response.data.success) {
         setCumulativeData(response.data.cumulative_analysis);
@@ -99,7 +99,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
       setLoading(true);
       setError(null);
       
-      const response = await apiRequest('get', `/insights/analysis/compare/?project_id=${projectId}&quarter1=${quarter1}&quarter2=${quarter2}`, undefined, true);
+      const response = await apiRequest('get', `/feedback/history/compare/?project_id=${projectId}&quarter1=${quarter1}&quarter2=${quarter2}`, undefined, true);
       
       if (response.data.success) {
         setComparisonData(response.data.comparison);
