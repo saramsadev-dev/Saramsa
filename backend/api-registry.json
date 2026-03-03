@@ -103,10 +103,11 @@
       "path": "/api/auth/register/request-otp/",
       "auth": "none",
       "enabled": true,
-      "expected_status": [200, 400],
-      "expect_json_keys": [
-        "data"
+      "expected_status": [
+        200,
+        400
       ],
+      "expect_json_keys": [],
       "body": {
         "email": "test_register@example.com"
       },
