@@ -116,3 +116,83 @@ To configure the hook: `git config core.hooksPath .githooks`
    python scripts/sync_api_registry_from_swagger.py
    python scripts/test_api_registry.py --notify-slack
    ```
+
+## Local Dev Workflow & Checks
+
+- **Backend sanity before push**:
+  - Run Django tests locally when changing backend logic:
+    ```bash
+    cd backend
+    python -m venv venv
+    venv\Scripts\activate
+    pip install -r requirements.txt
+    python manage.py test
+    ```
+  - Optionally run the API registry scripts manually if you want to see the same checks as the pre-push hook:
+    ```bash
+    python scripts/sync_api_registry_from_swagger.py
+    python scripts/test_api_registry.py --notify-slack
+    ```
+- **Frontend sanity before push**:
+  - From `saramsa-ai/`:
+    ```bash
+    npm install
+    npm run build
+    ```
+  - If `npm run lint` exists, run it before opening a PR.
+
+The pre-push hook is the final guardrail for the backend API registry. GitHub Actions workflows then run full CI/CD for backend, frontend, and Celery.
+
+## CI/CD Pipelines
+
+- **Backend (`saramsa-backend`)**:
+  - Workflow: `.github/workflows/master_saramsa-backend.yml`
+  - Trigger: push to `master` touching `backend/**`
+  - Steps (simplified):
+    - Create/restore Python virtualenv and install `backend/requirements.txt`
+    - Run Django tests
+    - Run `collectstatic`
+    - Zip backend code into `artifact/backend.zip`
+    - Login to Azure and deploy zip to `saramsa-backend` App Service
+    - Hit a configurable `BACKEND_HEALTH_URL` (GitHub secret) to verify the deployment
+
+- **Frontend (`saramsa-fe`)**:
+  - Workflow: `.github/workflows/master_saramsa-fe.yml`
+  - Trigger: push to `master` touching `saramsa-ai/**`
+  - Steps (simplified):
+    - Install Node.js and `npm ci`
+    - Optionally run `npm run lint` if a `lint` script exists
+    - Build the Next.js app with `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_API_BASE_URL` pointed at the backend
+    - Package the standalone output into `frontend.zip`
+    - Deploy `frontend.zip` to `saramsa-fe` App Service using the publish profile
+    - Hit a configurable `FRONTEND_HEALTH_URL` (GitHub secret) to verify the deployment
+
+- **Celery GPU worker (`saramsa-celery-gpu`)**:
+  - Base image workflow: `.github/workflows/celery-gpu-base-image.yml`
+    - Builds and pushes a GPU base image to `saramsaacr` when requirements change.
+  - App image workflow: `.github/workflows/master_saramsa-celery-gpu.yml`
+    - Builds a Celery GPU worker image on top of the base image
+    - Pushes to `saramsaacr`
+    - Updates the `saramsa-celery-gpu` Container App to the new image
+    - Polls the Container App health until the latest revision is `Healthy`
+
+- **API Registry Tests**:
+  - Workflow: `.github/workflows/api-registry-tests.yml`
+  - Trigger: push or PR touching `backend/**`
+  - Steps:
+    - Sync API registry from the live Swagger spec
+    - Run API registry tests against the deployed backend (with Slack notifications on failure)
+
+## DevOps Agent (Codex/Cursor)
+
+Use a dedicated DevOps agent when CI/CD or the pre-push hook fails.
+
+- **Overview**:
+  - The DevOps agent focuses on keeping backend, frontend, and Celery deployments healthy.
+  - It fixes build, test, and deployment issues rather than adding new features.
+- **Where to find full instructions**:
+  - See `DEVOPS_AGENT.md` for:
+    - Detailed scope and responsibilities.
+    - Expected inputs (pre-push errors, CI logs, Azure logs).
+    - Step-by-step behavior and guardrails.
+    - Incident runbook and example prompts.

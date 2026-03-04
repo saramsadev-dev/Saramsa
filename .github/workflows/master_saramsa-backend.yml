@@ -47,6 +47,20 @@ jobs:
           source .venv/bin/activate
           uv pip install -r requirements.txt
 
+      - name: Run Django tests
+        env:
+          DJANGO_SETTINGS_MODULE: apis.settings
+          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
+          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
+          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          source .venv/bin/activate
+          python manage.py test
+
       - name: Run Django collectstatic
         env:
           DJANGO_SETTINGS_MODULE: apis.settings
@@ -89,3 +103,25 @@ jobs:
           AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
           AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+
+      - name: Verify backend health
+        env:
+          HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
+        run: |
+          if [ -z "$HEALTH_URL" ]; then
+            echo "BACKEND_HEALTH_URL is not set; skipping health check."
+            exit 0
+          fi
+
+          echo "Checking backend health at $HEALTH_URL"
+          for i in 1 2 3; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo "Backend health check succeeded."
+              exit 0
+            fi
+            echo "Health check attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "Backend health check failed after 3 attempts."
+          exit 1

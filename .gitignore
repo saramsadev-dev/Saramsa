@@ -83,6 +83,8 @@ dist/
 *.tmp
 *.temp
 .pre-push-prompt.txt
+ai_failures/
+.ci_watch_state.json
 
 # Local JSON DB (temporary Cosmos replacement)
 backend/local_db/
