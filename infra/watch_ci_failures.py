@@ -51,15 +51,28 @@ def gh_api_runs() -> List[Dict[str, Any]]:
     """Return recent workflow runs for the current repo using gh CLI."""
     cmd = [
         gh_cmd(),
-        "api",
-        "repos/:owner/:repo/actions/runs",
-        "--paginate",
-        "-F",
-        "per_page=20",
+        "run",
+        "list",
+        "--json",
+        "databaseId,workflowName,conclusion,headBranch,headSha",
+        "--limit",
+        "20",
     ]
     out = subprocess.check_output(cmd, cwd=ROOT, text=True)
-    data = json.loads(out)
-    return data.get("workflow_runs", [])
+    runs = json.loads(out)
+    # Normalize to a shape similar to the actions/runs API for downstream code.
+    norm: List[Dict[str, Any]] = []
+    for r in runs:
+        norm.append(
+            {
+                "id": r.get("databaseId"),
+                "name": r.get("workflowName"),
+                "conclusion": r.get("conclusion"),
+                "head_branch": r.get("headBranch"),
+                "head_sha": r.get("headSha"),
+            }
+        )
+    return norm
 
 
 def download_artifacts(run_id: int) -> Path:
