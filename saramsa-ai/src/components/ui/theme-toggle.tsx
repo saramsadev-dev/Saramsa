@@ -25,11 +25,11 @@ export function ThemeToggle() {
       onClick={() => setTheme(isLight ? 'dark' : 'light')}
       variant="ghost"
       size="icon"
-      className="h-11 w-11 rounded-full bg-card/10 backdrop-blur-sm border border-white/20 dark:border-border/60 hover:bg-card/20 dark:hover:bg-accent/60 transition-all duration-300 group"
+      className="h-11 w-11 rounded-full border border-border/70 bg-card/90 hover:bg-accent/70 transition-all duration-300 group"
       aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
     >
       {isDark ? (
-        <Sun className="w-5 h-5 text-white group-hover:text-saramsa-brand transition-colors" />
+        <Sun className="w-5 h-5 text-foreground group-hover:text-saramsa-brand transition-colors" />
       ) : (
         <Moon className="w-5 h-5 text-muted-foreground group-hover:text-saramsa-brand transition-colors" />
       )}

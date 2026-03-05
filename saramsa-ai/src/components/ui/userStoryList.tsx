@@ -731,7 +731,7 @@ export const UserStoryList = ({
       case "low":
         return "bg-green-500 text-white";
       default:
-        return "bg-secondary/400 text-white";
+        return "bg-secondary text-secondary-foreground border border-border";
     }
   };
 

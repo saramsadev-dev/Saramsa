@@ -300,10 +300,10 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
           >
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-xl font-semibold text-white drop-shadow">
+                <h2 className="text-xl font-semibold text-foreground dark:text-white">
                   Why link Jira?
                 </h2>
-                <p className="text-sm text-white/80">
+                <p className="text-sm text-muted-foreground dark:text-white/80">
                   Create issues directly from feedback, synchronize updates, and keep teams aligned without switching tools.
                 </p>
               </div>
@@ -322,19 +322,19 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
                     description: "We detect existing connections and let you manage multiple Jira accounts with ease."
                   }
                 ].map((item) => (
-                  <div key={item.title} className="rounded-2xl border border-white/20 bg-card/10 p-4">
-                    <p className="text-sm font-medium text-white/90">{item.title}</p>
-                    <p className="mt-1 text-xs text-white/70">
+                  <div key={item.title} className="rounded-2xl border border-border/60 bg-card/70 p-4">
+                    <p className="text-sm font-medium text-foreground dark:text-white/90">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground dark:text-white/70">
                       {item.description}
                     </p>
                   </div>
                 ))}
               </div>
-              <div className="rounded-2xl border border-white/20 bg-black/20 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-white/70">
+              <div className="rounded-2xl border border-border/60 bg-secondary/50 p-4 dark:bg-black/20">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground dark:text-white/70">
                   Need help?
                 </p>
-                <p className="mt-2 text-sm text-white/85">
+                <p className="mt-2 text-sm text-foreground dark:text-white/85">
                   Reach out to your Saramsa.ai admin to enable Jira integrations for your workspace.
                 </p>
               </div>
