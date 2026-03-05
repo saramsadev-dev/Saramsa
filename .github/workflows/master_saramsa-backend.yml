@@ -28,6 +28,20 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Prepare CI requirements
+        run: |
+          awk '{
+            if ($0 ~ /^-e git\+https:\/\/github.com\/RakeshMahendran\/Saramsa.git@/ && $0 ~ /subdirectory=celery_ops/) {
+              print "-e ../celery_ops"
+            } else if ($0 ~ /^torch==/ && $0 ~ /\+/) {
+              split($0, a, "==")
+              split(a[2], b, "+")
+              print "torch==" b[1]
+            } else {
+              print $0
+            }
+          }' requirements.txt > requirements.ci.txt
+
       - name: Cache virtualenv
         id: cache-venv
         uses: actions/cache@v4
@@ -43,17 +57,6 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip
-          awk '{
-            if ($0 ~ /^-e git\+https:\/\/github.com\/RakeshMahendran\/Saramsa.git@/ && $0 ~ /subdirectory=celery_ops/) {
-              print "-e ../celery_ops"
-            } else if ($0 ~ /^torch==/ && $0 ~ /\+/) {
-              split($0, a, "==")
-              split(a[2], b, "+")
-              print "torch==" b[1]
-            } else {
-              print $0
-            }
-          }' requirements.txt > requirements.ci.txt
           pip install -r requirements.ci.txt
 
       - name: Run Django tests
@@ -86,9 +89,12 @@ jobs:
 
       - name: Create deployment bundle
         run: |
+          cp requirements.txt requirements.txt.bak
+          cp requirements.ci.txt requirements.txt
           mkdir -p ../artifact
           rm -f ../artifact/backend.zip
           zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
+          mv requirements.txt.bak requirements.txt
 
       - name: Login to Azure
         uses: azure/login@v2
