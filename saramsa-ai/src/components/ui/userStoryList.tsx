@@ -398,7 +398,7 @@ export const UserStoryList = ({
     }
 
     // Use the id field (which contains the proper user_xxxxx format) instead of user_id
-    let userId = user.id || user.user_id || user.username || '';
+    const userId = user.id || user.user_id || user.username || '';
     
     // Check if user_id is in the correct format
     if (userId && !userId.startsWith('user_')) {

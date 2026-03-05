@@ -279,10 +279,10 @@ export function PipelineStatusWidget() {
   }, [analysisStatus]);
 
   const stageIcons = [
-    <Upload className="h-3.5 w-3.5" />,
-    <Cpu className="h-3.5 w-3.5" />,
-    <Sparkles className="h-3.5 w-3.5" />,
-    <Wrench className="h-3.5 w-3.5" />,
+    <Upload key="ingestion" className="h-3.5 w-3.5" />,
+    <Cpu key="processing" className="h-3.5 w-3.5" />,
+    <Sparkles key="synthesis" className="h-3.5 w-3.5" />,
+    <Wrench key="work-items" className="h-3.5 w-3.5" />,
   ];
 
   const commentCount = Array.isArray(loadedComments)
