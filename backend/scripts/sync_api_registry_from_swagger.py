@@ -112,7 +112,7 @@ def _schema_hash(meta):
 
 def main():
     _load_dotenv(DOTENV_PATH)
-    base_url = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+    base_url = os.getenv("API_BASE_URL") or "http://127.0.0.1:8000"
     schema = _fetch_schema(base_url)
     registry = _load_registry()
 

@@ -46,11 +46,36 @@ jobs:
       - name: Login to ACR
         run: az acr login --name $ACR_NAME
 
+      - name: Resolve base image tag
+        id: base_tag
+        run: |
+          CANDIDATE="${{ steps.hash.outputs.tag }}"
+          if az acr repository show-tags \
+            --name "$ACR_NAME" \
+            --repository "$GPU_BASE_IMAGE_REPO" \
+            --query "[?@=='$CANDIDATE'] | [0]" -o tsv | grep -q .; then
+            TAG="$CANDIDATE"
+            echo "Using computed base tag: $TAG"
+          else
+            TAG=$(az acr repository show-tags \
+              --name "$ACR_NAME" \
+              --repository "$GPU_BASE_IMAGE_REPO" \
+              --orderby time_desc \
+              --top 1 \
+              --query "[0]" -o tsv)
+            if [ -z "$TAG" ]; then
+              echo "No tags found for $GPU_BASE_IMAGE_REPO in $ACR_NAME"
+              exit 1
+            fi
+            echo "Computed tag '$CANDIDATE' not found. Falling back to latest tag: $TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Build app image
         run: |
           docker build \
             -f Dockerfile.celery-gpu \
-            --build-arg BASE_IMAGE=$ACR_REGISTRY/$GPU_BASE_IMAGE_REPO:${{ steps.hash.outputs.tag }} \
+            --build-arg BASE_IMAGE=$ACR_REGISTRY/$GPU_BASE_IMAGE_REPO:${{ steps.base_tag.outputs.tag }} \
             -t $ACR_REGISTRY/$APP_IMAGE_REPO:${{ github.sha }} \
             .
 
