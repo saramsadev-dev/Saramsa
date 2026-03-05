@@ -816,358 +816,265 @@ export const UserStoryList = ({
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header Info */}
-      <div className="text-sm text-muted-foreground dark:text-muted-foreground">
-        User story generation based on the uploaded feedback analysis for {getPlatformDisplayName()}
-      </div>
+  const draftItems = actionItems.filter(actionItem => {
+    const submittedItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
+    return !submittedItem?.submitted;
+  });
+  const submittedItems = getSubmittedWorkItems();
 
+  const renderAccordionItem = (item: ActionItem, isSubmitted: boolean, submittedData?: any) => {
+    const isExpanded = expandedDescriptionIds[item.id] === true;
+    const isSelected = selectedActions.includes(item.id);
+
+    return (
+      <div
+        key={item.id}
+        className={`rounded-xl border transition-all duration-200 ${
+          isSubmitted
+            ? 'border-emerald-500/20 bg-emerald-500/5'
+            : isSelected
+            ? 'border-saramsa-brand/30 bg-saramsa-brand/5'
+            : 'border-border/60 bg-card/40'
+        }`}
+      >
+        {/* Collapsed Row */}
+        <div
+          className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+          onClick={() => toggleDescription(item.id)}
+        >
+          {/* Checkbox */}
+          {!isSubmitted ? (
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(e) => {
+                handleActionSelect(item.id);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0"
+            />
+          ) : (
+            <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+          )}
+
+          {/* Expand Arrow */}
+          <ChevronRight
+            className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 ${
+              isExpanded ? 'rotate-90' : ''
+            }`}
+          />
+
+          {/* Type Icon */}
+          <span className="shrink-0">{getTypeIcon(item.type || 'feature')}</span>
+
+          {/* Title */}
+          <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
+            {item.title}
+          </span>
+
+          {/* Badges */}
+          <Badge className={`text-[10px] px-1.5 py-0 shrink-0 ${getPriorityColor(item.priority || 'medium')}`}>
+            {item.priority}
+          </Badge>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+            {item.type}
+          </Badge>
+          {isSubmitted && (
+            <Badge className="text-[10px] px-1.5 py-0 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 shrink-0">
+              Pushed
+            </Badge>
+          )}
+
+          {/* Edit button */}
+          {!isSubmitted && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditAction(item);
+              }}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+            >
+              <Edit className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
+
+        {/* Expanded Content */}
+        {isExpanded && (
+          <div className="px-4 pb-4 pt-1 border-t border-border/40 space-y-3">
+            {/* Description + Acceptance in two columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Description</p>
+                <p className="text-sm text-foreground/80 leading-relaxed">
+                  {item.description || 'No description.'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1">Acceptance Criteria</p>
+                <p className="text-sm text-foreground/80 leading-relaxed">
+                  {item.acceptance || 'Not defined.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Tags */}
+            {item.tags && item.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {item.tags.map((tag, i) => (
+                  <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-secondary/70 text-foreground">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Related Insights */}
+            {renderRelatedInsights(item.id)}
+
+            {/* Submitted info */}
+            {isSubmitted && submittedData && (
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+                {submittedData.submittedAt && (
+                  <span>Submitted {new Date(submittedData.submittedAt).toLocaleDateString()}</span>
+                )}
+                {submittedData.external_work_item_id && (
+                  <span>ID: {submittedData.external_work_item_id}</span>
+                )}
+                {submittedData.external_url && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={() => window.open(submittedData.external_url, '_blank')}
+                    className="text-xs text-emerald-600 dark:text-emerald-400 h-auto p-0"
+                  >
+                    <Send className="w-3 h-3 mr-1" />
+                    View in {getPlatformDisplayName()}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
           <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
         </div>
       )}
 
-      {/* Action Items (from deep analysis) - Filter out submitted items */}
-      {actionItems.filter(actionItem => {
-        const submittedItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
-        return !submittedItem?.submitted;
-      }).length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            Generated Work Items ({actionItems.filter(actionItem => {
-              const submittedItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
-              return !submittedItem?.submitted;
-            }).length})
+      {/* Header + Action Buttons */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold text-foreground">
+            Work Items
           </h3>
-          {actionItems.filter(actionItem => {
-            const submittedItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
-            return !submittedItem?.submitted;
-          }).map((actionItem: ActionItem, index: number) => (
-            <motion.div
-              key={actionItem.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              className="bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60 rounded-xl p-4"
-            >
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  checked={selectedActions.includes(actionItem.id)}
-                  onCheckedChange={() => handleActionSelect(actionItem.id)}
-                  className="mt-1"
-                  disabled={currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id)?.submitted === true}
-                />
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-foreground dark:text-foreground">
-                      {actionItem.title}
-                    </h4>
-                    <Badge
-                      variant={
-                        actionItem.priority === "high" || actionItem.priority === "critical"
-                          ? "destructive"
-                          : actionItem.priority === "medium"
-                          ? "default"
-                          : "secondary"
-                      }
-                    >
-                      {actionItem.priority}
-                    </Badge>
-                    <Badge variant="outline">{actionItem.type}</Badge>
-                  </div>
-                  {renderDescription(actionItem.description, `draft-${actionItem.id}`)}
-                  {actionItem.acceptance && (
-                    <div className="text-xs text-muted-foreground dark:text-muted-foreground">
-                      <strong>Acceptance Criteria:</strong> {actionItem.acceptance}
-                    </div>
-                  )}
-                  {actionItem.tags && actionItem.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {actionItem.tags.map((tag, tagIndex) => (
-                        <Badge key={tagIndex} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  {renderRelatedInsights(actionItem.id)}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleEditAction(actionItem)}
-                  className="text-muted-foreground hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
-              </div>
-            </motion.div>
-          ))}
+          {draftItems.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {draftItems.length} draft{submittedItems.length > 0 ? `, ${submittedItems.length} pushed` : ''}
+            </span>
+          )}
         </div>
-      )}
-
-      {/* Features and Actions */}
-      {features.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            Features ({features.length})
-          </h3>
-          {features.map((feature: Feature, featureIndex: number) => (
-          <motion.div
-            key={feature.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: featureIndex * 0.1 }}
-            className="space-y-4"
-          >
-            {/* Feature Header with Collapse */}
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => toggleFeatureCollapse(feature.name)}
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-accent/60 dark:hover:bg-accent/60"
-              >
-                {collapsedFeatures.has(feature.name) ? (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                )}
-              </Button>
-              <Badge className={`px-3 py-1 ${feature.color || 'bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand'}`}>
-                {feature.name}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {feature.actions.length} items
-              </span>
-            </div>
-
-            {/* Action Items - Collapsible */}
-            {!collapsedFeatures.has(feature.name) && (
-              <div className="space-y-4 ml-6">
-                {feature.actions.map(
-                  (action: ActionItem, actionIndex: number) => (
-                    <motion.div
-                      key={action.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{
-                        duration: 0.4,
-                        delay: featureIndex * 0.1 + actionIndex * 0.05,
-                      }}
-                    >
-                      <Card className="bg-card/90 dark:bg-card/95 border border-border/60 dark:border-border/60 hover:shadow-md transition-all duration-300">
-                        <CardContent className="p-6">
-                          <div className="space-y-4">
-                            {/* Action Header */}
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-start gap-3 flex-1">
-                                <Checkbox
-                                  checked={selectedActions.includes(action.id)}
-                                  onCheckedChange={() =>
-                                    handleActionSelect(action.id)
-                                  }
-                                  className="mt-1"
-                                  disabled={currentProjectUserStoryWorkItems.find(item => item.id === action.id)?.submitted === true}
-                                />
-                                <div className="space-y-1 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    {getTypeIcon(action.type || "feature")}
-                                    <h4 className="font-medium text-foreground dark:text-foreground">
-                                      {action.title}
-                                    </h4>
-                                    <Badge
-                                      className={`px-2 py-1 text-xs ${getPriorityColor(
-                                        action.priority || "medium"
-                                      )}`}
-                                    >
-                                      {action.priority}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditAction(action)}
-                                className="text-saramsa-brand hover:text-saramsa-brand/80 hover:bg-saramsa-brand/10"
-                              >
-                                <Edit className="w-4 h-4 mr-1" />
-                                Edit
-                              </Button>
-                            </div>
-
-                            {/* Action Details Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                              {/* Description */}
-                              <div className="space-y-2">
-                                <h5 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
-                                  Description
-                                </h5>
-                                {renderDescription(action.description, `feature-${action.id}`)}
-                              </div>
-
-                              {/* Acceptance Criteria */}
-                              <div className="space-y-2">
-                                <h5 className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
-                                  Acceptance Criteria
-                                </h5>
-                                <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                                  {action.acceptance ||
-                                    "Define acceptance criteria for this user story."}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Tags */}
-                            {action.tags && action.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {action.tags.map(
-                                  (tag: string, index: number) => (
-                                    <Badge
-                                      key={index}
-                                      variant="outline"
-                                      className="text-xs bg-secondary/40 dark:bg-secondary/40"
-                                    >
-                                      {tag}
-                                    </Badge>
-                                  )
-                                )}
-                              </div>
-                            )}
-                            {renderRelatedInsights(action.id)}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  )
-                )}
-              </div>
-            )}
-          </motion.div>
-        ))}
-        </div>
-      )}
-
-      {/* Pushed to Jira/Azure Section */}
-      {getSubmittedWorkItems().length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            Pushed to {getPlatformDisplayName()} ({getSubmittedWorkItems().length})
-          </h3>
-          <div className="space-y-3">
-            {getSubmittedWorkItems().map((workItem: any, index: number) => (
-              <motion.div
-                key={workItem.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <h4 className="font-medium text-foreground dark:text-foreground">
-                        {workItem.title}
-                      </h4>
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200">
-                        Submitted
-                      </Badge>
-                      <Badge variant="outline">{workItem.type}</Badge>
-                    </div>
-                    {renderDescription(workItem.description, `submitted-${workItem.id}`)}
-                    {renderRelatedInsights(workItem.id)}
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground dark:text-muted-foreground">
-                      <span>
-                        <strong>Submitted:</strong> {new Date(workItem.submittedAt).toLocaleDateString()} at {new Date(workItem.submittedAt).toLocaleTimeString()}
-                      </span>
-                      {workItem.external_work_item_id && (
-                        <span>
-                          <strong>ID:</strong> {workItem.external_work_item_id}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {workItem.external_url && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(workItem.external_url, '_blank')}
-                      className="text-green-600 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/20"
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      View in {getPlatformDisplayName()}
-                    </Button>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="flex items-center gap-4 pt-6 border-t border-border/60 dark:border-border/60">
-        {onRegenerateAnalysis && (
+        <div className="flex items-center gap-2">
+          {selectedActions.length > 0 && (
+            <span className="text-xs text-muted-foreground mr-1">{selectedActions.length} selected</span>
+          )}
           <Button
-            onClick={onRegenerateAnalysis}
-            disabled={isAnalyzing}
             variant="outline"
-            className="text-saramsa-brand border-saramsa-brand/20 hover:bg-saramsa-brand/10 dark:text-saramsa-brand dark:border-saramsa-brand/30 dark:hover:bg-saramsa-brand/20"
+            size="sm"
+            onClick={handleDeleteSelected}
+            disabled={selectedActions.length === 0}
+            className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20 h-8 text-xs"
           >
-            {isAnalyzing ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-saramsa-brand/30 border-t-blue-600 rounded-full animate-spin" />
-                <span>Generating...</span>
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            Delete
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleReviewClick}
+            disabled={selectedActions.length === 0 || isPushing || qualityLoading}
+            className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white h-8 text-xs px-3"
+          >
+            {isPushing || qualityLoading ? (
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>{qualityLoading ? 'Checking...' : 'Pushing...'}</span>
               </div>
             ) : (
-              <span>Regenerate Analysis</span>
+              <div className="flex items-center gap-1.5">
+                <Send className="w-3.5 h-3.5" />
+                <span>{isDraftProject ? 'Configure & Push' : 'Review & Push'}</span>
+              </div>
             )}
           </Button>
-        )}
-
-        <Button
-          onClick={handleReviewClick}
-          disabled={selectedActions.length === 0 || isPushing || qualityLoading}
-          className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white px-6"
-        >
-          {isPushing || qualityLoading ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>{qualityLoading ? "Checking..." : "Pushing..."}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Send className="w-4 h-4" />
-              <span>
-                {isDraftProject 
-                  ? "Configure Integration to Push" 
-                  : `Review & Push`
-                }
-              </span>
-            </div>
-          )}
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={handleDeleteSelected}
-          disabled={selectedActions.length === 0}
-          className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
-        >
-          <Trash2 className="w-4 h-4 mr-2" />
-          Delete Selected
-        </Button>
-
-        <div className="text-sm text-muted-foreground dark:text-muted-foreground">
-          {selectedActions.length} items selected
         </div>
       </div>
+
+      {/* Draft Work Items */}
+      {draftItems.length > 0 && (
+        <div className="space-y-1.5">
+          {draftItems.map((item) => renderAccordionItem(item, false))}
+        </div>
+      )}
+
+      {/* Feature-grouped items */}
+      {features.length > 0 && features.map((feature: Feature) => (
+        <div key={feature.id} className="space-y-1.5">
+          <div
+            className="flex items-center gap-2 cursor-pointer select-none py-1"
+            onClick={() => toggleFeatureCollapse(feature.name)}
+          >
+            <ChevronRight
+              className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${
+                !collapsedFeatures.has(feature.name) ? 'rotate-90' : ''
+              }`}
+            />
+            <Badge className={`text-xs ${feature.color || 'bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand'}`}>
+              {feature.name}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{feature.actions.length} items</span>
+          </div>
+          {!collapsedFeatures.has(feature.name) && (
+            <div className="space-y-1.5 ml-4">
+              {feature.actions.map((action: ActionItem) => renderAccordionItem(action, false))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Pushed Items */}
+      {submittedItems.length > 0 && (
+        <div className="space-y-1.5 pt-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Pushed to {getPlatformDisplayName()}
+          </p>
+          {submittedItems.map((workItem: any) => {
+            // Build a pseudo ActionItem for the renderer
+            const pseudoAction: ActionItem = {
+              id: workItem.id,
+              title: workItem.title,
+              description: workItem.description,
+              type: workItem.type || 'feature',
+              priority: workItem.priority || 'medium',
+              acceptance: workItem.acceptance_criteria || workItem.acceptance || '',
+              tags: workItem.tags || workItem.labels || [],
+              featureArea: workItem.feature_area || '',
+              status: 'done',
+              submitted: true,
+              createdAt: workItem.created_at || '',
+              updatedAt: workItem.submittedAt || '',
+            };
+            return renderAccordionItem(pseudoAction, true, workItem);
+          })}
+        </div>
+      )}
 
       {/* Edit Drawer */}
       <EditActionDrawer

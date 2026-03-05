@@ -1,12 +1,10 @@
 'use client';
 
-import { CheckCircle2, RefreshCw, TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, RefreshCw, AlertCircle, ChevronRight, MessageSquareQuote } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { CompactSentimentBar } from './CompactSentimentBar';
-
-// Compact Sentiment Bar Component
-
 
 interface FeatureSentiment {
   name: string;
@@ -32,7 +30,7 @@ interface FeatureSentimentsTableProps {
   onFeatureToggle: (featureName: string) => void;
   onRegenerateAnalysis?: () => void;
   hasEditedFeaturesProp?: boolean;
-  hasComments?: boolean; // Add this prop
+  hasComments?: boolean;
 }
 
 export const FeatureSentimentsTable = ({
@@ -43,19 +41,15 @@ export const FeatureSentimentsTable = ({
   hasEditedFeaturesProp,
   hasComments
 }: FeatureSentimentsTableProps) => {
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
 
-  const getSentimentIcon = (positive: number, negative: number, neutral: number) => {
-    const max = Math.max(positive, negative, neutral);
-    if (max === positive) return <TrendingUp className="w-4 h-4 text-saramsa-brand" />;
-    if (max === negative) return <TrendingDown className="w-4 h-4 text-saramsa-gradient-to" />;
-    return <Minus className="w-4 h-4 text-muted-foreground" />;
-  };
-
-  const getSentimentColor = (positive: number, negative: number, neutral: number) => {
-    const max = Math.max(positive, negative, neutral);
-    if (max === positive) return 'text-saramsa-brand';
-    if (max === negative) return 'text-saramsa-gradient-to';
-    return 'text-muted-foreground';
+  const toggleExpand = (name: string) => {
+    setExpandedFeatures(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
   };
 
   if (!features || features.length === 0) {
@@ -77,7 +71,8 @@ export const FeatureSentimentsTable = ({
   }
 
   return (
-    <div className="relative z-[900] space-y-6">
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-foreground">
@@ -92,7 +87,7 @@ export const FeatureSentimentsTable = ({
             className="border-border/70 text-foreground hover:bg-secondary/60"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Regenerate Analysis
+            Regenerate
           </Button>
         )}
         {hasEditedFeaturesProp && !hasComments && (
@@ -102,160 +97,165 @@ export const FeatureSentimentsTable = ({
           </div>
         )}
       </div>
-      
-      <div className="overflow-hidden">
-          {/* Table Header */}
-          <div className="grid grid-cols-5 gap-4 pb-4 border-b border-border/70">
-            <div className="text-sm font-semibold text-muted-foreground">
-              Select
-            </div>
-            <div className="text-sm font-semibold text-muted-foreground">
-              Feature
-            </div>
-            <div className="text-sm font-semibold text-muted-foreground col-span-2">
-              Description
-            </div>
-            <div className="text-sm font-semibold text-center text-muted-foreground">
-              Sentiment
-            </div>
-          </div>
 
-          {/* Table Rows */}
-          <div className="space-y-2">
-            {features.map((feature, index) => (
-              <div 
-                key={index} 
-                className={`grid grid-cols-5 gap-4 py-4 rounded-xl transition-all duration-200 ${
-                  selectedFeatures.includes(feature.name)
-                    ? 'bg-secondary/60 border border-border/70'
-                    : 'hover:bg-secondary/40 border border-transparent'
-                }`}
+      {/* Accordion Cards */}
+      <div className="space-y-2">
+        {features.map((feature, index) => {
+          const isExpanded = expandedFeatures.has(feature.name);
+          const isSelected = selectedFeatures.includes(feature.name);
+          const hasPositive = (feature.sample_comments?.positive?.length ?? 0) > 0;
+          const hasNegative = (feature.sample_comments?.negative?.length ?? 0) > 0;
+          const hasEvidence = hasPositive || hasNegative;
+
+          return (
+            <div
+              key={index}
+              className={`rounded-xl border transition-all duration-200 ${
+                isSelected
+                  ? 'border-saramsa-brand/30 bg-saramsa-brand/5'
+                  : 'border-border/60 bg-card/40'
+              }`}
+            >
+              {/* Collapsed Header Row */}
+              <div
+                className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+                onClick={() => toggleExpand(feature.name)}
               >
-                {/* Checkbox Column */}
-                <div className="flex items-center justify-center">
-                  <Button
-                    onClick={() => onFeatureToggle(feature.name)}
-                    variant="ghost"
-                    size="icon"
-                    className={`h-5 w-5 rounded-full border-2 transition-all duration-200 ${
-                      selectedFeatures.includes(feature.name)
-                        ? 'bg-foreground border-foreground text-background'
-                        : 'border-border/70 hover:border-saramsa-brand/50'
-                    }`}
-                  >
-                    {selectedFeatures.includes(feature.name) && (
-                      <CheckCircle2 className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-                
-                {/* Feature Name Column */}
-                <div className="text-sm text-foreground">
-                  <div className="font-medium">
+                {/* Expand Arrow */}
+                <ChevronRight
+                  className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 ${
+                    isExpanded ? 'rotate-90' : ''
+                  }`}
+                />
+
+                {/* Select Checkbox */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onFeatureToggle(feature.name);
+                  }}
+                  className={`w-4 h-4 rounded-full border-2 shrink-0 transition-all duration-200 flex items-center justify-center ${
+                    isSelected
+                      ? 'bg-foreground border-foreground'
+                      : 'border-border/70 hover:border-saramsa-brand/50'
+                  }`}
+                >
+                  {isSelected && <CheckCircle2 className="w-3 h-3 text-background" />}
+                </button>
+
+                {/* Feature Name */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground truncate">
                     {feature.name}
-                    {feature.comment_count && (
-                      <span className="text-muted-foreground font-normal ml-1">
-                        ({feature.comment_count})
-                      </span>
-                    )}
-                    {feature.isEdited && (
-                      <Badge className="ml-2 bg-secondary/70 text-foreground text-xs">
-                        Edited
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Description Column - Expanded */}
-                <div className="text-sm text-muted-foreground col-span-2">
-                  <p className="line-clamp-3 leading-relaxed">
-                    {feature.description}
-                  </p>
-                  {feature.keywords && feature.keywords.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {feature.keywords.slice(0, 4).map((keyword: string, i: number) => (
-                        <span 
-                          key={i} 
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-secondary/70 text-foreground"
-                        >
-                          {keyword}
-                        </span>
-                      ))}
-                      {feature.keywords.length > 4 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-secondary/70 text-muted-foreground">
-                          +{feature.keywords.length - 4}
-                        </span>
-                      )}
-                    </div>
+                  </span>
+                  {feature.comment_count != null && (
+                    <span className="text-xs text-muted-foreground ml-1.5">
+                      ({feature.comment_count})
+                    </span>
                   )}
-                  {(feature.sample_comments?.positive?.length ||
-                    feature.sample_comments?.negative?.length) && (
-                    <div className="mt-3 space-y-2">
-                      {feature.sample_comments?.positive?.length ? (
-                        <div>
-                          <p className="text-xs font-semibold text-emerald-600">
-                            Positive Comments
-                          </p>
-                          <div className="mt-1 space-y-1">
-                            {feature.sample_comments.positive.slice(0, 10).map((c, i) => (
-                              <p key={`pos-${i}`} className="text-xs text-foreground/90">
-                                {c}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                      {feature.sample_comments?.negative?.length ? (
-                        <div>
-                          <p className="text-xs font-semibold text-rose-600">
-                            Negative Comments
-                          </p>
-                          <div className="mt-1 space-y-1">
-                            {feature.sample_comments.negative.slice(0, 10).map((c, i) => (
-                              <p key={`neg-${i}`} className="text-xs text-foreground/90">
-                                {c}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
+                  {feature.isEdited && (
+                    <Badge className="ml-2 bg-secondary/70 text-foreground text-[10px] py-0">
+                      Edited
+                    </Badge>
                   )}
                 </div>
-                
-                {/* Compact Sentiment Visualization */}
-                <div className="flex items-center justify-center">
-                  <CompactSentimentBar 
+
+                {/* Evidence indicator */}
+                {hasEvidence && !isExpanded && (
+                  <MessageSquareQuote className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                )}
+
+                {/* Sentiment Bar */}
+                <div className="shrink-0">
+                  <CompactSentimentBar
                     positive={feature.sentiment.positive}
                     negative={feature.sentiment.negative}
                     neutral={feature.sentiment.neutral}
                   />
                 </div>
-
               </div>
-            ))}
-          </div>
+
+              {/* Expanded Content */}
+              {isExpanded && (
+                <div className="px-4 pb-4 pt-1 border-t border-border/40 space-y-3">
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {feature.description}
+                  </p>
+
+                  {/* Keywords */}
+                  {feature.keywords && feature.keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {feature.keywords.map((keyword, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-secondary/70 text-foreground"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Evidence Comments — two columns */}
+                  {hasEvidence && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                      {hasPositive && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                            Positive ({feature.sample_comments!.positive!.length})
+                          </p>
+                          <div className="space-y-1 max-h-[160px] overflow-y-auto pr-1">
+                            {feature.sample_comments!.positive!.slice(0, 10).map((c, i) => (
+                              <p
+                                key={`pos-${i}`}
+                                className="text-xs text-foreground/80 pl-2 border-l-2 border-emerald-500/30 leading-relaxed"
+                              >
+                                {c}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {hasNegative && (
+                        <div className="space-y-1.5">
+                          <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                            Negative ({feature.sample_comments!.negative!.length})
+                          </p>
+                          <div className="space-y-1 max-h-[160px] overflow-y-auto pr-1">
+                            {feature.sample_comments!.negative!.slice(0, 10).map((c, i) => (
+                              <p
+                                key={`neg-${i}`}
+                                className="text-xs text-foreground/80 pl-2 border-l-2 border-rose-500/30 leading-relaxed"
+                              >
+                                {c}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Selection Status */}
       {selectedFeatures.length > 0 && (
-        <div className="p-4 bg-secondary/60 rounded-xl border border-border/70">
+        <div className="p-3 bg-secondary/60 rounded-xl border border-border/70">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-foreground rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-background" />
+            <div className="w-6 h-6 bg-foreground rounded-full flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-3 h-3 text-background" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Selected for Interactive Charts
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {selectedFeatures.join(', ')}
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{selectedFeatures.length} selected</span> for interactive charts: {selectedFeatures.join(', ')}
+            </p>
           </div>
         </div>
       )}
-
     </div>
   );
 };
