@@ -32,7 +32,7 @@ jobs:
         run: |
           awk '{
             if ($0 ~ /^-e git\+https:\/\/github.com\/RakeshMahendran\/Saramsa.git@/ && $0 ~ /subdirectory=celery_ops/) {
-              print "-e ../celery_ops"
+              next
             } else if ($0 ~ /^torch==/ && $0 ~ /\+/) {
               split($0, a, "==")
               split(a[2], b, "+")
