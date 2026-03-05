@@ -35,6 +35,7 @@ jobs:
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: |
+          export API_BASE_URL="${API_BASE_URL:-https://saramsa-backend-h6b6edbjbcawbnee.centralus-01.azurewebsites.net}"
           python scripts/sync_api_registry_from_swagger.py
 
       - name: Run API registry tests (notify Slack on failures)
@@ -46,4 +47,5 @@ jobs:
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
+          export API_BASE_URL="${API_BASE_URL:-https://saramsa-backend-h6b6edbjbcawbnee.centralus-01.azurewebsites.net}"
           python scripts/test_api_registry.py --notify-slack

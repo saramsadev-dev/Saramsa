@@ -92,19 +92,33 @@ jobs:
       - name: Verify Container App revision health
         run: |
           echo "Checking health for Container App $CONTAINER_APP_NAME in $RESOURCE_GROUP"
-          for i in 1 2 3; do
-            STATE=$(az containerapp show \
+          REVISION=$(az containerapp show \
+            --name $CONTAINER_APP_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --query "properties.latestRevisionName" -o tsv)
+          if [ -z "$REVISION" ]; then
+            echo "Could not resolve latest revision name."
+            exit 1
+          fi
+          echo "Latest revision: $REVISION"
+
+          for i in 1 2 3 4 5; do
+            STATE=$(az containerapp revision list \
               --name $CONTAINER_APP_NAME \
               --resource-group $RESOURCE_GROUP \
-              --query "properties.latestRevisionHealthState" -o tsv)
-            echo "Latest revision health state: $STATE"
+              --query "[?name=='$REVISION'] | [0].properties.healthState" -o tsv)
+            RUNNING=$(az containerapp revision list \
+              --name $CONTAINER_APP_NAME \
+              --resource-group $RESOURCE_GROUP \
+              --query "[?name=='$REVISION'] | [0].properties.runningState" -o tsv)
+            echo "Revision state: health='$STATE' running='$RUNNING'"
             if [ "$STATE" = "Healthy" ]; then
               echo "Container App is healthy."
               exit 0
             fi
-            echo "Health state is '$STATE', retrying in 15s..."
-            sleep 15
+            echo "Revision health is '$STATE', retrying in 20s..."
+            sleep 20
           done
 
-          echo "Container App failed to reach Healthy state after 3 checks."
+          echo "Container App failed to reach Healthy revision state after retries."
           exit 1
