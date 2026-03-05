@@ -34,7 +34,6 @@ import {
 import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
 import { Sparkles } from 'lucide-react';
-import { AnalysisProjectSelector } from './AnalysisProjectSelector';
 import { UploadPanel } from './UploadPanel';
 import { MetricsCards } from './MetricsCards';
 import { FeatureSentimentsTable } from '../../dashboard/analysisDashboard/FeatureSentimentsTable';
@@ -144,6 +143,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const [wordCloudView, setWordCloudView] = useState<'split' | 'advanced'>('split');
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
+  const selectedProjectName = projects?.find((p: any) => p.id === (currentProjectId || projectId))?.name;
   const isProjectAnalyzing = isAnalyzing;
   const selectedPlatform = useMemo((): 'azure' | 'jira' | null => {
     if (!projects || !projects.length) return null;
@@ -1415,27 +1415,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   // Analysis loading is handled within the dashboard section
   if (projectsLoading && projects.length === 0) {
     return (
-      <div className="min-h-screen bg-secondary/40 dark:bg-background">
+      <div className="h-full overflow-hidden bg-secondary/40 dark:bg-background">
         {/* Main Content */}
         <main className="p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Project Selector & Navigation */}
+            {/* Navigation */}
             <div className="flex items-center justify-between">
-              {/* Unified Project Selector */}
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Select Project
-                </label>
-                <AnalysisProjectSelector
-                  projects={projects}
-                  selectedProjectId={currentProjectId}
-                  loading={projectsLoading}
-                  error={error}
-                  onProjectSelect={handleProjectSelect}
-                  onRefreshProjects={() => dispatch(fetchProjects())}
-                />
-              </div>
-
               {/* Navigation Tabs - Inlined */}
               <div className="flex bg-secondary/60 rounded-xl p-1">
                 <button
@@ -1508,116 +1493,30 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   }
 
   return (
-    <div className="min-h-screen bg-secondary/40 dark:bg-background">
-      {/* Top Bar - Full Width */}
-      <div className="p-6 pb-0">
-        <div className="max-w-[1400px] mx-auto">
-          <div className="flex items-center justify-between">
-            {/* Unified Project Selector */}
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">
-                Select Project
-              </label>
-              <AnalysisProjectSelector
-                projects={projects}
-                selectedProjectId={currentProjectId}
-                loading={projectsLoading}
-                error={error}
-                onProjectSelect={handleProjectSelect}
-                onRefreshProjects={() => dispatch(fetchProjects())}
-              />
-            </div>
-
-            {/* Navigation Tabs - Inlined */}
-            <div className="flex gap-4 items-center">
-              <div className="flex bg-secondary/60 rounded-xl p-1">
-                <button
-                  onClick={() => setActiveView('dashboard')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/50 focus-visible:ring-offset-1 ${
-                    activeView === 'dashboard'
-                      ? 'bg-background/90 text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Dashboard
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveView('user-stories');
-                    const effectiveProjectId = currentProjectId || personalProjectId;
-                    if (effectiveProjectId && user?.id) {
-                      console.log('🔄 Fetching user stories on tab switch...');
-                      const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
-                      const userId = user.id || user.user_id || user.username;
-                      console.log('🔍 Tab switch fetch params:', {
-                        projectId: formattedProjectId,
-                        userId,
-                        selectedPlatform,
-                        userObject: user
-                      });
-                      dispatch(fetchUserStoriesByProject({
-                        projectId: formattedProjectId,
-                        userId
-                      }));
-                    }
-                  }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/50 focus-visible:ring-offset-1 ${
-                    activeView === 'user-stories'
-                      ? 'bg-background/90 text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  User Stories
-                </button>
-              </div>
-
-              {/* Projects Button */}
-              <button
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.location.href = '/projects';
-                  }
-                }}
-                className="px-4 py-2 bg-foreground text-background rounded-lg hover:bg-foreground/90 transition-all duration-200 text-sm font-medium"
-              >
-                Projects
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two-Panel Layout */}
-      <div className="p-6">
-        <div className="max-w-[1400px] mx-auto flex gap-6 items-start">
-          {/* Left Panel - Analysis Run List */}
+    <div className="h-full flex flex-col overflow-hidden bg-secondary/40 dark:bg-background">
+      {/* Tabs + Panels in one seamless column */}
+      <div className="w-full flex flex-col flex-1 min-h-0">
+        {/* Two-Panel Layout */}
+        <div className="flex gap-6 items-stretch flex-1 min-h-0 pr-6 pb-4">
+          {/* Left Panel - Analysis Run List + Upload */}
           <AnalysisRunList
             entries={analysisHistory}
             selectedId={selectedAnalysisId}
             isLoading={historyLoading}
             onSelect={handleRunSelect}
             onRename={handleRunRename}
-            projectName={projects?.find((p: any) => p.id === (currentProjectId || projectId))?.name}
+            projectName={selectedProjectName}
+            topFile={topFile}
+            topError={error || topError}
+            isAnalyzing={isAnalyzing}
+            onFileSelect={setTopFile}
+            onAnalyze={handleTopAnalyze}
           />
 
           {/* Right Panel - Main Content */}
-          <main className="flex-1 min-w-0 space-y-6">
+          <main className="flex-1 min-w-0 space-y-6 overflow-y-auto pr-2">
 
-          {activeView === 'dashboard' ? (
             <>
-              {/* Upload Panel - Always visible */}
-              <UploadPanel
-                dbProjectId={currentProjectId}
-                topFile={topFile}
-                topError={error || topError}
-                loadedComments={loadedComments}
-                topUploading={isAnalyzing}
-                onFileSelect={setTopFile}
-                onAnalyze={handleTopAnalyze}
-                onCloudConnect={handleCloudConnect}
-                isAnalyzing={isAnalyzing}
-              />
-
               {/* Dismissible error banner above results */}
               {(error || topError) && (
                 <div className="flex items-center justify-between gap-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
@@ -1643,137 +1542,33 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 <LoaderForDashboard />
               ) : (
                 <>
-                  {/* Summary Info */}
-                  <div className="text-sm text-muted-foreground">
-                    {hasAnalysisResults ? (
-                      <>Current file summary based on the data uploaded as of {
-                        (() => {
-                          // Try to get the most recent timestamp
-                          const analysisDate = activeAnalysisData?.createdAt;
-                          const deepAnalysisDate = activeAnalysisData?.deepAnalysis?.generated_at;
-                          
-                          // Use the most recent date available
-                          const timestamp = deepAnalysisDate || analysisDate;
-                          
-                          if (timestamp) {
-                            return new Date(timestamp).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            });
-                          } else {
-                            return new Date().toLocaleDateString();
-                          }
-                        })()
-                      }
-                      </>
-                    ) : (
-                      <>No analysis data available yet. Upload a file above to get started.</>
-                    )}
-                  </div>
-
                   {/* Metrics Cards */}
                   {hasAnalysisResults && <MetricsCards metrics={metrics} />}
 
+                  {/* Feature Sentiments Table */}
                   {hasAnalysisResults && (
-                    <>
-                      {/* Feature Sentiments Table */}
-                      {hasAnalysisResults && (
-                        <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
-                            <FeatureSentimentsTable
-                              features={transformedFeatures}
-                              selectedFeatures={selectedFeatures}
-                              onFeatureToggle={(featureName) => {
-                                setSelectedFeatures(prev => 
-                                  prev.includes(featureName) 
-                                    ? prev.filter(name => name !== featureName)
-                                    : [...prev, featureName]
-                                );
-                              }}
-                              onRegenerateAnalysis={handleRegenerateAnalysis}
-                              hasEditedFeaturesProp={Object.keys(editedKeywords).length > 0}
-                              hasComments={!!loadedComments && loadedComments.length > 0}
-                            />
-                        </div>
-                      )}
-
-                      <SentimentCharts
-                        featureSentimentData={featureSentimentData}
-                        sentimentData={sentimentData}
-                        selectedFeatures={selectedFeatures}
-                      />
-                    </>
-                  )}
-
-                  {/* Keywords Analysis */}
-                  {hasAnalysisResults && (
-                    <div className="space-y-4">
-                      {/* Word Cloud View Toggle */}
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-foreground">
-                          Word Cloud Analysis
-                        </h3>
-                        {/* <div className="flex bg-secondary/60 rounded-xl p-1">
-                          <button
-                            onClick={() => setWordCloudView('split')}
-                            className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
-                              wordCloudView === 'split' 
-                                ? 'bg-background/90 text-foreground shadow-sm' 
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            Split View
-                          </button>
-                          <button
-                            onClick={() => setWordCloudView('advanced')}
-                            className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-200 ${
-                              wordCloudView === 'advanced' 
-                                ? 'bg-background/90 text-foreground shadow-sm' 
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            Advanced View
-                          </button>
-                        </div> */}
-                      </div>
-
-                      {/* Word Cloud Components */}
-                      {wordCloudView === 'split' ? (
-                        <KeywordCloud
-                          positiveKeywords={
-                            activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) => 
-                              typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                            ) || []
-                          }
-                          negativeKeywords={
-                            activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) => 
-                              typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                            ) || []
-                          }
+                    <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
+                        <FeatureSentimentsTable
+                          features={transformedFeatures}
+                          selectedFeatures={selectedFeatures}
+                          onFeatureToggle={(featureName) => {
+                            setSelectedFeatures(prev =>
+                              prev.includes(featureName)
+                                ? prev.filter(name => name !== featureName)
+                                : [...prev, featureName]
+                            );
+                          }}
+                          onRegenerateAnalysis={handleRegenerateAnalysis}
+                          hasEditedFeaturesProp={Object.keys(editedKeywords).length > 0}
+                          hasComments={!!loadedComments && loadedComments.length > 0}
                         />
-                      ) : (
-                        <AdvancedWordCloud
-                          positiveKeywords={
-                            activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) => 
-                              typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                            ) || []
-                          }
-                          negativeKeywords={
-                            activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) => 
-                              typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                            ) || []
-                          }
-                        />
-                      )}
                     </div>
                   )}
                 </>
               )}
             </>
-          ) : activeView === 'user-stories' ? (
-            /* User Stories View */
+
+            {/* User Stories Section */}
             <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
               {isGeneratingUserStories ? (
                 <div className="flex flex-col items-center justify-center py-12">
@@ -2022,7 +1817,72 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 })()
               )}
             </div>
-          ) : null}
+
+            {/* Sentiment Charts */}
+            {hasAnalysisResults && (
+              <SentimentCharts
+                featureSentimentData={featureSentimentData}
+                sentimentData={sentimentData}
+                selectedFeatures={selectedFeatures}
+              />
+            )}
+
+            {/* Keywords Analysis */}
+            {hasAnalysisResults && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    Word Cloud Analysis
+                  </h3>
+                </div>
+
+                {wordCloudView === 'split' ? (
+                  <KeywordCloud
+                    positiveKeywords={
+                      activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                    negativeKeywords={
+                      activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                  />
+                ) : (
+                  <AdvancedWordCloud
+                    positiveKeywords={
+                      activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                    negativeKeywords={
+                      activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Summary Info */}
+            {hasAnalysisResults && (
+              <div className="text-xs text-muted-foreground/70 text-right">
+                Analysis from {(() => {
+                  const analysisDate = activeAnalysisData?.createdAt;
+                  const deepAnalysisDate = activeAnalysisData?.deepAnalysis?.generated_at;
+                  const timestamp = deepAnalysisDate || analysisDate;
+                  if (timestamp) {
+                    return new Date(timestamp).toLocaleDateString('en-US', {
+                      year: 'numeric', month: 'long', day: 'numeric',
+                      hour: '2-digit', minute: '2-digit'
+                    });
+                  }
+                  return new Date().toLocaleDateString();
+                })()}
+              </div>
+            )}
 
           </main>
         </div>

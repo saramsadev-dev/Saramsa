@@ -230,7 +230,7 @@ export default function ProjectDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-full overflow-hidden bg-background">
       {/* Dashboard Content */}
       {EnhancedDashboard}
     </div>
