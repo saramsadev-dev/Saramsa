@@ -31,8 +31,7 @@ import {
 } from '../../../store/features/userStories/userStoriesSlice';
 
 
-import type { AnalysisData } from '../../../lib/uploadService';
-import { uploadService } from '@/lib/uploadService';
+import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
 import { Sparkles } from 'lucide-react';
 import { AnalysisProjectSelector } from './AnalysisProjectSelector';
@@ -67,6 +66,23 @@ interface DashboardProps {
   onProjectSelect?: (projectId: string) => void;
   initialProjectId?: string;
   skipBootstrapFetches?: boolean; // when true, parent handles projects/integrations fetching
+}
+
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+function validateSelectedFile(file: File): { isValid: boolean; error?: string } {
+  const name = file.name.toLowerCase();
+  const isSupported = name.endsWith('.csv') || name.endsWith('.json');
+  if (!isSupported) {
+    return { isValid: false, error: 'Please upload a CSV or JSON file.' };
+  }
+  if (file.size <= 0) {
+    return { isValid: false, error: 'Selected file is empty.' };
+  }
+  if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+    return { isValid: false, error: 'File is too large. Max size is 10MB.' };
+  }
+  return { isValid: true };
 }
 
 export function DashboardComponent({ data, onProjectSelect, initialProjectId, skipBootstrapFetches = false }: DashboardProps) {
@@ -740,7 +756,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       setTopError('Please select a file first');
       return;
     }
-    const validation = uploadService.validateFile(topFile);
+    const validation = validateSelectedFile(topFile);
     if (!validation.isValid) {
       setTopError(validation.error);
       return;
