@@ -1497,7 +1497,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       {/* Tabs + Panels in one seamless column */}
       <div className="w-full flex flex-col flex-1 min-h-0">
         {/* Two-Panel Layout */}
-        <div className="flex gap-6 items-stretch flex-1 min-h-0 pr-6 pb-4">
+        <div className="flex gap-6 items-stretch flex-1 min-h-0 pb-4">
           {/* Left Panel - Analysis Run List + Upload */}
           <AnalysisRunList
             entries={analysisHistory}
@@ -1514,7 +1514,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           />
 
           {/* Right Panel - Main Content */}
-          <main className="flex-1 min-w-0 space-y-6 overflow-y-auto pr-2">
+          <main className="flex-1 min-w-0 space-y-6 overflow-y-auto pr-2 scrollbar-thin">
 
             <>
               {/* Dismissible error banner above results */}
