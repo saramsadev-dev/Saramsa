@@ -209,7 +209,7 @@ class TrendService:
     def _extract_pipeline_status(self, analysis: Dict[str, Any]) -> Optional[str]:
         narration = analysis.get("narration") or {}
         meta = narration.get("_meta") if isinstance(narration, dict) else None
-        if isinstance(meta, dict) and meta.get("status") == "FALLBACK":
+        if isinstance(meta, dict) and meta.get("status") != "OK":
             return "PARTIAL"
         return "COMPLETE"
 

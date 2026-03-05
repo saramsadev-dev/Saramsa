@@ -6,7 +6,9 @@ Deterministic inputs are trimmed and validated before/after the call.
 """
 
 from typing import Dict, Any, List, Optional
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from asgiref.sync import async_to_sync
 from datetime import datetime
@@ -31,70 +33,44 @@ class NarrationService:
     last_cost = None
 
     def generate_narratives(self, narration_input: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate narratives with strict schema validation and deterministic trimming."""
+        """Generate narratives with strict schema validation and deterministic trimming.
+
+        Raises on failure so callers see the real error instead of silent mock data.
+        """
         trimmed = self._trim_input(narration_input)
         project_id = trimmed.get("project_id")
         analysis_id = trimmed.get("analysis_id")
         cache = get_cache_service()
 
-        # Hard cap: max narration calls per analysis = 1
         if analysis_id:
             if cache.get(f"narration_called:{analysis_id}"):
-                self.last_status = "HARD_CAP"
-                self.last_errors = ["max_narration_calls_per_analysis exceeded"]
-                result = self._fallback(trimmed)
-                result["_meta"] = {"status": "HARD_CAP", "errors": self.last_errors}
-                return result
+                raise RuntimeError("max_narration_calls_per_analysis exceeded")
             cache.set(f"narration_called:{analysis_id}", True, ttl=86400)
 
-        # Soft budgets + abuse throttles (skip narration only)
         if project_id and self._budget_exceeded(project_id):
-            self.last_status = "BUDGET_EXCEEDED"
-            self.last_errors = ["budget_exceeded"]
-            result = self._fallback(trimmed)
-            result["_meta"] = {"status": "BUDGET_EXCEEDED", "errors": self.last_errors}
-            return result
+            raise RuntimeError("Narration budget exceeded for this project")
         if project_id and self._throttle_exceeded(project_id):
-            self.last_status = "THROTTLED"
-            self.last_errors = ["throttled"]
-            result = self._fallback(trimmed)
-            result["_meta"] = {"status": "THROTTLED", "errors": self.last_errors}
-            return result
+            raise RuntimeError("Narration throttle exceeded for this project")
         if analysis_id and cache.get(f"analysis_failed:{analysis_id}"):
-            self.last_status = "THROTTLED"
-            self.last_errors = ["failed_analysis_retry"]
-            result = self._fallback(trimmed)
-            result["_meta"] = {"status": "THROTTLED", "errors": self.last_errors}
-            return result
+            raise RuntimeError("Cannot narrate a previously failed analysis")
+
         prompt = create_narration_prompt(trimmed)
 
-        try:
-            raw = async_to_sync(generate_completions)(prompt, max_tokens=self.MAX_OUTPUT_TOKENS)
-            parsed, errors = validate_narration_output(
-                raw,
-                allowed_aspect_keys=[f.get("aspect_key") for f in trimmed.get("features", [])],
-                allowed_candidate_ids=[c.get("candidate_id") for c in trimmed.get("work_item_candidates", [])],
-            )
-            if parsed is None:
-                logger.warning("Narration validation failed, using fallback: %s", errors)
-                self.last_status = "FALLBACK"
-                self.last_errors = errors
-                result = self._fallback(trimmed)
-                result["_meta"] = {"status": "FALLBACK", "errors": errors}
-                return result
-            self.last_status = "OK"
-            self.last_errors = None
-            parsed["_meta"] = {"status": "OK"}
-            self._record_usage(project_id, prompt, raw, cache_hit=False)
-            self._increment_usage_counters(project_id, prompt, raw)
-            return parsed
-        except Exception as e:
-            logger.warning(f"Narration generation failed, using fallback: {e}")
-            self.last_status = "FALLBACK"
-            self.last_errors = [str(e)]
-            result = self._fallback(trimmed)
-            result["_meta"] = {"status": "FALLBACK", "errors": [str(e)]}
-            return result
+        raw = self._call_generate_completions(prompt)
+        parsed, errors = validate_narration_output(
+            raw,
+            allowed_aspect_keys=[f.get("aspect_key") for f in trimmed.get("features", [])],
+            allowed_candidate_ids=[c.get("candidate_id") for c in trimmed.get("work_item_candidates", [])],
+        )
+        if parsed is None:
+            raise RuntimeError(f"Narration validation failed: {errors}")
+
+        self.last_status = "OK"
+        self.last_errors = None
+        parsed["_meta"] = {"status": "OK"}
+        self._record_usage(project_id, prompt, raw, cache_hit=False)
+        self._increment_usage_counters(project_id, prompt, raw)
+        return parsed
 
     def _trim_input(self, narration_input: Dict[str, Any]) -> Dict[str, Any]:
         """Deterministically trim evidence and keywords to budgets."""
@@ -124,59 +100,19 @@ class NarrationService:
 
         return trimmed
 
-    def _fallback(self, narration_input: Dict[str, Any]) -> Dict[str, Any]:
-        """Deterministic fallback narratives."""
-        insights = [
-            "Analysis completed using deterministic metrics.",
-            "Review feature-level sentiment for actionable areas.",
-            "Prioritize items based on negative sentiment and volume.",
-        ]
-        features = [
-            {
-                "aspect_key": f.get("aspect_key"),
-                "description": f"Customer feedback about {self._humanize_key(f.get('aspect_key'))}.",
-            }
-            for f in narration_input.get("features", [])
-            if isinstance(f, dict) and f.get("aspect_key")
-        ]
-        work_items = []
-        for c in narration_input.get("work_item_candidates", []):
-            if not isinstance(c, dict) or not c.get("candidate_id"):
-                continue
-            ctype = (c.get("type") or "").lower()
-            aspect_key = c.get("aspect_key", "")
-            reason = c.get("reason") or {}
-            if ctype == "taxonomy_gap":
-                title = "Review taxonomy gaps in customer feedback"
-                desc = (
-                    "A large portion of feedback could not be mapped to existing categories. "
-                    "Review unmapped comments and expand the taxonomy to capture recurring themes."
-                )
-            else:
-                label = self._humanize_key(aspect_key)
-                neg_pct = reason.get("neg_pct", 0)
-                count = reason.get("comment_count", 0)
-                title = f"Improve {label} based on customer feedback"
-                desc = (
-                    f"{label} has {neg_pct:.0%} negative sentiment across {count} comments. "
-                    f"Investigate root causes and address the top concerns."
-                )
-            work_items.append({
-                "candidate_id": c.get("candidate_id"),
-                "title": title,
-                "description": desc,
-            })
-        return {
-            "insights": insights[:5],
-            "features": features,
-            "work_items": work_items,
-        }
+    def _call_generate_completions(self, prompt: str):
+        """Call async generate_completions from sync code. Safe when already inside an async event loop."""
+        def _run():
+            return async_to_sync(generate_completions)(prompt, max_tokens=self.MAX_OUTPUT_TOKENS)
 
-    @staticmethod
-    def _humanize_key(key: str) -> str:
-        if not key or key == "__taxonomy__":
-            return "taxonomy coverage"
-        return str(key).replace("_", " ").title()
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return _run()
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_run)
+            return future.result()
 
     def _record_usage(self, project_id: Optional[str], prompt: str, output: Any, cache_hit: bool) -> None:
         if not project_id:

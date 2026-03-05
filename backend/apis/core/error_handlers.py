@@ -56,12 +56,13 @@ def handle_service_errors(func: Callable) -> Callable:
                 error_type="resource-not-found"
             )
         except ConnectionError as e:
-            # External service connection errors
+            # External service connection errors (Azure OpenAI, Redis, etc.)
             func_name = getattr(func, '__name__', 'unknown_function')
             logger.error(f"Connection error in {func_name}: {e}")
+            detail = str(e).strip() or "Unable to connect to external service. Please try again later."
             return StandardResponse.error(
                 title="Service unavailable",
-                detail="Unable to connect to external service. Please try again later.",
+                detail=detail,
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 error_type="service-unavailable"
             )
@@ -125,12 +126,13 @@ def handle_async_service_errors(func: Callable) -> Callable:
                 error_type="resource-not-found"
             )
         except ConnectionError as e:
-            # External service connection errors
+            # External service connection errors (Azure OpenAI, Redis, etc.)
             func_name = getattr(func, '__name__', 'unknown_function')
             logger.error(f"Connection error in {func_name}: {e}")
+            detail = str(e).strip() or "Unable to connect to external service. Please try again later."
             return StandardResponse.error(
                 title="Service unavailable",
-                detail="Unable to connect to external service. Please try again later.",
+                detail=detail,
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 error_type="service-unavailable"
             )

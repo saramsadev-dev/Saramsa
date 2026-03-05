@@ -16,6 +16,7 @@ from .analysis_views import (
     TaskListView,
     TaskStreamView,
     AnalysisByIdView,
+    AnalysisRenameView,
 )
 from .insights_views import (
     InsightsListView,
@@ -48,6 +49,7 @@ __all__ = [
     'TaskListView',
     'TaskStreamView',
     'AnalysisByIdView',
+    'AnalysisRenameView',
     # Insights views
     'InsightsListView',
     'InsightDetailView',

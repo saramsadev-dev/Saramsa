@@ -12,6 +12,7 @@ import json
 import uuid
 import os
 from datetime import datetime, timezone
+from ..schemas.analysis_data_schema import validate_analysis_data
 
 logger = logging.getLogger(__name__)
 
@@ -76,16 +77,12 @@ class TaskService:
                 )
                 health.end_stage("llm_chunking")
 
-            # Mark partial/degraded/failed based on narration status
+            # Record narration cost if available
             try:
                 from .narration_service import get_narration_service
                 narration_status = getattr(get_narration_service(), "last_status", None)
-                if narration_status == "FALLBACK":
-                    health.mark_partial("narration_fallback")
-                if narration_status in ("BUDGET_EXCEEDED", "THROTTLED"):
-                    health.mark_degraded("budget_exceeded", narration_status.lower())
-                if narration_status == "HARD_CAP":
-                    health.mark_failed("narration_hard_cap")
+                if narration_status and narration_status != "OK":
+                    logger.warning(f"Narration status: {narration_status}")
             except Exception:
                 pass
 
@@ -156,9 +153,15 @@ class TaskService:
         
         # 3. Convert pipeline result to expected format
         normalized_result = self._convert_pipeline_result_to_schema(pipeline_result, comments)
+        try:
+            validate_analysis_data(normalized_result)
+        except Exception as e:
+            logger.error(f"Invalid analysisData schema (local pipeline): {e}")
+            raise ValueError(f"Invalid analysisData schema (local pipeline): {e}")
         
         # 4. Save to database
         insight_id = analysis_id
+        default_name = f"Run {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
         insight_data = {
             'id': f'insight_{insight_id}',
             'type': 'insight',
@@ -173,6 +176,7 @@ class TaskService:
             'run_id': run_id,
             'analysisData': normalized_result,
             'status': 'complete',
+            'name': default_name,
             'original_comments': comments,
             'feedback': comments,
             'company_name': company_name,
@@ -287,13 +291,19 @@ class TaskService:
         # 7. Aggregate using aggregation service (works directly from extracted_comments in memory)
         from .aggregation_service import get_aggregation_service
         aggregation_service = get_aggregation_service()
-        normalized = aggregation_service.aggregate_comment_extractions(extracted_comments)
+        normalized = aggregation_service.aggregate_comment_extractions(extracted_comments, comments)
         
         # Ensure counts match actual comment count (system of record)
         normalized['counts']['total'] = len(comments)
+        try:
+            validate_analysis_data(normalized)
+        except Exception as e:
+            logger.error(f"Invalid analysisData schema (llm chunking): {e}")
+            raise ValueError(f"Invalid analysisData schema (llm chunking): {e}")
         
         # 9. Save aggregated analysis to database with original comments included
         insight_id = analysis_id
+        default_name = f"Run {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
         insight_data = {
             'id': f'insight_{insight_id}',
             'type': 'insight',
@@ -308,6 +318,7 @@ class TaskService:
             'run_id': run_id,
             'analysisData': normalized,
             'status': 'complete',
+            'name': default_name,
             # Store original comments for retrieval (NEVER overwrite)
             'original_comments': comments,
             'feedback': comments,  # Alternative field name
@@ -475,7 +486,8 @@ class TaskService:
                 'description': feature['description'],
                 'sentiment': feature['sentiment'],
                 'keywords': feature['keywords'],
-                'comment_count': feature['comment_count']
+                'comment_count': feature['comment_count'],
+                'sample_comments': feature.get('sample_comments')
             })
         
         # Calculate overall sentiment from aggregated stats

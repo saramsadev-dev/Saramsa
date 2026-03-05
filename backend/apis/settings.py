@@ -3,9 +3,10 @@ import os
 import ssl
 from datetime import timedelta
 from dotenv import load_dotenv
-load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Load .env from backend directory so Django and Celery see the same vars no matter where the process is started
+load_dotenv(BASE_DIR / ".env")
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 
@@ -443,3 +444,4 @@ REGISTRATION_OTP_EMAIL_SUBJECT = os.getenv('REGISTRATION_OTP_EMAIL_SUBJECT', 'Yo
 REGISTRATION_OTP_TTL_MINUTES = int(os.getenv('REGISTRATION_OTP_TTL_MINUTES', '10'))
 REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv('REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS', '60'))
 REGISTRATION_OTP_MAX_ATTEMPTS = int(os.getenv('REGISTRATION_OTP_MAX_ATTEMPTS', '5'))
+REGISTRATION_OTP_BYPASS = os.getenv('REGISTRATION_OTP_BYPASS', '').lower() in ('true', '1', 'yes')

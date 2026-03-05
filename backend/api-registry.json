@@ -190,6 +190,21 @@
       "schema_hash": "f7b840d2120786bf"
     },
     {
+      "name": "feedback_analysis_rename_create",
+      "method": "POST",
+      "path": "/api/feedback/analysis/{analysis_id}/rename/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "body": {
+        "name": "Sprint 3 Run"
+      },
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
       "name": "feedback_history_retrieve",
       "method": "GET",
       "path": "/api/feedback/history/",

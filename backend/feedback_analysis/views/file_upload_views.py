@@ -6,6 +6,7 @@ Moved from old uploadFile app to feedback_analysis app for better organization.
 """
 
 from datetime import datetime
+import os
 from rest_framework.views import APIView
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -333,6 +334,7 @@ class FeedbackFileUploadView(APIView):
                 "analysisType": "commentSentiment",
                 "rawLlm": formatted_result.get("rawLlm", {}),
                 "analysisData": formatted_result.get("analysisData", {}),
+                "name": os.path.splitext(file_name)[0] if file_name else None,
                 # Store original comments for retrieval (same as task service)
                 "original_comments": original_comments,
                 "feedback": original_comments,  # Alternative field name

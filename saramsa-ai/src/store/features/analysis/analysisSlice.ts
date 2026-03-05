@@ -9,6 +9,15 @@ interface ProjectContext {
   is_draft?: boolean;
 }
 
+export interface AnalysisHistoryEntry {
+  id: string;
+  analysis_date: string;
+  comments_count: number;
+  positive_pct: number;
+  status: string;
+  name?: string;
+}
+
 interface AnalysisState {
   analysisData: AnalysisData | null;
   deepAnalysis: any | null;
@@ -25,6 +34,12 @@ interface AnalysisState {
   taskId: string | null;
   analysisStatus: 'idle' | 'pending' | 'processing' | 'success' | 'failure';
   pollingInterval: number | null;
+  // Analysis history
+  analysisHistory: AnalysisHistoryEntry[];
+  historyLoading: boolean;
+  historyError: string | null;
+  selectedAnalysisId: string | null;
+  fetchingAnalysisById: boolean;
 }
 
 const initialState: AnalysisState = {
@@ -43,6 +58,12 @@ const initialState: AnalysisState = {
   taskId: null,
   analysisStatus: 'idle',
   pollingInterval: null,
+  // Analysis history
+  analysisHistory: [],
+  historyLoading: false,
+  historyError: null,
+  selectedAnalysisId: null,
+  fetchingAnalysisById: false,
 };
 
 
@@ -118,7 +139,7 @@ export const analyzeComments = createAsyncThunk<
                   const analysis = analysisData.analysis;
                   resolve({
                     id: analysis.id || taskResult.insight_id,
-                    analysisData: analysis.result ?? analysis
+                    analysisData: analysis.analysisData ?? analysis.result ?? analysis
                   });
                   return;
                 }
@@ -277,21 +298,24 @@ export const generateUserStories = createAsyncThunk<
     return userStoriesData || response.data;
   } catch (err: any) {
     console.error('❌ generateUserStories error:', err);
+    const status = err.response?.status;
+    const body = err.response?.data;
+    const apiDetail = typeof body?.detail === 'string' ? body.detail : body?.data?.detail;
+
     let errorMessage = `${data.platform === 'jira' ? 'Jira' : 'Azure'} work items generation failed. Please try again.`;
 
-    // Handle timeout errors specifically
     if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
       errorMessage = 'Work item generation is taking longer than expected. This may happen with large datasets. Please try again or reduce the number of comments.';
-    } else if (err.response?.status === 401) {
-      errorMessage = 'Authentication required. Please login again.';
-    } else if (err.response?.status === 400) {
-      errorMessage = err.response?.data?.error || err.response?.data?.detail || 'Invalid input data.';
-    } else if (err.response?.status >= 500) {
-      errorMessage = 'Server error. Please try again later.';
+    } else if (status === 401) {
+      errorMessage = apiDetail || 'Authentication required. Please login again.';
+    } else if (status === 400) {
+      errorMessage = body?.error || apiDetail || 'Invalid input data.';
+    } else if (status === 503 || (status && status >= 500)) {
+      errorMessage = apiDetail || (status === 503 ? 'Service unavailable. Please try again later.' : 'Server error. Please try again later.');
     } else if (err.message) {
       errorMessage = err.message;
     }
-    
+
     console.error('❌ Final error message:', errorMessage);
     return rejectWithValue(errorMessage);
   }
@@ -341,6 +365,94 @@ export const submitUserStories = createAsyncThunk<
   }
 });
 
+// Async thunk for fetching analysis history for a project
+export const fetchAnalysisHistory = createAsyncThunk<
+  AnalysisHistoryEntry[],
+  string,
+  { rejectValue: string }
+>('analysis/fetchAnalysisHistory', async (projectId, { rejectWithValue }) => {
+  try {
+    const response = await apiRequest('get', `/feedback/history/?project_id=${projectId}`, undefined, true);
+    const analyses: any[] = response.data?.data?.analyses ?? [];
+    return analyses.map((a: any): AnalysisHistoryEntry => {
+      const counts = a.analysisData?.counts ?? a.result?.counts ?? a.counts ?? {};
+      const total = Number(a.comments_count ?? counts.total ?? 0);
+      const positive = Number(counts.positive ?? 0);
+      return {
+        id: a.id,
+        analysis_date: a.createdAt ?? a.analysis_date ?? a._ts ?? '',
+        comments_count: total,
+        positive_pct: total > 0 ? Math.round((positive / total) * 100) : 0,
+        status: a.status ?? 'completed',
+        name: a.name ?? a.run_name ?? a.analysis_name ?? a.file_name,
+      };
+    });
+  } catch (err: any) {
+    let errorMessage = 'Failed to load analysis history.';
+    if (err.response?.status === 401) {
+      errorMessage = 'Authentication required. Please login again.';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Async thunk for fetching a single analysis by ID
+export const fetchAnalysisById = createAsyncThunk<
+  any,
+  string,
+  { rejectValue: string }
+>('analysis/fetchAnalysisById', async (analysisId, { rejectWithValue }) => {
+  try {
+    const response = await apiRequest('get', `/feedback/analysis/${analysisId}/`, undefined, true);
+    return response.data?.data ?? response.data;
+  } catch (err: any) {
+    let errorMessage = 'Failed to load analysis.';
+    if (err.response?.status === 401) {
+      errorMessage = 'Authentication required. Please login again.';
+    } else if (err.response?.status === 404) {
+      errorMessage = 'Analysis not found.';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Async thunk for renaming an analysis run
+export const renameAnalysisRun = createAsyncThunk<
+  { id: string; name: string | null },
+  { id: string; name: string },
+  { rejectValue: string }
+>('analysis/renameAnalysisRun', async ({ id, name }, { rejectWithValue }) => {
+  try {
+    const trimmed = (name ?? '').trim();
+    const payload = { name: trimmed.length > 0 ? trimmed : null };
+    const response = await apiRequest('post', `/feedback/analysis/${encodeURIComponent(id)}/rename/`, payload, true);
+    const data = response.data?.data;
+    if (!data || typeof data.id !== 'string' || !('name' in data)) {
+      throw new Error('Rename response missing updated name.');
+    }
+    return {
+      id: data.id,
+      name: data.name === null || typeof data.name === 'string' ? data.name : null
+    };
+  } catch (err: any) {
+    let errorMessage = 'Failed to rename analysis run.';
+    if (err.response?.status === 401) {
+      errorMessage = 'Authentication required. Please login again.';
+    } else if (err.response?.status === 403) {
+      errorMessage = 'You do not have permission to rename this run.';
+    } else if (err.response?.status === 404) {
+      errorMessage = 'Analysis not found.';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    return rejectWithValue(errorMessage);
+  }
+});
+
 const analysisSlice = createSlice({
   name: 'analysis',
   initialState,
@@ -350,6 +462,43 @@ const analysisSlice = createSlice({
       state.deepAnalysis = null;
       state.error = null;
       state.projectContext = null;
+      state.analysisHistory = [];
+      state.historyLoading = false;
+      state.historyError = null;
+      state.selectedAnalysisId = null;
+      state.fetchingAnalysisById = false;
+    },
+    setSelectedAnalysisId: (state, action: PayloadAction<string | null>) => {
+      state.selectedAnalysisId = action.payload;
+    },
+    prependToHistory: (state, action: PayloadAction<AnalysisHistoryEntry>) => {
+      const entry = action.payload;
+      // Remove duplicate if exists, then prepend
+      state.analysisHistory = [
+        entry,
+        ...state.analysisHistory.filter(e => e.id !== entry.id),
+      ];
+    },
+    replaceInHistory: (state, action: PayloadAction<{ oldId: string; entry: AnalysisHistoryEntry }>) => {
+      const idx = state.analysisHistory.findIndex(e => e.id === action.payload.oldId);
+      if (idx >= 0) {
+        state.analysisHistory[idx] = action.payload.entry;
+      } else {
+        // Fallback: prepend if not found
+        state.analysisHistory = [
+          action.payload.entry,
+          ...state.analysisHistory,
+        ];
+      }
+    },
+    removeFromHistory: (state, action: PayloadAction<string>) => {
+      state.analysisHistory = state.analysisHistory.filter(e => e.id !== action.payload);
+    },
+    renameHistoryEntry: (state, action: PayloadAction<{ id: string; name: string }>) => {
+      const entry = state.analysisHistory.find(e => e.id === action.payload.id);
+      if (entry) {
+        entry.name = action.payload.name;
+      }
     },
     clearError: (state) => {
       state.error = null;
@@ -384,7 +533,7 @@ const analysisSlice = createSlice({
         state.loading = false;
         state.error = null;
         const key = action.meta.arg.projectId ?? 'personal';
-        state.analyzingByProject[key] = false;
+        delete state.analyzingByProject[key];
         state.isAnalyzing = Object.values(state.analyzingByProject).some(Boolean);
         state.analysisStatus = 'success';
         state.taskId = null;
@@ -399,7 +548,7 @@ const analysisSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Analysis failed.';
         const key = action.meta.arg.projectId ?? 'personal';
-        state.analyzingByProject[key] = false;
+        delete state.analyzingByProject[key];
         state.isAnalyzing = Object.values(state.analyzingByProject).some(Boolean);
         state.analysisStatus = 'failure';
         state.taskId = null;
@@ -492,6 +641,38 @@ const analysisSlice = createSlice({
       .addCase(submitUserStories.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'User stories submission failed.';
+      })
+      // Analysis history
+      .addCase(fetchAnalysisHistory.pending, (state) => {
+        state.historyLoading = true;
+        state.historyError = null;
+      })
+      .addCase(fetchAnalysisHistory.fulfilled, (state, action) => {
+        state.historyLoading = false;
+        state.analysisHistory = action.payload;
+      })
+      .addCase(fetchAnalysisHistory.rejected, (state, action) => {
+        state.historyLoading = false;
+        state.historyError = action.payload || 'Failed to load history.';
+      })
+      // Fetch analysis by ID
+      .addCase(fetchAnalysisById.pending, (state) => {
+        state.fetchingAnalysisById = true;
+      })
+      .addCase(fetchAnalysisById.fulfilled, (state, action) => {
+        state.fetchingAnalysisById = false;
+        // Analysis data will be processed by the Dashboard component
+      })
+      .addCase(fetchAnalysisById.rejected, (state, action) => {
+        state.fetchingAnalysisById = false;
+        state.error = action.payload || 'Failed to load analysis.';
+      })
+      // Rename analysis run
+      .addCase(renameAnalysisRun.fulfilled, (state, action) => {
+        const entry = state.analysisHistory.find(e => e.id === action.payload.id);
+        if (entry) {
+          entry.name = action.payload.name || undefined;
+        }
       });
   },
 });
@@ -504,6 +685,11 @@ export const {
   setAnalysisData,
   setDeepAnalysis,
   setProjectContext,
+  setSelectedAnalysisId,
+  prependToHistory,
+  replaceInHistory,
+  removeFromHistory,
+  renameHistoryEntry,
 } = analysisSlice.actions;
 
 export default analysisSlice.reducer; 

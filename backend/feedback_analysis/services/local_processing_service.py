@@ -20,7 +20,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from aiCore.services.aspect_service_factory import get_aspect_service
 from aiCore.services.embedding_service import EmbeddingService
 from aiCore.services.local_sentiment_service import LocalSentimentService, SentimentResult
-from apis.prompts.synthesis_prompt import FALLBACK_RESPONSE_TEMPLATE
 from .narration_service import get_narration_service
 
 logger = logging.getLogger(__name__)
@@ -405,6 +404,7 @@ class LocalProcessingService:
         narrative_map = {f.get("aspect_key"): f.get("description") for f in narratives.get("features", [])}
         sentiment_counts_map = aggregated_stats.aspect_sentiment_counts
         features_out = []
+        feature_comment_buckets = self._build_feature_comment_buckets(matches)
         for feature in features:
             aspect_key = feature.get("aspect_key")
             total_comments = feature["metrics"]["comment_count"]
@@ -425,31 +425,14 @@ class LocalProcessingService:
                 },
                 "keywords": feature.get("keywords", []),
                 "comment_count": total_comments,
+                "sample_comments": feature_comment_buckets.get(aspect_key, {
+                    "positive": [],
+                    "negative": [],
+                    "neutral": []
+                }),
             })
 
         return narratives.get("insights", []), features_out, narratives.get("work_items", [])
-
-    def _build_fallback(self, aggregated_stats, aspects):
-        """Produce fallback insights/features/work_items when GPT call fails."""
-        insights = list(FALLBACK_RESPONSE_TEMPLATE["insights"])
-        work_items = list(FALLBACK_RESPONSE_TEMPLATE["work_items"])
-
-        features = []
-        for aspect, sentiment_counts in aggregated_stats.aspect_sentiment_counts.items():
-            if aspect == "UNMAPPED":
-                continue
-            total = sum(sentiment_counts.values())
-            if total == 0:
-                continue
-            features.append({
-                "feature": aspect,
-                "description": f"Customer feedback about {aspect}.",
-                "sentiment": {k.lower(): (v / total) * 100 for k, v in sentiment_counts.items()},
-                "keywords": aggregated_stats.aspect_keywords.get(aspect, [])[:5],
-                "comment_count": total,
-            })
-
-        return insights, features, work_items
 
     # ------------------------------------------------------------------
     # Evidence sampling (per-aspect, capped)
@@ -540,6 +523,38 @@ class LocalProcessingService:
     @staticmethod
     def _normalize_aspect_key(label: str) -> str:
         return str(label).strip().lower().replace(" ", "_")
+
+    def _build_feature_comment_buckets(self, matches: List[AspectMatch], limit: int = 10) -> Dict[str, Dict[str, List[str]]]:
+        """Build per-feature comment buckets split by sentiment (positive/negative/neutral)."""
+        buckets: Dict[str, Dict[str, List[str]]] = {}
+
+        def _add(bucket: Dict[str, List[str]], sentiment: str, text: str) -> None:
+            if not text:
+                return
+            key = sentiment.upper()
+            if key == "POSITIVE":
+                k = "positive"
+            elif key == "NEGATIVE":
+                k = "negative"
+            else:
+                k = "neutral"
+            existing = bucket[k]
+            if text in existing or len(existing) >= limit:
+                return
+            existing.append(text)
+
+        for m in matches:
+            for aspect in m.matched_aspects:
+                if aspect == "UNMAPPED":
+                    continue
+                aspect_key = self._normalize_aspect_key(aspect)
+                if aspect_key not in buckets:
+                    buckets[aspect_key] = {"positive": [], "negative": [], "neutral": []}
+                asp_sent = m.aspect_sentiments.get(aspect)
+                sentiment = asp_sent.sentiment if asp_sent else m.comment_sentiment.sentiment
+                _add(buckets[aspect_key], sentiment, m.comment_text)
+
+        return buckets
 
     @staticmethod
     def _confidence_to_score(confidence: str) -> float:

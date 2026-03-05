@@ -185,24 +185,3 @@ def _format_sample_comments(representative_samples: list) -> str:
         lines.append(f"... and {len(representative_samples) - 15} more comments")
     
     return "\n".join(lines)
-
-
-# Template for fallback when GPT synthesis fails
-FALLBACK_RESPONSE_TEMPLATE = {
-    "insights": [
-        "Customer feedback analysis completed using local ML pipeline",
-        "Sentiment patterns identified across multiple aspects",
-        "Recommendations available for product improvement"
-    ],
-    "features": [],  # Will be populated with actual data
-    "work_items": [
-        {
-            "title": "Review Customer Feedback Analysis Results",
-            "description": "Analyze the processed customer feedback data and identify specific action items",
-            "priority": "Medium",
-            "type": "Investigation",
-            "affected_feature": "General",
-            "estimated_impact": "Improved customer satisfaction through data-driven insights"
-        }
-    ]
-}

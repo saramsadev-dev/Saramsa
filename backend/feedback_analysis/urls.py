@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     AnalysisByIdView,
+    AnalysisRenameView,
     UpdateKeywordsView,
     InsightsListView,
     InsightDetailView,
@@ -14,6 +15,7 @@ from .views import (
 urlpatterns = [
     # Analysis by ID (unique to /api/feedback/)
     path('analysis/<str:analysis_id>/', AnalysisByIdView.as_view(), name='analysis_by_id'),
+    path('analysis/<str:analysis_id>/rename/', AnalysisRenameView.as_view(), name='analysis_rename'),
     path('keywords/update/', UpdateKeywordsView.as_view(), name='update_keywords'),
 
     # Insights list/detail (unique to /api/feedback/)

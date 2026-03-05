@@ -24,6 +24,7 @@ interface UploadPanelProps {
   onFileSelect: (file: File | null) => void;
   onAnalyze: () => Promise<void>;
   onCloudConnect: () => void;
+  isAnalyzing?: boolean;
 }
 
 export function UploadPanel({
@@ -35,6 +36,7 @@ export function UploadPanel({
   onFileSelect,
   onAnalyze,
   onCloudConnect,
+  isAnalyzing = false,
 }: UploadPanelProps) {
   const [activeTab, setActiveTab] = useState("file");
   const [isConnected, setIsConnected] = useState(false);
@@ -260,10 +262,9 @@ export function UploadPanel({
                       onClick={onAnalyze}
                       disabled={topUploading || !canAnalyze}
                       className="bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 gap-2 px-4"
-                      title={topUploading ? "Analyzing..." : "Analyze"}
                     >
                       <BarChart3 className="w-4 h-4 shrink-0" />
-                      <span>{topUploading ? "Analyzing..." : "Analyze"}</span>
+                      <span>Analyze</span>
                     </Button>
                     <Button
                       type="button"

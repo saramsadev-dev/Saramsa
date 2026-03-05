@@ -59,28 +59,22 @@ class AspectSuggestionService:
         prompt = self._build_aspect_suggestion_prompt(sample_comments)
         
         # Step 3: Call LLM with constrained prompt
-        try:
-            result = await generate_completions(prompt)
-            parsed_result = self._parse_llm_response(result)
-            
-            # Step 4: Validate and normalize response
-            validated_result = self._validate_aspect_suggestions(parsed_result)
-            
-            logger.info(
-                f"✅ Aspect suggestion completed: domain='{validated_result['identified_domain']}', "
-                f"aspects={len(validated_result['suggested_aspects'])}"
-            )
-            
-            # Add metadata
-            validated_result['sample_size'] = len(sample_comments)
-            validated_result['total_comments'] = len(comments)
-            
-            return validated_result
-            
-        except Exception as e:
-            logger.error(f"Error generating aspect suggestions: {e}", exc_info=True)
-            # Return fallback aspects
-            return self._get_fallback_aspects(len(comments))
+        result = await generate_completions(prompt)
+        parsed_result = self._parse_llm_response(result)
+
+        # Step 4: Validate and normalize response
+        validated_result = self._validate_aspect_suggestions(parsed_result)
+
+        logger.info(
+            f"✅ Aspect suggestion completed: domain='{validated_result['identified_domain']}', "
+            f"aspects={len(validated_result['suggested_aspects'])}"
+        )
+
+        # Add metadata
+        validated_result['sample_size'] = len(sample_comments)
+        validated_result['total_comments'] = len(comments)
+
+        return validated_result
     
     def _sample_comments(self, comments: List[str]) -> List[str]:
         """
@@ -250,40 +244,14 @@ Return ONLY valid JSON in the following format:
             logger.warning(f"Too few aspects ({len(cleaned_aspects)}), may need review")
         
         if not cleaned_aspects:
-            logger.warning("No valid aspects found, using fallback")
-            return self._get_fallback_aspects(0)
-        
+            raise ValueError(
+                "LLM returned no valid aspects. Ensure Azure OpenAI is configured "
+                "and the model can analyse the provided comments."
+            )
+
         return {
             "identified_domain": domain,
             "suggested_aspects": cleaned_aspects
-        }
-    
-    def _get_fallback_aspects(self, total_comments: int) -> Dict[str, Any]:
-        """
-        Get fallback aspect suggestions if LLM call fails.
-        
-        Args:
-            total_comments: Total number of comments (for metadata)
-            
-        Returns:
-            Fallback result with generic aspects
-        """
-        logger.warning("Using fallback aspect suggestions")
-        return {
-            "identified_domain": "General",
-            "suggested_aspects": [
-                "Product Quality",
-                "Customer Service",
-                "User Experience",
-                "Performance",
-                "Pricing",
-                "Features",
-                "Support",
-                "Reliability"
-            ],
-            "sample_size": 0,
-            "total_comments": total_comments,
-            "is_fallback": True
         }
 
 

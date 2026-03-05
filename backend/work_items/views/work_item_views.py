@@ -76,46 +76,59 @@ class WorkItemGenerationView(APIView):
 
         # Generate work items using DevOps service
         devops_service = get_devops_service()
-        result = await devops_service.generate_work_items_from_analysis(
-            analysis_data=analysis_data,
-            platform=platform,
-            process_template=process_template,
-            company_name=company_name,
-            project_metadata=project_metadata
-        )
+        try:
+            result = await devops_service.generate_work_items_from_analysis(
+                analysis_data=analysis_data,
+                platform=platform,
+                process_template=process_template,
+                company_name=company_name,
+                project_metadata=project_metadata
+            )
+        except ConnectionError:
+            raise
+        except Exception as e:
+            logger.error("Work item generation failed: %s", e, exc_info=True)
+            return StandardResponse.internal_server_error(
+                detail=f"Work item generation failed: {e}",
+                instance=request.path
+            )
+
+        work_items = result.get("work_items") or []
 
         # Add project context to work items
-        for item in result['work_items']:
+        for item in work_items:
             item["project_id"] = resolved_project_id
 
         # Save work items if project exists
-        if resolved_project_id:
+        if resolved_project_id and work_items:
             try:
                 analysis_id = None
                 if isinstance(analysis_data, dict):
-                    analysis_id = analysis_data.get("analysis_id") or analysis_data.get("id")
+                    raw = analysis_data.get("analysis_id") or analysis_data.get("id")
+                    if raw is not None and str(raw).strip().lower() not in ("", "none"):
+                        analysis_id = str(raw).strip()
                 saved_work_items = devops_service.create_work_items(
                     user_id=user_id_str,
-                    work_items=result['work_items'],
+                    work_items=work_items,
                     platform=platform,
                     project_id=resolved_project_id,
                     analysis_id=analysis_id
                 )
-                result['saved_id'] = saved_work_items.get('id')
+                result["saved_id"] = saved_work_items.get("id") if saved_work_items else None
             except Exception as e:
-                logger.warning(f"Failed to save work items: {e}")
+                logger.warning("Failed to save work items: %s", e)
 
         # Add context information
-        result['context'] = {
-            'project_id': resolved_project_id,
-            'project_status': project_doc.get("status", "draft" if is_draft else "active"),
-            'config_state': project_doc.get("config_state", "unconfigured" if is_draft else "complete"),
-            'is_draft': is_draft,
+        result["context"] = {
+            "project_id": resolved_project_id,
+            "project_status": project_doc.get("status", "draft" if is_draft else "active"),
+            "config_state": project_doc.get("config_state", "unconfigured" if is_draft else "complete"),
+            "is_draft": is_draft,
         }
-        
+
         # Add grouped work items for frontend compatibility
-        result['work_items_by_feature'] = devops_service.group_work_items_by_feature(result['work_items'])
-        
+        result["work_items_by_feature"] = devops_service.group_work_items_by_feature(work_items)
+
         return StandardResponse.success(data=result, message="Work items generated successfully")
 
 

@@ -805,6 +805,14 @@ class AnalysisByIdView(APIView):
                 instance=request.path
             )
 
+        include_comments_param = request.query_params.get("include_comments")
+        include_comments = str(include_comments_param).lower() in ("true", "1", "yes")
+        if not include_comments:
+            # Avoid sending full comment lists by default
+            analysis = dict(analysis)
+            analysis.pop("original_comments", None)
+            analysis.pop("feedback", None)
+
         project_id = analysis.get('projectId')
         if project_id and not self._has_project_access(request.user, project_id):
             return StandardResponse.forbidden(
@@ -880,6 +888,87 @@ class AnalysisByIdView(APIView):
             if item.get('submitted'):
                 logger.info(f"Work item {item.get('id')} is submitted: {item.get('submitted_to')} at {item.get('submitted_at')}")
         return work_items
+
+    def _has_project_access(self, user, project_id: str) -> bool:
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        if _get_role_from_user(user) == 'admin':
+            return True
+        user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
+        if not user_id:
+            return False
+        project = cosmos_service.get_project_by_id_any(project_id)
+        if isinstance(project, dict):
+            owner_id = project.get('owner_user_id') or project.get('userId')
+            if owner_id and str(owner_id) == str(user_id):
+                return True
+        role = cosmos_service.get_project_role_for_user(project_id, str(user_id))
+        return bool(role)
+
+
+class AnalysisRenameView(APIView):
+    """Rename an analysis run and persist the name in storage."""
+    permission_classes = [IsAdminOrUser]
+
+    @handle_service_errors
+    def post(self, request, analysis_id: str):
+        user_id = getattr(request.user, "id", None) or getattr(request.user, "user_id", None)
+        if not user_id:
+            return StandardResponse.unauthorized(
+                detail="Authentication required",
+                instance=request.path
+            )
+
+        raw_name = request.data.get("name", "")
+        if raw_name is not None and not isinstance(raw_name, str):
+            return StandardResponse.validation_error(
+                detail="Name must be a string.",
+                errors=[{"field": "name", "message": "This field must be a string."}],
+                instance=request.path
+            )
+
+        name = (raw_name or "").strip()
+        if name and len(name) > 120:
+            return StandardResponse.validation_error(
+                detail="Name is too long (max 120 characters).",
+                errors=[{"field": "name", "message": "Max length is 120 characters."}],
+                instance=request.path
+            )
+
+        analysis_service = get_analysis_service()
+        analysis = analysis_service.get_analysis_by_id(analysis_id, str(user_id))
+        if not analysis:
+            analysis = analysis_service.get_analysis_by_id_any(analysis_id)
+            if not analysis:
+                return StandardResponse.not_found(
+                    detail="Analysis not found",
+                    instance=request.path
+                )
+
+        project_id = analysis.get("projectId")
+        analysis_owner_id = analysis.get("userId")
+        if str(analysis_owner_id) != str(user_id):
+            if project_id and not self._has_project_access(request.user, project_id):
+                return StandardResponse.forbidden(
+                    detail="You do not have permission to update this analysis.",
+                    instance=request.path
+                )
+
+        updated = analysis_service.update_analysis_name_for_doc(analysis, str(user_id), name or None)
+        if not updated:
+            return StandardResponse.server_error(
+                detail="Failed to update analysis name.",
+                instance=request.path
+            )
+
+        return StandardResponse.success(
+            data={
+                "id": updated.get("id") or analysis.get("id"),
+                "name": updated.get("name"),
+                "updatedAt": updated.get("updatedAt"),
+            },
+            message="Analysis name updated successfully"
+        )
 
     def _has_project_access(self, user, project_id: str) -> bool:
         if not user or not getattr(user, 'is_authenticated', False):

@@ -3,17 +3,25 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store/store';
-import { 
-  analyzeComments, 
-  getLatestAnalysis, 
+import {
+  analyzeComments,
+  getLatestAnalysis,
   getConsolidatedDashboardData,
   generateUserStories,
-  setAnalysisData, 
-  setDeepAnalysis, 
+  fetchAnalysisHistory,
+  fetchAnalysisById,
+  setAnalysisData,
+  setDeepAnalysis,
   setLoadedComments,
   clearAnalysisData,
-  clearError 
+  clearError,
+  setSelectedAnalysisId,
+  prependToHistory,
+  replaceInHistory,
+  removeFromHistory,
+  renameAnalysisRun,
 } from '../../../store/features/analysis/analysisSlice';
+import type { AnalysisHistoryEntry } from '../../../store/features/analysis/analysisSlice';
 import { fetchProjects } from '../../../store/features/projects/projectsSlice';
 import { fetchIntegrationAccounts } from '../../../store/features/integrations/integrationsSlice';
 import { 
@@ -38,6 +46,7 @@ import { AdvancedWordCloud } from './AdvancedWordCloud';
 import { UserStoryList } from '../userStoryList';
 
 import { LoaderForDashboard } from '@/components/dashboard/analysisDashboard/LoaderForDashboard';
+import { AnalysisRunList } from './AnalysisRunList';
 
 // Local interface for the component
 interface LocalFeatureSentiment {
@@ -62,16 +71,19 @@ interface DashboardProps {
 
 export function DashboardComponent({ data, onProjectSelect, initialProjectId, skipBootstrapFetches = false }: DashboardProps) {
   const dispatch = useDispatch<AppDispatch>();
-  const { 
-    analysisData, 
-    deepAnalysis, 
-    loading, 
-    error, 
-    isAnalyzing, 
-    analyzingProjectId,
+  const {
+    analysisData,
+    deepAnalysis,
+    loading,
+    error,
+    isAnalyzing,
     loadedComments,
     latestAnalysis,
     projectContext,
+    analysisHistory,
+    historyLoading,
+    selectedAnalysisId,
+    fetchingAnalysisById,
   } = useSelector((state: RootState) => state.analysis);
   
   const { analysis: jiraAnalysis, isAnalyzing: isJiraAnalyzing } = useSelector((state: RootState) => state.jira);
@@ -96,6 +108,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const hasConsolidatedFetchRef = useRef(false);
   const lastFetchedProjectRef = useRef<string | null>(null);
   const lastProcessedAnalysisIdRef = useRef<string | null>(null);
+  const lastHistoryProjectRef = useRef<string | null>(null);
   useEffect(() => {
     const contextProjectId = projectContext?.project_id;
     if (!contextProjectId) return;
@@ -115,7 +128,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const [wordCloudView, setWordCloudView] = useState<'split' | 'advanced'>('split');
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
-  const isProjectAnalyzing = isAnalyzing && analyzingProjectId === (currentProjectId || projectId || null);
+  const isProjectAnalyzing = isAnalyzing;
   const selectedPlatform = useMemo((): 'azure' | 'jira' | null => {
     if (!projects || !projects.length) return null;
     const pid = currentProjectId || projectId || '';
@@ -123,13 +136,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     const provider = proj?.externalLinks?.[0]?.provider;
     return provider === 'jira' ? 'jira' : provider === 'azure' ? 'azure' : null;
   }, [projects, currentProjectId, projectId]);
-  // Handle keyword updates
-  const handleKeywordsUpdate = (featureName: string, keywords: string[]) => {
-    setEditedKeywords(prev => ({
-      ...prev,
-      [featureName]: keywords
-    }));
-  };
 
 
   // Handle regeneration of analysis
@@ -223,7 +229,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       },
       keywords: feature.keywords || [],
       comment_count: feature.comment_count,
-      isEdited: editedKeywords[feature.name || feature.feature] !== undefined
+      isEdited: editedKeywords[feature.name || feature.feature] !== undefined,
+      sample_comments: feature.sample_comments
     })) as LocalFeatureSentiment[];
   }, [activeAnalysisData?.analysisData?.features, editedKeywords]);
 
@@ -339,16 +346,24 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       if (a.analysisData) {
         // Data is already in the new format, use it directly
         console.log('🔍 Dashboard: Using new format data directly from consolidated fetch');
-        console.log('🔍 Dashboard: Setting analysisData with structure:', {
-          id: a.id,
-          hasAnalysisData: !!a.analysisData,
-          counts: a.analysisData.counts,
-          featuresCount: a.analysisData.features?.length,
-          overall: a.analysisData.overall
-        });
         dispatch(setAnalysisData(a));
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
         lastProcessedAnalysisIdRef.current = a.id;
+        // Select this run in the sidebar and ensure it exists in history
+        if (a.id) {
+          dispatch(setSelectedAnalysisId(a.id));
+          const counts = a.analysisData.counts ?? {};
+          const total = Number(counts.total ?? 0);
+          const positive = Number(counts.positive ?? 0);
+          dispatch(prependToHistory({
+            id: a.id,
+            analysis_date: a.createdAt || a.analysis_date || new Date().toISOString(),
+            comments_count: total,
+            positive_pct: total > 0 ? Math.round((positive / total) * 100) : 0,
+            status: 'completed',
+            name: a.name,
+          }));
+        }
       } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
         // Data is nested under result field - normalize it and merge metadata
         console.log('🔍 Dashboard: Using result field data, normalizing from consolidated fetch');
@@ -469,6 +484,45 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     dispatch(fetchIntegrationAccounts());
   }, [dispatch, skipBootstrapFetches]);
 
+  // Fetch analysis history when project changes
+  useEffect(() => {
+    const pid = currentProjectId || projectId || '';
+    if (!pid || lastHistoryProjectRef.current === pid) return;
+    lastHistoryProjectRef.current = pid;
+    dispatch(fetchAnalysisHistory(pid));
+  }, [currentProjectId, projectId, dispatch]);
+
+  // Load full analysis when a historical run is selected
+  useEffect(() => {
+    if (!selectedAnalysisId) return;
+    // Skip fetch for temporary "analyzing" entries
+    if (selectedAnalysisId.startsWith('analyzing_')) return;
+    // If the currently loaded analysis already matches, skip fetch
+    if (analysisData && (analysisData as any).id === selectedAnalysisId) return;
+
+    (async () => {
+      try {
+        const result = await dispatch(fetchAnalysisById(selectedAnalysisId)).unwrap();
+        if (result?.exists !== false && result?.analysis) {
+          const a = result.analysis;
+          if (a.analysisData) {
+            dispatch(setAnalysisData(a));
+            dispatch(setDeepAnalysis(a.userStories ? a.userStories : null));
+          } else {
+            dispatch(setAnalysisData(normalizeAnalysis(a.result ?? a)));
+            dispatch(setDeepAnalysis(a.userStories ?? null));
+          }
+        } else if (result?.analysisData || result?.id) {
+          // Direct analysis object returned
+          dispatch(setAnalysisData(result.analysisData ? result : normalizeAnalysis(result)));
+          dispatch(setDeepAnalysis(result.userStories ?? null));
+        }
+      } catch {
+        // Error is handled by the slice
+      }
+    })();
+  }, [selectedAnalysisId, dispatch]);
+
   // Handle page refresh - fetch consolidated dashboard data for the current project
   useEffect(() => {
     // Prevent duplicate fetches
@@ -504,9 +558,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     dispatch(clearAnalysisData());
     dispatch(setLoadedComments(null));
     dispatch(clearCurrentProjectUserStories());
-    
+    dispatch(setSelectedAnalysisId(null));
+
     // Reset the processed analysis ID ref when switching projects
     lastProcessedAnalysisIdRef.current = null;
+    lastHistoryProjectRef.current = null;
     
     // Fetch consolidated dashboard data for the selected project
     if (projectId) {
@@ -689,6 +745,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       setTopError(validation.error);
       return;
     }
+    const tempId = `analyzing_${Date.now()}`;
     try {
       setTopError(null);
       dispatch(clearError());
@@ -764,16 +821,30 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         setTopError('No comments detected. Ensure JSON has a comments array or CSV has a comment column.');
         return;
       }
-      
+
       // Update loadedComments for display
       dispatch(setLoadedComments(comments));
-      
+
+      // Clear the file from upload panel immediately so it resets
+      const fileName = topFile.name;
+      setTopFile(null);
+
+      // Prepend a temporary "analyzing" entry to the sidebar for immediate feedback
+      dispatch(prependToHistory({
+        id: tempId,
+        analysis_date: new Date().toISOString(),
+        comments_count: comments.length,
+        positive_pct: 0,
+        status: 'analyzing',
+      }));
+      dispatch(setSelectedAnalysisId(tempId));
+
       // Use Redux action to analyze comments
       const effectiveProjectId = currentProjectId || personalProjectId || undefined;
-      const result = await dispatch(analyzeComments({ 
-        comments, 
+      const result = await dispatch(analyzeComments({
+        comments,
         projectId: effectiveProjectId,
-        fileName: topFile.name 
+        fileName
       })).unwrap();
       
 
@@ -797,7 +868,29 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         // The result is already in the correct format, just use it directly
         console.log('Using analysis result directly:', payload);
         dispatch(setAnalysisData(payload));
-        
+
+        // Replace the temporary "analyzing" entry with the real one
+        if (payload.id) {
+          const counts = payload.analysisData?.counts ?? {};
+          const total = Number(counts.total ?? 0);
+          const positive = Number(counts.positive ?? 0);
+          dispatch(replaceInHistory({
+            oldId: tempId,
+            entry: {
+              id: payload.id,
+              analysis_date: payload.createdAt || new Date().toISOString(),
+              comments_count: total,
+              positive_pct: total > 0 ? Math.round((positive / total) * 100) : 0,
+              status: 'completed',
+              name: payload.name,
+            },
+          }));
+          dispatch(setSelectedAnalysisId(payload.id));
+        } else {
+          // No id returned, remove the temp entry
+          dispatch(removeFromHistory(tempId));
+        }
+
         // Set deepAnalysis if available
         if (payload.deepAnalysis) {
           dispatch(setDeepAnalysis(payload.deepAnalysis));
@@ -812,6 +905,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       }
       
     } catch (e: any) {
+      // Remove the temporary "analyzing" entry on failure
+      dispatch(removeFromHistory(tempId));
       const data = e?.response?.data;
       const message =
         (typeof data?.message === 'string' && data.message) ||
@@ -1284,6 +1379,20 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     }
   ];
 
+  const handleRunSelect = (id: string) => {
+    dispatch(setSelectedAnalysisId(id));
+    lastProcessedAnalysisIdRef.current = null; // allow re-processing
+  };
+
+  const handleRunRename = async (id: string, name: string) => {
+    try {
+      await dispatch(renameAnalysisRun({ id, name })).unwrap();
+    } catch (err: any) {
+      console.error('Failed to rename analysis run:', err);
+      alert(typeof err === 'string' ? err : 'Failed to rename analysis run.');
+    }
+  };
+
   // Show loader while:
   // - projects are still loading (initial load only)
   // Note: We don't show full-screen loader for analysis loading anymore
@@ -1348,6 +1457,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                   onFileSelect={setTopFile}
                   onAnalyze={handleTopAnalyze}
                   onCloudConnect={handleCloudConnect}
+                  isAnalyzing={isAnalyzing}
                 />
               </>
             ) : activeView === 'user-stories' ? (
@@ -1383,10 +1493,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
   return (
     <div className="min-h-screen bg-secondary/40 dark:bg-background">
-      {/* Main Content */}
-      <main className="p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Project Selector & Navigation */}
+      {/* Top Bar - Full Width */}
+      <div className="p-6 pb-0">
+        <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center justify-between">
             {/* Unified Project Selector */}
             <div>
@@ -1409,8 +1518,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 <button
                   onClick={() => setActiveView('dashboard')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/50 focus-visible:ring-offset-1 ${
-                    activeView === 'dashboard' 
-                      ? 'bg-background/90 text-foreground shadow-sm' 
+                    activeView === 'dashboard'
+                      ? 'bg-background/90 text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -1424,28 +1533,28 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                       console.log('🔄 Fetching user stories on tab switch...');
                       const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
                       const userId = user.id || user.user_id || user.username;
-                      console.log('🔍 Tab switch fetch params:', { 
-                        projectId: formattedProjectId, 
-                        userId, 
+                      console.log('🔍 Tab switch fetch params:', {
+                        projectId: formattedProjectId,
+                        userId,
                         selectedPlatform,
-                        userObject: user 
+                        userObject: user
                       });
-                      dispatch(fetchUserStoriesByProject({ 
+                      dispatch(fetchUserStoriesByProject({
                         projectId: formattedProjectId,
                         userId
                       }));
                     }
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saramsa-brand/50 focus-visible:ring-offset-1 ${
-                    activeView === 'user-stories' 
-                      ? 'bg-background/90 text-foreground shadow-sm' 
+                    activeView === 'user-stories'
+                      ? 'bg-background/90 text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   User Stories
                 </button>
               </div>
-              
+
               {/* Projects Button */}
               <button
                 onClick={() => {
@@ -1459,6 +1568,24 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Two-Panel Layout */}
+      <div className="p-6">
+        <div className="max-w-[1400px] mx-auto flex gap-6 items-start">
+          {/* Left Panel - Analysis Run List */}
+          <AnalysisRunList
+            entries={analysisHistory}
+            selectedId={selectedAnalysisId}
+            isLoading={historyLoading}
+            onSelect={handleRunSelect}
+            onRename={handleRunRename}
+            projectName={projects?.find((p: any) => p.id === (currentProjectId || projectId))?.name}
+          />
+
+          {/* Right Panel - Main Content */}
+          <main className="flex-1 min-w-0 space-y-6">
 
           {activeView === 'dashboard' ? (
             <>
@@ -1472,6 +1599,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 onFileSelect={setTopFile}
                 onAnalyze={handleTopAnalyze}
                 onCloudConnect={handleCloudConnect}
+                isAnalyzing={isAnalyzing}
               />
 
               {/* Dismissible error banner above results */}
@@ -1494,8 +1622,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 </div>
               )}
 
-              {/* Analysis Results Section */}
-              {(isAnalyzing || loading) ? (
+              {/* Analysis Results Section — only show loader when the selected run is the one being analyzed */}
+              {(selectedAnalysisId?.startsWith('analyzing_') || fetchingAnalysisById) ? (
                 <LoaderForDashboard />
               ) : (
                 <>
@@ -1538,21 +1666,20 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                       {/* Feature Sentiments Table */}
                       {hasAnalysisResults && (
                         <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
-                          <FeatureSentimentsTable
-                            features={transformedFeatures}
-                            selectedFeatures={selectedFeatures}
-                            onFeatureToggle={(featureName) => {
-                              setSelectedFeatures(prev => 
-                                prev.includes(featureName) 
-                                  ? prev.filter(name => name !== featureName)
-                                  : [...prev, featureName]
-                              );
-                            }}
-                            onKeywordsUpdate={handleKeywordsUpdate}
-                            onRegenerateAnalysis={handleRegenerateAnalysis}
-                            hasEditedFeaturesProp={Object.keys(editedKeywords).length > 0}
-                            hasComments={!!loadedComments && loadedComments.length > 0}
-                          />
+                            <FeatureSentimentsTable
+                              features={transformedFeatures}
+                              selectedFeatures={selectedFeatures}
+                              onFeatureToggle={(featureName) => {
+                                setSelectedFeatures(prev => 
+                                  prev.includes(featureName) 
+                                    ? prev.filter(name => name !== featureName)
+                                    : [...prev, featureName]
+                                );
+                              }}
+                              onRegenerateAnalysis={handleRegenerateAnalysis}
+                              hasEditedFeaturesProp={Object.keys(editedKeywords).length > 0}
+                              hasComments={!!loadedComments && loadedComments.length > 0}
+                            />
                         </div>
                       )}
 
@@ -1880,8 +2007,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               )}
             </div>
           ) : null}
+
+          </main>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

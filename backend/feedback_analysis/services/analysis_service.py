@@ -352,6 +352,65 @@ class AnalysisService:
         except Exception as e:
             logger.error(f"Error getting analysis by ID: {e}")
             return None
+
+    def get_analysis_by_id_any(self, analysis_id: str) -> Optional[Dict[str, Any]]:
+        """Get analysis by ID without user ownership filter."""
+        try:
+            return self.analysis_repo.get_analysis_by_id_any(analysis_id)
+        except Exception as e:
+            logger.error(f"Error getting analysis by ID (any user): {e}")
+            return None
+
+    def update_analysis_name(self, analysis_id: str, user_id: str, name: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Update a stored analysis run name (owner-only)."""
+        try:
+            analysis = self.analysis_repo.get_analysis_by_id(analysis_id, user_id)
+            if not analysis:
+                return None
+
+            project_id = analysis.get("projectId") or analysis.get("project_id")
+            if not project_id:
+                logger.error("Analysis update failed: missing projectId on analysis document.")
+                return None
+
+            now = datetime.now(timezone.utc).isoformat()
+            if name:
+                analysis["name"] = name
+            else:
+                analysis.pop("name", None)
+            analysis["updatedAt"] = now
+            analysis["name_updated_at"] = now
+            analysis["name_updated_by"] = str(user_id)
+
+            return self.analysis_repo.update_analysis(project_id, analysis)
+        except Exception as e:
+            logger.error(f"Error updating analysis name: {e}")
+            return None
+
+    def update_analysis_name_for_doc(self, analysis: Dict[str, Any], user_id: str, name: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Update a stored analysis run name for a fetched analysis document."""
+        try:
+            if not analysis or not analysis.get("id"):
+                return None
+
+            project_id = analysis.get("projectId") or analysis.get("project_id")
+            if not project_id:
+                logger.error("Analysis update failed: missing projectId on analysis document.")
+                return None
+
+            now = datetime.now(timezone.utc).isoformat()
+            if name:
+                analysis["name"] = name
+            else:
+                analysis.pop("name", None)
+            analysis["updatedAt"] = now
+            analysis["name_updated_at"] = now
+            analysis["name_updated_by"] = str(user_id)
+
+            return self.analysis_repo.update_analysis(project_id, analysis)
+        except Exception as e:
+            logger.error(f"Error updating analysis name: {e}")
+            return None
     
     # Analysis History Methods
     def get_analysis_history_for_project(self, project_id: str) -> List[Dict[str, Any]]:

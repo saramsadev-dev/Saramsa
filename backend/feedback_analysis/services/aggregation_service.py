@@ -26,7 +26,7 @@ class SentimentAggregationService:
     OUTLIER_DETECTION_THRESHOLD = 0.15  # 15% threshold for outlier detection
     KEYWORD_MIN_OCCURRENCES = 2  # Minimum occurrences for keyword to be significant
     
-    def aggregate_comment_extractions(self, extracted_comments: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def aggregate_comment_extractions(self, extracted_comments: List[Dict[str, Any]], original_comments: List[str] | None = None) -> Dict[str, Any]:
         """
         Aggregate LLM-extracted comment data into summary statistics.
         
@@ -54,7 +54,7 @@ class SentimentAggregationService:
         sentiment_percentages = self._calculate_percentages(sentiment_counts, total_comments)
         
         # Step 3: Aggregate aspects (aspect-level sentiment breakdown)
-        aspect_aggregations = self._aggregate_aspects(extracted_comments)
+        aspect_aggregations = self._aggregate_aspects(extracted_comments, original_comments)
         
         # Step 4: Aggregate keywords
         keyword_aggregations = self._aggregate_keywords(extracted_comments)
@@ -142,7 +142,7 @@ class SentimentAggregationService:
             counts[confidence] += 1
         return dict(counts)
     
-    def _aggregate_aspects(self, extracted_comments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _aggregate_aspects(self, extracted_comments: List[Dict[str, Any]], original_comments: List[str] | None = None) -> List[Dict[str, Any]]:
         """
         Aggregate aspects across all comments with aspect-level sentiment breakdown.
         
@@ -162,6 +162,11 @@ class SentimentAggregationService:
             "comment_indices": [],
             "sentiment_counts": Counter({"positive": 0, "negative": 0, "neutral": 0}),
             "all_keywords": set(),
+            "sample_comments": {
+                "positive": [],
+                "negative": [],
+                "neutral": []
+            },
         })
         
         # Aggregate aspect mentions
@@ -186,6 +191,15 @@ class SentimentAggregationService:
             if not isinstance(keywords, list):
                 keywords = []
             
+            # Resolve original comment text if available
+            comment_id = comment.get("comment_id")
+            comment_text = None
+            if isinstance(original_comments, list):
+                if isinstance(comment_id, int) and 0 <= comment_id < len(original_comments):
+                    comment_text = str(original_comments[comment_id])
+                elif 0 <= idx < len(original_comments):
+                    comment_text = str(original_comments[idx])
+
             # Aggregate each aspect mentioned in this comment
             for aspect in aspects:
                 if not isinstance(aspect, str):
@@ -207,6 +221,14 @@ class SentimentAggregationService:
                 aspect_data[aspect_key]["all_keywords"].update(
                     kw.strip() for kw in keywords if isinstance(kw, str) and kw.strip()
                 )
+
+                # Store sample comments (limit 10 per sentiment bucket)
+                if comment_text:
+                    bucket = aspect_data[aspect_key]["sample_comments"]
+                    if sentiment_key in ("positive", "negative", "neutral"):
+                        target = bucket[sentiment_key]
+                        if comment_text not in target and len(target) < 10:
+                            target.append(comment_text)
         
         # Build aspect summaries (only include aspects with minimum mentions)
         aspect_summaries = []
@@ -255,6 +277,7 @@ class SentimentAggregationService:
                 "sentiment": sentiment_percentages,
                 "keywords": list(data["all_keywords"])[:20],
                 "comment_count": comment_count,
+                "sample_comments": data.get("sample_comments"),
             })
         
         # Sort by comment count (descending)

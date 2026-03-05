@@ -37,9 +37,13 @@ def get_async_azure_client_instance():
         if not async_client:
             raise RuntimeError("Azure OpenAI async client is not initialized")
         return async_client
+    except ConnectionError:
+        raise
     except Exception as e:
-        logger.error(f"Failed to get Azure OpenAI async client: {e}")
-        raise ConnectionError(f"Azure OpenAI service unavailable: {str(e)}")
+        logger.error("Failed to get Azure OpenAI async client: %s", e)
+        raise ConnectionError(
+            str(e) if "Missing" in str(e) or "Set these env" in str(e) else f"Azure OpenAI service unavailable: {e}"
+        )
 
 @handle_service_errors
 async def generate_completions(prompt_instruction, max_tokens=None):
@@ -108,10 +112,16 @@ async def generate_completions(prompt_instruction, max_tokens=None):
         return result
         
     except Exception as e:
-        logger.error(f"Error generating completion: {e}")
-        if "rate limit" in str(e).lower():
-            raise ConnectionError("AI service rate limit exceeded. Please try again later.")
-        elif "authentication" in str(e).lower():
-            raise ConnectionError("AI service authentication failed. Please check configuration.")
-        else:
-            raise ConnectionError(f"AI service unavailable: {str(e)}")
+        err_msg = str(e).strip()
+        logger.error("GPT/Azure OpenAI completion failed: %s", err_msg, exc_info=True)
+        if "rate limit" in err_msg.lower() or "429" in err_msg:
+            raise ConnectionError("Azure OpenAI rate limit exceeded. Please try again later.")
+        if "authentication" in err_msg.lower() or "401" in err_msg or "invalid" in err_msg.lower() and "key" in err_msg.lower():
+            raise ConnectionError(
+                "Azure OpenAI authentication failed. Check AZURE_API_KEY and AZURE_ENDPOINT_URL in .env"
+            )
+        if "404" in err_msg or "deployment" in err_msg.lower() or "not found" in err_msg.lower():
+            raise ConnectionError(
+                "Azure OpenAI deployment not found. Check AZURE_DEPLOYMENT_NAME matches your Azure portal deployment name."
+            )
+        raise ConnectionError(f"Azure OpenAI error: {err_msg}")

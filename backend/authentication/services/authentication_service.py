@@ -206,6 +206,9 @@ class AuthenticationService:
 
     def verify_registration_otp(self, email: str, code: str) -> None:
         """Verify registration OTP or raise ValueError."""
+        if getattr(settings, "REGISTRATION_OTP_BYPASS", False):
+            logger.warning("Registration OTP bypass is enabled; skipping verification.")
+            return
         entry = self.user_repo.get_registration_otp(email)
         if not entry:
             raise ValueError("OTP not found. Please request a new code.")

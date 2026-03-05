@@ -276,7 +276,13 @@ class ProcessingService:
             # New format: use aggregation service
             from .aggregation_service import get_aggregation_service
             aggregation_service = get_aggregation_service()
-            normalized_results = aggregation_service.aggregate_comment_extractions(extracted_comments)
+            original_comments = None
+            if text:
+                original_comments = [l.strip() for l in text.splitlines() if l.strip()]
+            normalized_results = aggregation_service.aggregate_comment_extractions(
+                extracted_comments,
+                original_comments
+            )
         
         # Save insights to database
         insight_data = self._prepare_insight_data(text, normalized_results, comments_analysis, deep_analysis)

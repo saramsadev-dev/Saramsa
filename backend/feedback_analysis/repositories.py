@@ -143,6 +143,59 @@ class AnalysisRepository:
                 'all_comments': []
             }
     
+    def get_analysis_by_id(self, analysis_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get specific analysis by ID and verify user ownership."""
+        try:
+            normalized_id = analysis_id
+            if normalized_id and not normalized_id.startswith("insight_"):
+                if normalized_id.startswith("analysis_"):
+                    normalized_id = normalized_id.replace("analysis_", "insight_", 1)
+                else:
+                    normalized_id = f"insight_{normalized_id}"
+
+            query = """
+            SELECT TOP 1 * FROM c
+            WHERE c.id = @analysis_id AND c.userId = @user_id
+            """
+            parameters = [
+                {"name": "@analysis_id", "value": normalized_id},
+                {"name": "@user_id", "value": user_id}
+            ]
+
+            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+            if results:
+                return results[0]
+
+            logger.warning(f"Analysis {analysis_id} not found for user {user_id}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting analysis by ID: {e}")
+            return None
+
+    def get_analysis_by_id_any(self, analysis_id: str) -> Optional[Dict[str, Any]]:
+        """Get analysis by ID without user ownership filter (for project editors/admins)."""
+        try:
+            normalized_id = analysis_id
+            if normalized_id and not normalized_id.startswith("insight_"):
+                if normalized_id.startswith("analysis_"):
+                    normalized_id = normalized_id.replace("analysis_", "insight_", 1)
+                else:
+                    normalized_id = f"insight_{normalized_id}"
+
+            query = """
+            SELECT TOP 1 * FROM c
+            WHERE c.id = @analysis_id
+            """
+            parameters = [{"name": "@analysis_id", "value": normalized_id}]
+            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
+            if results:
+                return results[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error getting analysis by ID (any user): {e}")
+            return None
+
     # Insights Methods
     def get_all_insights(self) -> List[Dict[str, Any]]:
         """Get all insights."""
@@ -203,6 +256,34 @@ class AnalysisRepository:
     def update_project_last_analysis(self, project_id: str, analysis_id: str) -> bool:
         """Update project's last analysis."""
         return self.cosmos_service.update_project_last_analysis(project_id, analysis_id)
+
+    def update_analysis(self, project_id: str, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update an existing analysis document by id + project partition."""
+        try:
+            if not analysis_data or not analysis_data.get("id"):
+                return None
+            return self.cosmos_service.update_document(
+                self.container_name,
+                analysis_data["id"],
+                project_id,
+                analysis_data
+            )
+        except Exception as e:
+            logger.error(f"Error updating analysis {analysis_data.get('id') if analysis_data else None}: {e}")
+            return None
+
+    # Analysis History Methods
+    def get_analysis_history_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get analysis history for project."""
+        return self.cosmos_service.get_analysis_history_for_project(project_id)
+    
+    def get_analysis_by_quarter(self, project_id: str, quarter: str) -> Optional[Dict[str, Any]]:
+        """Get analysis by quarter."""
+        return self.cosmos_service.get_analysis_by_quarter(project_id, quarter)
+    
+    def get_cumulative_analysis_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get cumulative analysis for project."""
+        return self.cosmos_service.get_cumulative_analysis_for_project(project_id)
     
     # User Data Methods
     def get_latest_personal_user_data(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -529,19 +610,6 @@ class ProjectTaxonomyRepository:
     def delete_embedded_work_items(self, work_item_ids: List[str], user_id: str) -> int:
         """Delete embedded work items."""
         return self.cosmos_service.delete_embedded_work_items(work_item_ids, user_id)
-    
-    # Analysis History Methods
-    def get_analysis_history_for_project(self, project_id: str) -> List[Dict[str, Any]]:
-        """Get analysis history for project."""
-        return self.cosmos_service.get_analysis_history_for_project(project_id)
-    
-    def get_analysis_by_quarter(self, project_id: str, quarter: str) -> Optional[Dict[str, Any]]:
-        """Get analysis by quarter."""
-        return self.cosmos_service.get_analysis_by_quarter(project_id, quarter)
-    
-    def get_cumulative_analysis_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get cumulative analysis for project."""
-        return self.cosmos_service.get_cumulative_analysis_for_project(project_id)
     
     # Generic Query Methods
     def query_items(self, container_name: str, query: str, parameters: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:

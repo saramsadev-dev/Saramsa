@@ -39,7 +39,6 @@ from aiCore.services.aspect_service_factory import get_aspect_service
 from aiCore.services.local_sentiment_service import LocalSentimentService, SentimentResult
 from feedback_analysis.services.narration_service import get_narration_service
 from feedback_analysis.services.aspect_taxonomy_service import get_aspect_taxonomy_service
-from apis.prompts.synthesis_prompt import FALLBACK_RESPONSE_TEMPLATE
 from feedback_analysis.services.ml.config import (
     REPRESENTATIVE_COMMENTS_SAMPLE_SIZE,
     TARGET_PROCESSING_TIME_SECONDS
@@ -219,17 +218,11 @@ class ProductionProcessingService:
         
         # Step 6: Unified narration (single GPT entrypoint)
         step_start = time.time()
-        try:
-            insights, features, work_items = self._bounded_gpt_synthesis(
-                combined_matches, aggregated_stats, aspects, comments, company_name
-            )
-            performance_metrics["gpt_synthesis_time"] = time.time() - step_start
-            performance_metrics["gpt_synthesis_success"] = True
-        except Exception as e:
-            logger.warning(f"Narration failed: {e}, using fallback")
-            insights, features, work_items = self._fallback_synthesis(aggregated_stats, aspects)
-            performance_metrics["gpt_synthesis_time"] = time.time() - step_start
-            performance_metrics["gpt_synthesis_success"] = False
+        insights, features, work_items = self._bounded_gpt_synthesis(
+            combined_matches, aggregated_stats, aspects, comments, company_name
+        )
+        performance_metrics["gpt_synthesis_time"] = time.time() - step_start
+        performance_metrics["gpt_synthesis_success"] = True
         
         # Calculate total processing time
         total_time = time.time() - start_time
@@ -584,37 +577,6 @@ class ProductionProcessingService:
         except Exception as e:
             logger.error(f"Failed to parse synthesis result: {e}")
             raise
-    
-    def _fallback_synthesis(
-        self, 
-        stats: Dict[str, Any], 
-        aspects: List[str]
-    ) -> Tuple[List[str], List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Fallback synthesis when GPT fails."""
-        total_comments = stats["counts"]["total"]
-        top_aspects = sorted(
-            stats.get("features", []), 
-            key=lambda x: x["total_mentions"], 
-            reverse=True
-        )[:3]
-        
-        insights = [
-            f"Analyzed {total_comments} comments across {len(aspects)} aspects",
-            f"Top concern: {top_aspects[0]['name']}" if top_aspects else "No major concerns identified",
-            "GPT synthesis unavailable - using statistical summary"
-        ]
-        
-        features = [{"insight": insight} for insight in insights]
-        
-        work_items = [
-            {
-                "title": "Review Analysis Results",
-                "description": "Manual review recommended due to synthesis failure",
-                "priority": "MEDIUM"
-            }
-        ]
-        
-        return insights, features, work_items
     
     def _match_to_dict(self, match: Dict[str, Any]) -> Dict[str, Any]:
         """Convert match to dictionary for serialization."""

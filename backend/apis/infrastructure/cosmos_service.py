@@ -1573,13 +1573,14 @@ class CosmosDBService:
             logger.error(f"Error marking previous analyses not latest: {e}")
 
     def get_analysis_history_for_project(self, project_id: str) -> List[Dict[str, Any]]:
-        """Get all analyses for a project ordered by version"""
+        """Get all analyses for a project ordered by date (newest first)"""
         try:
             container = self.get_container('analysis')
+            # Only return analysis/insight docs for the exact projectId.
             query = (
-                "SELECT * FROM c WHERE c.type = 'analysis' "
-                "AND c.project_id = @project_id "
-                "ORDER BY c.version ASC"
+                "SELECT * FROM c WHERE c.projectId = @project_id "
+                "AND c.type IN ('insight', 'analysis') "
+                "ORDER BY c.createdAt DESC"
             )
             params = [{"name": "@project_id", "value": project_id}]
             return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
