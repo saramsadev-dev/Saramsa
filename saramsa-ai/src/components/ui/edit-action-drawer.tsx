@@ -172,7 +172,7 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
               <div className="flex items-center justify-between p-6 border-t border-border/60 dark:border-border/60 bg-secondary/40 dark:bg-card/95">
                 <Button
                   variant="outline"
-                  onClick={() => console.log('Delete action:', formData.id)}
+                  onClick={() => {}}
                   className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
@@ -203,3 +203,5 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
     </AnimatePresence>
   );
 }; 
+
+

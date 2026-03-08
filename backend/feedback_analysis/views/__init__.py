@@ -14,7 +14,6 @@ from .analysis_views import (
     GetUserCommentsView,
     TaskStatusView,
     TaskListView,
-    TaskStreamView,
     AnalysisByIdView,
     AnalysisRenameView,
 )
@@ -47,7 +46,6 @@ __all__ = [
     'GetUserCommentsView',
     'TaskStatusView',
     'TaskListView',
-    'TaskStreamView',
     'AnalysisByIdView',
     'AnalysisRenameView',
     # Insights views

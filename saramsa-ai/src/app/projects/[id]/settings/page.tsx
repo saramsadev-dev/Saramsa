@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/apiRequest";
 import { decryptProjectId, isValidEncryptedId, encryptProjectId } from "@/lib/encryption";
-import { ArrowLeft, Loader2, Shield } from "lucide-react";
+import { ArrowLeft, Loader2, Shield } from 'lucide-react';
 
 type RoleEntry = {
   user_id: string;
@@ -246,3 +246,4 @@ export default function ProjectSettingsPage() {
     </div>
   );
 }
+

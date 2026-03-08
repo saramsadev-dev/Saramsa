@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store/rootReducer";
-import { apiRequest, buildApiUrl } from "@/lib/apiRequest";
+import { apiRequest } from "@/lib/apiRequest";
 import { getValidAccessToken } from "@/lib/auth";
 import {
   Activity,
@@ -17,7 +17,7 @@ import {
   Cpu,
   Sparkles,
   Wrench,
-} from "lucide-react";
+} from 'lucide-react';
 import { cn } from "./utils";
 
 type StageStatus = "idle" | "pending" | "running" | "success" | "error";
@@ -127,7 +127,6 @@ export function PipelineStatusWidget() {
 
   useEffect(() => {
     let isMounted = true;
-    let eventSource: EventSource | null = null;
     const mapApiTask = (task: any): TaskItem => {
       const raw = String(task?.status || "").toUpperCase();
       if (raw === "PARTIAL") {
@@ -188,47 +187,14 @@ export function PipelineStatusWidget() {
       }
     };
 
-    const startStream = () => {
-      if (typeof window === "undefined") return;
-      try {
-        const token = getValidAccessToken();
-        if (!token) {
-          return;
-        }
-        const baseUrl = buildApiUrl("/insights/tasks/stream/");
-        const url = `${baseUrl}?token=${encodeURIComponent(token)}`;
-        eventSource = new EventSource(url);
-        eventSource.addEventListener("tasks", (event) => {
-          try {
-            const payload = JSON.parse((event as MessageEvent).data);
-            const list = payload?.tasks ?? [];
-            if (!isMounted || !Array.isArray(list)) return;
-            const mapped = list.slice(0, 15).map((task: any) => mapApiTask(task));
-            setApiTasks(mapped);
-          } catch {
-            // ignore
-          }
-        });
-        eventSource.onerror = () => {
-          eventSource?.close();
-          eventSource = null;
-          fetchTasks();
-        };
-      } catch {
-        fetchTasks();
-      }
-    };
-
     const token = getValidAccessToken();
     if (token) {
-      startStream();
       fetchTasks();
     }
     const interval = setInterval(fetchTasks, 30000);
     return () => {
       isMounted = false;
       clearInterval(interval);
-      eventSource?.close();
     };
   }, []);
 
@@ -529,3 +495,4 @@ export function PipelineStatusWidget() {
     </div>
   );
 }
+

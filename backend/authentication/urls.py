@@ -4,8 +4,8 @@ from .views import (
     RegisterOtpRequestView,
     ProfileMeView, 
     CheckUsernameView, 
-    CosmosDBTokenObtainPairView,
-    CosmosDBTokenRefreshView,
+    AppTokenObtainPairView,
+    AppTokenRefreshView,
     UserListView, 
     UserDetailView,
     LoginView,
@@ -21,9 +21,10 @@ urlpatterns = [
     path('check-username', CheckUsernameView.as_view(), name='check-username'), #verified
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
-    path('token/', CosmosDBTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', CosmosDBTokenRefreshView.as_view(), name='token_refresh'),
-    path('refresh/', CosmosDBTokenRefreshView.as_view(), name='refresh'),  # Frontend expects this endpoint
+    path('token/', AppTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', AppTokenRefreshView.as_view(), name='token_refresh'),
+    path('refresh/', AppTokenRefreshView.as_view(), name='refresh'),  # Frontend expects this endpoint
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
 ]
+

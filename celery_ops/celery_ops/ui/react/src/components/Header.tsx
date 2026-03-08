@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from '@/components/ui/no-icons';
 import { StatusIndicator } from './StatusIndicator';
 
 interface HeaderProps {

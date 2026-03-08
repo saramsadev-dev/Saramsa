@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Upload, Cloud, BarChart3, FileText, FolderOpen, Trash2 } from "lucide-react";
+import { Upload, Cloud, BarChart3, FileText, FolderOpen, Trash2 } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -376,3 +376,4 @@ export function UploadPanel({
     </Card>
   );
 }
+

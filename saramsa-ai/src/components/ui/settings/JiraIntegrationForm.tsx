@@ -301,3 +301,5 @@ export function JiraIntegrationForm({ onClose, onSuccess }: JiraIntegrationFormP
     </motion.div>
   );
 }
+
+

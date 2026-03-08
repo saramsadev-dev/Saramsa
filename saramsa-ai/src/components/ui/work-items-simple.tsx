@@ -56,7 +56,6 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
       })).unwrap();
 
       setSelectedWorkItems([]);
-      console.log(`Successfully deleted ${selectedWorkItems.length} work items`);
     } catch (err) {
       console.error('Failed to delete work items:', err);
       alert(`Failed to delete work items: ${err}`);
@@ -178,3 +177,5 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
     </Card>
   );
 }
+
+

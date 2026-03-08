@@ -9,7 +9,6 @@ Redundancy sources:
 
 import json
 import os
-import re
 
 REGISTRY_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "api-registry.json")
 
@@ -22,7 +21,6 @@ FEEDBACK_DUPLICATED_BY_INSIGHTS = {
     "POST /api/feedback/analyze/",
     "GET /api/feedback/task-status/",
     "GET /api/feedback/tasks/",
-    "GET /api/feedback/tasks/stream/",
     "GET /api/feedback/comments/",
     "POST /api/feedback/upload/",
     "POST /api/feedback/keywords/update/",
@@ -33,7 +31,6 @@ FEEDBACK_DUPLICATED_BY_INSIGHTS = {
     "POST /api/feedback/insights/rules/",
     "POST /api/feedback/insights/rules/apply/",
     "GET /api/feedback/insights/user-stories/",
-    "GET /api/feedback/insights/user-stories/all/",
     "POST /api/feedback/ingestion/run-now/",
     "GET /api/feedback/ingestion/schedule/",
     "POST /api/feedback/ingestion/schedule/",

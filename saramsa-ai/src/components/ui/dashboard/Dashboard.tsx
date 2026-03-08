@@ -164,17 +164,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         if (regenerationProjectId || !currentProjectId) {
           try {
             const queryParam = regenerationProjectId ? `project_id=${regenerationProjectId}` : 'is_personal=true';
-            console.log('🔄 Loading comments from backend for regeneration, query:', queryParam);
             const response = await apiRequest('get', `/insights/comments/?${queryParam}`, undefined, true);
           if (response.data.success && response.data.data.comments && response.data.data.comments.length > 0) {
             dispatch(setLoadedComments(response.data.data.comments));
-            console.log(`✅ Loaded ${response.data.data.comments.length} comments from backend for regeneration`);
             if (!regenerationProjectId && response.data.data.project_id) {
               setPersonalProjectId(response.data.data.project_id);
             }
             // Continue with regeneration using the loaded comments
           } else {
-            console.log('⚠️ No comments found in backend for this context');
             alert('No comments found for this analysis. Please upload a file with comments first.');
             return;
           }
@@ -210,7 +207,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         // Clear edited keywords after successful regeneration
         setEditedKeywords({});
         
-        console.log('Analysis regenerated successfully:', response.data);
       }
     } catch (error) {
       console.error('Failed to regenerate analysis:', error);
@@ -224,7 +220,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       dispatch(setLoadedComments(null));
       dispatch(clearAnalysisData());
       setEditedKeywords({});
-      console.log('All stored data cleared');
     }
   };
 
@@ -265,19 +260,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
     return totalComments > 0 || hasFeatureData || hasKeywordData;
   }, [activeAnalysisData?.analysisData]);
-
-  console.log("Dashboard data:0------->", {
-    activeAnalysisData,
-    hasAnalysisData: !!activeAnalysisData?.analysisData,
-    analysisDataStructure: activeAnalysisData?.analysisData ? {
-      hasOverall: !!activeAnalysisData.analysisData.overall,
-      hasCounts: !!activeAnalysisData.analysisData.counts,
-      featuresCount: activeAnalysisData.analysisData.features?.length,
-      hasPositiveKeywords: !!activeAnalysisData.analysisData.positive_keywords?.length,
-      hasNegativeKeywords: !!activeAnalysisData.analysisData.negative_keywords?.length
-    } : null,
-    hasAnalysisResults
-  });
   const userStoryFromDeepAnalysis = useMemo(() => {
     if (!deepAnalysis?.work_items || deepAnalysis.work_items.length === 0) {
       return null;
@@ -309,26 +291,16 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     if (!userStoryFromDeepAnalysis) return;
     if (currentProjectUserStories && currentProjectUserStories.length > 0) return;
 
-    console.log('🔍 Storing user story from deep analysis:', userStoryFromDeepAnalysis);
     dispatch(setCurrentProjectUserStories([userStoryFromDeepAnalysis]));
   }, [dispatch, userStoryFromDeepAnalysis, currentProjectUserStories]);
   
   // Log when analysis data changes
   useEffect(() => {
-    console.log('Redux analysis state updated:', {
-      analysisData,
-      deepAnalysis,
-      loading,
-      error,
-      isAnalyzing,
-      loadedComments
-    });
   }, [analysisData, deepAnalysis, loading, error, isAnalyzing, loadedComments]);
 
   // Process latestAnalysis from getConsolidatedDashboardData and set analysisData
   useEffect(() => {
     if (!latestAnalysis) {
-      console.log('🔍 Dashboard: No latestAnalysis available');
       return;
     }
     
@@ -336,32 +308,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     
     // Skip if we've already processed this analysis
     if (analysisId && lastProcessedAnalysisIdRef.current === analysisId) {
-      console.log('🔍 Dashboard: Analysis already processed, skipping', { analysisId });
       return;
     }
-    
-    console.log('🔍 Dashboard: Processing latestAnalysis from consolidated data:', {
-      exists: latestAnalysis.exists,
-      hasAnalysis: !!latestAnalysis.analysis,
-      analysisId: analysisId,
-      lastProcessedId: lastProcessedAnalysisIdRef.current
-    });
-    
     if (latestAnalysis.exists && latestAnalysis.analysis) {
       const a = latestAnalysis.analysis; // Extract the nested analysis data
-      console.log('🔍 Dashboard: Analysis data from consolidated fetch:', {
-        id: a.id,
-        hasAnalysisData: !!a.analysisData,
-        hasUserStories: !!a.userStories,
-        analysisDataKeys: a.analysisData ? Object.keys(a.analysisData) : [],
-        allKeys: Object.keys(a)
-      });
-      
       // The backend now returns data in the new format (analysisData field)
       // Check if data is already in the correct frontend format
       if (a.analysisData) {
         // Data is already in the new format, use it directly
-        console.log('🔍 Dashboard: Using new format data directly from consolidated fetch');
         dispatch(setAnalysisData(a));
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
         lastProcessedAnalysisIdRef.current = a.id;
@@ -382,7 +336,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         }
       } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
         // Data is nested under result field - normalize it and merge metadata
-        console.log('🔍 Dashboard: Using result field data, normalizing from consolidated fetch');
         const normalized = normalizeAnalysis(a.result);
         // Merge metadata from the analysis object
         if (normalized) {
@@ -397,21 +350,18 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
       } else if (a.sentimentsummary && a.counts && a.featureasba !== undefined) {
         // Data is in the old format, normalize it
-        console.log('🔍 Dashboard: Using old format data, normalizing from consolidated fetch');
         const normalized = normalizeAnalysis(a);
         dispatch(setAnalysisData(normalized));
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
         lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
       } else if (a.overall && a.counts && a.features !== undefined) {
         // Fallback: data is in the old format, normalize it
-        console.log('🔍 Dashboard: Using old format data (fallback), normalizing from consolidated fetch');
         const normalized = normalizeAnalysis(a);
         dispatch(setAnalysisData(normalized));
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
         lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
       } else if (a.commentAnalysis) {
         // Fallback: use commentAnalysis if available
-        console.log('🔍 Dashboard: Using commentAnalysis as fallback from consolidated fetch');
         const ca = Array.isArray(a.commentAnalysis)
           ? (typeof a.commentAnalysis[0] === 'string' ? JSON.parse(a.commentAnalysis[0]) : a.commentAnalysis[0])
           : a.commentAnalysis;
@@ -420,16 +370,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
         lastProcessedAnalysisIdRef.current = normalized?.id || a.id;
       } else {
-        console.log('🔍 Dashboard: No analysis data found in consolidated fetch, analysis structure:', Object.keys(a), 'has result:', !!a.result);
         dispatch(setAnalysisData(null));
         dispatch(setDeepAnalysis(null));
         lastProcessedAnalysisIdRef.current = null;
       }
     } else {
-      console.log('🔍 Dashboard: No analysis exists for project in consolidated fetch', {
-        exists: latestAnalysis.exists,
-        hasAnalysis: !!latestAnalysis.analysis
-      });
       dispatch(setAnalysisData(null));
       dispatch(setDeepAnalysis(null));
       lastProcessedAnalysisIdRef.current = null;
@@ -438,17 +383,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
 
   // Extract user stories from consolidated data and set in Redux store
   useEffect(() => {
-    console.log('🔍 Dashboard useEffect triggered - latestAnalysis:', latestAnalysis);
-    console.log('🔍 Dashboard useEffect - latestAnalysis.analysis:', latestAnalysis?.analysis);
-    console.log('🔍 Dashboard useEffect - latestAnalysis.analysis.userStories:', latestAnalysis?.analysis?.userStories);
-    console.log('🔍 Dashboard useEffect - work_items:', latestAnalysis?.analysis?.userStories?.work_items);
     
     if (latestAnalysis?.analysis?.userStories?.work_items) {
       const workItems = latestAnalysis.analysis.userStories.work_items;
-      console.log('🔍 Dashboard: Extracting user stories from consolidated data:', workItems.length, 'items');
-      console.log('🔍 Dashboard: User stories platform from data:', latestAnalysis.analysis.userStories.platform);
-      console.log('🔍 Dashboard: Selected platform:', selectedPlatform);
-      console.log('🔍 Dashboard: Work items sample:', workItems[0]);
       
       // Convert work items to user stories format for compatibility
       const userStoriesData = [{
@@ -481,11 +418,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         comments_count: latestAnalysis.analysis.userStories.comments_count || 0
       };
       
-      console.log('🔍 Dashboard: Setting deepAnalysis from consolidated data:', deepAnalysisData);
       dispatch(setDeepAnalysis(deepAnalysisData));
     } else if (latestAnalysis && (!latestAnalysis.exists || !latestAnalysis.analysis)) {
       // Clear user stories when no analysis data exists for the project
-      console.log('🔍 Dashboard: Clearing user stories - no analysis data exists for project');
       dispatch(clearCurrentProjectUserStories());
       dispatch(setDeepAnalysis(null));
     }
@@ -551,7 +486,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       // Mark latest fetch as satisfied for this project to avoid a subsequent getLatestAnalysis call
       lastFetchedProjectRef.current = currentProjectId;
       // Fetch consolidated dashboard data (analysis + user stories + comments + submission status)
-      console.log('🔍 Dashboard: Fetching consolidated data for project:', currentProjectId);
       dispatch(getConsolidatedDashboardData(currentProjectId));
     }
   }, [dispatch]);
@@ -582,7 +516,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     
     // Fetch consolidated dashboard data for the selected project
     if (projectId) {
-      console.log('🔍 Dashboard: Fetching consolidated data for selected project:', projectId);
       // Mark latest fetch as satisfied for this project to avoid triggering getLatestAnalysis
       lastFetchedProjectRef.current = projectId;
       dispatch(getConsolidatedDashboardData(projectId));
@@ -595,18 +528,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   // Handle deep analysis data when it's included in analysis response
   useEffect(() => {
     if (analysisData && analysisData.deepAnalysis && !deepAnalysis) {
-      console.log('Setting deep analysis from analysis data:', analysisData.deepAnalysis);
       dispatch(setDeepAnalysis(analysisData.deepAnalysis));
     }
   }, [analysisData, deepAnalysis, dispatch]);
 
   // Debug: Monitor deepAnalysis state changes
   useEffect(() => {
-    console.log('🔍 deepAnalysis state changed:', {
-      deepAnalysis: deepAnalysis,
-      workItemsLength: deepAnalysis?.work_items?.length,
-      hasWorkItems: deepAnalysis?.work_items && deepAnalysis.work_items.length > 0
-    });
   }, [deepAnalysis]);
 
 
@@ -623,16 +550,13 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           ? `project_id=${effectiveProjectId}`
           : 'is_personal=true';
         try {
-          console.log('🔄 Loading comments from backend:', queryParam);
           const response = await apiRequest('get', `/insights/comments/?${queryParam}`, undefined, true);
           if (response.data.success && response.data.data.comments) {
             dispatch(setLoadedComments(response.data.data.comments));
-            console.log(`✅ Loaded ${response.data.data.comments.length} comments from backend for regeneration`);
             if (!effectiveProjectId && response.data.data.project_id) {
               setPersonalProjectId(response.data.data.project_id);
             }
           } else {
-            console.log('⚠️ No comments found in backend for this context');
           }
         } catch (error: any) {
           console.error('❌ Error loading comments from backend:', error);
@@ -686,21 +610,17 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     (async () => {
       try {
         const result = await dispatch(getLatestAnalysis(currentProjectId)).unwrap();
-        console.log('Latest analysis result:', result);
         if (result?.exists && result?.analysis) {
           const a = result.analysis; // Extract the nested analysis data
-          console.log('Analysis data from backend:', a);
           
           // The backend now returns data in the new format (analysisData field)
           // Check if data is already in the correct frontend format
           if (a.analysisData) {
             // Data is already in the new format, use it directly
-            console.log('Using new format data directly');
             dispatch(setAnalysisData(a));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.result?.overall && a.result?.counts && a.result?.features !== undefined) {
             // Data is nested under result field - normalize it and merge metadata
-            console.log('Using result field data, normalizing');
             const normalized = normalizeAnalysis(a.result);
             // Merge metadata from the analysis object
             if (normalized) {
@@ -714,29 +634,24 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.sentimentsummary && a.counts && a.featureasba !== undefined) {
             // Data is in the old format, normalize it
-            console.log('Using old format data, normalizing');
             dispatch(setAnalysisData(normalizeAnalysis(a)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.overall && a.counts && a.features !== undefined) {
             // Fallback: data is in the old format, normalize it
-            console.log('Using old format data, normalizing');
             dispatch(setAnalysisData(normalizeAnalysis(a)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else if (a.commentAnalysis) {
             // Fallback: use commentAnalysis if available
-            console.log('Using commentAnalysis as fallback');
             const ca = Array.isArray(a.commentAnalysis)
               ? (typeof a.commentAnalysis[0] === 'string' ? JSON.parse(a.commentAnalysis[0]) : a.commentAnalysis[0])
               : a.commentAnalysis;
             dispatch(setAnalysisData(normalizeAnalysis(ca)));
             dispatch(setDeepAnalysis(a.userStories ? parseDeepAnalysis(a.userStories) : null));
           } else {
-            console.log('No analysis data found, available keys:', Object.keys(a));
             dispatch(setAnalysisData(null));
             dispatch(setDeepAnalysis(null));
           }
         } else {
-          console.log('No analysis exists for project');
           dispatch(setAnalysisData(null));
           dispatch(setDeepAnalysis(null));
         }
@@ -882,7 +797,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           }
         }
         // The result is already in the correct format, just use it directly
-        console.log('Using analysis result directly:', payload);
         dispatch(setAnalysisData(payload));
 
         // Replace the temporary "analyzing" entry with the real one
@@ -947,7 +861,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       let commentsToUse = loadedComments;
       const effectiveProjectId = currentProjectId || personalProjectId || '';
       if (!commentsToUse || commentsToUse.length === 0) {
-        console.log('🔄 No comments available, trying to load from backend...');
         try {
           const queryParam = effectiveProjectId
             ? `project_id=${effectiveProjectId}`
@@ -956,7 +869,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           if (response.data.success && response.data.data.comments) {
             commentsToUse = response.data.data.comments;
             dispatch(setLoadedComments(commentsToUse));
-            console.log(`✅ Loaded ${commentsToUse?.length} comments from backend`);
             if (!effectiveProjectId && response.data.data.project_id) {
               setPersonalProjectId(response.data.data.project_id);
             }
@@ -971,17 +883,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         setIsGeneratingUserStories(false);
         return;
       }
-      
-      console.log('🔧 generateWorkItemsFromAnalysis called:', {
-        currentPlatform,
-        analysisData: !!analysisData,
-        loadedCommentsLength: commentsToUse?.length,
-        projectContext: effectiveProjectId || null
-      });
-      
       if (currentPlatform === 'jira') {
         // For Jira, follow the same flow as Azure: general analysis -> work items generation
-        console.log('🔧 Generating Jira work items using the correct flow');
         
         if (commentsToUse && commentsToUse.length > 0) {
           // Step 1: Get Jira project metadata for better work item generation
@@ -992,14 +895,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             try {
               const metadataResponse = await apiRequest('get', `/workitems/jira/project-metadata?projectId=${selectedJiraProjectId}`, {}, true, false);
               jiraProjectMetadata = metadataResponse.data.metadata;
-              console.log('✅ Jira project metadata:', jiraProjectMetadata);
             } catch (e) {
               console.warn('⚠️ Failed to fetch Jira project metadata, proceeding without it:', e);
             }
           }
           
           // Step 2: Generate work items using the analysis data and Jira metadata
-          console.log('🔧 Step 2: Generating Jira work items from analysis data...');
           const workItemsResult = await dispatch(generateUserStories({
             analysisData,
             comments: commentsToUse, // Use the loaded comments
@@ -1009,12 +910,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             projectMetadata: jiraProjectMetadata
           })).unwrap();
           
-          console.log('✅ Jira work items generated:', workItemsResult);
-          console.log('📊 Work items count:', workItemsResult.work_items?.length);
           
           // Fetch the persisted user stories from the backend after successful generation
           if (effectiveProjectId && user?.id) {
-            console.log('🔄 Fetching persisted user stories after Jira generation...');
             const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
             
             // Add a small delay to ensure the backend has saved the data
@@ -1028,7 +926,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           
           // Set the generated work items in the store
           if (workItemsResult.work_items) {
-            console.log('🔄 Dispatching setDeepAnalysis with work items...');
             
             // Structure the data properly for the UserStories component
             // The UserStoryList expects an array of user stories, so we need to wrap the response
@@ -1057,31 +954,23 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             
             // Store in the userStories slice as well for proper display
             // This ensures the UserStoryList component gets the data in the expected format
-            console.log('✅ Structured user story format:', userStoryFormat);
             
             dispatch(setDeepAnalysis(structuredData));
-            console.log('✅ setDeepAnalysis dispatched with structured data:', structuredData);
-            console.log('🔍 Work items in structured data:', structuredData.work_items?.length);
-            console.log('🔍 Structured data keys:', Object.keys(structuredData));
           } else {
             console.warn('⚠️ No work items in result');
           }
         } else {
-          console.log('📝 No comments available for Jira work item generation');
         }
       } else {
         // For Azure DevOps, use the existing logic
         const processTemplate = (typeof window !== 'undefined') ? 
           localStorage.getItem('azure_process_template') || 'Agile' : 'Agile';
         
-        console.log('🔧 Generating Azure work items with template:', processTemplate);
         
         // Check if we have comments and analysis data available
         if (commentsToUse && commentsToUse.length > 0 && analysisData) {
-          console.log('Using existing analysis data with comments:', commentsToUse.length);
           
           // Use existing analysis data instead of calling analyzeComments again
-          console.log('Using existing analysis data:', analysisData);
           
           // Generate work items from the existing analysis data
           const workItemsResult = await dispatch(generateUserStories({
@@ -1102,11 +991,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             };
             
             dispatch(setDeepAnalysis(structuredData));
-            console.log('✅ Work items generated and stored:', workItemsResult);
             
             // Fetch the persisted user stories from the backend after successful generation
             if (effectiveProjectId && user?.id) {
-              console.log('🔄 Fetching persisted user stories after Azure generation...');
               const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
               
               // Add a small delay to ensure the backend has saved the data
@@ -1121,7 +1008,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             console.warn('No work items generated from analysis');
           }
         } else {
-          console.log('No comments available, using analysis data for work items');
           
           // Fallback to old method using analysis data
           const workItemsResult = await dispatch(generateUserStories({
@@ -1132,7 +1018,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             projectId: effectiveProjectId || undefined
           })).unwrap();
           
-          console.log('Work items generated:', workItemsResult);
           
           // Set the generated work items in the store
           if (workItemsResult.work_items) {
@@ -1144,11 +1029,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               summary: workItemsResult.summary
             };
             dispatch(setDeepAnalysis(structuredData));
-            console.log('✅ setDeepAnalysis dispatched (fallback 2):', structuredData);
             
             // Fetch the persisted user stories from the backend after fallback generation
             if (effectiveProjectId && user?.id) {
-              console.log('🔄 Fetching persisted user stories after fallback generation...');
               const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
               
               // Add a small delay to ensure the backend has saved the data
@@ -1178,7 +1061,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       // Fetch the persisted user stories from the backend after generation
       const effectiveProjectId = currentProjectId || personalProjectId;
       if (effectiveProjectId && user?.id) {
-        console.log('🔄 Fetching persisted user stories after generation...');
         const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
         
         // Add a small delay to ensure the backend has saved the data
@@ -1196,7 +1078,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   function normalizeAnalysis(input: any): AnalysisData {
     if (!input) return input as AnalysisData;
     
-    console.log('Normalizing analysis data:', input);
     
     // If data is already in the new format (has analysisData field)
     if (input.analysisData) {
@@ -1239,7 +1120,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         deepAnalysis: input.deepAnalysis,
       } as AnalysisData;
       
-      console.log('Normalized data:', normalized);
       return normalized;
     }
     
@@ -1284,7 +1164,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
         deepAnalysis: input.deepAnalysis,
       } as AnalysisData;
       
-      console.log('Normalized data:', normalized);
       return normalized;
     }
     
@@ -1368,10 +1247,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     comment_count: feature.comment_count
   }));
 
-  console.log('Feature sentiment data:---?', featureSentimentData);
-  console.log('Analysis data for features:', activeAnalysisData?.analysisData?.features);
-  console.log('Raw features array:', activeAnalysisData?.analysisData?.features);
-  console.log('First feature example:', activeAnalysisData?.analysisData?.features?.[0]);
 
   // Enhanced colorful metrics
   const metrics = [
@@ -1578,43 +1453,13 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               ) : selectedPlatform === 'jira' ? (
                 /* Jira User Stories View */
                 (() => {
-                  console.log('🔍 Jira Platform Debug:', {
-                    selectedPlatform,
-                    loadedComments: loadedComments?.length,
-                    currentProjectUserStories: currentProjectUserStories?.length,
-                    deepAnalysis: deepAnalysis ? 'exists' : 'null',
-                    deepAnalysisWorkItems: deepAnalysis?.work_items?.length
-                  });
                   return loadedComments && loadedComments.length > 0;
                 })() ? (
                   (() => {
-                    console.log('🔍 Jira User Stories Debug:', {
-                      selectedPlatform,
-                      loadedCommentsLength: loadedComments?.length ?? 0,
-                      deepAnalysis: deepAnalysis,
-                      deepAnalysisWorkItems: deepAnalysis?.work_items,
-                      workItemsLength: deepAnalysis?.work_items?.length,
-                      jiraAnalysis: jiraAnalysis,
-                      jiraAnalysisWorkItems: jiraAnalysis?.work_items,
-                      deepAnalysisKeys: deepAnalysis ? Object.keys(deepAnalysis) : 'null',
-                      deepAnalysisType: typeof deepAnalysis
-                    });
-                    
                     // Check if we have work items in deepAnalysis OR in currentProjectUserStories
                     const hasDeepAnalysisWorkItems = deepAnalysis?.work_items && deepAnalysis.work_items.length > 0;
                     const hasCurrentUserStories = currentProjectUserStories && currentProjectUserStories.length > 0;
                     const hasAnyUserStories = hasDeepAnalysisWorkItems || hasCurrentUserStories;
-                    
-                    console.log('🔍 Jira User Stories Check:', {
-                      hasDeepAnalysisWorkItems,
-                      hasCurrentUserStories,
-                      hasAnyUserStories,
-                      deepAnalysisWorkItemsLength: deepAnalysis?.work_items?.length,
-                      currentUserStoriesLength: currentProjectUserStories?.length,
-                      currentProjectUserStories: currentProjectUserStories,
-                      currentUserStoriesPlatform: currentProjectUserStories?.[0]?.platform
-                    });
-                    
                     return hasAnyUserStories ? (
                       (() => {
                         // Prepare user stories data for display
@@ -1637,14 +1482,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                           
                           // Check if we need to store this in Redux (similar to Azure logic)
                           if (!hasCurrentUserStories) {
-                            console.log('🔍 Storing Jira user story in Redux state:', jiraUserStory);
                             dispatch(setCurrentProjectUserStories([jiraUserStory]));
                           }
                           
                           userStoriesToDisplay = [jiraUserStory];
                         }
                         
-                        console.log('🔍 Jira UserStoryList will receive:', userStoriesToDisplay);
                         
                         return (
                           <UserStoryList 
@@ -1693,7 +1536,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                                     summary: workItemsResult.summary
                                   };
                                   dispatch(setDeepAnalysis(structuredData));
-                                  console.log('✅ setDeepAnalysis dispatched (regenerate):', structuredData);
                                 } catch (error) {
                                   console.error('Failed to regenerate Jira analysis:', error);
                                 }
@@ -1765,26 +1607,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               ) : (
                 /* Azure User Stories View */
                 (() => {
-                  console.log('🔍 Azure User Stories Debug:', {
-                    deepAnalysis: deepAnalysis,
-                    deepAnalysisWorkItems: deepAnalysis?.work_items,
-                    workItemsLength: deepAnalysis?.work_items?.length,
-                    deepAnalysisKeys: deepAnalysis ? Object.keys(deepAnalysis) : 'null',
-                    deepAnalysisType: typeof deepAnalysis
-                  });
-                  
                   // Check if we have work items in the response
                   const hasWorkItems = deepAnalysis?.work_items && deepAnalysis.work_items.length > 0;
                   const hasValidDeepAnalysis = deepAnalysis && (deepAnalysis.work_items || deepAnalysis.work_items_by_feature);
                   const hasUserStories = currentProjectUserStories && currentProjectUserStories.length > 0;
-                  console.log('🔍 Final check - hasWorkItems:', hasWorkItems, 'work_items length:', deepAnalysis?.work_items?.length);
-                  console.log('🔍 Final check - hasValidDeepAnalysis:', hasValidDeepAnalysis);
-                  console.log('🔍 Final check - hasUserStories:', hasUserStories);
-                  console.log('🔍 Final check - deepAnalysis.work_items:', deepAnalysis?.work_items);
-                  console.log('🔍 Final check - currentProjectUserStories:', currentProjectUserStories);
-                  console.log('🔍 Final check - currentProjectUserStories length:', currentProjectUserStories?.length);
-                  console.log('🔍 Final check - currentProjectUserStories[0]:', currentProjectUserStories?.[0]);
-                  console.log('🔍 Final check - Condition result:', (hasValidDeepAnalysis && hasWorkItems) || hasUserStories);
                   
                   // Simplified condition - show if we have ANY work items from either source
                   const shouldShowUserStories = (hasValidDeepAnalysis && hasWorkItems) || hasUserStories;
@@ -1890,3 +1716,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     </div>
   );
 }
+
+
+

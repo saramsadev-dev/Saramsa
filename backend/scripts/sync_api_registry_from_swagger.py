@@ -69,7 +69,6 @@ FEEDBACK_INSIGHT_ALIASES = {
     "/api/feedback/analyze/": "/api/insights/analyze/",
     "/api/feedback/task-status/": "/api/insights/task-status/",
     "/api/feedback/tasks/": "/api/insights/tasks/",
-    "/api/feedback/tasks/stream/": "/api/insights/tasks/stream/",
     "/api/feedback/comments/": "/api/insights/comments/",
     "/api/feedback/upload/": "/api/insights/upload/",
     "/api/feedback/keywords/update/": "/api/insights/keywords/update/",

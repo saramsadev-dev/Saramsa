@@ -31,7 +31,6 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
     if (confirm('Are you sure you want to delete this user story? This action cannot be undone.')) {
       try {
         await dispatch(deleteUserStory({ userStoryId })).unwrap();
-        console.log('User story deleted successfully');
       } catch (error) {
         console.error('Failed to delete user story:', error);
       }
@@ -51,7 +50,6 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
           userStoryIds: selectedUserStories 
         })).unwrap();
         
-        console.log(`Successfully deleted ${result.deletedIds.length} user stories`);
         
         if (result.failedDeletions && result.failedDeletions.length > 0) {
           console.warn('Some deletions failed:', result.failedDeletions);
@@ -90,7 +88,6 @@ export function UserStoryDeleteExample({ projectId, userId }: UserStoryDeleteExa
           projectId: projectId
         })).unwrap();
         
-        console.log(`Successfully deleted ${result.deletedCount} work items`);
         setSelectedWorkItems([]);
         
         // Refresh user stories to reflect the changes
@@ -312,3 +309,5 @@ dispatch(deleteWorkItems({ workItemIds: ["work_item_id_1", "work_item_id_2"], pr
     </div>
   );
 }
+
+

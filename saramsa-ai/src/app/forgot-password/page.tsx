@@ -76,7 +76,6 @@ export default function ForgotPasswordPage() {
         if (result.data?.reset_link) {
           setResetLink(result.data.reset_link);
           if (typeof window !== 'undefined') {
-            console.log('Reset link:', result.data.reset_link);
           }
         }
       } else {
@@ -309,4 +308,6 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+
+
 

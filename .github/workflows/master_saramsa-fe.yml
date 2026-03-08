@@ -41,19 +41,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Optional lint (if configured)
+      - name: Run lint
+        run: npm run lint
+
+      - name: Validate frontend API env secrets
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
         run: |
-          if node -e "const s=require('./package.json').scripts||{}; process.exit(s.lint?0:1)"; then
-            echo "Found lint script, running npm run lint"
-            npm run lint
-          else
-            echo "No lint script defined in package.json, skipping lint step"
+          if [ -z "$NEXT_PUBLIC_API_URL" ] || [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
+            echo "NEXT_PUBLIC_API_URL and NEXT_PUBLIC_API_BASE_URL secrets must be set."
+            exit 1
           fi
 
       - name: Build Next.js standalone
         env:
-          NEXT_PUBLIC_API_URL: https://saramsa-backend-h6b6edbjbcawbnee.centralus-01.azurewebsites.net/api
-          NEXT_PUBLIC_API_BASE_URL: https://saramsa-backend-h6b6edbjbcawbnee.centralus-01.azurewebsites.net
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
         run: npm run build
 
       - name: Prepare standalone package
@@ -111,8 +115,8 @@ jobs:
           FRONTEND_HEALTH_URL: ${{ secrets.FRONTEND_HEALTH_URL }}
         run: |
           if [ -z "$FRONTEND_HEALTH_URL" ]; then
-            echo "FRONTEND_HEALTH_URL is not set; skipping health check."
-            exit 0
+            echo "FRONTEND_HEALTH_URL is not set; failing workflow."
+            exit 1
           fi
 
           echo "Checking frontend health at $FRONTEND_HEALTH_URL"

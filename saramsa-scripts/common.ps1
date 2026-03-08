@@ -1,5 +1,5 @@
 # Saramsa scripts - shared paths and helpers
-# Dot-source from start.ps1, kill.ps1, logs.ps1
+# Dot-source from start-procfile.ps1
 
 $ErrorActionPreference = "Stop"
 
@@ -8,41 +8,161 @@ $ScriptDir = Split-Path -Parent $PSScriptRoot
 $BackendDir = Join-Path $ScriptDir "backend"
 $FrontendDir = Join-Path $ScriptDir "saramsa-ai"
 $CeleryOpsUIDir = Join-Path $ScriptDir "celery_ops" | Join-Path -ChildPath "celery_ops" | Join-Path -ChildPath "ui" | Join-Path -ChildPath "react"
-# Canonical PID file path so start/kill use same file
+# Canonical PID file path (legacy background mode). Kept to clear stale files.
 $PidFile = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir ".saramsa-pids.json"))
 $FrontendLog = Join-Path $ScriptDir ".saramsa-frontend.log"
 $BackendLog = Join-Path $ScriptDir ".saramsa-backend.log"
+$SystemLog = Join-Path $ScriptDir ".saramsa-system.log"
+$AllLog = Join-Path $ScriptDir ".saramsa-all.log"
 $BackendErrLog = Join-Path $ScriptDir ".saramsa-backend.err.log"
 $CeleryLog = Join-Path $ScriptDir ".saramsa-celery.log"
 $CeleryErrLog = Join-Path $ScriptDir ".saramsa-celery.err.log"
 $CeleryOpsLog = Join-Path $ScriptDir ".saramsa-celery-ops.log"
 $CeleryOpsErrLog = Join-Path $ScriptDir ".saramsa-celery-ops.err.log"
+$CeleryOpsBuildLog = Join-Path $ScriptDir ".saramsa-celery-ops.build.log"
+$CeleryOpsBuildErrLog = Join-Path $ScriptDir ".saramsa-celery-ops.build.err.log"
 
 $VenvPath = Join-Path $BackendDir "venv"
 $VenvActivate = Join-Path $VenvPath "Scripts\Activate.ps1"
 $UseVenv = (Test-Path $VenvActivate)
 
-function Save-ProcessId { param([string]$ServiceName, [int]$ProcessId)
-    $Pids = @{}
-    if (Test-Path $PidFile) {
-        $j = Get-Content $PidFile -Raw | ConvertFrom-Json
-        $j.PSObject.Properties | ForEach-Object { $Pids[$_.Name] = $_.Value }
+function Get-PythonExe {
+    if ($UseVenv -and (Test-Path $VenvPath)) {
+        $py = Join-Path $VenvPath "Scripts\python.exe"
+        if (Test-Path $py) { return $py }
     }
-    $Pids[$ServiceName] = $ProcessId
-    $Pids | ConvertTo-Json | Out-File -FilePath $PidFile -Encoding UTF8
+    return "python"
 }
 
-function Load-ProcessIds {
-    $Pids = @{}
-    if (Test-Path $PidFile) {
-        $j = Get-Content $PidFile -Raw | ConvertFrom-Json
-        $j.PSObject.Properties | ForEach-Object { $Pids[$_.Name] = $_.Value }
-    }
-    return $Pids
+function Rotate-Log { param([string]$Path)
+    try {
+        if (Test-Path $Path) {
+            $dir = Split-Path -Parent $Path
+            $base = [System.IO.Path]::GetFileNameWithoutExtension($Path)
+            $ext = [System.IO.Path]::GetExtension($Path)
+            $ts = Get-Date -Format "yyyyMMdd-HHmmss"
+            $newPath = Join-Path $dir "$base.$ts$ext"
+            Move-Item -Path $Path -Destination $newPath -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
 }
 
 function Clear-ProcessIds {
     try { if (Test-Path $PidFile) { Remove-Item $PidFile -Force -ErrorAction SilentlyContinue } } catch { }
+}
+
+function Get-ListeningProcessId { param([int]$Port)
+    try {
+        $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($conn -and $conn.OwningProcess) { return [int]$conn.OwningProcess }
+    } catch { }
+
+    try {
+        $line = netstat -ano 2>$null | Select-String "LISTENING" | Where-Object {
+            $_.ToString() -match "[:.]$Port\s+.*LISTENING\s+(\d+)$"
+        } | Select-Object -First 1
+        if ($line -and $matches[1]) { return [int]$matches[1] }
+    } catch { }
+
+    return $null
+}
+
+function Get-ProcessCommandLine { param([int]$ProcessId)
+    try {
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop
+        if ($proc -and $proc.CommandLine) { return [string]$proc.CommandLine }
+    } catch { }
+    return ""
+}
+
+function Test-SaramsaProcessForPort { param([int]$Port, [string]$CommandLine)
+    if (-not $CommandLine) { return $false }
+    $cmd = $CommandLine.ToLowerInvariant()
+
+    switch ($Port) {
+        8000 { return $cmd.Contains("manage.py runserver 127.0.0.1:8000") }
+        3001 {
+            # Next.js on Windows may show either the npm command or node start-server.js.
+            return $cmd.Contains("next dev -p 3001") `
+                -or $cmd.Contains("npm run dev") `
+                -or ($cmd.Contains("\saramsa-ai\") -and $cmd.Contains("next\dist\server\lib\start-server.js"))
+        }
+        9800 { return $cmd.Contains("celery_ops serve") -and $cmd.Contains("--port 9800") }
+        default { return $false }
+    }
+}
+
+function Get-PortConflictSummary {
+    $conflicts = @()
+    foreach ($port in @(8000, 3001, 9800)) {
+        $portProcessId = Get-ListeningProcessId -Port $port
+        if (-not $portProcessId) { continue }
+        $cmd = Get-ProcessCommandLine -ProcessId $portProcessId
+        $conflicts += [pscustomobject]@{
+            Port = $port
+            ProcessId = $portProcessId
+            IsSaramsa = (Test-SaramsaProcessForPort -Port $port -CommandLine $cmd)
+            CommandLine = $cmd
+        }
+    }
+    return $conflicts
+}
+
+function Stop-SaramsaServices {
+    $conflicts = Get-PortConflictSummary
+    if (-not $conflicts -or $conflicts.Count -eq 0) {
+        Write-Host "[OK] No Saramsa services found on ports 8000, 3001, or 9800." -ForegroundColor Green
+        return
+    }
+
+    $saramsaConflicts = @($conflicts | Where-Object { $_.IsSaramsa })
+    $foreignConflicts = @($conflicts | Where-Object { -not $_.IsSaramsa })
+
+    if ($foreignConflicts.Count -gt 0) {
+        foreach ($conflict in $foreignConflicts) {
+            Write-Host "[WARNING] Port $($conflict.Port) is in use by PID $($conflict.ProcessId), but it does not look like a Saramsa process." -ForegroundColor Yellow
+        }
+    }
+
+    if ($saramsaConflicts.Count -eq 0) {
+        Write-Host "[ERROR] No Saramsa-owned processes were identified to stop." -ForegroundColor Red
+        # Continue and still attempt stale Honcho cleanup below.
+    }
+
+    $stopped = @{}
+    foreach ($conflict in $saramsaConflicts) {
+        if ($stopped.ContainsKey($conflict.ProcessId)) { continue }
+        try {
+            $null = & taskkill /T /F /PID $conflict.ProcessId 2>$null
+            $stopped[$conflict.ProcessId] = $true
+            Write-Host "[OK] Stopped PID $($conflict.ProcessId) for port $($conflict.Port)." -ForegroundColor Green
+        } catch {
+            Write-Host "[ERROR] Failed to stop PID $($conflict.ProcessId) on port $($conflict.Port): $_" -ForegroundColor Red
+        }
+    }
+
+    Stop-StaleSaramsaHoncho
+}
+
+function Stop-StaleSaramsaHoncho {
+    $scriptRootLower = $ScriptDir.ToLowerInvariant()
+    $targets = @()
+    try {
+        $targets = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -eq "python.exe" -and $_.CommandLine -and
+            $_.CommandLine.ToLowerInvariant().Contains($scriptRootLower) -and
+            $_.CommandLine.ToLowerInvariant().Contains("-m honcho start")
+        } | Select-Object -ExpandProperty ProcessId
+    } catch { }
+
+    $targets = @($targets | Sort-Object -Unique)
+    foreach ($procId in $targets) {
+        try {
+            $null = & taskkill /T /F /PID $procId 2>$null
+            Write-Host "[OK] Stopped stale Honcho PID $procId." -ForegroundColor Green
+        } catch { }
+    }
 }
 
 function Test-PortListening { param([string]$TargetHost = "127.0.0.1", [int]$Port = 3001, [int]$TimeoutMs = 2000)
@@ -54,6 +174,15 @@ function Test-PortListening { param([string]$TargetHost = "127.0.0.1", [int]$Por
         if ($task.IsCompleted -and -not $task.IsFaulted -and $tcp.Connected) { return $true }
     } catch { }
     finally { if ($tcp) { try { $tcp.Dispose() } catch {} } }
+    return $false
+}
+
+function Wait-PortListening { param([int]$Port, [int]$TimeoutSec = 30, [int]$IntervalMs = 500)
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
+        if (Test-PortListening -Port $Port) { return $true }
+        Start-Sleep -Milliseconds $IntervalMs
+    }
     return $false
 }
 
@@ -71,8 +200,14 @@ function Check-Redis {
 }
 
 function Check-WSL {
-    try { if ((wsl --version 2>$null) -or ($LASTEXITCODE -eq 0)) { return $true } } catch { }
-    try { wsl --list --quiet 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { return $true } } catch { }
+    try {
+        $null = & wsl --version 2>$null
+        if ($LASTEXITCODE -eq 0) { return $true }
+    } catch { }
+    try {
+        $null = & wsl --list --quiet 2>$null
+        if ($LASTEXITCODE -eq 0) { return $true }
+    } catch { }
     return $false
 }
 
@@ -90,18 +225,7 @@ function Install-RedisWindows {
     Write-Host "  1. Chocolatey: choco install redis-64 -y" -ForegroundColor Gray
     Write-Host "  2. Manual: https://github.com/tporadowski/redis/releases" -ForegroundColor Gray
     Write-Host ""
-    $r = Read-Host "Install Redis via Chocolatey now? (Y/N)"
-    if ($r -eq "Y" -or $r -eq "y") {
-        try {
-            if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-                Set-ExecutionPolicy Bypass -Scope Process -Force
-                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-                iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-            }
-            choco install redis-64 -y
-            Write-Host "[OK] Redis installed. Restart PowerShell and run saramsa start all dev" -ForegroundColor Green
-        } catch { Write-Host "[ERROR] Install failed: $_" -ForegroundColor Red }
-    }
+    Write-Host "For safety, this script will not auto-install Redis." -ForegroundColor Yellow
 }
 
 function Start-Redis {
@@ -142,63 +266,3 @@ function Start-Redis {
     Write-Host "  See START-SERVICES.md section 'Redis failed to start' for details." -ForegroundColor Gray
 }
 
-function Stop-AllServices {
-    Write-Host "`nStopping all Saramsa services..." -ForegroundColor Yellow
-    $killed = @{}
-    $n = 0
-    $Pids = Load-ProcessIds
-    foreach ($sn in @("backend", "celery", "celery-ops", "frontend")) {
-        if (-not $Pids.ContainsKey($sn)) { continue }
-        $pid_ = $Pids[$sn]
-        try {
-            $p = Get-Process -Id $pid_ -ErrorAction SilentlyContinue
-            if ($p) {
-                Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue
-                Write-Host "  Stopped $sn (PID: $pid_)" -ForegroundColor Gray
-                $killed[$pid_] = $true
-                $n++
-            } else {
-                Write-Host "  Stale PID for $sn (PID: $pid_) not found" -ForegroundColor DarkYellow
-            }
-        } catch { }
-    }
-    $portPids = @{}
-    try {
-        $net = netstat -ano 2>$null
-        $wantedPorts = @(3000, 3001, 5173, 8000, 9800)
-        $listenLines = $net | Select-String "LISTENING"
-        foreach ($line in $listenLines) {
-            $text = $line.ToString().Trim()
-            $tokens = $text -split '\s+'
-            if ($tokens.Length -lt 5) { continue }
-            $local = $tokens[1]
-            $pidToken = $tokens[-1]
-            if ($pidToken -notmatch '^\d+$') { continue }
-            $portToken = $local.Split(':')[-1]
-            if ($portToken -notmatch '^\d+$') { continue }
-            $port = [int]$portToken
-            $procId = [int]$pidToken
-            if ($wantedPorts -contains $port) {
-                $portPids[$procId] = $port
-            }
-        }
-        foreach ($kv in $portPids.GetEnumerator()) {
-            $portPid = [int]$kv.Key
-            if ($killed.ContainsKey($portPid)) { continue }
-            try {
-                $qp = Get-Process -Id $portPid -ErrorAction SilentlyContinue
-                if ($qp) {
-                    Stop-Process -Id $portPid -Force -ErrorAction SilentlyContinue
-                    Write-Host "  Stopped process on port $($kv.Value) (PID: $portPid)" -ForegroundColor Gray
-                    $n++
-                }
-            } catch { }
-        }
-    } catch { }
-    if ($portPids.Count -eq 0) {
-        Write-Host "  No listening processes found on ports 3000/3001/5173/8000/9800" -ForegroundColor DarkYellow
-    }
-    Write-Host "  Redis shutdown skipped (use redis-cli shutdown if needed)" -ForegroundColor DarkYellow
-    Clear-ProcessIds
-    Write-Host "[OK] Stopped $n service(s)." -ForegroundColor Green
-}

@@ -74,7 +74,6 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
     setError(null);
 
     try {
-      console.log('🏗️ Creating Jira project in database...');
       
       const projectData = {
         project_name: projectName,
@@ -90,7 +89,6 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
       
       if (result.success) {
         setCreatedProjectId(result.project.id);
-        console.log('✅ Jira project created:', result.project);
         
         // Store the project ID in localStorage for future use
         if (typeof window !== 'undefined') {
@@ -124,28 +122,21 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
     setError(null);
 
     try {
-      console.log('🔄 Starting Jira analysis process...');
-      console.log('📊 Comments count:', comments.length);
-      console.log('🏗️ Project ID:', createdProjectId);
       
       // Step 1: General Analysis (same as Azure)
-      console.log('📈 Step 1: Performing general analysis...');
       const analysisResult = await dispatch(analyzeComments({
         comments,
         projectId: createdProjectId
       })).unwrap();
       
-      console.log('✅ General analysis completed:', analysisResult);
       setAnalysisResults(analysisResult);
       
       // Step 2: Use the analysis data directly for Jira issue creation
-      console.log('🔧 Step 2: Preparing work items from analysis...');
       const workItemsResult = {
         work_items: analysisResult.work_items || [],
         summary: analysisResult.summary || {}
       };
       
-      console.log('✅ Work items generated:', workItemsResult);
       setWorkItemsResults(workItemsResult);
       setCurrentStep('work-items');
       
@@ -172,14 +163,6 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
         acceptance_criteria: item.acceptance_criteria || item.acceptancecriteria || '',
         business_value: item.business_value || item.businessvalue || ''
       }));
-
-      console.log('🔧 Creating Jira issues with:', {
-        projectId: createdProjectId,
-        projectKey: selectedJiraProject.key,
-        itemsCount: transformedItems.length,
-        transformedItems
-      });
-
       const result = await dispatch(createJiraIssues({
         items: transformedItems,
         projectId: createdProjectId,
@@ -498,3 +481,6 @@ export default function JiraIntegration({ comments, projectId }: JiraIntegration
     </div>
   );
 }
+
+
+

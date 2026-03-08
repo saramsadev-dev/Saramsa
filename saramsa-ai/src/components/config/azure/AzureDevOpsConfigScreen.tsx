@@ -207,7 +207,6 @@ export function AzureDevOpsConfigScreen({ onContinue, onBack }: AzureDevOpsConfi
       localStorage.setItem('project_id', result.id);
       localStorage.setItem('selected_project_name', selectedProjectData?.name || '');
       
-      console.log('Project created successfully:', result.id);
       
     } catch (e) {
       console.error('persist project error', e);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid3X3, Activity, Users, List } from 'lucide-react';
+import { Grid3X3, Activity, Users, List } from '@/components/ui/no-icons';
 
 interface SidebarProps {
   activeSection: string;

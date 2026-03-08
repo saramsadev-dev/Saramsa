@@ -11,7 +11,7 @@ import uuid
 import logging
 
 from ..repositories import IntegrationsRepository
-from apis.infrastructure.cosmos_service import cosmos_service
+from apis.infrastructure.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class ProjectService:
     }
     def __init__(self):
         self.integrations_repo = IntegrationsRepository()
-        self.cosmos_service = cosmos_service
+        self.storage_service = storage_service
 
     def _normalize_project(self, project: Dict[str, Any]) -> Dict[str, Any]:
         if not project:
@@ -42,7 +42,7 @@ class ProjectService:
     
     def _create_project_document(self, user_id: str, name: str, description: str = None, 
                                 external_links: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Create a new project document for Cosmos DB."""
+        """Create a new project document for PostgreSQL."""
         project_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         
@@ -132,7 +132,7 @@ class ProjectService:
             try:
                 owner_id = project.get("owner_user_id") or project.get("userId") or user_id
                 if owner_id:
-                    self.cosmos_service.upsert_project_role(
+                    self.storage_service.upsert_project_role(
                         project.get("id"),
                         str(owner_id),
                         "owner",
@@ -155,9 +155,9 @@ class ProjectService:
             owned = self.integrations_repo.get_projects_by_user(user_id)
             owned_ids = {p.get('id') for p in owned if p.get('id')}
 
-            shared_ids = self.cosmos_service.get_project_ids_for_user(user_id)
+            shared_ids = self.storage_service.get_project_ids_for_user(user_id)
             shared_ids = [pid for pid in shared_ids if pid not in owned_ids]
-            shared = self.cosmos_service.get_projects_by_ids(shared_ids) if shared_ids else []
+            shared = self.storage_service.get_projects_by_ids(shared_ids) if shared_ids else []
 
             all_projects = []
             for project in owned + shared:
@@ -195,9 +195,9 @@ class ProjectService:
                 return self._normalize_project(project)
 
             # Check project roles for shared access
-            role = self.cosmos_service.get_project_role_for_user(project_id, user_id)
+            role = self.storage_service.get_project_role_for_user(project_id, user_id)
             if role:
-                project = self.cosmos_service.get_project_by_id_any(project_id)
+                project = self.storage_service.get_project_by_id_any(project_id)
                 return self._normalize_project(project) if project else None
 
             return None
@@ -271,13 +271,13 @@ class ProjectService:
 
     def _get_project_role(self, project_id: str, user_id: str, project: Optional[Dict[str, Any]] = None) -> Optional[str]:
         if project is None:
-            project = self.cosmos_service.get_project_by_id_any(project_id)
+            project = self.storage_service.get_project_by_id_any(project_id)
         owner_id = None
         if isinstance(project, dict):
             owner_id = project.get("owner_user_id") or project.get("userId")
         if owner_id and str(owner_id) == str(user_id):
             return "owner"
-        return self.cosmos_service.get_project_role_for_user(project_id, str(user_id))
+        return self.storage_service.get_project_role_for_user(project_id, str(user_id))
 
     def _has_min_role(self, role: Optional[str], required: str) -> bool:
         if not role:
@@ -352,3 +352,4 @@ def get_project_service() -> ProjectService:
     if _project_service is None:
         _project_service = ProjectService()
     return _project_service
+

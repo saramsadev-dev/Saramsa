@@ -17,35 +17,22 @@ export const AuthInitializer: React.FC<AuthInitializerProps> = ({ children }) =>
   useEffect(() => {
     // Initialize authentication state from localStorage
     const initializeAuth = async () => {
-      console.log('AuthInitializer: Starting authentication initialization...');
       
       try {
         const storedUser = getStoredUser();
         const tokens = getTokens();
         const validAccessToken = getValidAccessToken();
 
-        console.log('AuthInitializer: Found tokens:', {
-          hasUser: !!storedUser,
-          hasTokens: !!tokens,
-          hasValidAccessToken: !!validAccessToken
-        });
-
         if (storedUser && validAccessToken) {
           // User has valid tokens, restore authentication state
-          console.log('AuthInitializer: Restoring user from localStorage:', storedUser.username);
           dispatch(setUser(storedUser));
         } else if (tokens && !validAccessToken) {
           // User has tokens but access token is expired
           // The axios interceptor will handle token refresh automatically
-          console.log('AuthInitializer: Access token expired, will be refreshed on next API call');
           if (storedUser) {
             dispatch(setUser(storedUser));
           }
         } else {
-          console.log('AuthInitializer: No valid authentication data found');
-          if (!storedUser) console.log('AuthInitializer: No user data in localStorage');
-          if (!validAccessToken) console.log('AuthInitializer: No valid access token');
-          
           // Clear any invalid/corrupted data
           clearTokens();
         }
@@ -54,7 +41,6 @@ export const AuthInitializer: React.FC<AuthInitializerProps> = ({ children }) =>
         // Clear corrupted data
         clearTokens();
       } finally {
-        console.log('AuthInitializer: Initialization complete');
         setIsInitialized(true);
       }
     };

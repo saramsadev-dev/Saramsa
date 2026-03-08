@@ -10,7 +10,7 @@ import {
   Shield,
   ArrowRight,
   CheckCircle,
-} from "lucide-react";
+} from 'lucide-react';
 import type { AppDispatch, RootState } from "@/store/store";
 import { fetchIntegrationAccounts } from "@/store/features/integrations/integrationsSlice";
 import { Button } from "@/components/ui/button";
@@ -241,3 +241,4 @@ export function PlatformSelectionScreen({
     </div>
   );
 }
+

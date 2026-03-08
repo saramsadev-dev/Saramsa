@@ -7,11 +7,30 @@ from functools import wraps
 from typing import Any, Callable
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .response import StandardResponse
 from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_validation_errors(detail: Any) -> list[dict]:
+    errors = []
+    if isinstance(detail, dict):
+        for field, messages in detail.items():
+            if isinstance(messages, (list, tuple)):
+                for message in messages:
+                    errors.append({"field": str(field), "message": str(message)})
+            else:
+                errors.append({"field": str(field), "message": str(messages)})
+    elif isinstance(detail, (list, tuple)):
+        for message in detail:
+            errors.append({"message": str(message)})
+    elif detail is not None:
+        errors.append({"message": str(detail)})
+    return errors
 
 
 def handle_service_errors(func: Callable) -> Callable:
@@ -28,6 +47,23 @@ def handle_service_errors(func: Callable) -> Callable:
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except DRFValidationError as e:
+            # Serializer/request validation errors
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Validation error in {func_name}: {e}")
+            errors = _extract_validation_errors(getattr(e, "detail", None))
+            return StandardResponse.validation_error(
+                detail="One or more fields are invalid.",
+                errors=errors if errors else None,
+            )
+        except DjangoValidationError as e:
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Django validation error in {func_name}: {e}")
+            errors = _extract_validation_errors(getattr(e, "message_dict", None) or getattr(e, "messages", None) or str(e))
+            return StandardResponse.validation_error(
+                detail="One or more fields are invalid.",
+                errors=errors if errors else None,
+            )
         except ValueError as e:
             # Business logic validation errors
             func_name = getattr(func, '__name__', 'unknown_function')
@@ -98,6 +134,22 @@ def handle_async_service_errors(func: Callable) -> Callable:
     async def wrapper(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
+        except DRFValidationError as e:
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Validation error in {func_name}: {e}")
+            errors = _extract_validation_errors(getattr(e, "detail", None))
+            return StandardResponse.validation_error(
+                detail="One or more fields are invalid.",
+                errors=errors if errors else None,
+            )
+        except DjangoValidationError as e:
+            func_name = getattr(func, '__name__', 'unknown_function')
+            logger.warning(f"Django validation error in {func_name}: {e}")
+            errors = _extract_validation_errors(getattr(e, "message_dict", None) or getattr(e, "messages", None) or str(e))
+            return StandardResponse.validation_error(
+                detail="One or more fields are invalid.",
+                errors=errors if errors else None,
+            )
         except ValueError as e:
             # Business logic validation errors
             func_name = getattr(func, '__name__', 'unknown_function')

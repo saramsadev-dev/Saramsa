@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock } from 'lucide-react';
+import { Clock } from '@/components/ui/no-icons';
 
 interface DurationBadgeProps {
   durationMs?: number;

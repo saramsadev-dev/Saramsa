@@ -31,7 +31,7 @@ urlpatterns = [
 ]
 
 # Endpoints moved to /api/insights/ aliases in apis/urls.py:
-#   analyze, task-status, tasks, tasks/stream, comments, upload,
+#   analyze, task-status, tasks, comments, upload,
 #   user-stories, review, rules, ingestion
 # Work item endpoints: /api/work-items/
 # Integration endpoints: /api/integrations/

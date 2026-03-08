@@ -36,7 +36,6 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
     if (confirm(`Are you sure you want to delete user story: ${userStoryId}?`)) {
       try {
         await dispatch(deleteUserStory({ userStoryId })).unwrap();
-        console.log(`Successfully deleted user story: ${userStoryId}`);
         // Refresh the list
         dispatch(fetchUserStoriesByProject({ projectId, userId }));
       } catch (error) {
@@ -57,7 +56,6 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
     if (confirm(`Are you sure you want to delete ALL ${userStoryIds.length} user stories? This action cannot be undone.`)) {
       try {
         await dispatch(deleteUserStories({ userStoryIds })).unwrap();
-        console.log(`Successfully deleted ${userStoryIds.length} user stories`);
         // Refresh the list
         dispatch(fetchUserStoriesByProject({ projectId, userId }));
       } catch (error) {
@@ -223,3 +221,5 @@ export function UserStoryDebug({ projectId, userId }: UserStoryDebugProps) {
     </div>
   );
 }
+
+

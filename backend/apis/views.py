@@ -7,11 +7,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from apis.core.response import StandardResponse
 from apis.infrastructure.performance_middleware import get_performance_summary
 from apis.infrastructure.cache_service import get_cache_service
-from apis.infrastructure.cosmos_service import cosmos_service
+from apis.infrastructure.storage_service import storage_service
 from aiCore.services.openai_client import get_azure_client
 from django.conf import settings
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -29,58 +28,26 @@ def health_check(request):
     """
     health_status = {
         'status': 'healthy',
-        'timestamp': cosmos_service._now(),
+        'timestamp': storage_service._now(),
         'components': {}
     }
     
-    # Diagnostic: Check raw environment variables and config values
-    raw_endpoint = os.getenv('COSMOS_DB_ENDPOINT')
-    raw_key = os.getenv('COSMOS_DB_KEY')
-    config_endpoint = settings.COSMOS_DB_CONFIG.get('endpoint')
-    config_key = settings.COSMOS_DB_CONFIG.get('key')
-    
-    # Build diagnostic info (don't expose full key for security)
-    diagnostic = {
-        'raw_env': {
-            'COSMOS_DB_ENDPOINT_present': bool(raw_endpoint),
-            'COSMOS_DB_ENDPOINT_length': len(raw_endpoint) if raw_endpoint else 0,
-            'COSMOS_DB_ENDPOINT_value': raw_endpoint[:50] + '...' if raw_endpoint and len(raw_endpoint) > 50 else raw_endpoint,
-            'COSMOS_DB_KEY_present': bool(raw_key),
-            'COSMOS_DB_KEY_length': len(raw_key) if raw_key else 0,
-            'COSMOS_DB_KEY_preview': raw_key[:10] + '...' if raw_key and len(raw_key) > 10 else ('***' if raw_key else None),
-        },
-        'from_config': {
-            'endpoint': config_endpoint[:50] + '...' if config_endpoint and len(config_endpoint) > 50 else config_endpoint,
-            'endpoint_has_placeholder': 'your-cosmos-account' in str(config_endpoint) if config_endpoint else None,
-            'key_length': len(str(config_key)) if config_key else 0,
-            'key_is_placeholder': config_key == 'your-cosmos-db-key' if config_key else None,
-            'key_preview': str(config_key)[:10] + '...' if config_key and len(str(config_key)) > 10 else ('***' if config_key else None),
-        },
-        'service_state': {
-            'is_enabled': cosmos_service.is_enabled,
-            'has_client': cosmos_service.client is not None,
-            'has_database': cosmos_service.database is not None,
-            'init_error': getattr(cosmos_service, '_init_error', None),
-        }
-    }
-    
-    # Check Cosmos DB
+    # Check PostgreSQL
     try:
-        if cosmos_service.is_enabled:
-            cosmos_stats = cosmos_service.get_performance_stats()
-            health_status['components']['cosmos_db'] = {
+        if storage_service.is_enabled:
+            db_stats = storage_service.get_performance_stats()
+            health_status['components']['database'] = {
                 'status': 'healthy',
-                'total_requests': cosmos_stats.get('total_requests', 0),
-                'success_rate': cosmos_stats.get('success_rate_percent', 0)
+                'total_requests': db_stats.get('total_requests', 0),
+                'success_rate': db_stats.get('success_rate_percent', 0)
             }
         else:
-            health_status['components']['cosmos_db'] = {
+            health_status['components']['database'] = {
                 'status': 'disabled',
-                'message': 'Cosmos DB is not configured',
-                '_diagnostic': diagnostic  # Add diagnostic info for debugging
+                'message': 'Database service is disabled'
             }
     except Exception as e:
-        health_status['components']['cosmos_db'] = {
+        health_status['components']['database'] = {
             'status': 'unhealthy',
             'error': str(e)
         }
@@ -162,9 +129,9 @@ def reset_performance_stats(request):
         Confirmation of reset
     """
     try:
-        # Reset Cosmos DB stats
-        if cosmos_service.is_enabled:
-            cosmos_service.reset_stats()
+        # Reset PostgreSQL stats
+        if storage_service.is_enabled:
+            storage_service.reset_stats()
         
         # Clear cache performance data
         cache_service = get_cache_service()

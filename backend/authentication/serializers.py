@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 from django.conf import settings
 import bcrypt
 
-class CosmosDBUserSerializer(serializers.Serializer):
-    """Serializer for Cosmos DB user data"""
+class AppUserSerializer(serializers.Serializer):
+    """Serializer for PostgreSQL user data"""
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=6)
@@ -60,8 +60,8 @@ class CosmosDBUserSerializer(serializers.Serializer):
         except Exception as e:
             raise serializers.ValidationError(f"Password hashing failed: {str(e)}")
 
-class CosmosDBTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Custom JWT serializer for Cosmos DB users"""
+class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Custom JWT serializer for PostgreSQL users"""
     
     def validate(self, attrs):
         email = attrs.get('email')
@@ -120,8 +120,8 @@ class CosmosDBTokenObtainPairSerializer(TokenObtainPairSerializer):
             }
         }
 
-class CosmosDBTokenRefreshSerializer(serializers.Serializer):
-    """Custom JWT refresh serializer for Cosmos DB users"""
+class AppTokenRefreshSerializer(serializers.Serializer):
+    """Custom JWT refresh serializer for PostgreSQL users"""
     
     refresh = serializers.CharField()
     
@@ -132,7 +132,7 @@ class CosmosDBTokenRefreshSerializer(serializers.Serializer):
             # Decode refresh token
             payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=['HS256'])
             
-            # Get user from Cosmos DB
+            # Get user from PostgreSQL
             user_id = payload.get('user_id')
             username = payload.get('username')
             
@@ -180,7 +180,7 @@ class CosmosDBTokenRefreshSerializer(serializers.Serializer):
         except Exception as e:
             raise serializers.ValidationError(f"Token refresh failed: {str(e)}")
 
-class CosmosDBUserProfileSerializer(serializers.Serializer):
+class AppUserProfileSerializer(serializers.Serializer):
     """Serializer for user profile updates"""
     first_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
     last_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
@@ -191,7 +191,7 @@ class CosmosDBUserProfileSerializer(serializers.Serializer):
         # This would need to be implemented based on your requirements
         return value
 
-class CosmosDBPasswordChangeSerializer(serializers.Serializer):
+class AppPasswordChangeSerializer(serializers.Serializer):
     """Serializer for password changes"""
     old_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True, min_length=6)
@@ -255,7 +255,7 @@ class ResetPasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"Password hashing failed: {str(e)}")
 
 
-class CosmosDBUserRegisterWithOtpSerializer(CosmosDBUserSerializer):
+class AppUserRegisterWithOtpSerializer(AppUserSerializer):
     """Serializer for registration with OTP."""
     otp = serializers.CharField(write_only=True, min_length=6, max_length=6)
 
@@ -263,3 +263,4 @@ class CosmosDBUserRegisterWithOtpSerializer(CosmosDBUserSerializer):
 class RegistrationOtpRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
     username = serializers.CharField(max_length=150, required=False, allow_blank=True)
+

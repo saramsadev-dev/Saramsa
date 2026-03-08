@@ -13,8 +13,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class CosmosDBUser:
-    """Custom user class for Cosmos DB users"""
+class AppUser:
+    """Custom user class for PostgreSQL users"""
     
     def __init__(self, user_data):
         self.user_data = user_data
@@ -82,8 +82,8 @@ class CosmosDBUser:
             logger.error(f"Password hashing error: {e}")
             return None
 
-class CosmosDBAuthenticationBackend(BaseBackend):
-    """Custom authentication backend for Cosmos DB users"""
+class AppAuthenticationBackend(BaseBackend):
+    """Custom authentication backend for PostgreSQL users"""
     
     def authenticate(self, request, username=None, password=None):
         if username is None or password is None:
@@ -94,7 +94,7 @@ class CosmosDBAuthenticationBackend(BaseBackend):
             user_data = user_service.authenticate_user(username, password)
             
             if user_data:
-                return CosmosDBUser(user_data)
+                return AppUser(user_data)
             
             return None
             
@@ -104,22 +104,21 @@ class CosmosDBAuthenticationBackend(BaseBackend):
     
     def get_user(self, user_id):
         try:
-            # Extract UUID from user_id (remove 'user_' prefix)
-            if user_id.startswith('user_'):
-                user_id = user_id[5:]  # Remove 'user_' prefix
-            
             user_service = get_user_service()
             user_data = user_service.get_user_by_id(user_id)
+            if not user_data and user_id.startswith('user_'):
+                # Backward compatibility for legacy prefixes.
+                user_data = user_service.get_user_by_id(user_id[5:])
             
             if user_data:
-                return CosmosDBUser(user_data)
+                return AppUser(user_data)
             return None
         except Exception as e:
             logger.error(f"Get user error: {e}")
             return None
 
-class CosmosDBJWTAuthentication(BaseAuthentication):
-    """Custom JWT authentication for Cosmos DB users"""
+class AppJWTAuthentication(BaseAuthentication):
+    """Custom JWT authentication for PostgreSQL users"""
     
     def authenticate(self, request):
         # Get the token from the Authorization header
@@ -145,7 +144,7 @@ class CosmosDBJWTAuthentication(BaseAuthentication):
                 raise AuthenticationFailed('User not found')
             
             # Create user object
-            user = CosmosDBUser(user_data)
+            user = AppUser(user_data)
             
             return (user, token)
             
@@ -159,8 +158,8 @@ class CosmosDBJWTAuthentication(BaseAuthentication):
     def authenticate_header(self, request):
         return 'Bearer realm="api"'
 
-class CosmosDBTokenAuthentication(BaseAuthentication):
-    """Custom token authentication for Cosmos DB users"""
+class AppTokenAuthentication(BaseAuthentication):
+    """Custom token authentication for PostgreSQL users"""
     
     def authenticate(self, request):
         # Get the token from the Authorization header
@@ -186,7 +185,7 @@ class CosmosDBTokenAuthentication(BaseAuthentication):
                 raise AuthenticationFailed('User not found')
             
             # Create user object
-            user = CosmosDBUser(user_data)
+            user = AppUser(user_data)
             
             return (user, token)
             
@@ -195,3 +194,4 @@ class CosmosDBTokenAuthentication(BaseAuthentication):
     
     def authenticate_header(self, request):
         return 'Token realm="api"'
+

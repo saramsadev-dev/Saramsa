@@ -666,8 +666,8 @@ class ProcessingService:
     def _save_insight(self, insight_data):
         """Save insight data to database."""
         try:
-            from apis.infrastructure.cosmos_service import cosmos_service
-            return cosmos_service.save_analysis_data(insight_data)
+            from apis.infrastructure.storage_service import storage_service
+            return storage_service.save_analysis_data(insight_data)
         except Exception as e:
             logger.error(f"Error saving insight to database: {e}")
             return None
@@ -682,3 +682,4 @@ def get_processing_service():
     if _processing_service is None:
         _processing_service = ProcessingService()
     return _processing_service
+

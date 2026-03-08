@@ -3,14 +3,6 @@ set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-to_win_path() {
-  if command -v cygpath >/dev/null 2>&1; then
-    cygpath -w "$1"
-  else
-    echo "$1" | sed 's|^/\([a-zA-Z]\)/|\1:\\|' | sed 's|/|\\|g'
-  fi
-}
-
 PYTHON_CMD=""
 if [ -x "$ROOT_DIR/backend/venv/Scripts/python.exe" ]; then
   PYTHON_CMD="$ROOT_DIR/backend/venv/Scripts/python.exe"
@@ -62,42 +54,10 @@ fi
 if [ $FAILED -ne 0 ]; then
   echo "$ERRORS"
   echo "Pre-push hook FAILED."
-  if [ -z "${CI:-}" ]; then
-    WIN_ROOT="$(to_win_path "$ROOT_DIR")"
-    PROMPT_FILE="$ROOT_DIR/.pre-push-prompt.txt"
-    {
-      echo "The pre-push hook failed with the errors below."
-      echo ""
-      echo "YOUR TASK:"
-      echo "1. Read the errors carefully."
-      echo "2. If there are unconfigured endpoints in api-registry.json:"
-      echo "   - Look at the corresponding Django view in backend/ to understand the response shape."
-      echo "   - Set 'enabled': true for each endpoint."
-      echo "   - Set the correct 'expected_status' (200, 201, 204, etc.)."
-      echo "   - Set 'expect_json_keys' to match the actual response keys."
-      echo "   - Add a 'body' object if the method is POST/PUT/PATCH and requires a request body."
-      echo "   - Remove the 'discovered': true flag to mark it as configured."
-      echo "3. If there are SCHEMA CHANGED warnings:"
-      echo "   - The Swagger spec for that endpoint changed (params, request body, or response)."
-      echo "   - Check the Django view to see what changed."
-      echo "   - Update 'expected_status', 'expect_json_keys', and 'body' in api-registry.json if needed."
-      echo "   - Remove the 'schema_changed' and 'prev_schema_hash' flags once verified."
-      echo "4. If there are test failures, fix the underlying code or registry config."
-      echo "4. Re-run both scripts to verify:"
-      echo "   cd backend"
-      echo "   python scripts/sync_api_registry_from_swagger.py"
-      echo "   python scripts/test_api_registry.py --notify-slack"
-      echo ""
-      echo "=== ERRORS ==="
-      echo "$ERRORS"
-    } > "$PROMPT_FILE"
-    WIN_PROMPT="$(to_win_path "$PROMPT_FILE")"
-    if command -v pwsh >/dev/null 2>&1; then
-      powershell.exe -Command "Start-Process pwsh -ArgumentList @('-NoExit','-Command','cd ''$WIN_ROOT''; `$env:TERM=''xterm-256color''; codex --yolo (Get-Content -Raw ''$WIN_PROMPT'')')"
-    else
-      powershell.exe -NoExit -Command "cd '$WIN_ROOT'; \$env:TERM='xterm-256color'; codex --yolo (Get-Content -Raw '$WIN_PROMPT')"
-    fi
-  fi
+  echo "Fix the reported issues and re-run:"
+  echo "  cd backend"
+  echo "  python scripts/sync_api_registry_from_swagger.py"
+  echo "  python scripts/test_api_registry.py --notify-slack"
   exit 1
 fi
 

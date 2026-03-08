@@ -49,8 +49,6 @@ ALWAYS_SKIP = {
     "POST /api/auth/token/refresh/",
     "POST /api/auth/refresh/",
     "POST /api/performance/reset/",
-    "GET /api/insights/tasks/stream/",
-    "GET /api/feedback/tasks/stream/",
 }
 
 

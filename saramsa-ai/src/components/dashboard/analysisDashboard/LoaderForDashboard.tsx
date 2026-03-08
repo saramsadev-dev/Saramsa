@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, BarChart3 } from "lucide-react";
+import { Loader2, BarChart3 } from 'lucide-react';
 
 export const LoaderForDashboard: React.FC = () => {
   return (
@@ -76,3 +76,4 @@ export const LoaderForDashboard: React.FC = () => {
     </div>
   );
 };
+

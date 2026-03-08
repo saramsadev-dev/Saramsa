@@ -1,0 +1,69 @@
+from django.db import models
+from django.utils import timezone
+
+
+class TimestampedModel(models.Model):
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        abstract = True
+
+
+class UserAccount(TimestampedModel):
+    id = models.CharField(max_length=64, primary_key=True)
+    username = models.CharField(max_length=150, unique=True, db_index=True)
+    email = models.EmailField(unique=True, db_index=True)
+    password = models.TextField()
+    first_name = models.CharField(max_length=150, blank=True, default="")
+    last_name = models.CharField(max_length=150, blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_staff = models.BooleanField(default=False, db_index=True)
+    date_joined = models.DateTimeField(default=timezone.now, db_index=True)
+    profile = models.JSONField(default=dict, blank=True)
+    company_name = models.CharField(max_length=255, blank=True, default="")
+    company_url = models.URLField(blank=True, default="")
+    avatar_url = models.URLField(blank=True, default="")
+    extra = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "users"
+        indexes = [
+            models.Index(fields=["username"]),
+            models.Index(fields=["email"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+
+class PasswordResetToken(TimestampedModel):
+    id = models.CharField(max_length=128, primary_key=True)
+    email = models.EmailField(db_index=True)
+    token = models.CharField(max_length=255, unique=True, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    used = models.BooleanField(default=False, db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "password_resets"
+        indexes = [
+            models.Index(fields=["email", "used"]),
+            models.Index(fields=["expires_at"]),
+        ]
+
+
+class RegistrationOtp(TimestampedModel):
+    id = models.CharField(max_length=128, primary_key=True)
+    email = models.EmailField(unique=True, db_index=True)
+    otp_hash = models.CharField(max_length=128)
+    expires_at = models.DateTimeField(db_index=True)
+    attempts = models.IntegerField(default=0)
+    max_attempts = models.IntegerField(default=5)
+    send_count = models.IntegerField(default=1)
+    last_sent_at = models.DateTimeField(default=timezone.now)
+    used = models.BooleanField(default=False, db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    extra = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "registration_otps"
+

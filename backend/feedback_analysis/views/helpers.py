@@ -61,9 +61,9 @@ async def getSentimentAnalysis(comments):
             
             saved_analysis = analysis_service.save_analysis_data(insight_data)
             if saved_analysis:
-                logger.info(f"Analysis saved to Cosmos DB with ID: {saved_analysis.get('id')}")
+                logger.info(f"Analysis saved to PostgreSQL with ID: {saved_analysis.get('id')}")
         except Exception as e:
-            logger.error(f"Error saving insight to Cosmos DB: {e}")
+            logger.error(f"Error saving insight to PostgreSQL: {e}")
         
         formatted = {
             "success": True,

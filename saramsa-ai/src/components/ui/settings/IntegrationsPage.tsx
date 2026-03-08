@@ -32,7 +32,7 @@ import {
   Download,
   Folder,
   Users,
-} from "lucide-react";
+} from 'lucide-react';
 import { AzureIntegrationForm } from "@/components/ui/settings/AzureIntegrationForm";
 import { JiraIntegrationForm } from "@/components/ui/settings/JiraIntegrationForm";
 import { BaseModal } from "@/components/ui/modals/BaseModal";
@@ -151,9 +151,7 @@ export function IntegrationsPage() {
 
       // Handle both new project creation and existing project navigation
       if (res.data.already_exists) {
-        console.log("Project already exists, navigating to existing project");
       } else {
-        console.log("Project created successfully, navigating to dashboard");
       }
 
       // Navigate to dashboard
@@ -647,3 +645,4 @@ export function IntegrationsPage() {
     </div>
   );
 }
+

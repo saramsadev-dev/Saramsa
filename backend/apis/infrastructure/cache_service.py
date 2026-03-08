@@ -1,6 +1,6 @@
 """
 Caching service for performance optimization.
-Provides Redis-based caching with fallback to in-memory caching.
+Provides Redis-based caching.
 Supports both local Redis and Azure Redis Cache with SSL.
 """
 
@@ -16,83 +16,92 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Try to import Redis, fall back to in-memory cache if not available
+# Try to import Redis
 try:
     import redis
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    logger.warning("Redis not available, using in-memory cache")
+    logger.error("Redis dependency is not installed.")
 
 class CacheService:
     """
-    Unified caching service with Redis backend and in-memory fallback.
+    Unified caching service with Redis backend.
     Supports both local Redis and Azure Redis Cache with SSL.
     """
     
     def __init__(self):
         self.redis_client = None
         self.memory_cache = {}
+        self.allow_in_memory_fallback = os.getenv('ALLOW_IN_MEMORY_CACHE', 'false').lower() == 'true'
         self.cache_stats = {
             'hits': 0,
             'misses': 0,
             'sets': 0,
             'deletes': 0
         }
-        
-        if REDIS_AVAILABLE:
-            try:
-                redis_url = os.getenv('REDIS_URL')
-                
-                if not redis_url:
-                    logger.warning("REDIS_URL environment variable not set. Using in-memory cache.")
+
+        if not REDIS_AVAILABLE:
+            if self.allow_in_memory_fallback:
+                logger.warning("Redis not available, using in-memory cache because ALLOW_IN_MEMORY_CACHE=true.")
+                return
+            raise RuntimeError("Redis dependency is not installed and ALLOW_IN_MEMORY_CACHE is false.")
+
+        try:
+            redis_url = os.getenv('REDIS_URL')
+
+            if not redis_url:
+                if self.allow_in_memory_fallback:
+                    logger.warning("REDIS_URL not set; using in-memory cache because ALLOW_IN_MEMORY_CACHE=true.")
                     return
-                
-                # Support both local Redis (redis://) and Azure Redis (rediss://)
-                is_ssl = redis_url.startswith('rediss://')
-                
-                if is_ssl:
-                    # Parse URL for Azure Redis with SSL
-                    parsed = urlparse(redis_url)
-                    host = parsed.hostname
-                    port = parsed.port or 6380  # Default SSL port for Azure Redis
-                    # Handle password (may be URL encoded)
-                    password = parsed.password
-                    if password:
-                        password = unquote(password)
-                    
-                    # Azure Redis requires SSL with certificate validation disabled
-                    # Use Redis() constructor directly as from_url() doesn't handle ssl_cert_reqs properly
-                    self.redis_client = redis.Redis(
-                        host=host,
-                        port=port,
-                        password=password,
-                        decode_responses=True,
-                        ssl=True,
-                        ssl_cert_reqs=ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
-                        ssl_ca_certs=None,
-                        ssl_certfile=None,
-                        ssl_keyfile=None
-                    )
-                    logger.info("Connecting to Azure Redis (SSL)...")
-                else:
-                    # Local Redis without SSL
-                    if not redis_url.startswith('redis://'):
-                        logger.warning(f"REDIS_URL should start with redis:// or rediss://. Got: {redis_url[:20]}... Using in-memory cache.")
-                        return
-                    
-                    self.redis_client = redis.from_url(
-                        redis_url,
-                        decode_responses=True
-                    )
-                    logger.info("Connecting to local Redis (non-SSL)...")
-                
-                # Test connection
-                self.redis_client.ping()
-                logger.info(f"Redis cache initialized successfully ({'SSL' if is_ssl else 'non-SSL'})")
-            except Exception as e:
-                logger.warning(f"Redis connection failed, using in-memory cache: {e}")
+                raise RuntimeError("REDIS_URL environment variable is required when ALLOW_IN_MEMORY_CACHE=false.")
+
+            # Support both local Redis (redis://) and Azure Redis (rediss://)
+            is_ssl = redis_url.startswith('rediss://')
+
+            if is_ssl:
+                # Parse URL for Azure Redis with SSL
+                parsed = urlparse(redis_url)
+                host = parsed.hostname
+                port = parsed.port or 6380  # Default SSL port for Azure Redis
+                # Handle password (may be URL encoded)
+                password = parsed.password
+                if password:
+                    password = unquote(password)
+
+                # Use Redis() constructor directly as from_url() doesn't handle ssl_cert_reqs properly
+                self.redis_client = redis.Redis(
+                    host=host,
+                    port=port,
+                    password=password,
+                    decode_responses=True,
+                    ssl=True,
+                    ssl_cert_reqs=ssl.CERT_NONE,  # Controlled globally in Django settings transport opts
+                    ssl_ca_certs=None,
+                    ssl_certfile=None,
+                    ssl_keyfile=None
+                )
+                logger.info("Connecting to Azure Redis (SSL)...")
+            else:
+                # Local Redis without SSL
+                if not redis_url.startswith('redis://'):
+                    raise RuntimeError(f"REDIS_URL should start with redis:// or rediss://. Got: {redis_url[:20]}...")
+
+                self.redis_client = redis.from_url(
+                    redis_url,
+                    decode_responses=True
+                )
+                logger.info("Connecting to local Redis (non-SSL)...")
+
+            # Test connection
+            self.redis_client.ping()
+            logger.info(f"Redis cache initialized successfully ({'SSL' if is_ssl else 'non-SSL'})")
+        except Exception as e:
+            if self.allow_in_memory_fallback:
+                logger.warning(f"Redis connection failed, using in-memory cache because ALLOW_IN_MEMORY_CACHE=true: {e}")
                 self.redis_client = None
+                return
+            raise RuntimeError(f"Redis connection failed and ALLOW_IN_MEMORY_CACHE=false: {e}") from e
     
     def _generate_key(self, key: str, prefix: str = "saramsa") -> str:
         """Generate a prefixed cache key."""

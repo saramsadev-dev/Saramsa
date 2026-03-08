@@ -200,7 +200,6 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
         if (checkResponse.data.data.exists && checkResponse.data.data.project) {
           // A Saramsa project already exists for this Jira project - use it!
           const existingSaramsaProject = checkResponse.data.data.project;
-          console.log('Saramsa project already exists for this Jira project, using existing project:', existingSaramsaProject.id);
           
           localStorage.setItem('project_id', existingSaramsaProject.id);
           localStorage.setItem('selected_project_name', existingSaramsaProject.name || selectedProjectData?.name || '');
@@ -235,7 +234,6 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
       localStorage.setItem('project_id', result.id);
       localStorage.setItem('selected_project_name', selectedProjectData?.name || '');
       
-      console.log('New Saramsa project created and linked to Jira project:', result.id);
       
     } catch (e: any) {
       console.error('persist project error', e);

@@ -317,3 +317,5 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
     </motion.div>
   );
 }
+
+

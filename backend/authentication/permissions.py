@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from apis.infrastructure.cosmos_service import cosmos_service
+from apis.infrastructure.storage_service import storage_service
 
 #check
 def _get_role_from_user(user):
@@ -70,14 +70,14 @@ class ProjectRolePermission(permissions.BasePermission):
         if not user_id:
             return False
 
-        project = cosmos_service.get_project_by_id_any(project_id)
+        project = storage_service.get_project_by_id_any(project_id)
         owner_id = None
         if isinstance(project, dict):
             owner_id = project.get('owner_user_id') or project.get('userId')
         if owner_id and str(owner_id) == str(user_id):
             return True
 
-        role = cosmos_service.get_project_role_for_user(project_id, str(user_id))
+        role = storage_service.get_project_role_for_user(project_id, str(user_id))
         if not role:
             return False
 
@@ -127,3 +127,4 @@ class IsAdminOrUser(permissions.BasePermission):
 class NoAuthentication(permissions.BasePermission):
     def has_permission(self, request, view):
         return True
+

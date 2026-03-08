@@ -461,3 +461,5 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
     </Card>
   );
 }
+
+

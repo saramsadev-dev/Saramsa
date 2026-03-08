@@ -12,11 +12,9 @@ from rest_framework.views import APIView
 from rest_framework import status
 from asgiref.sync import async_to_sync
 from datetime import datetime
-import json
 import uuid
 import logging
 import os
-import time
 
 from aiCore.services.completion_service import generate_completions
 from authentication.permissions import IsAdminOrUser, IsProjectViewer, IsProjectEditor, _get_role_from_user
@@ -24,10 +22,7 @@ from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from celery.result import AsyncResult
 from apis.infrastructure.cache_service import get_cache_service
-from django.http import StreamingHttpResponse
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.contrib.auth.models import AnonymousUser
-from apis.infrastructure.cosmos_service import cosmos_service
+from apis.infrastructure.storage_service import storage_service
 
 from apis.prompts import getSentAnalysisPrompt
 from ..services import get_task_service
@@ -372,44 +367,7 @@ class GetUserCommentsView(APIView):
             recent_analysis_id = request.query_params.get('analysis_id')
             
             try:
-                # COMPREHENSIVE DEBUG: Check what analysis documents exist
-                logger.info("STEP 1: Checking all analysis documents for this user...")
-                try:
-                    analysis_service = get_analysis_service()
-                    
-                    # Use the existing analysis service to check documents
-                    debug_results = analysis_service.analysis_repo.cosmos_service.query_documents(
-                        'analysis', 
-                        "SELECT * FROM c WHERE c.userId = @user_id ORDER BY c.createdAt DESC",
-                        [{"name": "@user_id", "value": user_id_str}]
-                    )
-                    logger.info(f"Found {len(debug_results)} total analysis documents for user {user_id_str}")
-                    
-                    # Log details of each document
-                    for i, doc in enumerate(debug_results[:5]):  # Log first 5 documents
-                        logger.info(f"Document {i+1}: id={doc.get('id')}, projectId={doc.get('projectId')}, type={doc.get('type')}, createdAt={doc.get('createdAt')}")
-                        logger.info(f"  - Has original_comments: {bool(doc.get('original_comments'))}")
-                        logger.info(f"  - Has feedback: {bool(doc.get('feedback'))}")
-                        if doc.get('original_comments'):
-                            logger.info(f"  - original_comments count: {len(doc.get('original_comments', []))}")
-                        if doc.get('feedback'):
-                            logger.info(f"  - feedback count: {len(doc.get('feedback', []))}")
-                    
-                    # Check specifically for this project
-                    project_results = analysis_service.analysis_repo.cosmos_service.query_documents(
-                        'analysis',
-                        "SELECT * FROM c WHERE c.userId = @user_id AND c.projectId = @project_id ORDER BY c.createdAt DESC",
-                        [
-                            {"name": "@user_id", "value": user_id_str},
-                            {"name": "@project_id", "value": project_id}
-                        ]
-                    )
-                    logger.info(f"Found {len(project_results)} analysis documents for project {project_id}")
-                    
-                except Exception as debug_e:
-                    logger.error(f"DEBUG query failed: {debug_e}")
-                
-                logger.info("STEP 2: Attempting to get analysis data using service method...")
+                logger.info("Attempting to get analysis data using service method...")
                 
                 # If we have a specific analysis ID, try to get that first
                 if recent_analysis_id:
@@ -692,98 +650,6 @@ class TaskListView(APIView):
         return StandardResponse.success(data={"tasks": enriched})
 
 
-class TaskStreamView(APIView):
-    """Stream recent task updates via Server-Sent Events (SSE)."""
-    permission_classes = []
-
-    def get(self, request):
-        token = request.query_params.get("token")
-        if token:
-            try:
-                jwt_auth = JWTAuthentication()
-                validated = jwt_auth.get_validated_token(token)
-                user = jwt_auth.get_user(validated)
-                request.user = user
-                request.auth = validated
-            except Exception:
-                request.user = AnonymousUser()
-
-        if not hasattr(request, "user") or not request.user.is_authenticated:
-            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
-
-        if not IsAdminOrUser().has_permission(request, self):
-            return StandardResponse.forbidden(detail="Permission denied.", instance=request.path)
-
-        user_id = request.user.id
-        if not user_id:
-            return StandardResponse.unauthorized(detail="User authentication required.", instance=request.path)
-
-        user_id_str = str(user_id)
-        cache = get_cache_service()
-
-        def map_status(raw: str, health=None) -> str:
-            if health:
-                health_status = str(health.get("status") or "").upper()
-                if health_status in ("DEGRADED", "PARTIAL"):
-                    return "PARTIAL"
-                if health_status in ("FAILED", "FAILURE"):
-                    return "FAILED"
-            if raw in ("PENDING", "STARTED"):
-                return "RUNNING"
-            if raw == "SUCCESS":
-                return "SUCCESS"
-            if raw == "FAILURE":
-                return "FAILED"
-            return "UNKNOWN"
-
-        def event_stream():
-            while True:
-                tasks_key = f"tasks:{user_id_str}"
-                tasks = cache.get(tasks_key, default=[])
-                if not isinstance(tasks, list):
-                    tasks = []
-
-                enriched = []
-                for item in tasks[:15]:
-                    task_id = item.get("task_id")
-                    if not task_id:
-                        continue
-                    res = AsyncResult(task_id)
-                    pipeline_health = cache.get(f"pipeline_health:{task_id}") if cache else None
-                    duration_seconds = None
-                    if pipeline_health:
-                        try:
-                            started = pipeline_health.get("started_at")
-                            updated = pipeline_health.get("updated_at")
-                            if started and updated:
-                                started_dt = datetime.fromisoformat(str(started))
-                                updated_dt = datetime.fromisoformat(str(updated))
-                                duration_seconds = (updated_dt - started_dt).total_seconds()
-                        except Exception:
-                            duration_seconds = None
-                    enriched.append({
-                        "task_id": task_id,
-                        "analysis_id": item.get("analysis_id"),
-                        "project_id": item.get("project_id"),
-                        "file_name": item.get("file_name"),
-                        "started_at": item.get("started_at"),
-                        "status": map_status(res.status, pipeline_health),
-                        "ready": res.ready(),
-                        "comment_count": item.get("comment_count"),
-                        "duration_seconds": duration_seconds,
-                        "pipeline_health": pipeline_health,
-                    })
-
-                payload = json.dumps({"tasks": enriched}, default=str)
-                yield f"event: tasks\ndata: {payload}\n\n"
-                time.sleep(5)
-
-        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
-        response["Cache-Control"] = "no-cache"
-        response["X-Accel-Buffering"] = "no"
-        return response
-
-
 class AnalysisByIdView(APIView):
     """Get analysis by ID (ensures user ownership)"""
     permission_classes = [IsAdminOrUser]
@@ -897,12 +763,12 @@ class AnalysisByIdView(APIView):
         user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
         if not user_id:
             return False
-        project = cosmos_service.get_project_by_id_any(project_id)
+        project = storage_service.get_project_by_id_any(project_id)
         if isinstance(project, dict):
             owner_id = project.get('owner_user_id') or project.get('userId')
             if owner_id and str(owner_id) == str(user_id):
                 return True
-        role = cosmos_service.get_project_role_for_user(project_id, str(user_id))
+        role = storage_service.get_project_role_for_user(project_id, str(user_id))
         return bool(role)
 
 
@@ -978,11 +844,12 @@ class AnalysisRenameView(APIView):
         user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
         if not user_id:
             return False
-        project = cosmos_service.get_project_by_id_any(project_id)
+        project = storage_service.get_project_by_id_any(project_id)
         if isinstance(project, dict):
             owner_id = project.get('owner_user_id') or project.get('userId')
             if owner_id and str(owner_id) == str(user_id):
                 return True
-        role = cosmos_service.get_project_role_for_user(project_id, str(user_id))
+        role = storage_service.get_project_role_for_user(project_id, str(user_id))
         return bool(role)
+
 

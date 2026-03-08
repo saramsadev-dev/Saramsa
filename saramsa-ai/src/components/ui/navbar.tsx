@@ -9,7 +9,7 @@ import {
   Bell,
   Search,
   ChevronDown,
-} from "lucide-react";
+} from 'lucide-react';
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
@@ -147,3 +147,4 @@ export function Navbar() {
     </>
   );
 }
+

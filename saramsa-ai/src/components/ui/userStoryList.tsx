@@ -34,7 +34,7 @@ import {
   Bug,
   RefreshCw,
   CheckCircle,
-} from "lucide-react";
+} from 'lucide-react';
 import { Badge } from "./badge";
 import { Card, CardContent } from "./card";
 import { Checkbox } from "./checkbox";
@@ -230,10 +230,6 @@ export const UserStoryList = ({
 
   // Set user stories or deep analysis data when component mounts or data changes
   useEffect(() => {
-    console.log('🔍 UserStoryList useEffect - userStories:', userStories);
-    console.log('🔍 UserStoryList useEffect - currentProjectUserStories:', currentProjectUserStories);
-    console.log('🔍 UserStoryList useEffect - features:', features);
-    console.log('🔍 UserStoryList useEffect - actionItems:', actionItems);
     
     // Use userStories work items (prioritize prop over Redux state)
     const workItemsToProcess = userStories && userStories.length > 0 
@@ -242,11 +238,8 @@ export const UserStoryList = ({
       ? currentProjectUserStories[0]?.work_items // Fallback to Redux state
       : [];
     
-    console.log('🔍 UserStoryList useEffect - work_items:', workItemsToProcess);
-    console.log('🔍 UserStoryList useEffect - work_items length:', workItemsToProcess?.length);
     
     if (workItemsToProcess && workItemsToProcess.length > 0) {
-      console.log('🔍 UserStoryList - Converting work items to action items:', workItemsToProcess.length);
       
       // Clear existing action items first to prevent duplicates
       dispatch(clearActionItems());
@@ -254,7 +247,6 @@ export const UserStoryList = ({
       
       // Convert work items to action items and add them
       workItemsToProcess.forEach((item, index) => {
-        console.log(`🔍 UserStoryList - Converting item ${index}:`, item);
         const actionItem: ActionItem = {
           id: item.id,
           title: item.title,
@@ -268,13 +260,10 @@ export const UserStoryList = ({
           acceptance: item.acceptancecriteria || item.acceptance_criteria || item.acceptance || '',
           featureArea: item.feature_area || item.featureArea || item.feature || item.feature_name || '',
         };
-        console.log(`🔍 UserStoryList - Dispatching action item ${index}:`, actionItem);
         dispatch(addActionItem(actionItem));
       });
       
-      console.log('🔍 UserStoryList - Finished converting work items to action items');
     } else {
-      console.log('🔍 UserStoryList - No work items to process');
     }
   }, [userStories, currentProjectUserStories, dispatch, platform]);
 
@@ -320,7 +309,6 @@ export const UserStoryList = ({
       }
 
       const result = response.data;
-      console.log("User story updated on server:", result);
 
       setIsEditDrawerOpen(false);
       setEditingAction(null);
@@ -349,14 +337,6 @@ export const UserStoryList = ({
     // Also check if projectId starts with "proj_draft" which indicates a draft project
     const isDraftProjectId = projectId && (projectId.startsWith('proj_draft') || projectId.includes('draft'));
     
-    console.log('🔍 Push check - projectId:', projectId);
-    console.log('🔍 Push check - platform:', platform);
-    console.log('🔍 Push check - isDraftFromContext:', isDraftFromContext);
-    console.log('🔍 Push check - hasIntegrations:', hasIntegrations);
-    console.log('🔍 Push check - hasPlatformIntegration:', hasPlatformIntegration);
-    console.log('🔍 Push check - isDraftProjectId:', isDraftProjectId);
-    console.log('🔍 Push check - currentProject:', currentProject);
-    console.log('🔍 Push check - final isDraftProject:', isDraftProject || isDraftProjectId);
     
     // Block push if: draft project, draft project ID, no integrations at all, or no platform-specific integration
     // Also block if currentProject is null (project not in list yet, likely a draft)
@@ -368,24 +348,13 @@ export const UserStoryList = ({
       (currentProject && !hasPlatformIntegration);
     
     if (shouldBlockPush) {
-      console.log('🚫 Blocking push - project needs integration configuration for', platform);
       setShowIntegrationModal(true);
       return;
     }
 
     // The backend expects the project ID without the project_ prefix
-    // It will add the prefix internally when querying Cosmos DB
+    // It will normalize the prefix internally when resolving the project ID
     const formattedProjectId = projectId.startsWith('project_') ? projectId.replace('project_', '') : projectId;
-    console.log('🔍 Original projectId:', projectId);
-    console.log('🔍 Formatted projectId (without project_ prefix):', formattedProjectId);
-
-    // Debug user authentication
-    console.log('🔍 Auth state - isAuthenticated:', isAuthenticated);
-    console.log('🔍 User object:', user);
-    console.log('🔍 User user_id:', user?.user_id);
-    console.log('🔍 User username:', user?.username);
-    console.log('🔍 User object keys:', user ? Object.keys(user) : 'No user object');
-    console.log('🔍 User object full:', JSON.stringify(user, null, 2));
 
     if (!isAuthenticated || !user) {
       alert("User authentication is required. Please login again.");
@@ -412,7 +381,6 @@ export const UserStoryList = ({
       return;
     }
 
-    console.log('🔍 Final userId being sent:', userId);
 
     const selectedItems = getSelectedItems();
 
@@ -435,7 +403,6 @@ export const UserStoryList = ({
     }));
 
     try {
-      console.log('🔍 Submitting user stories with userId:', userId);
       
       const result = await dispatch(
         submitUserStories({
@@ -455,7 +422,6 @@ export const UserStoryList = ({
         
         // Update Redux state with the updated user stories from the response
         if (result.updated_user_stories && Array.isArray(result.updated_user_stories)) {
-          console.log('🔍 Updating Redux state with submitted user stories from response');
           dispatch(setCurrentProjectUserStories(result.updated_user_stories));
           
           // Also update deepAnalysis to sync the top section
@@ -464,13 +430,11 @@ export const UserStoryList = ({
               ...userStories[0],
               work_items: result.updated_user_stories[0]?.work_items || userStories[0].work_items
             };
-            console.log('🔍 Updating deepAnalysis to sync top section');
             dispatch(setDeepAnalysis(updatedDeepAnalysis));
           }
         } else {
           // Fallback: Refresh user stories to get updated submission status
           if (projectId && user) {
-            console.log('🔍 Refreshing user stories after successful submission (fallback)');
             dispatch(fetchUserStoriesByProject({ 
               projectId: projectId.startsWith('project_') ? projectId.replace('project_', '') : projectId,
               userId: user.id || user.user_id || user.username
@@ -701,7 +665,6 @@ export const UserStoryList = ({
       // Close modal
       setShowDeleteModal(false);
       
-      console.log(`Successfully deleted ${toDelete.length} work items`);
     } catch (err) {
       console.error('Failed to delete work items:', err);
       alert('Failed to delete work items. Please try again.');
@@ -760,20 +723,11 @@ export const UserStoryList = ({
 
   // Get submitted work items for the "Pushed to" section
   const getSubmittedWorkItems = () => {
-    console.log('🔍 currentProjectUserStories:', currentProjectUserStories);
-    console.log('🔍 currentProjectUserStoryWorkItems:', currentProjectUserStoryWorkItems);
     
     const submitted = currentProjectUserStoryWorkItems.filter(item => item.submitted === true);
-    console.log('🔍 Submitted work items:', submitted);
-    console.log('🔍 All work items:', currentProjectUserStoryWorkItems.map(item => ({ id: item.id, submitted: item.submitted })));
     return submitted;
   };
 
-  console.log('🔍 UserStoryList render - features.length:', features.length, 'actionItems.length:', actionItems.length);
-  console.log('🔍 UserStoryList render - userStories:', userStories);
-  console.log('🔍 UserStoryList render - currentProjectUserStories:', currentProjectUserStories);
-  console.log('🔍 UserStoryList render - features:', features);
-  console.log('🔍 UserStoryList render - actionItems:', actionItems);
   
   // Check if there are any user stories available (from props, Redux state, features, or action items)
   const hasUserStories = (userStories && userStories.length > 0) || 
@@ -784,13 +738,6 @@ export const UserStoryList = ({
   const hasWorkItemsInData = userStories?.some(story => story.work_items && story.work_items.length > 0) ||
                             currentProjectUserStories?.some(story => story.work_items && story.work_items.length > 0);
   
-  console.log('🔍 UserStoryList render - hasUserStories:', hasUserStories);
-  console.log('🔍 UserStoryList render - hasWorkItems:', hasWorkItems);
-  console.log('🔍 UserStoryList render - hasWorkItemsInData:', hasWorkItemsInData);
-  console.log('🔍 UserStoryList render - userStories length:', userStories?.length);
-  console.log('🔍 UserStoryList render - currentProjectUserStories length:', currentProjectUserStories?.length);
-  console.log('🔍 UserStoryList render - features length:', features.length);
-  console.log('🔍 UserStoryList render - actionItems length:', actionItems.length);
   
   // Show content if we have user stories OR work items OR work items in data
   const shouldShowContent = hasUserStories || hasWorkItems || hasWorkItemsInData;
@@ -1129,3 +1076,4 @@ export const UserStoryList = ({
     </div>
   );
 };
+

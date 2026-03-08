@@ -1,25 +1,14 @@
-# Saramsa - master CLI
-# Usage: saramsa start all [dev|prod] | saramsa logs [backend|frontend|celery|celery-ops] | saramsa kill | saramsa help
-# Delegates to saramsa-scripts/start.ps1, logs.ps1, kill.ps1, help.ps1
+﻿# Saramsa - master CLI
+# Usage: saramsa start | saramsa kill | saramsa help
+# Delegates to saramsa-scripts/start-procfile.ps1, kill.ps1, help.ps1
 
 param(
     [Parameter(Position=0)][string]$Command = "",
     [Parameter(Position=1)][string]$Arg1 = "",
-    [Parameter(Position=2)][string]$Arg2 = "dev"
+    [Parameter(Position=2)][string]$Arg2 = ""
 )
 
 $ErrorActionPreference = "Stop"
-
-# Normalize "start all dev" -> start-all
-if ($Command -eq "start" -and $Arg1 -eq "all") {
-    $Command = "start-all"
-    $Environment = $Arg2
-} elseif ($Command -eq "start" -and $Arg1 -ne "") {
-    $Command = "start-all"
-    $Environment = $Arg1
-} else {
-    $Environment = if ($Arg1 -ne "" -and $Arg1 -ne "all") { $Arg1 } else { "dev" }
-}
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ScriptsDir = Join-Path $ScriptDir "saramsa-scripts"
@@ -29,26 +18,43 @@ if (-not (Test-Path $ScriptsDir)) {
     exit 1
 }
 
-$startScript = Join-Path $ScriptsDir "start.ps1"
+$startProcfileScript = Join-Path $ScriptsDir "start-procfile.ps1"
 $killScript = Join-Path $ScriptsDir "kill.ps1"
-$logsScript = Join-Path $ScriptsDir "logs.ps1"
+$logScript = Join-Path $ScriptsDir "log.ps1"
 $helpScript = Join-Path $ScriptsDir "help.ps1"
 
 switch ($Command.ToLower()) {
-    "start-all" {
-        & $startScript -Env $Environment
+    "start" {
+        if ($Arg1 -or $Arg2) {
+            Write-Host "[ERROR] 'saramsa start' does not take an environment. Use 'saramsa start'." -ForegroundColor Red
+            exit 1
+        }
+        & $startProcfileScript
     }
-    "stop-all" { & $killScript }
-    "kill"     { & $killScript }
-    "stop"     { & $killScript }
-    "logs"     { & $logsScript -Service $Arg1 }
-    "help"     { & $helpScript }
+    "help" {
+        & $helpScript
+    }
+    "kill" {
+        if ($Arg1 -or $Arg2) {
+            Write-Host "[ERROR] 'saramsa kill' does not take any arguments. Use 'saramsa kill'." -ForegroundColor Red
+            exit 1
+        }
+        & $killScript
+    }
+    "log" {
+        if (-not $Arg1) {
+            Write-Host "[ERROR] Missing log target. Use 'saramsa log frontend' or 'saramsa log all'." -ForegroundColor Red
+            exit 1
+        }
+        & $logScript $Arg1 $Arg2
+    }
     default {
         if (-not $Command) {
             Write-Host "[ERROR] No command. Use 'saramsa help'." -ForegroundColor Red
             Write-Host ""
-            Write-Host "  saramsa start all dev" -ForegroundColor Yellow
-            Write-Host "  saramsa logs [backend|frontend|celery|celery-ops]" -ForegroundColor Gray
+            Write-Host "  saramsa start" -ForegroundColor Yellow
+            Write-Host "  saramsa kill" -ForegroundColor Yellow
+            Write-Host "  saramsa log frontend" -ForegroundColor Yellow
         } else {
             Write-Host "[ERROR] Unknown command: $Command. Use 'saramsa help'." -ForegroundColor Red
         }

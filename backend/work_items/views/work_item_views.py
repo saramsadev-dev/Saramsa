@@ -15,7 +15,7 @@ from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework import status
 from django.http import JsonResponse
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 import json
 import uuid
 
@@ -65,8 +65,11 @@ class WorkItemGenerationView(APIView):
         analysis_service = get_analysis_service()
         
         try:
-            resolved_project_id, project_doc, is_draft = analysis_service.ensure_project_context(
-                incoming_project_id, user_id_str
+            resolved_project_id, project_doc, is_draft = await sync_to_async(
+                analysis_service.ensure_project_context, thread_sensitive=True
+            )(
+                incoming_project_id,
+                user_id_str,
             )
         except ValueError as e:
             return StandardResponse.error(
@@ -107,7 +110,9 @@ class WorkItemGenerationView(APIView):
                     raw = analysis_data.get("analysis_id") or analysis_data.get("id")
                     if raw is not None and str(raw).strip().lower() not in ("", "none"):
                         analysis_id = str(raw).strip()
-                saved_work_items = devops_service.create_work_items(
+                saved_work_items = await sync_to_async(
+                    devops_service.create_work_items, thread_sensitive=True
+                )(
                     user_id=user_id_str,
                     work_items=work_items,
                     platform=platform,
@@ -127,7 +132,9 @@ class WorkItemGenerationView(APIView):
         }
 
         # Add grouped work items for frontend compatibility
-        result["work_items_by_feature"] = devops_service.group_work_items_by_feature(work_items)
+        result["work_items_by_feature"] = await sync_to_async(
+            devops_service.group_work_items_by_feature, thread_sensitive=True
+        )(work_items)
 
         return StandardResponse.success(data=result, message="Work items generated successfully")
 
@@ -173,7 +180,9 @@ class WorkItemSubmissionView(APIView):
             # Import here to avoid circular dependency
             from integrations.services import get_project_service
             project_service = get_project_service()
-            project_config = project_service.get_project(project_id, user_id_str)
+            project_config = await sync_to_async(project_service.get_project, thread_sensitive=True)(
+                project_id, user_id_str
+            )
             if not project_config:
                 return StandardResponse.not_found(
                     detail=f"Project {project_id} not found", 
@@ -188,8 +197,10 @@ class WorkItemSubmissionView(APIView):
         
         # Quality gate validation (project-level rules)
         quality_gate = get_quality_gate_service()
-        rules = quality_gate.get_rules_for_project(project_id)
-        quality_report = quality_gate.evaluate_work_items(work_items, rules)
+        rules = await sync_to_async(quality_gate.get_rules_for_project, thread_sensitive=True)(project_id)
+        quality_report = await sync_to_async(quality_gate.evaluate_work_items, thread_sensitive=True)(
+            work_items, rules
+        )
 
         if quality_report["items_with_issues"] > 0 and not rules.get("allow_push_with_warnings", False):
             return StandardResponse.validation_error(
@@ -201,7 +212,9 @@ class WorkItemSubmissionView(APIView):
         # Submit work items using DevOps service
         try:
             devops_service = get_devops_service()
-            submission_result = devops_service.submit_to_external_platform(
+            submission_result = await sync_to_async(
+                devops_service.submit_to_external_platform, thread_sensitive=True
+            )(
                 user_id=user_id_str,
                 work_items=work_items,
                 platform=platform,

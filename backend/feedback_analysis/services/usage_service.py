@@ -9,14 +9,14 @@ from datetime import datetime, timezone
 import os
 import logging
 
-from apis.infrastructure.cosmos_service import cosmos_service
+from apis.infrastructure.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
 
 class UsageService:
     def __init__(self):
-        self.cosmos_service = cosmos_service
+        self.storage_service = storage_service
         self.container_name = 'usage'
 
     def record_narration_usage(self, project_id: str, period: str, input_tokens: int,
@@ -25,7 +25,7 @@ class UsageService:
         doc_id = f"usage:{project_id}:{period}"
         existing = None
         try:
-            existing = self.cosmos_service.get_document(self.container_name, doc_id, project_id)
+            existing = self.storage_service.get_document(self.container_name, doc_id, project_id)
         except Exception:
             existing = None
 
@@ -49,14 +49,14 @@ class UsageService:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
-            return self.cosmos_service.update_document(self.container_name, doc_id, project_id, data)
+            return self.storage_service.update_document(self.container_name, doc_id, project_id, data)
         except Exception as e:
             logger.warning(f"Failed to record usage: {e}")
             return data
 
     def get_usage(self, project_id: str, period: str) -> Dict[str, Any]:
         doc_id = f"usage:{project_id}:{period}"
-        return self.cosmos_service.get_document(self.container_name, doc_id, project_id) or {}
+        return self.storage_service.get_document(self.container_name, doc_id, project_id) or {}
 
     @staticmethod
     def _estimate_cost_usd(input_tokens: int, output_tokens: int) -> float:
@@ -73,3 +73,4 @@ def get_usage_service() -> UsageService:
     if _usage_service is None:
         _usage_service = UsageService()
     return _usage_service
+

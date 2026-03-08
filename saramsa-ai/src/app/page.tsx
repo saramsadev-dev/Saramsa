@@ -12,10 +12,8 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('Home page - loading:', loading, 'isAuthenticated:', isAuthenticated);
     // Only redirect to login if auth check is complete and user is not authenticated
     if (!loading && !isAuthenticated) {
-      console.log('Redirecting to login...');
       router.replace('/login');
     }
   }, [isAuthenticated, loading, router]);

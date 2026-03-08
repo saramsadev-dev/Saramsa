@@ -23,7 +23,7 @@ import hashlib
 
 
 class InsightsListView(APIView):
-    """Get all insights from Cosmos DB"""
+    """Get all insights from PostgreSQL"""
     permission_classes = [IsAdmin]
     
     @handle_service_errors
@@ -40,7 +40,7 @@ class InsightsListView(APIView):
 
 
 class InsightDetailView(APIView):
-    """Get specific insight by ID from Cosmos DB"""
+    """Get specific insight by ID from PostgreSQL"""
     permission_classes = [IsAdmin]
     
     @handle_service_errors
@@ -541,15 +541,15 @@ class UserStoriesView(APIView):
                 instance=request.path
             )
         
-        # Get user stories from Cosmos DB
-        from apis.infrastructure.cosmos_service import cosmos_service
+        # Get user stories from PostgreSQL
+        from apis.infrastructure.storage_service import storage_service
         
         if user_id:
             # Get user stories for specific user and project
-            user_stories = cosmos_service.get_user_stories_by_user_and_project(user_id, project_id)
+            user_stories = storage_service.get_user_stories_by_user_and_project(user_id, project_id)
         else:
             # Get all user stories for the project
-            user_stories = cosmos_service.get_user_stories_by_project(project_id)
+            user_stories = storage_service.get_user_stories_by_project(project_id)
         
         return StandardResponse.success(data={
             "user_stories": user_stories,
@@ -557,3 +557,4 @@ class UserStoriesView(APIView):
             "user_id": user_id,
             "count": len(user_stories)
         }, message="User stories retrieved successfully")
+

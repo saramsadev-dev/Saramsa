@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon } from 'lucide-react';
 import { cn } from "./utils";
 
 interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -86,3 +86,4 @@ function Checkbox({
 }
 
 export { Checkbox }; 
+

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, UserRound, PlugZap } from "lucide-react";
+import { Settings, UserRound, PlugZap } from 'lucide-react';
 import { apiRequest } from "@/lib/apiRequest";
 import { IntegrationsPage } from "@/components/ui/settings/IntegrationsPage";
 import { Button } from "@/components/ui/button";
@@ -155,5 +155,6 @@ export default function SettingsPage() {
     </div>
   );
 }
+
 
 

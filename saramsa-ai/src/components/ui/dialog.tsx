@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X } from 'lucide-react';
 import { cn } from "./utils";
 
 interface DialogProps {
@@ -142,3 +142,4 @@ export {
   DialogTitle,
   DialogDescription,
 };
+

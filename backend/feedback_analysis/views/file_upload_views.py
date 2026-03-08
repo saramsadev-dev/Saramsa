@@ -201,7 +201,7 @@ class FeedbackFileUploadView(APIView):
                     "context": project_context,
                 }
             
-            # Save analysis data to Cosmos DB (includes aspect suggestions)
+            # Save analysis data to PostgreSQL (includes aspect suggestions)
             await self._save_analysis_data(
                 user_id, project_id, file.name, 'json', 
                 original_comments, formatted, aspect_suggestions, taxonomy
@@ -278,7 +278,7 @@ class FeedbackFileUploadView(APIView):
                     "context": project_context,
                 }
             
-            # Save CSV analysis data to Cosmos DB (includes aspect suggestions)
+            # Save CSV analysis data to PostgreSQL (includes aspect suggestions)
             await self._save_analysis_data(
                 user_id, project_id, file.name, 'csv', 
                 original_comments, formatted, aspect_suggestions, taxonomy
@@ -384,7 +384,7 @@ class FeedbackFileUploadView(APIView):
                     logger.warning(f"Failed to record taxonomy health snapshot: {e}")
                 
         except Exception as e:
-            logger.error(f"Error saving to Cosmos DB: {e}")
+            logger.error(f"Error saving to PostgreSQL: {e}")
 
     async def _resolve_taxonomy_for_upload(self, project_id, original_comments):
         """

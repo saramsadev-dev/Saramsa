@@ -3,6 +3,7 @@ import os
 import ssl
 from datetime import timedelta
 from dotenv import load_dotenv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 # Load .env from backend directory so Django and Celery see the same vars no matter where the process is started
@@ -10,19 +11,37 @@ load_dotenv(BASE_DIR / ".env")
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-here-change-in-production')
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+def _as_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+DEBUG = _as_bool(os.getenv('DEBUG', 'False'))
+SECRET_KEY = os.getenv('SECRET_KEY', '')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-local-dev-key'
+    else:
+        raise RuntimeError("SECRET_KEY must be set when DEBUG=False")
 
 # Backend's own URL in production (e.g. https://saramsa-backend-xxx.centralus-01.azurewebsites.net).
 # When set, this host is added to ALLOWED_HOSTS so Azure can route to the app.
 BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', '').rstrip('/')
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', '').rstrip('/')
 
-_allowed = os.getenv("ALLOWED_HOSTS", "*").split(",")
+_allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
+if _allowed_hosts_env.strip():
+    _allowed = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
+elif DEBUG:
+    _allowed = ["127.0.0.1", "localhost"]
+else:
+    raise RuntimeError("ALLOWED_HOSTS must be set when DEBUG=False")
+
 if BACKEND_BASE_URL:
     from urllib.parse import urlparse
     _backend_host = urlparse(BACKEND_BASE_URL).netloc or BACKEND_BASE_URL
-    if _backend_host and _backend_host not in _allowed and '*' not in _allowed:
+    if _backend_host and _backend_host not in _allowed:
         _allowed.append(_backend_host)
 ALLOWED_HOSTS = _allowed
 
@@ -146,49 +165,31 @@ LOGGING = {
     },
 }
 
-# Cosmos DB Configuration
-COSMOS_DB_CONFIG = {
-    'endpoint': os.getenv('COSMOS_DB_ENDPOINT', 'https://your-cosmos-account.documents.azure.com:443/'),
-    'key': os.getenv('COSMOS_DB_KEY', 'your-cosmos-db-key'),
-    'database_name': os.getenv('COSMOS_DB_DATABASE', 'saramsa-db'),
-    'containers': {
-        'users': os.getenv('COSMOS_DB_USERS_CONTAINER', 'users'),
-        'analysis': os.getenv('COSMOS_DB_ANALYSIS_CONTAINER', 'analysis'),
-        'uploads': os.getenv('COSMOS_DB_UPLOADS_CONTAINER', 'uploads'),
-        'user_stories': os.getenv('COSMOS_DB_USER_STORIES_CONTAINER', 'user_stories'),
-        'projects': os.getenv('COSMOS_DB_PROJECTS_CONTAINER', 'projects'),
-        'user_data': os.getenv('COSMOS_DB_USER_DATA_CONTAINER', 'user_data'),
-        'integrations': os.getenv('COSMOS_DB_INTEGRATIONS_CONTAINER', 'integrations'),
-        'password_resets': os.getenv('COSMOS_DB_PASSWORD_RESETS_CONTAINER', 'password_resets'),
-        'insights': os.getenv('COSMOS_DB_INSIGHTS_CONTAINER', 'insights'),
-        'comment_extractions': os.getenv('COSMOS_DB_COMMENT_EXTRACTIONS_CONTAINER', 'comment_extractions'),
-        'taxonomies': os.getenv('COSMOS_DB_TAXONOMIES_CONTAINER', 'taxonomies'),
-        'usage': os.getenv('COSMOS_DB_USAGE_CONTAINER', 'usage'),
-        'insight_rules': os.getenv('COSMOS_DB_INSIGHT_RULES_CONTAINER', 'insight_rules'),
-        'insight_reviews': os.getenv('COSMOS_DB_INSIGHT_REVIEWS_CONTAINER', 'insight_reviews'),
-        'work_item_quality_rules': os.getenv('COSMOS_DB_WORK_ITEM_QUALITY_RULES_CONTAINER', 'work_item_quality_rules'),
-        'ingestion_schedules': os.getenv('COSMOS_DB_INGESTION_SCHEDULES_CONTAINER', 'ingestion_schedules'),
-        'project_roles': os.getenv('COSMOS_DB_PROJECT_ROLES_CONTAINER', 'project_roles'),
-        'registration_otps': os.getenv('COSMOS_DB_REGISTRATION_OTPS_CONTAINER', 'registration_otps'),
-    } 
-}
-
-
 # Celery Configuration - Azure Redis
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL')  # Required for Azure Redis Cache
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND')  # Required for Azure Redis Cache
+
+_redis_ssl_cert_reqs_env = os.getenv("REDIS_SSL_CERT_REQS", "required").strip().lower()
+_redis_ssl_cert_map = {
+    "required": ssl.CERT_REQUIRED,
+    "optional": ssl.CERT_OPTIONAL,
+    "none": ssl.CERT_NONE,
+}
+if _redis_ssl_cert_reqs_env not in _redis_ssl_cert_map:
+    raise RuntimeError("REDIS_SSL_CERT_REQS must be one of: required, optional, none")
+_redis_ssl_cert_reqs = _redis_ssl_cert_map[_redis_ssl_cert_reqs_env]
+_redis_ssl_cert_reqs_url = _redis_ssl_cert_reqs_env
 
 # Add SSL certificate requirements to Redis URLs for Azure Redis
 if CELERY_BROKER_URL and CELERY_BROKER_URL.startswith('rediss://'):
     # Append ssl_cert_reqs parameter to URL if not already present
     if 'ssl_cert_reqs' not in CELERY_BROKER_URL:
         separator = '&' if '?' in CELERY_BROKER_URL else '?'
-        # Use CERT_NONE as the value (required by Celery Redis backend)
-        CELERY_BROKER_URL = f"{CELERY_BROKER_URL}{separator}ssl_cert_reqs=CERT_NONE"
+        CELERY_BROKER_URL = f"{CELERY_BROKER_URL}{separator}ssl_cert_reqs={_redis_ssl_cert_reqs_url}"
         # Update environment variable for celery.py
         os.environ['CELERY_BROKER_URL'] = CELERY_BROKER_URL
     CELERY_BROKER_TRANSPORT_OPTIONS = {
-        'ssl_cert_reqs': ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
+        'ssl_cert_reqs': _redis_ssl_cert_reqs,
     }
 else:
     CELERY_BROKER_TRANSPORT_OPTIONS = {}
@@ -197,12 +198,11 @@ if CELERY_RESULT_BACKEND and CELERY_RESULT_BACKEND.startswith('rediss://'):
     # Append ssl_cert_reqs parameter to URL if not already present
     if 'ssl_cert_reqs' not in CELERY_RESULT_BACKEND:
         separator = '&' if '?' in CELERY_RESULT_BACKEND else '?'
-        # Use CERT_NONE as the value (required by Celery Redis backend)
-        CELERY_RESULT_BACKEND = f"{CELERY_RESULT_BACKEND}{separator}ssl_cert_reqs=CERT_NONE"
+        CELERY_RESULT_BACKEND = f"{CELERY_RESULT_BACKEND}{separator}ssl_cert_reqs={_redis_ssl_cert_reqs_url}"
         # Update environment variable for celery.py
         os.environ['CELERY_RESULT_BACKEND'] = CELERY_RESULT_BACKEND
     CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
-        'ssl_cert_reqs': ssl.CERT_NONE,  # Azure Redis uses CERT_NONE
+        'ssl_cert_reqs': _redis_ssl_cert_reqs,
     }
 else:
     CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {}
@@ -212,11 +212,24 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
-DATABASES = {}
+DATABASES = {
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        ssl_require=_as_bool(os.getenv("DB_SSL_REQUIRE", "true")),
+    )
+}
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = _as_bool(os.getenv("SECURE_SSL_REDIRECT", "true"))
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.auth',
+    'django.contrib.sessions',
     'django.contrib.staticfiles',
     'rest_framework',
     'drf_spectacular',
@@ -228,9 +241,9 @@ INSTALLED_APPS = [
     'integrations',
 ]
 
-# Custom authentication backend for Cosmos DB
+# Custom authentication backend for PostgreSQL
 AUTHENTICATION_BACKENDS = [
-    'authentication.authentication.CosmosDBAuthenticationBackend',
+    'authentication.authentication.AppAuthenticationBackend',
 ]
 
 MIDDLEWARE = [
@@ -267,7 +280,7 @@ WSGI_APPLICATION = 'apis.wsgi.application'
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
-# Password validation disabled - using custom Cosmos DB authentication
+# Password validation disabled - using custom PostgreSQL authentication
 # AUTH_PASSWORD_VALIDATORS = []
 
 
@@ -290,7 +303,7 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
-# Cosmos DB is used for all data storage - no Django models needed
+# PostgreSQL is used for all data storage - no Django models needed
 
 CORS_ALLOW_ALL_ORIGINS = False
 
@@ -349,7 +362,7 @@ if _csrf_extra:
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'authentication.authentication.CosmosDBJWTAuthentication',
+        'authentication.authentication.AppJWTAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',  # Fallback
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -384,10 +397,10 @@ VERY_SLOW_REQUEST_THRESHOLD = float(os.getenv('VERY_SLOW_REQUEST_THRESHOLD', '5.
 
 REDIS_URL = os.getenv('REDIS_URL')  
 
-# Cosmos DB Performance Configuration
-COSMOS_CONNECTION_POOL_SIZE = int(os.getenv('COSMOS_CONNECTION_POOL_SIZE', '10'))
-COSMOS_REQUEST_TIMEOUT = int(os.getenv('COSMOS_REQUEST_TIMEOUT', '30'))
-COSMOS_RETRY_TOTAL = int(os.getenv('COSMOS_RETRY_TOTAL', '3'))
+# Database performance tuning knobs
+DB_CONNECTION_POOL_SIZE = int(os.getenv('DB_CONNECTION_POOL_SIZE', '10'))
+DB_REQUEST_TIMEOUT = int(os.getenv('DB_REQUEST_TIMEOUT', '30'))
+DB_RETRY_TOTAL = int(os.getenv('DB_RETRY_TOTAL', '3'))
 
 # Local ML Pipeline Configuration
 USE_LOCAL_PIPELINE = os.getenv('USE_LOCAL_PIPELINE', 'false').lower() == 'true'
@@ -445,3 +458,4 @@ REGISTRATION_OTP_TTL_MINUTES = int(os.getenv('REGISTRATION_OTP_TTL_MINUTES', '10
 REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv('REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS', '60'))
 REGISTRATION_OTP_MAX_ATTEMPTS = int(os.getenv('REGISTRATION_OTP_MAX_ATTEMPTS', '5'))
 REGISTRATION_OTP_BYPASS = os.getenv('REGISTRATION_OTP_BYPASS', '').lower() in ('true', '1', 'yes')
+

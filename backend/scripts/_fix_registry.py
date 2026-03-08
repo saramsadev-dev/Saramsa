@@ -17,7 +17,6 @@ EXPECT_403 = {
     "POST /api/insights/analyze/",
     "POST /api/insights/upload/",
     "GET /api/insights/user-stories/",
-    "GET /api/insights/user-stories/all/",
     "PUT /api/insights/user-stories/remove-work-items/",
     "POST /api/insights/user-story-creation/",
     "POST /api/insights/user-story-submission/",

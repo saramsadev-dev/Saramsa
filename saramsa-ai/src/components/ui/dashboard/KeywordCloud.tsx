@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useMemo } from "react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "../card";
 
 interface KeywordCloudProps {
@@ -154,3 +154,4 @@ export function KeywordCloud({
     </div>
   );
 }
+

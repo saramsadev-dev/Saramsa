@@ -124,11 +124,8 @@ class TaskService:
                 self.local_processing_service = LocalProcessingService()
                 logger.info("✅ LocalProcessingService initialized successfully")
             except Exception as e:
-                logger.error(f"❌ Failed to initialize LocalProcessingService: {e}")
-                logger.info("🔄 Falling back to LLM-based processing")
-                return self._process_with_llm_chunking(
-                    comments, company_name, user_id_str, project_id, suggested_aspects
-                )
+                logger.error(f"❌ Failed to initialize LocalProcessingService: {e}", exc_info=True)
+                raise RuntimeError("Local ML pipeline initialization failed; fallback is disabled.") from e
         
         # 1. Resolve aspect taxonomy (cached → last analysis → GPT suggestion)
         taxonomy, resolved_aspects = self._resolve_taxonomy(comments, project_id, suggested_aspects)
@@ -193,13 +190,13 @@ class TaskService:
         saved_result = analysis_service.save_analysis_data(insight_data)
         
         if saved_result:
-            logger.info(f"✅ Local ML analysis saved to Cosmos DB with ID: {saved_result.get('id')}")
+            logger.info(f"✅ Local ML analysis saved to PostgreSQL with ID: {saved_result.get('id')}")
             try:
                 analysis_service.update_project_last_analysis(project_id, insight_data["id"])
             except Exception as e:
                 logger.warning(f"Could not update project last_analysis: {e}")
         else:
-            logger.error(f"❌ Failed to save local ML analysis data to Cosmos DB")
+            logger.error(f"❌ Failed to save local ML analysis data to PostgreSQL")
         
         self._record_taxonomy_health(taxonomy, project_id, self._compute_health_metrics_local(pipeline_result))
 
@@ -222,17 +219,11 @@ class TaskService:
         GET) and is called between NLI batches for cooperative cancellation
         on Windows where SIGTERM is ignored.
         """
-        try:
-            cache = get_cache_service()
-        except Exception:
-            return None
+        cache = get_cache_service()
 
         # Get the celery task id if available
-        try:
-            from celery import current_task
-            celery_task_id = getattr(current_task.request, "id", None)
-        except Exception:
-            celery_task_id = None
+        from celery import current_task
+        celery_task_id = getattr(current_task.request, "id", None)
 
         def _is_cancelled() -> bool:
             try:
@@ -242,8 +233,8 @@ class TaskService:
                         logger.info(f"Task {celery_task_id} cancelled via Redis flag")
                         return True
                 return False
-            except Exception:
-                return False
+            except Exception as exc:
+                raise RuntimeError("Cancellation checker failed while reading Redis cancellation flag.") from exc
 
         return _is_cancelled
 
@@ -339,16 +330,16 @@ class TaskService:
         saved_result = analysis_service.save_analysis_data(insight_data)
         
         if saved_result:
-            logger.info(f"✅ Analysis saved to Cosmos DB successfully with ID: {saved_result.get('id')}")
+            logger.info(f"✅ Analysis saved to PostgreSQL successfully with ID: {saved_result.get('id')}")
             logger.info(f"🔍 DEBUG: Saved result keys: {list(saved_result.keys()) if saved_result else 'None'}")
             try:
                 analysis_service.update_project_last_analysis(project_id, insight_data["id"])
             except Exception as e:
                 logger.warning(f"Could not update project last_analysis: {e}")
         else:
-            logger.error(f"❌ Failed to save analysis data to Cosmos DB")
+            logger.error(f"❌ Failed to save analysis data to PostgreSQL")
         
-        logger.info(f"Analysis saved to Cosmos DB for background task with {len(comments)} comments")
+        logger.info(f"Analysis saved to PostgreSQL for background task with {len(comments)} comments")
         
         # Return minimal payload to avoid Celery result backend serialization issues
         # (large normalized result can cause task to be marked FAILURE after save).

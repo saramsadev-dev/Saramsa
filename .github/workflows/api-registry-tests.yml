@@ -36,8 +36,8 @@ jobs:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: |
           if [ -z "$API_BASE_URL" ]; then
-            echo "API_BASE_URL is not set; skipping registry sync."
-            exit 0
+            echo "API_BASE_URL is not set; failing API registry workflow."
+            exit 1
           fi
           python scripts/sync_api_registry_from_swagger.py
 
@@ -51,7 +51,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           if [ -z "$API_BASE_URL" ]; then
-            echo "API_BASE_URL is not set; skipping API registry tests."
-            exit 0
+            echo "API_BASE_URL is not set; failing API registry workflow."
+            exit 1
           fi
           python scripts/test_api_registry.py --notify-slack

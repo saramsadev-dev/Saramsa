@@ -267,7 +267,6 @@ export const generateUserStories = createAsyncThunk<
       payload.project_metadata = data.projectMetadata;
     }
 
-    console.log(`🔧 generateUserStories payload for ${data.platform}:`, payload);
 
     // User story generation involves LLM calls which can take longer - increase timeout to 3 minutes
     const response = await apiRequest(
@@ -278,23 +277,9 @@ export const generateUserStories = createAsyncThunk<
       false,
       { timeout: 180000 } // 3 minutes timeout for LLM calls
     );
-
-    console.log('✅ Raw API response received:', {
-      status: response.status,
-      dataSize: JSON.stringify(response.data).length,
-      hasData: !!response.data,
-      hasNestedData: !!response.data?.data
-    });
-
     // Fix: Extract user stories from nested response structure
     // Backend returns: { data: { data: { user_stories: [{ work_items: [...] }] } } }
     const userStoriesData = response.data.data?.user_stories?.[0];
-    
-    console.log('✅ Extracted user stories data:', {
-      hasUserStoriesData: !!userStoriesData,
-      workItemsCount: userStoriesData?.work_items?.length || 0
-    });
-    
     return userStoriesData || response.data;
   } catch (err: any) {
     console.error('❌ generateUserStories error:', err);
@@ -344,7 +329,6 @@ export const submitUserStories = createAsyncThunk<
       time: data.time || new Date().toISOString()
     };
 
-    console.log(`🔧 submitUserStories payload for ${data.platform}:`, payload);
 
     const response = await apiRequest('post', '/insights/user-story-submission/', payload, true, false);
     return response.data;
@@ -693,3 +677,4 @@ export const {
 } = analysisSlice.actions;
 
 export default analysisSlice.reducer; 
+

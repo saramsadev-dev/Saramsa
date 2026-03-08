@@ -108,10 +108,8 @@ Typical inputs:
   - `.githooks/pre-push` runs:
     - `python scripts/sync_api_registry_from_swagger.py`
     - `python scripts/test_api_registry.py --notify-slack`
-  - On failure, it writes `.pre-push-prompt.txt` that contains:
-    - Script names and error sections.
-    - Guidance on unconfigured endpoints and schema changes.
-  - Pass that prompt (or the terminal output) into the DevOps agent.
+  - On failure, it prints error output directly in the terminal.
+  - Pass that terminal output into the DevOps agent.
 
 - **GitHub Actions failures**
   - Copy relevant logs for failed jobs:

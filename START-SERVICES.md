@@ -1,63 +1,47 @@
-# Saramsa Service Manager
+﻿# Saramsa Service Manager
 
-Master CLI (`saramsa.ps1`) that invokes child scripts in `saramsa-scripts/` to start, stop, and tail logs for all services.
+Master CLI (`saramsa.ps1`) that invokes child scripts in `saramsa-scripts/` to start services.
 
 ## Script layout
 
-- **`saramsa.ps1`** – Master CLI: parses `start` / `logs` / `kill` / `help` and invokes child scripts
-- **`saramsa-scripts/common.ps1`** – Shared paths, Redis checks, PID helpers, `Stop-AllServices`
-- **`saramsa-scripts/start.ps1`** – Start Redis, Backend, Celery, Celery Ops, Frontend; prints URLs + Logs section
-- **`saramsa-scripts/logs.ps1`** – Tail a service log or show log paths + `Get-Content` commands
-- **`saramsa-scripts/kill.ps1`** – Stop all services
-- **`saramsa-scripts/help.ps1`** – Print usage
+- **`saramsa.ps1`** - Master CLI: parses `start` / `kill` / `help` and invokes child scripts
+- **`saramsa-scripts/common.ps1`** - Shared paths, Redis checks, and startup helpers
+- **`saramsa-scripts/start-procfile.ps1`** - Start via Procfile + honcho (foreground)
+- **`saramsa-scripts/kill.ps1`** - Stop Saramsa processes by their bound ports
+- **`saramsa-scripts/help.ps1`** - Print usage
 
 ## Quick Start
 
-### Option 1: Direct PowerShell Script
+### Option 1: Procfile + honcho (recommended)
 
 ```powershell
-# From project root
-.\saramsa.ps1 start all dev
-.\saramsa.ps1 logs          # Show log paths and tail commands
-.\saramsa.ps1 logs backend  # Tail backend log
-.\saramsa.ps1 kill
+pip install honcho
+.\saramsa.ps1 start
 ```
 
-### Option 2: Batch File
-
-```cmd
-saramsa.bat start all dev
-saramsa.bat logs [backend|frontend|celery|celery-ops]
-saramsa.bat kill
-```
-
-### Option 3: PowerShell function (one-time setup)
+### Option 2: PowerShell function (one-time setup)
 
 ```powershell
 .\setup-saramsa-command.ps1
 . $PROFILE
 
-saramsa start all dev
-saramsa logs [backend|frontend|celery|celery-ops]
-saramsa kill
+saramsa start
 ```
 
 ## Commands
 
-- **`saramsa start all [dev|prod]`** – Start all services (Redis, Backend, Celery, Celery Ops, Frontend). Prints Service URLs and **Logs** (paths + `Get-Content ... -Wait -Tail 50`).
-- **`saramsa logs`** – Show log paths and tail commands only
-- **`saramsa logs [backend|frontend|celery|celery-ops]`** – Tail that service’s log
-- **`saramsa kill`** (alias: **`stop`**) – Stop all services
-- **`saramsa help`** – Show usage
+- **`saramsa start`** - Start all services via Procfile + honcho (foreground)
+- **`saramsa kill`** - Stop Saramsa services using ports `8000`, `3001`, and `9800`
+- **`saramsa help`** - Show usage
 
 ## Services Started
 
-1. **Frontend (Next.js)** - http://localhost:3000
+1. **Frontend (Next.js)** - http://localhost:3001
 2. **Backend (Django)** - http://127.0.0.1:8000
 3. **Celery Worker** - Background task processing
 4. **Celery Ops (Monitoring UI)** - http://localhost:9800
 
-Each service runs in a separate PowerShell window. Close individual windows to stop specific services.
+Procfile mode runs all services in a single foreground session. Press Ctrl+C to stop all services.
 
 ## Prerequisites
 
@@ -76,9 +60,15 @@ If you see a warning about venv, make sure:
 ### Port Already in Use
 
 If a port is already in use:
-- **3000**: Frontend - Stop other Next.js apps
+- **3001**: Frontend - Stop other Next.js apps
 - **8000**: Backend - Stop other Django servers
 - **9800**: Celery Ops - Stop other instances
+
+If the existing listeners are from Saramsa itself, run:
+
+```powershell
+saramsa kill
+```
 
 ### Services Not Starting
 
@@ -87,7 +77,7 @@ If a port is already in use:
    # Backend
    cd backend
    pip install -r requirements.txt
-   
+
    # Frontend
    cd saramsa-ai
    npm install
@@ -95,17 +85,16 @@ If a port is already in use:
 
 2. Ensure Redis is running:
    ```powershell
-   # Check Redis
    redis-cli ping
    ```
 
-3. Check individual service logs in their respective windows
+3. Check the terminal output from honcho
 
 ### Redis failed to start / "Redis failed to start. Start manually"
 
-If `saramsa start all dev` shows **"Redis failed to start"** and suggests WSL commands:
+If `saramsa start` shows **"Redis failed to start"** and suggests WSL commands:
 
-- **Option A – Redis on Windows (recommended when running backend on Windows)**  
+- **Option A - Redis on Windows (recommended when running backend on Windows)**
   So the backend (and Celery) can connect to `localhost:6379` without WSL networking:
 
   1. Install Redis for Windows (PowerShell as Administrator):
@@ -115,7 +104,7 @@ If `saramsa start all dev` shows **"Redis failed to start"** and suggests WSL co
      Or download from: [tporadowski/redis/releases](https://github.com/tporadowski/redis/releases)
 
   2. Start Redis (pick one):
-     - If installed as a service: start the **Redis** service from Services (services.msc), or:
+     - If installed as a service: start the **Redis** service from Services (`services.msc`), or:
        ```powershell
        Start-Service Redis
        ```
@@ -125,9 +114,9 @@ If `saramsa start all dev` shows **"Redis failed to start"** and suggests WSL co
      ```powershell
      redis-cli ping
      ```
-     Should return `PONG`. Then run `.\saramsa.ps1 start all dev` again (or start only backend/Celery if the rest are already running).
+     Should return `PONG`. Then run `.\saramsa.ps1 start` again.
 
-- **Option B – Redis in WSL**  
+- **Option B - Redis in WSL**
   If you prefer WSL:
 
   1. Install and start Redis inside WSL:
@@ -143,7 +132,7 @@ If `saramsa start all dev` shows **"Redis failed to start"** and suggests WSL co
      ```powershell
      wsl redis-cli ping
      ```
-     If that returns `PONG` but the backend still cannot connect, WSL2 may not be exposing port 6379 to Windows. Use Option A (Redis on Windows) instead.
+     If that returns `PONG` but the backend still cannot connect, WSL2 may not be exposing port 6379 to Windows. Use Option A instead.
 
 ### 500 Error on Analyze / "Error 10061 connecting to localhost:6379"
 
@@ -151,14 +140,14 @@ If `POST /api/insights/analyze/` returns **500** with a message like *"Error 100
 
 - **Cause:** Redis is not running. The analyze endpoint enqueues a Celery task, and Celery uses Redis as the broker.
 - **Fix:**
-  1. Start Redis, then start the Celery worker. Easiest: from project root run **`.\saramsa.ps1 start all dev`** (it starts Redis, backend, Celery, Celery Ops, frontend).
-  2. If you start services manually, start **Redis first** (e.g. `redis-server` or WSL: `wsl redis-server --daemonize yes`), then backend and Celery.
+  1. Start Redis, then run **`.\saramsa.ps1 start`**.
+  2. If you start services manually, start **Redis first** (for example `redis-server` or `wsl redis-server --daemonize yes`), then backend and Celery.
   3. Verify Redis: `redis-cli ping` should return `PONG`.
-- **Logs:** The backend logs this as an error. Use `saramsa logs backend` and check `.saramsa-backend.err.log` in the project root.
+- **Logs:** The backend logs this as an error in the terminal output.
 
 ## Manual Start (Alternative)
 
-If the script doesn't work, start services manually:
+If the script does not work, start services manually:
 
 ```powershell
 # Terminal 1: Backend

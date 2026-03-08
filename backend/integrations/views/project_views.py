@@ -19,7 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from authentication.permissions import IsProjectAdmin, IsProjectViewer, IsProjectOwner
-from apis.infrastructure.cosmos_service import cosmos_service
+from apis.infrastructure.storage_service import storage_service
 
 from ..services import get_project_service
 
@@ -327,7 +327,7 @@ class ProjectRolesView(APIView):
 
     @handle_service_errors
     def get(self, request, project_id: str):
-        project = cosmos_service.get_project_by_id_any(project_id)
+        project = storage_service.get_project_by_id_any(project_id)
         if not project:
             return StandardResponse.not_found(
                 detail=f"Project with ID '{project_id}' was not found",
@@ -335,7 +335,7 @@ class ProjectRolesView(APIView):
             )
 
         owner_id = project.get("owner_user_id") or project.get("userId")
-        roles = cosmos_service.get_project_roles_for_project(project_id)
+        roles = storage_service.get_project_roles_for_project(project_id)
         role_entries = []
 
         if owner_id:
@@ -359,7 +359,7 @@ class ProjectRolesView(APIView):
         current_user_id = getattr(request.user, "id", None)
         current_role = "owner" if current_user_id and owner_id and str(current_user_id) == str(owner_id) else None
         if current_role is None and current_user_id:
-            current_role = cosmos_service.get_project_role_for_user(project_id, str(current_user_id))
+            current_role = storage_service.get_project_role_for_user(project_id, str(current_user_id))
 
         return StandardResponse.success(
             data={
@@ -381,7 +381,7 @@ class ProjectRolesView(APIView):
                 instance=request.path
             )
 
-        project = cosmos_service.get_project_by_id_any(project_id)
+        project = storage_service.get_project_by_id_any(project_id)
         if not project:
             return StandardResponse.not_found(
                 detail=f"Project with ID '{project_id}' was not found",
@@ -396,7 +396,7 @@ class ProjectRolesView(APIView):
             )
 
         actor_id = getattr(request.user, "id", None)
-        saved = cosmos_service.upsert_project_role(project_id, str(user_id), role, actor_id=str(actor_id) if actor_id else None)
+        saved = storage_service.upsert_project_role(project_id, str(user_id), role, actor_id=str(actor_id) if actor_id else None)
         if not saved:
             return StandardResponse.internal_server_error(
                 detail="Failed to save project role.",
@@ -417,7 +417,7 @@ class ProjectRolesView(APIView):
                 instance=request.path
             )
 
-        project = cosmos_service.get_project_by_id_any(project_id)
+        project = storage_service.get_project_by_id_any(project_id)
         if not project:
             return StandardResponse.not_found(
                 detail=f"Project with ID '{project_id}' was not found",
@@ -431,7 +431,7 @@ class ProjectRolesView(APIView):
                 instance=request.path
             )
 
-        if not cosmos_service.delete_project_role(project_id, str(user_id)):
+        if not storage_service.delete_project_role(project_id, str(user_id)):
             return StandardResponse.not_found(
                 detail="Project role not found.",
                 instance=request.path
@@ -441,3 +441,4 @@ class ProjectRolesView(APIView):
             data={},
             message="Project role removed successfully"
         )
+

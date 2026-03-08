@@ -124,8 +124,8 @@ jobs:
           HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
           if [ -z "$HEALTH_URL" ]; then
-            echo "BACKEND_HEALTH_URL is not set; skipping health check."
-            exit 0
+            echo "BACKEND_HEALTH_URL is not set; failing workflow."
+            exit 1
           fi
 
           echo "Checking backend health at $HEALTH_URL"

@@ -12,8 +12,8 @@ Contains views for authentication operations:
 from .authentication_views import (
     RegisterView,
     RegisterOtpRequestView,
-    CosmosDBTokenObtainPairView,
-    CosmosDBTokenRefreshView,
+    AppTokenObtainPairView,
+    AppTokenRefreshView,
     ProfileMeView,
     CheckUsernameView,
     UserListView,
@@ -26,8 +26,8 @@ from .authentication_views import (
 __all__ = [
     'RegisterView',
     'RegisterOtpRequestView',
-    'CosmosDBTokenObtainPairView',
-    'CosmosDBTokenRefreshView',
+    'AppTokenObtainPairView',
+    'AppTokenRefreshView',
     'ProfileMeView',
     'CheckUsernameView',
     'UserListView',
@@ -36,3 +36,4 @@ __all__ = [
     'ForgotPasswordView',
     'ResetPasswordView',
 ]
+

@@ -7,7 +7,7 @@ asgiref==3.8.1
 async-timeout==5.0.1
 attrs==25.3.0
 azure-core==1.35.0
-azure-cosmos==4.6.0
+azure-communication-email==1.0.0
 azure-identity==1.25.0
 azure-monitor-opentelemetry-exporter==1.0.0b41
 bcrypt==4.1.2
@@ -29,6 +29,7 @@ Deprecated==1.2.18
 distro==1.9.0
 Django==4.2.20
 django-cors-headers==4.7.0
+dj-database-url==2.2.0
 djangorestframework==3.16.0
 djangorestframework_simplejwt==5.5.0
 drf-spectacular==0.27.1

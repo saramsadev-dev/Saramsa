@@ -1,5 +1,5 @@
-# Saramsa kill - stop all services
-# Invoked by master saramsa.ps1: & kill.ps1
+# Saramsa kill - stop Procfile-managed services by their bound ports
 
 . "$PSScriptRoot\common.ps1"
-Stop-AllServices
+
+Stop-SaramsaServices

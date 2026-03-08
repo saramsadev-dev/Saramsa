@@ -1,423 +1,517 @@
-"""
-Analysis repository for analysis-related data operations.
-"""
+"""Analysis and taxonomy repositories backed by Django ORM."""
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
-from apis.infrastructure.cosmos_service import cosmos_service
+from __future__ import annotations
+
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from django.utils import timezone
+
+from feedback_analysis.models import Analysis, Insight, InsightReview, InsightRule, Taxonomy, Upload, UserData
+from integrations.models import Project
+from work_items.models import UserStory
 
 logger = logging.getLogger(__name__)
 
 
+def _parse_dt(value: Any):
+    if not value:
+        return timezone.now()
+    if isinstance(value, datetime):
+        return value
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.utc)
+        return dt
+    except Exception:
+        return timezone.now()
+
+
+def _merge_payload(base: Dict[str, Any], extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    merged = dict(base or {})
+    if extra:
+        merged.update(extra)
+    return merged
+
+
+def _doc_from_analysis(obj: Analysis) -> Dict[str, Any]:
+    payload = _merge_payload(
+        obj.payload,
+        {
+            "id": str(obj.id),
+            "projectId": obj.project_id,
+            "userId": obj.user_id,
+            "type": obj.type,
+            "analysis_type": obj.analysis_type,
+            "quarter": obj.quarter,
+            "result": obj.result or {},
+            "comments": obj.comments or [],
+            "createdAt": obj.created_at.isoformat() if obj.created_at else None,
+            "updatedAt": obj.updated_at.isoformat() if obj.updated_at else None,
+        },
+    )
+    return payload
+
+
+def _doc_from_insight(obj: Insight) -> Dict[str, Any]:
+    payload = _merge_payload(
+        obj.payload,
+        {
+            "id": str(obj.id),
+            "projectId": obj.project_id,
+            "userId": obj.user_id,
+            "type": obj.type,
+            "analysis_type": obj.analysis_type,
+            "analysis_date": obj.analysis_date.isoformat() if obj.analysis_date else None,
+            "createdAt": obj.created_at.isoformat() if obj.created_at else None,
+            "updatedAt": obj.updated_at.isoformat() if obj.updated_at else None,
+        },
+    )
+    return payload
+
+
+def _doc_from_taxonomy(obj: Taxonomy) -> Dict[str, Any]:
+    payload = _merge_payload(
+        obj.payload,
+        {
+            "id": str(obj.id),
+            "projectId": obj.project_id,
+            "project_id": obj.project_id,
+            "type": obj.type,
+            "version": obj.version,
+            "status": obj.status,
+            "is_pinned": obj.is_pinned,
+            "taxonomy": obj.taxonomy or {},
+            "createdAt": obj.created_at.isoformat() if obj.created_at else None,
+            "updatedAt": obj.updated_at.isoformat() if obj.updated_at else None,
+            "created_at": obj.created_at.isoformat() if obj.created_at else None,
+            "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
+        },
+    )
+    return payload
+
+
+def _doc_from_user_story(obj: UserStory) -> Dict[str, Any]:
+    payload = _merge_payload(
+        obj.payload,
+        {
+            "id": str(obj.id),
+            "projectId": obj.project_id,
+            "userId": obj.user_id,
+            "type": obj.type,
+            "status": obj.status,
+            "title": obj.title,
+            "description": obj.description,
+            "generated_at": obj.generated_at.isoformat() if obj.generated_at else None,
+            "work_items": obj.work_items or [],
+            "createdAt": obj.created_at.isoformat() if obj.created_at else None,
+            "updatedAt": obj.updated_at.isoformat() if obj.updated_at else None,
+        },
+    )
+    return payload
+
+
+def _contains_comments(doc: Dict[str, Any]) -> bool:
+    if doc.get("original_comments") or doc.get("feedback"):
+        return True
+    analysis_data = doc.get("analysisData") if isinstance(doc.get("analysisData"), dict) else {}
+    result_data = doc.get("result") if isinstance(doc.get("result"), dict) else {}
+    return bool(
+        analysis_data.get("original_comments")
+        or analysis_data.get("feedback")
+        or result_data.get("original_comments")
+        or result_data.get("feedback")
+    )
+
+
 class AnalysisRepository:
     """Repository for analysis operations."""
-    
+
     def __init__(self):
-        self.cosmos_service = cosmos_service
-        self.container_name = 'analysis'
         self.entity_type = "analysis"
-    
+
+    def _normalize_analysis_id(self, analysis_id: str) -> str:
+        normalized_id = analysis_id
+        if normalized_id and not normalized_id.startswith("insight_"):
+            if normalized_id.startswith("analysis_"):
+                normalized_id = normalized_id.replace("analysis_", "insight_", 1)
+            else:
+                normalized_id = f"insight_{normalized_id}"
+        return normalized_id
+
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new analysis document."""
         try:
-            data['type'] = self.entity_type
-            return self.cosmos_service.create_document(self.container_name, data)
+            data = dict(data)
+            data["type"] = self.entity_type
+            item_id = str(data["id"])
+            obj, _ = Analysis.objects.update_or_create(
+                id=item_id,
+                defaults={
+                    "project_id": str(data.get("projectId")) if data.get("projectId") else None,
+                    "user_id": str(data.get("userId")) if data.get("userId") else None,
+                    "type": data.get("type", self.entity_type),
+                    "analysis_type": data.get("analysis_type") or data.get("analysisType", ""),
+                    "quarter": data.get("quarter", ""),
+                    "result": data.get("result") or data.get("analysisData") or {},
+                    "comments": data.get("comments") or [],
+                    "payload": data,
+                    "created_at": _parse_dt(data.get("createdAt")),
+                    "updated_at": _parse_dt(data.get("updatedAt")),
+                },
+            )
+            return _doc_from_analysis(obj)
         except Exception as e:
             logger.error(f"Error creating analysis: {e}")
             raise
-    
+
     def get_by_id(self, analysis_id: str) -> Optional[Dict[str, Any]]:
-        """Get analysis by ID."""
-        try:
-            return self.cosmos_service.get_analysis_data(analysis_id)
-        except Exception as e:
-            logger.error(f"Error getting analysis by ID {analysis_id}: {e}")
-            return None
-    
+        obj = Analysis.objects.filter(id=str(analysis_id)).first()
+        return _doc_from_analysis(obj) if obj else None
+
     def get_latest_by_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get the latest analysis for a project."""
-        try:
-            return self.cosmos_service.get_latest_analysis_for_project(project_id)
-        except Exception as e:
-            logger.error(f"Error getting latest analysis for project {project_id}: {e}")
-            return None
-    
+        obj = Analysis.objects.filter(project_id=str(project_id), type=self.entity_type).order_by("-created_at").first()
+        return _doc_from_analysis(obj) if obj else None
+
     def get_latest_personal_by_user(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get the latest personal analysis for a user."""
-        try:
-            return self.cosmos_service.get_latest_personal_analysis(user_id)
-        except Exception as e:
-            logger.error(f"Error getting latest personal analysis for user {user_id}: {e}")
-            return None
-    
+        obj = Analysis.objects.filter(user_id=str(user_id), type=self.entity_type).order_by("-created_at").first()
+        return _doc_from_analysis(obj) if obj else None
+
     def get_by_project(self, project_id: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get analyses for a project with optional limit."""
-        try:
-            # Use existing cosmos service method with query
-            query = """
-            SELECT * FROM c 
-            WHERE c.projectId = @project_id AND c.type = @type 
-            ORDER BY c.createdAt DESC 
-            OFFSET 0 LIMIT @limit
-            """
-            parameters = [
-                {"name": "@project_id", "value": project_id},
-                {"name": "@type", "value": self.entity_type},
-                {"name": "@limit", "value": limit}
-            ]
-            return self.cosmos_service.query_documents(self.container_name, query, parameters)
-        except Exception as e:
-            logger.error(f"Error getting analyses for project {project_id}: {e}")
-            return []
+        qs = Analysis.objects.filter(project_id=str(project_id), type=self.entity_type).order_by("-created_at")[:limit]
+        return [_doc_from_analysis(row) for row in qs]
 
     def get_recent_by_project(self, project_id: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Get recent analyses for trend calculations."""
-        try:
-            query = """
-            SELECT * FROM c
-            WHERE c.projectId = @project_id AND c.result != null
-            ORDER BY c.createdAt DESC
-            OFFSET 0 LIMIT @limit
-            """
-            parameters = [
-                {"name": "@project_id", "value": project_id},
-                {"name": "@limit", "value": limit}
-            ]
-            return self.cosmos_service.query_documents(self.container_name, query, parameters)
-        except Exception as e:
-            logger.error(f"Error getting recent analyses for project {project_id}: {e}")
-            return []
-    
+        qs = Analysis.objects.filter(project_id=str(project_id)).exclude(result={}).order_by("-created_at")[:limit]
+        return [_doc_from_analysis(row) for row in qs]
+
     def get_cumulative_data_by_user(self, user_id: str) -> Dict[str, Any]:
-        """Get cumulative analysis data for a user across all projects."""
         try:
-            query = """
-            SELECT * FROM c 
-            WHERE c.userId = @user_id AND c.type = @type 
-            ORDER BY c.createdAt ASC
-            """
-            parameters = [
-                {"name": "@user_id", "value": user_id},
-                {"name": "@type", "value": self.entity_type}
+            analyses = [
+                _doc_from_analysis(row)
+                for row in Analysis.objects.filter(user_id=str(user_id), type=self.entity_type).order_by("created_at")
             ]
-            
-            analyses = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            
             if not analyses:
                 return {
-                    'total_analyses': 0,
-                    'total_comments': 0,
-                    'quarters_covered': [],
-                    'latest_quarter': None,
-                    'analyses_history': [],
-                    'all_comments': []
+                    "total_analyses": 0,
+                    "total_comments": 0,
+                    "quarters_covered": [],
+                    "latest_quarter": None,
+                    "analyses_history": [],
+                    "all_comments": [],
                 }
-            
-            # Process cumulative data
-            all_comments = []
+
+            all_comments: List[Any] = []
             quarters = set()
-            
             for analysis in analyses:
-                if 'comments' in analysis:
-                    all_comments.extend(analysis['comments'])
-                if 'quarter' in analysis:
-                    quarters.add(analysis['quarter'])
-            
+                all_comments.extend(analysis.get("comments") or [])
+                if analysis.get("quarter"):
+                    quarters.add(analysis.get("quarter"))
+
             return {
-                'total_analyses': len(analyses),
-                'total_comments': len(all_comments),
-                'quarters_covered': list(quarters),
-                'latest_quarter': analyses[-1].get('quarter') if analyses else None,
-                'analyses_history': analyses,
-                'all_comments': all_comments
+                "total_analyses": len(analyses),
+                "total_comments": len(all_comments),
+                "quarters_covered": list(quarters),
+                "latest_quarter": analyses[-1].get("quarter"),
+                "analyses_history": analyses,
+                "all_comments": all_comments,
             }
         except Exception as e:
             logger.error(f"Error getting cumulative data for user {user_id}: {e}")
             return {
-                'total_analyses': 0,
-                'total_comments': 0,
-                'quarters_covered': [],
-                'latest_quarter': None,
-                'analyses_history': [],
-                'all_comments': []
+                "total_analyses": 0,
+                "total_comments": 0,
+                "quarters_covered": [],
+                "latest_quarter": None,
+                "analyses_history": [],
+                "all_comments": [],
             }
-    
+
     def get_analysis_by_id(self, analysis_id: str, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get specific analysis by ID and verify user ownership."""
         try:
-            normalized_id = analysis_id
-            if normalized_id and not normalized_id.startswith("insight_"):
-                if normalized_id.startswith("analysis_"):
-                    normalized_id = normalized_id.replace("analysis_", "insight_", 1)
-                else:
-                    normalized_id = f"insight_{normalized_id}"
-
-            query = """
-            SELECT TOP 1 * FROM c
-            WHERE c.id = @analysis_id AND c.userId = @user_id
-            """
-            parameters = [
-                {"name": "@analysis_id", "value": normalized_id},
-                {"name": "@user_id", "value": user_id}
-            ]
-
-            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            if results:
-                return results[0]
-
+            normalized = self._normalize_analysis_id(analysis_id)
+            obj = Analysis.objects.filter(id=normalized, user_id=str(user_id)).first()
+            if not obj and normalized != analysis_id:
+                obj = Analysis.objects.filter(id=str(analysis_id), user_id=str(user_id)).first()
+            if obj:
+                return _doc_from_analysis(obj)
             logger.warning(f"Analysis {analysis_id} not found for user {user_id}")
             return None
-
         except Exception as e:
             logger.error(f"Error getting analysis by ID: {e}")
             return None
 
     def get_analysis_by_id_any(self, analysis_id: str) -> Optional[Dict[str, Any]]:
-        """Get analysis by ID without user ownership filter (for project editors/admins)."""
         try:
-            normalized_id = analysis_id
-            if normalized_id and not normalized_id.startswith("insight_"):
-                if normalized_id.startswith("analysis_"):
-                    normalized_id = normalized_id.replace("analysis_", "insight_", 1)
-                else:
-                    normalized_id = f"insight_{normalized_id}"
-
-            query = """
-            SELECT TOP 1 * FROM c
-            WHERE c.id = @analysis_id
-            """
-            parameters = [{"name": "@analysis_id", "value": normalized_id}]
-            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            if results:
-                return results[0]
-            return None
+            normalized = self._normalize_analysis_id(analysis_id)
+            obj = Analysis.objects.filter(id=normalized).first()
+            if not obj and normalized != analysis_id:
+                obj = Analysis.objects.filter(id=str(analysis_id)).first()
+            return _doc_from_analysis(obj) if obj else None
         except Exception as e:
             logger.error(f"Error getting analysis by ID (any user): {e}")
             return None
 
-    # Insights Methods
     def get_all_insights(self) -> List[Dict[str, Any]]:
-        """Get all insights."""
-        return self.cosmos_service.query_documents("insights", "SELECT * FROM c WHERE c.type = 'insight' ORDER BY c.analysis_date DESC")
-    
+        return [_doc_from_insight(row) for row in Insight.objects.filter(type="insight").order_by("-analysis_date", "-created_at")]
+
     def get_insight_by_id(self, insight_id: str) -> Optional[Dict[str, Any]]:
-        """Get insight by ID."""
-        return self.cosmos_service.get_insight(insight_id)
-    
+        obj = Insight.objects.filter(id=str(insight_id)).first()
+        return _doc_from_insight(obj) if obj else None
+
     def get_insights_by_type(self, analysis_type: str) -> List[Dict[str, Any]]:
-        """Get insights by analysis type."""
-        return self.cosmos_service.query_documents(
-            "insights", 
-            "SELECT * FROM c WHERE c.type = 'insight' AND c.analysis_type = @analysis_type ORDER BY c.analysis_date DESC",
-            [{"name": "@analysis_type", "value": analysis_type}]
-        )
+        qs = Insight.objects.filter(type="insight", analysis_type=analysis_type).order_by("-analysis_date", "-created_at")
+        return [_doc_from_insight(row) for row in qs]
 
     def get_insight_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get insight auto-rule configuration for a project."""
-        return self.cosmos_service.get_insight_rules_for_project(project_id)
+        obj = InsightRule.objects.filter(project_id=str(project_id)).first()
+        if not obj:
+            return None
+        payload = _merge_payload(obj.payload, {"id": str(obj.id), "projectId": obj.project_id, "type": obj.type})
+        return payload
 
     def upsert_insight_rules_for_project(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Upsert insight auto-rule configuration for a project."""
-        return self.cosmos_service.upsert_insight_rules_for_project(project_id, data)
+        rule_id = str(data.get("id") or f"insight_rule:{project_id}")
+        obj, _ = InsightRule.objects.update_or_create(
+            project_id=str(project_id),
+            defaults={
+                "id": rule_id,
+                "type": data.get("type", "insight_rule"),
+                "payload": data,
+                "updated_at": timezone.now(),
+            },
+        )
+        return _merge_payload(obj.payload, {"id": str(obj.id), "projectId": obj.project_id, "type": obj.type})
 
     def get_insight_reviews_for_project(self, project_id: str) -> List[Dict[str, Any]]:
-        """Get insight review statuses for a project."""
-        return self.cosmos_service.get_insight_reviews_for_project(project_id)
+        qs = InsightReview.objects.filter(project_id=str(project_id)).order_by("-updated_at")
+        return [_merge_payload(row.payload, {"id": str(row.id), "projectId": row.project_id, "status": row.status, "type": row.type}) for row in qs]
 
     def upsert_insight_review(self, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Upsert insight review status."""
-        return self.cosmos_service.upsert_insight_review(project_id, data)
-    
-    # Work Items Methods
+        review_id = str(data.get("id") or f"insight_review:{project_id}:{data.get('insightId') or 'default'}")
+        obj, _ = InsightReview.objects.update_or_create(
+            id=review_id,
+            defaults={
+                "project_id": str(project_id),
+                "type": data.get("type", "insight_review"),
+                "status": data.get("status", ""),
+                "payload": data,
+                "updated_at": timezone.now(),
+            },
+        )
+        return _merge_payload(obj.payload, {"id": str(obj.id), "projectId": obj.project_id, "status": obj.status, "type": obj.type})
+
     def get_work_items_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
-        """Get work items by project."""
-        return self.cosmos_service.get_work_items_by_project(project_id)
-    
+        qs = UserStory.objects.filter(project_id=str(project_id)).order_by("-created_at")
+        return [_doc_from_user_story(row) for row in qs]
+
     def get_deep_analysis_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
-        """Get deep analysis by project."""
-        return self.cosmos_service.get_deep_analysis_by_project(project_id)
-    
-    # Analysis Data Methods
+        qs = Analysis.objects.filter(project_id=str(project_id), analysis_type="deep_analysis").order_by("-created_at")
+        return [_doc_from_analysis(row) for row in qs]
+
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Save analysis data."""
-        logger.info(f"🔍 DEBUG: FeedbackAnalysisRepository.save_analysis_data called")
-        logger.info(f"🔍 DEBUG: About to call cosmos_service.save_analysis_data")
-        
-        result = self.cosmos_service.save_analysis_data(analysis_data)
-        
-        if result:
-            logger.info(f"✅ FeedbackAnalysisRepository.save_analysis_data SUCCESS")
-        else:
-            logger.error(f"❌ FeedbackAnalysisRepository.save_analysis_data FAILED")
-            
-        return result
-    
+        try:
+            item_id = str(analysis_data.get("id") or f"insight_{timezone.now().timestamp()}")
+            obj, _ = Analysis.objects.update_or_create(
+                id=item_id,
+                defaults={
+                    "project_id": str(analysis_data.get("projectId")) if analysis_data.get("projectId") else None,
+                    "user_id": str(analysis_data.get("userId")) if analysis_data.get("userId") else None,
+                    "type": analysis_data.get("type", "analysis"),
+                    "analysis_type": analysis_data.get("analysis_type") or analysis_data.get("analysisType", ""),
+                    "quarter": analysis_data.get("quarter", ""),
+                    "result": analysis_data.get("result") or analysis_data.get("analysisData") or {},
+                    "comments": analysis_data.get("comments") or analysis_data.get("original_comments") or analysis_data.get("feedback") or [],
+                    "payload": analysis_data,
+                    "updated_at": timezone.now(),
+                },
+            )
+            return _doc_from_analysis(obj)
+        except Exception as e:
+            logger.error(f"Error saving analysis data: {e}")
+            return None
+
     def update_project_last_analysis(self, project_id: str, analysis_id: str) -> bool:
-        """Update project's last analysis."""
-        return self.cosmos_service.update_project_last_analysis(project_id, analysis_id)
+        updated = Project.objects.filter(id=str(project_id)).update(last_analysis_id=str(analysis_id), updated_at=timezone.now())
+        return updated > 0
 
     def update_analysis(self, project_id: str, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update an existing analysis document by id + project partition."""
         try:
             if not analysis_data or not analysis_data.get("id"):
                 return None
-            return self.cosmos_service.update_document(
-                self.container_name,
-                analysis_data["id"],
-                project_id,
-                analysis_data
+            payload = dict(analysis_data)
+            payload["projectId"] = str(project_id)
+            obj, _ = Analysis.objects.update_or_create(
+                id=str(payload["id"]),
+                defaults={
+                    "project_id": str(project_id),
+                    "user_id": str(payload.get("userId")) if payload.get("userId") else None,
+                    "type": payload.get("type", "analysis"),
+                    "analysis_type": payload.get("analysis_type") or payload.get("analysisType", ""),
+                    "quarter": payload.get("quarter", ""),
+                    "result": payload.get("result") or payload.get("analysisData") or {},
+                    "comments": payload.get("comments") or [],
+                    "payload": payload,
+                    "updated_at": timezone.now(),
+                },
             )
+            return _doc_from_analysis(obj)
         except Exception as e:
             logger.error(f"Error updating analysis {analysis_data.get('id') if analysis_data else None}: {e}")
             return None
 
-    # Analysis History Methods
     def get_analysis_history_for_project(self, project_id: str) -> List[Dict[str, Any]]:
-        """Get analysis history for project."""
-        return self.cosmos_service.get_analysis_history_for_project(project_id)
-    
+        qs = Analysis.objects.filter(project_id=str(project_id)).order_by("-created_at")
+        return [_doc_from_analysis(row) for row in qs]
+
     def get_analysis_by_quarter(self, project_id: str, quarter: str) -> Optional[Dict[str, Any]]:
-        """Get analysis by quarter."""
-        return self.cosmos_service.get_analysis_by_quarter(project_id, quarter)
-    
+        obj = Analysis.objects.filter(project_id=str(project_id), quarter=quarter).order_by("-created_at").first()
+        return _doc_from_analysis(obj) if obj else None
+
     def get_cumulative_analysis_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get cumulative analysis for project."""
-        return self.cosmos_service.get_cumulative_analysis_for_project(project_id)
-    
-    # User Data Methods
-    def get_latest_personal_user_data(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get latest personal user data."""
-        return self.cosmos_service.get_latest_personal_user_data(user_id)
-    
-    def get_user_data_by_project(self, user_id: str, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get user data by project."""
-        return self.cosmos_service.get_user_data_by_project(user_id, project_id)
-    
-    def get_latest_analysis_by_project(self, project_id: str, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get latest analysis data for a project with comprehensive search."""
-        try:
-            # Primary containers to search (in order of preference)
-            containers_to_try = ['analysis', 'user_data', 'uploads']
-            
-            for container in containers_to_try:
-                try:
-                    logger.info(f"Searching container: {container}")
-                    
-                    # Strategy 1: Exact project and user match
-                    queries_to_try = [
-                        # Modern field names - single field ordering
-                        {
-                            "query": """
-                            SELECT * FROM c 
-                            WHERE c.projectId = @project_id 
-                            AND c.userId = @user_id 
-                            AND (c.original_comments != null OR c.feedback != null)
-                            ORDER BY c.createdAt DESC
-                            """,
-                            "params": [
-                                {"name": "@project_id", "value": project_id},
-                                {"name": "@user_id", "value": user_id}
-                            ],
-                            "description": "Exact match with modern field names"
-                        },
-                        # Legacy field names - single field ordering
-                        {
-                            "query": """
-                            SELECT * FROM c 
-                            WHERE c.project_id = @project_id 
-                            AND c.user_id = @user_id 
-                            AND (c.original_comments != null OR c.feedback != null)
-                            ORDER BY c.analysis_date DESC
-                            """,
-                            "params": [
-                                {"name": "@project_id", "value": project_id},
-                                {"name": "@user_id", "value": user_id}
-                            ],
-                            "description": "Exact match with legacy field names"
-                        },
-                        # Any recent analysis for user with comments - no ORDER BY to avoid index issues
-                        {
-                            "query": """
-                            SELECT * FROM c 
-                            WHERE c.userId = @user_id 
-                            AND (c.original_comments != null OR c.feedback != null)
-                            AND (c.type = 'insight' OR c.analysis_type != null)
-                            """,
-                            "params": [{"name": "@user_id", "value": user_id}],
-                            "description": "Any analysis with comments (modern fields)"
-                        },
-                        # Fallback with legacy fields - no ORDER BY
-                        {
-                            "query": """
-                            SELECT * FROM c 
-                            WHERE c.user_id = @user_id 
-                            AND (c.original_comments != null OR c.feedback != null)
-                            """,
-                            "params": [{"name": "@user_id", "value": user_id}],
-                            "description": "Any analysis with comments (legacy fields)"
-                        },
-                        # Last resort - just find any data for this user
-                        {
-                            "query": """
-                            SELECT * FROM c 
-                            WHERE c.userId = @user_id
-                            """,
-                            "params": [{"name": "@user_id", "value": user_id}],
-                            "description": "Any data for user (modern fields)"
-                        }
-                    ]
-                    
-                    for query_info in queries_to_try:
-                        try:
-                            logger.info(f"Trying query: {query_info['description']}")
-                            results = self.cosmos_service.query_documents(
-                                container, 
-                                query_info["query"], 
-                                query_info["params"]
-                            )
-                            
-                            if results:
-                                logger.info(f"Found {len(results)} results with: {query_info['description']}")
-                                
-                                # Sort results by date if no ORDER BY was used
-                                if "ORDER BY" not in query_info["query"]:
-                                    try:
-                                        # Sort by createdAt or analysis_date, most recent first
-                                        results.sort(key=lambda x: x.get('createdAt') or x.get('analysis_date') or '1900-01-01', reverse=True)
-                                        logger.info("Results sorted by date (client-side)")
-                                    except Exception as sort_error:
-                                        logger.warning(f"Could not sort results: {sort_error}")
-                                
-                                result = results[0]
-                                
-                                # Verify the result has comments
-                                has_comments = (
-                                    result.get('original_comments') or 
-                                    result.get('feedback') or
-                                    (result.get('analysisData', {}).get('original_comments')) or
-                                    (result.get('analysisData', {}).get('feedback'))
-                                )
-                                
-                                if has_comments:
-                                    logger.info(f"Successfully found analysis data with comments in {container}")
-                                    return result
-                                else:
-                                    logger.info("Result found but no comments detected, trying next query")
-                                    
-                        except Exception as query_error:
-                            logger.warning(f"Query failed: {query_error}")
-                            continue
-                    
-                except Exception as container_error:
-                    logger.warning(f"Container {container} search failed: {container_error}")
-                    continue
-            
-            logger.warning(f"No analysis data with comments found for project {project_id}, user {user_id}")
+        analyses = self.get_analysis_history_for_project(project_id)
+        if not analyses:
             return None
-            
+        all_comments: List[Any] = []
+        for item in analyses:
+            all_comments.extend(item.get("comments") or [])
+        return {
+            "projectId": str(project_id),
+            "total_analyses": len(analyses),
+            "total_comments": len(all_comments),
+            "analyses_history": analyses,
+            "all_comments": all_comments,
+            "latest_analysis_id": analyses[0].get("id"),
+        }
+
+    def get_latest_personal_user_data(self, user_id: str) -> Optional[Dict[str, Any]]:
+        obj = UserData.objects.filter(user_id=str(user_id)).order_by("-created_at").first()
+        if not obj:
+            return None
+        return _merge_payload(
+            obj.payload,
+            {
+                "id": str(obj.id),
+                "userId": obj.user_id,
+                "projectId": obj.project_id,
+                "type": obj.type,
+                "createdAt": obj.created_at.isoformat() if obj.created_at else None,
+                "updatedAt": obj.updated_at.isoformat() if obj.updated_at else None,
+            },
+        )
+
+    def get_user_data_by_project(self, user_id: str, project_id: str) -> Optional[Dict[str, Any]]:
+        obj = UserData.objects.filter(user_id=str(user_id), project_id=str(project_id)).order_by("-created_at").first()
+        if not obj:
+            return None
+        return _merge_payload(
+            obj.payload,
+            {
+                "id": str(obj.id),
+                "userId": obj.user_id,
+                "projectId": obj.project_id,
+                "type": obj.type,
+                "createdAt": obj.created_at.isoformat() if obj.created_at else None,
+                "updatedAt": obj.updated_at.isoformat() if obj.updated_at else None,
+            },
+        )
+
+    def get_latest_analysis_by_project(self, project_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            candidates: List[Dict[str, Any]] = []
+
+            analysis_rows = Analysis.objects.filter(project_id=str(project_id), user_id=str(user_id)).order_by("-created_at")[:50]
+            candidates.extend(_doc_from_analysis(row) for row in analysis_rows)
+
+            user_data_rows = UserData.objects.filter(project_id=str(project_id), user_id=str(user_id)).order_by("-created_at")[:50]
+            candidates.extend(
+                _merge_payload(
+                    row.payload,
+                    {
+                        "id": str(row.id),
+                        "projectId": row.project_id,
+                        "userId": row.user_id,
+                        "createdAt": row.created_at.isoformat() if row.created_at else None,
+                        "updatedAt": row.updated_at.isoformat() if row.updated_at else None,
+                    },
+                )
+                for row in user_data_rows
+            )
+
+            upload_rows = Upload.objects.filter(project_id=str(project_id), user_id=str(user_id)).order_by("-created_at")[:50]
+            candidates.extend(
+                _merge_payload(
+                    row.payload,
+                    {
+                        "id": str(row.id),
+                        "projectId": row.project_id,
+                        "userId": row.user_id,
+                        "createdAt": row.created_at.isoformat() if row.created_at else None,
+                        "updatedAt": row.updated_at.isoformat() if row.updated_at else None,
+                    },
+                )
+                for row in upload_rows
+            )
+
+            candidates.sort(key=lambda x: x.get("createdAt") or x.get("analysis_date") or "", reverse=True)
+            for doc in candidates:
+                if _contains_comments(doc):
+                    return doc
+            return candidates[0] if candidates else None
         except Exception as e:
             logger.error(f"Error in get_latest_analysis_by_project: {e}")
+            return None
+
+    def query_items(self, container_name: str, query: str, parameters: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        logger.warning("query_items called in ORM mode; query string is ignored")
+        if container_name == "analysis":
+            docs = [_doc_from_analysis(row) for row in Analysis.objects.all().order_by("-created_at")]
+        elif container_name == "insights":
+            docs = [_doc_from_insight(row) for row in Insight.objects.all().order_by("-created_at")]
+        elif container_name == "taxonomies":
+            docs = [_doc_from_taxonomy(row) for row in Taxonomy.objects.all().order_by("-created_at")]
+        elif container_name == "user_stories":
+            docs = [_doc_from_user_story(row) for row in UserStory.objects.all().order_by("-created_at")]
+        else:
+            return []
+
+        if not parameters:
+            return docs
+
+        filtered: List[Dict[str, Any]] = []
+        for doc in docs:
+            ok = True
+            for p in parameters:
+                key = str(p.get("name", "")).lstrip("@")
+                val = p.get("value")
+                variants = [key, f"{key}Id", key.replace("_id", "Id"), key.replace("Id", "_id")]
+                if not any(str(doc.get(v)) == str(val) for v in variants):
+                    ok = False
+                    break
+            if ok:
+                filtered.append(doc)
+        return filtered
+
+    def patch_user_story(self, user_story_id: str, partition_key: str, patch_operations: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        try:
+            obj = UserStory.objects.filter(id=str(user_story_id)).first()
+            if not obj:
+                return None
+            payload = dict(obj.payload or {})
+            for op in patch_operations or []:
+                if str(op.get("op", "")).lower() not in {"add", "replace", "set"}:
+                    continue
+                path = str(op.get("path", "")).strip("/")
+                if not path:
+                    continue
+                payload[path] = op.get("value")
+            obj.payload = payload
+            obj.updated_at = timezone.now()
+            obj.save(update_fields=["payload", "updated_at"])
+            return _doc_from_user_story(obj)
+        except Exception as e:
+            logger.error(f"Error patching user story {user_story_id}: {e}")
             return None
 
 
@@ -425,203 +519,73 @@ class ProjectTaxonomyRepository:
     """Repository for project taxonomy operations."""
 
     def __init__(self):
-        self.cosmos_service = cosmos_service
-        self.container_name = 'taxonomies'
         self.entity_type = "taxonomy"
 
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new taxonomy document."""
         try:
-            data['type'] = self.entity_type
-            return self.cosmos_service.create_document(self.container_name, data)
+            payload = dict(data)
+            payload["type"] = self.entity_type
+            taxonomy_id = str(payload["id"])
+            obj, _ = Taxonomy.objects.update_or_create(
+                id=taxonomy_id,
+                defaults={
+                    "project_id": str(payload.get("projectId") or payload.get("project_id")) if (payload.get("projectId") or payload.get("project_id")) else None,
+                    "type": self.entity_type,
+                    "version": int(payload.get("version") or 1),
+                    "status": payload.get("status", "active"),
+                    "is_pinned": bool(payload.get("is_pinned", False)),
+                    "taxonomy": payload.get("taxonomy") or {"aspects": payload.get("aspects", [])},
+                    "payload": payload,
+                    "created_at": _parse_dt(payload.get("created_at") or payload.get("createdAt")),
+                    "updated_at": _parse_dt(payload.get("updated_at") or payload.get("updatedAt")),
+                },
+            )
+            return _doc_from_taxonomy(obj)
         except Exception as e:
             logger.error(f"Error creating taxonomy: {e}")
             raise
 
     def update(self, taxonomy_id: str, project_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update a taxonomy document."""
         try:
-            return self.cosmos_service.update_document(self.container_name, taxonomy_id, project_id, data)
+            payload = dict(data)
+            payload["projectId"] = str(project_id)
+            obj, _ = Taxonomy.objects.update_or_create(
+                id=str(taxonomy_id),
+                defaults={
+                    "project_id": str(project_id),
+                    "type": payload.get("type", self.entity_type),
+                    "version": int(payload.get("version") or 1),
+                    "status": payload.get("status", "active"),
+                    "is_pinned": bool(payload.get("is_pinned", False)),
+                    "taxonomy": payload.get("taxonomy") or {"aspects": payload.get("aspects", [])},
+                    "payload": payload,
+                    "updated_at": timezone.now(),
+                },
+            )
+            return _doc_from_taxonomy(obj)
         except Exception as e:
             logger.error(f"Error updating taxonomy {taxonomy_id}: {e}")
             return None
 
     def get_by_id(self, taxonomy_id: str, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get taxonomy by ID."""
-        try:
-            return self.cosmos_service.get_document(self.container_name, taxonomy_id, project_id)
-        except Exception as e:
-            logger.error(f"Error getting taxonomy by ID {taxonomy_id}: {e}")
-            return None
+        obj = Taxonomy.objects.filter(id=str(taxonomy_id), project_id=str(project_id)).first()
+        return _doc_from_taxonomy(obj) if obj else None
 
     def get_pinned_by_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get pinned taxonomy for a project."""
-        try:
-            query = """
-            SELECT * FROM c
-            WHERE c.projectId = @project_id AND c.type = @type AND c.is_pinned = true
-            ORDER BY c.version DESC
-            OFFSET 0 LIMIT 1
-            """
-            parameters = [
-                {"name": "@project_id", "value": project_id},
-                {"name": "@type", "value": self.entity_type},
-            ]
-            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            return results[0] if results else None
-        except Exception as e:
-            logger.error(f"Error getting pinned taxonomy for project {project_id}: {e}")
-            return None
+        obj = Taxonomy.objects.filter(project_id=str(project_id), type=self.entity_type, is_pinned=True).order_by("-version", "-created_at").first()
+        return _doc_from_taxonomy(obj) if obj else None
 
     def get_active_by_project(self, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get active taxonomy for a project."""
-        try:
-            query = """
-            SELECT * FROM c
-            WHERE c.projectId = @project_id AND c.type = @type AND c.status = @status
-            ORDER BY c.version DESC
-            OFFSET 0 LIMIT 1
-            """
-            parameters = [
-                {"name": "@project_id", "value": project_id},
-                {"name": "@type", "value": self.entity_type},
-                {"name": "@status", "value": "active"},
-            ]
-            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            return results[0] if results else None
-        except Exception as e:
-            logger.error(f"Error getting active taxonomy for project {project_id}: {e}")
-            return None
+        obj = Taxonomy.objects.filter(project_id=str(project_id), type=self.entity_type, status="active").order_by("-version", "-created_at").first()
+        return _doc_from_taxonomy(obj) if obj else None
 
     def get_latest_version(self, project_id: str) -> int:
-        """Get latest taxonomy version for a project."""
-        try:
-            query = """
-            SELECT VALUE MAX(c.version) FROM c
-            WHERE c.projectId = @project_id AND c.type = @type
-            """
-            parameters = [
-                {"name": "@project_id", "value": project_id},
-                {"name": "@type", "value": self.entity_type},
-            ]
-            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            if results and isinstance(results[0], (int, float)):
-                return int(results[0])
-            return 0
-        except Exception as e:
-            logger.error(f"Error getting latest taxonomy version for project {project_id}: {e}")
-            return 0
+        latest = Taxonomy.objects.filter(project_id=str(project_id), type=self.entity_type).order_by("-version").first()
+        return int(latest.version) if latest else 0
 
     def archive_others_for_project(self, project_id: str, keep_taxonomy_id: str) -> None:
-        """Archive all other active taxonomies for a project."""
-        try:
-            query = """
-            SELECT * FROM c
-            WHERE c.projectId = @project_id AND c.type = @type AND c.status = @status
-            """
-            parameters = [
-                {"name": "@project_id", "value": project_id},
-                {"name": "@type", "value": self.entity_type},
-                {"name": "@status", "value": "active"},
-            ]
-            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            for doc in results:
-                if doc.get("id") == keep_taxonomy_id:
-                    continue
-                doc["status"] = "archived"
-                doc["updated_at"] = datetime.now(timezone.utc).isoformat()
-                self.update(doc["id"], project_id, doc)
-        except Exception as e:
-            logger.error(f"Error archiving other taxonomies for project {project_id}: {e}")
-    
-    def get_analysis_by_id(self, analysis_id: str, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get specific analysis by ID and verify user ownership."""
-        try:
-            # Normalize id to insight_* which is used by analysis documents
-            normalized_id = analysis_id
-            if normalized_id and not normalized_id.startswith("insight_"):
-                if normalized_id.startswith("analysis_"):
-                    normalized_id = normalized_id.replace("analysis_", "insight_", 1)
-                else:
-                    normalized_id = f"insight_{normalized_id}"
-
-            query = """
-            SELECT TOP 1 * FROM c
-            WHERE c.id = @analysis_id AND c.userId = @user_id
-            """
-            parameters = [
-                {"name": "@analysis_id", "value": normalized_id},
-                {"name": "@user_id", "value": user_id}
-            ]
-
-            results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-            if results:
-                return results[0]
-
-            logger.warning(f"Analysis {analysis_id} not found for user {user_id}")
-            return None
-
-        except Exception as e:
-            logger.error(f"Error getting analysis by ID: {e}")
-            return None
-    
-    # User Stories Methods
-    def get_user_stories_by_user_and_project(self, user_id: str, project_id: str) -> List[Dict[str, Any]]:
-        """Get user stories by user and project."""
-        return self.cosmos_service.get_user_stories_by_user_and_project(user_id, project_id)
-    
-    def get_user_stories_by_user(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get user stories by user."""
-        return self.cosmos_service.get_user_stories_by_user(user_id)
-    
-    def get_user_stories_by_project(self, project_id: str) -> List[Dict[str, Any]]:
-        """Get user stories by project."""
-        return self.cosmos_service.get_user_stories_by_project(project_id)
-    
-    def save_user_story(self, user_story_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Save user story."""
-        return self.cosmos_service.save_user_story(user_story_data)
-    
-    def get_user_story(self, user_story_id: str, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user story by ID and user."""
-        return self.cosmos_service.get_user_story(user_story_id, user_id)
-    
-    def get_user_story_by_id(self, user_story_id: str) -> Optional[Dict[str, Any]]:
-        """Get user story by ID."""
-        return self.cosmos_service.get_user_story_by_id(user_story_id)
-    
-    def delete_user_story(self, user_story_id: str, user_id: str) -> bool:
-        """Delete user story."""
-        return self.cosmos_service.delete_item(
-            container_type='user_stories',
-            item_id=user_story_id,
-            partition_key=user_id
+        Taxonomy.objects.filter(project_id=str(project_id), type=self.entity_type, status="active").exclude(id=str(keep_taxonomy_id)).update(
+            status="archived",
+            is_pinned=False,
+            updated_at=timezone.now(),
         )
-    
-    # Work Item Management Methods
-    def update_embedded_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update embedded work item."""
-        return self.cosmos_service.update_embedded_work_item(work_item_id, user_id, updated_data)
-    
-    def delete_work_items_from_user_story(self, user_story_id: str, work_item_ids: List[str], user_id: str) -> Dict[str, Any]:
-        """Delete work items from user story."""
-        return self.cosmos_service.delete_work_items_from_user_story(user_story_id, work_item_ids, user_id)
-    
-    def delete_embedded_work_items(self, work_item_ids: List[str], user_id: str) -> int:
-        """Delete embedded work items."""
-        return self.cosmos_service.delete_embedded_work_items(work_item_ids, user_id)
-    
-    # Generic Query Methods
-    def query_items(self, container_name: str, query: str, parameters: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Generic query method."""
-        return self.cosmos_service.query_documents(container_name, query, parameters)
-    
-    def patch_user_story(self, user_story_id: str, partition_key: str, patch_operations: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """Patch user story."""
-        try:
-            return self.cosmos_service.patch_user_story(user_story_id, partition_key, patch_operations)
-        except Exception as e:
-            logger.error(f"Error patching user story {user_story_id}: {e}")
-            return None
-            
-        

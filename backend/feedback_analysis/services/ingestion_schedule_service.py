@@ -7,14 +7,14 @@ from datetime import datetime, timedelta, timezone
 import logging
 from apis.infrastructure.cache_service import get_cache_service
 from .analysis_service import get_analysis_service
-from apis.infrastructure.cosmos_service import cosmos_service
+from apis.infrastructure.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
 
 class IngestionScheduleService:
     def __init__(self):
-        self.cosmos = cosmos_service
+        self.storage = storage_service
         self.cache = get_cache_service()
 
     def _now(self) -> datetime:
@@ -39,7 +39,7 @@ class IngestionScheduleService:
         return candidate
 
     def get_schedule(self, project_id: str) -> Optional[Dict[str, Any]]:
-        return self.cosmos.get_ingestion_schedule_for_project(project_id)
+        return self.storage.get_ingestion_schedule_for_project(project_id)
 
     def save_schedule(self, project_id: str, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         now = self._now()
@@ -63,11 +63,11 @@ class IngestionScheduleService:
             "next_run_at": next_run_at.isoformat() if next_run_at else None,
             "updated_at": now.isoformat(),
         }
-        saved = self.cosmos.upsert_ingestion_schedule_for_project(project_id, payload)
+        saved = self.storage.upsert_ingestion_schedule_for_project(project_id, payload)
         return saved or payload
 
     def get_due_schedules(self) -> List[Dict[str, Any]]:
-        schedules = self.cosmos.get_enabled_ingestion_schedules()
+        schedules = self.storage.get_enabled_ingestion_schedules()
         now = self._now()
         due = []
         for schedule in schedules:
@@ -99,7 +99,7 @@ class IngestionScheduleService:
         schedule["updated_at"] = now.isoformat()
         project_id = schedule.get("projectId")
         if project_id:
-            self.cosmos.upsert_ingestion_schedule_for_project(project_id, schedule)
+            self.storage.upsert_ingestion_schedule_for_project(project_id, schedule)
 
     def acquire_run_lock(self, project_id: str, ttl_seconds: int = 600) -> bool:
         lock_key = f"ingestion_run_lock:{project_id}"
@@ -183,3 +183,4 @@ def get_ingestion_schedule_service() -> IngestionScheduleService:
     if _ingestion_schedule_service is None:
         _ingestion_schedule_service = IngestionScheduleService()
     return _ingestion_schedule_service
+

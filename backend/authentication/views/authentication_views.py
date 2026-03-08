@@ -26,27 +26,27 @@ from datetime import datetime, timedelta
 import secrets
 from django.conf import settings
 from ..serializers import (
-    CosmosDBUserSerializer, 
-    CosmosDBUserRegisterWithOtpSerializer,
-    CosmosDBTokenObtainPairSerializer,
-    CosmosDBTokenRefreshSerializer,
+    AppUserSerializer, 
+    AppUserRegisterWithOtpSerializer,
+    AppTokenObtainPairSerializer,
+    AppTokenRefreshSerializer,
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
     RegistrationOtpRequestSerializer
 )
-from ..authentication import CosmosDBJWTAuthentication, CosmosDBUser
+from ..authentication import AppJWTAuthentication, AppUser
 import bcrypt
 
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [NoAuthentication]
-    serializer_class = CosmosDBUserRegisterWithOtpSerializer
+    serializer_class = AppUserRegisterWithOtpSerializer
     logger = logging.getLogger(__name__)
     
     def get(self, request):
         return StandardResponse.success(
             data={
-                "db_engine": "cosmos_db",
+                "db_engine": "postgresql",
                 "db_name": "saramsa-db",
                 "container": "users",
             },
@@ -82,7 +82,7 @@ class RegisterView(generics.CreateAPIView):
         )
 
         # Generate JWT tokens for the newly created user
-        token_serializer = CosmosDBTokenObtainPairSerializer()
+        token_serializer = AppTokenObtainPairSerializer()
         token_data = token_serializer.validate({
             'email': user_data['email'],
             'password': serializer.validated_data['password']
@@ -125,19 +125,19 @@ class RegisterOtpRequestView(APIView):
         )
 
 
-class CosmosDBTokenObtainPairView(TokenObtainPairView):
-    """Custom token obtain view for Cosmos DB users"""
-    serializer_class = CosmosDBTokenObtainPairSerializer
+class AppTokenObtainPairView(TokenObtainPairView):
+    """Custom token obtain view for PostgreSQL users"""
+    serializer_class = AppTokenObtainPairSerializer
 
 
-class CosmosDBTokenRefreshView(TokenRefreshView):
-    """Custom token refresh view for Cosmos DB users"""
-    serializer_class = CosmosDBTokenRefreshSerializer
+class AppTokenRefreshView(TokenRefreshView):
+    """Custom token refresh view for PostgreSQL users"""
+    serializer_class = AppTokenRefreshSerializer
 
 
 class ProfileMeView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CosmosDBJWTAuthentication]
+    authentication_classes = [AppJWTAuthentication]
     
     def get(self, request):
         # Get user from service using username from JWT token
@@ -250,7 +250,7 @@ class CheckUsernameView(APIView):
 
 class UserListView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CosmosDBJWTAuthentication]
+    authentication_classes = [AppJWTAuthentication]
     
     @handle_service_errors
     def get(self, request):
@@ -274,7 +274,7 @@ class UserListView(APIView):
 
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [CosmosDBJWTAuthentication]
+    authentication_classes = [AppJWTAuthentication]
     
     @handle_service_errors
     def get(self, request, user_id):
@@ -335,8 +335,8 @@ class LoginView(APIView):
             )
         
         # Generate JWT token
-        from ..serializers import CosmosDBTokenObtainPairSerializer
-        serializer = CosmosDBTokenObtainPairSerializer()
+        from ..serializers import AppTokenObtainPairSerializer
+        serializer = AppTokenObtainPairSerializer()
         token_data = serializer.validate({
             'email': email,
             'password': password
@@ -486,3 +486,4 @@ class ResetPasswordView(APIView):
                 detail="Failed to reset password",
                 instance=request.path
             )
+

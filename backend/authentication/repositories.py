@@ -2,172 +2,201 @@
 User repository for user-related data operations.
 """
 
-from typing import Dict, List, Optional, Any
 from datetime import datetime
-from apis.infrastructure.cosmos_service import cosmos_service
-import logging
+from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+from django.forms.models import model_to_dict
+from django.utils import timezone
+
+from .models import PasswordResetToken, RegistrationOtp, UserAccount
+
+
+def _iso(dt: Optional[datetime]) -> Optional[str]:
+    if not dt:
+        return None
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    return dt.isoformat()
+
+
+def _user_to_dict(user: UserAccount) -> Dict[str, Any]:
+    data = model_to_dict(user)
+    data["createdAt"] = _iso(user.created_at)
+    data["updatedAt"] = _iso(user.updated_at)
+    data["date_joined"] = _iso(user.date_joined)
+    return data
 
 
 class UserRepository:
     """Repository for user operations."""
-    
+
     def __init__(self):
-        self.cosmos_service = cosmos_service
-        self.container_name = 'users'
         self.entity_type = "user"
-    
+
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new user document."""
-        try:
-            data['type'] = self.entity_type
-            return self.cosmos_service.create_document(self.container_name, data)
-        except Exception as e:
-            logger.error(f"Error creating user: {e}")
-            raise
-    
+        user = UserAccount.objects.create(
+            id=data["id"],
+            username=data["username"],
+            email=data["email"],
+            password=data["password"],
+            first_name=data.get("first_name", ""),
+            last_name=data.get("last_name", ""),
+            is_active=data.get("is_active", True),
+            is_staff=data.get("is_staff", False),
+            date_joined=data.get("date_joined") or timezone.now(),
+            profile=data.get("profile") or {},
+            company_name=data.get("company_name", ""),
+            company_url=data.get("company_url", ""),
+            avatar_url=data.get("avatar_url", ""),
+            extra={k: v for k, v in data.items() if k not in {
+                "id", "username", "email", "password", "first_name", "last_name",
+                "is_active", "is_staff", "date_joined", "profile", "company_name",
+                "company_url", "avatar_url", "createdAt", "updatedAt", "type",
+            }},
+        )
+        return _user_to_dict(user)
+
     def get_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user by ID."""
-        try:
-            return self.cosmos_service.get_document(
-                self.container_name, 
-                user_id, 
-                user_id
-            )
-        except Exception as e:
-            logger.error(f"Error getting user by ID {user_id}: {e}")
-            return None
-    
+        user = UserAccount.objects.filter(id=user_id).first()
+        return _user_to_dict(user) if user else None
+
     def get_by_username(self, username: str) -> Optional[Dict[str, Any]]:
-        """Get user by username."""
-        query = "SELECT * FROM c WHERE c.username = @username AND c.type = @type"
-        parameters = [
-            {"name": "@username", "value": username},
-            {"name": "@type", "value": self.entity_type}
-        ]
-        results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-        return results[0] if results else None
-    
+        user = UserAccount.objects.filter(username=username).first()
+        return _user_to_dict(user) if user else None
+
     def get_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        """Get user by email."""
-        query = "SELECT * FROM c WHERE c.email = @email AND c.type = @type"
-        parameters = [
-            {"name": "@email", "value": email},
-            {"name": "@type", "value": self.entity_type}
-        ]
-        results = self.cosmos_service.query_documents(self.container_name, query, parameters)
-        return results[0] if results else None
-    
+        user = UserAccount.objects.filter(email=email).first()
+        return _user_to_dict(user) if user else None
+
     def update(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update user document."""
-        try:
-            return self.cosmos_service.update_document(
-                self.container_name,
-                user_id,
-                user_id,  # partition_key
-                data      # data
-            )
-        except Exception as e:
-            logger.error(f"Error updating user {user_id}: {e}")
-            raise
-    
+        user = UserAccount.objects.get(id=user_id)
+        fields = [
+            "username", "email", "password", "first_name", "last_name",
+            "is_active", "is_staff", "profile", "company_name", "company_url", "avatar_url",
+        ]
+        for field in fields:
+            if field in data:
+                setattr(user, field, data[field])
+        user.updated_at = timezone.now()
+        user.save()
+        return _user_to_dict(user)
+
     def get_all(self) -> List[Dict[str, Any]]:
-        """Get all users."""
-        query = "SELECT * FROM c WHERE c.type = @type"
-        parameters = [{"name": "@type", "value": self.entity_type}]
-        return self.cosmos_service.query_documents(self.container_name, query, parameters)
+        return [_user_to_dict(user) for user in UserAccount.objects.all().order_by("-created_at")]
 
     def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new user with proper validation."""
-        # Check if user already exists
-        if self.get_by_username(user_data['username']):
+        if self.get_by_username(user_data["username"]):
             raise ValueError(f"User with username '{user_data['username']}' already exists")
-        
-        if self.get_by_email(user_data['email']):
+        if self.get_by_email(user_data["email"]):
             raise ValueError(f"User with email '{user_data['email']}' already exists")
-        
         return self.create(user_data)
-    
-    # Password reset methods
-    def save_reset_token(self, email: str, token: str, expires_at: str) -> Dict[str, Any]:
-        """Save password reset token."""
-        try:
-            token_data = {
-                "id": f"reset_token_{token}",
-                "type": "password_reset_token",
-                "email": email,
-                "token": token,
-                "expires_at": expires_at,
-                "used": False,
-                "created_at": datetime.now().isoformat()
-            }
-            return self.cosmos_service.create_document('password_resets', token_data)
-        except Exception as e:
-            logger.error(f"Error saving reset token: {e}")
-            raise
-    
-    def get_reset_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Get password reset token."""
-        try:
-            return self.cosmos_service.get_document('password_resets', f"reset_token_{token}", f"reset_token_{token}")
-        except Exception as e:
-            logger.error(f"Error getting reset token: {e}")
-            return None
-    
-    def mark_reset_token_used(self, token: str) -> bool:
-        """Mark password reset token as used."""
-        try:
-            token_data = self.get_reset_token(token)
-            if token_data:
-                token_data['used'] = True
-                token_data['used_at'] = datetime.now().isoformat()
-                self.cosmos_service.update_document('password_resets', f"reset_token_{token}", f"reset_token_{token}", token_data)
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error marking reset token as used: {e}")
-            return False
-    
-    def save_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Save/update user data."""
-        try:
-            return self.cosmos_service.update_document(
-                self.container_name,
-                user_data['id'],
-                user_data['id'],  # partition_key
-                user_data         # data
-            )
-        except Exception as e:
-            logger.error(f"Error saving user: {e}")
-            raise
 
-    # Registration OTP methods
+    def save_reset_token(self, email: str, token: str, expires_at: str) -> Dict[str, Any]:
+        dt = datetime.fromisoformat(expires_at)
+        item = PasswordResetToken.objects.create(
+            id=f"reset_token_{token}",
+            email=email,
+            token=token,
+            expires_at=dt,
+            used=False,
+        )
+        return {
+            "id": item.id,
+            "type": "password_reset_token",
+            "email": item.email,
+            "token": item.token,
+            "expires_at": _iso(item.expires_at),
+            "used": item.used,
+            "created_at": _iso(item.created_at),
+            "updated_at": _iso(item.updated_at),
+        }
+
+    def get_reset_token(self, token: str) -> Optional[Dict[str, Any]]:
+        item = PasswordResetToken.objects.filter(token=token).first()
+        if not item:
+            return None
+        return {
+            "id": item.id,
+            "type": "password_reset_token",
+            "email": item.email,
+            "token": item.token,
+            "expires_at": _iso(item.expires_at),
+            "used": item.used,
+            "used_at": _iso(item.used_at),
+            "created_at": _iso(item.created_at),
+            "updated_at": _iso(item.updated_at),
+        }
+
+    def mark_reset_token_used(self, token: str) -> bool:
+        item = PasswordResetToken.objects.filter(token=token).first()
+        if not item:
+            return False
+        item.used = True
+        item.used_at = timezone.now()
+        item.updated_at = timezone.now()
+        item.save(update_fields=["used", "used_at", "updated_at"])
+        return True
+
+    def save_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        return self.update(user_data["id"], user_data)
+
     def save_registration_otp(self, otp_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create or update registration OTP entry."""
-        try:
-            return self.cosmos_service.update_document(
-                'registration_otps',
-                otp_data['id'],
-                otp_data['email'],  # partition_key
-                otp_data
-            )
-        except Exception as e:
-            logger.error(f"Error saving registration OTP: {e}")
-            raise
+        item, _created = RegistrationOtp.objects.update_or_create(
+            email=otp_data["email"],
+            defaults={
+                "id": otp_data["id"],
+                "otp_hash": otp_data["otp_hash"],
+                "expires_at": datetime.fromisoformat(otp_data["expires_at"]),
+                "attempts": int(otp_data.get("attempts", 0)),
+                "max_attempts": int(otp_data.get("max_attempts", 5)),
+                "send_count": int(otp_data.get("send_count", 1)),
+                "last_sent_at": datetime.fromisoformat(otp_data["last_sent_at"]),
+                "used": bool(otp_data.get("used", False)),
+                "used_at": datetime.fromisoformat(otp_data["used_at"]) if otp_data.get("used_at") else None,
+                "updated_at": timezone.now(),
+                "extra": {k: v for k, v in otp_data.items() if k not in {
+                    "id", "email", "otp_hash", "expires_at", "attempts", "max_attempts",
+                    "send_count", "last_sent_at", "used", "used_at", "created_at", "updated_at", "type",
+                }},
+            },
+        )
+        return {
+            "id": item.id,
+            "type": "registration_otp",
+            "email": item.email,
+            "otp_hash": item.otp_hash,
+            "expires_at": _iso(item.expires_at),
+            "attempts": item.attempts,
+            "max_attempts": item.max_attempts,
+            "send_count": item.send_count,
+            "last_sent_at": _iso(item.last_sent_at),
+            "used": item.used,
+            "used_at": _iso(item.used_at),
+            "created_at": _iso(item.created_at),
+            "updated_at": _iso(item.updated_at),
+        }
 
     def get_registration_otp(self, email: str) -> Optional[Dict[str, Any]]:
-        """Get registration OTP entry by email."""
-        try:
-            return self.cosmos_service.get_document('registration_otps', f"reg_otp:{email}", email)
-        except Exception as e:
-            logger.error(f"Error getting registration OTP for {email}: {e}")
+        item = RegistrationOtp.objects.filter(email=email).first()
+        if not item:
             return None
+        return {
+            "id": item.id,
+            "type": "registration_otp",
+            "email": item.email,
+            "otp_hash": item.otp_hash,
+            "expires_at": _iso(item.expires_at),
+            "attempts": item.attempts,
+            "max_attempts": item.max_attempts,
+            "send_count": item.send_count,
+            "last_sent_at": _iso(item.last_sent_at),
+            "used": item.used,
+            "used_at": _iso(item.used_at),
+            "created_at": _iso(item.created_at),
+            "updated_at": _iso(item.updated_at),
+        }
 
     def delete_registration_otp(self, email: str) -> bool:
-        """Delete registration OTP entry by email."""
-        try:
-            return self.cosmos_service.delete_document('registration_otps', f"reg_otp:{email}", email)
-        except Exception as e:
-            logger.error(f"Error deleting registration OTP for {email}: {e}")
-            return False
+        deleted, _ = RegistrationOtp.objects.filter(email=email).delete()
+        return deleted > 0
+

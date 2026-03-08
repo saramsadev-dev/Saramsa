@@ -9,7 +9,7 @@ import {
   ArrowRight,
   CheckCircle,
   Shield,
-} from "lucide-react";
+} from 'lucide-react';
 import type { AppDispatch, RootState } from "@/store/store";
 import { fetchIntegrationAccounts } from "@/store/features/integrations/integrationsSlice";
 
@@ -178,3 +178,4 @@ export function DashboardPlatformSelection({
     </div>
   );
 }
+

@@ -101,7 +101,7 @@ The `.githooks/pre-push` hook runs automatically before every push:
 1. Syncs `api-registry.json` from the live Swagger schema
 2. Fails if any endpoints are unconfigured (`discovered: true` + `enabled: false`)
 3. Runs API tests against all enabled endpoints
-4. On failure: opens a Windows Terminal with `codex --yolo` and a prompt containing the errors
+4. On failure: prints errors and exits non-zero
 
 To configure the hook: `git config core.hooksPath .githooks`
 

@@ -33,7 +33,7 @@ class IntegrationService:
     
     def _create_integration_account_document(self, user_id: str, provider: str, credentials: Dict[str, Any], 
                                            metadata: Dict[str, Any], display_name: str = None) -> Dict[str, Any]:
-        """Create a new integration account document for Cosmos DB."""
+        """Create a new integration account document for PostgreSQL."""
         account_id = f"ia_{uuid.uuid4().hex[:12]}"
         
         return {

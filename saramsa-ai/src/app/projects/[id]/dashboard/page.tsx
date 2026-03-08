@@ -17,7 +17,7 @@ import {
   isValidEncryptedId,
   encryptProjectId,
 } from "@/lib/encryption";
-import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 export default function ProjectDashboardPage() {
@@ -113,7 +113,6 @@ export default function ProjectDashboardPage() {
       // Project not found after projects are loaded
       // Try to refetch projects once in case it's a newly created project
       if (!hasFetchedProjectsRef.current) {
-        console.log('Project not found, refetching projects...');
         hasFetchedProjectsRef.current = true;
         dispatch(fetchProjects());
       } else {
@@ -236,3 +235,4 @@ export default function ProjectDashboardPage() {
     </div>
   );
 }
+

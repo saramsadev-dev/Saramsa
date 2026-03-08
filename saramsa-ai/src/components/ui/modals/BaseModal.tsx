@@ -3,7 +3,7 @@
 import type { ReactNode, MouseEvent } from "react";
 import { useId } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { X } from 'lucide-react';
 import { Button } from "../button";
 
 type ModalSize = "sm" | "md" | "lg";
@@ -160,3 +160,4 @@ export function BaseModal({
     </AnimatePresence>
   );
 }
+

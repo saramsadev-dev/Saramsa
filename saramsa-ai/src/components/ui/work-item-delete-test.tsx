@@ -61,7 +61,6 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
         data: response.data
       });
       
-      console.log('Delete response:', response.data);
     } catch (error: any) {
       setResult({
         success: false,
@@ -186,3 +185,5 @@ export function WorkItemDeleteTest({ userStoryData }: WorkItemDeleteTestProps) {
     </Card>
   );
 }
+
+

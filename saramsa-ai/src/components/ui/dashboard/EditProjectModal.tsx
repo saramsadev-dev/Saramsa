@@ -306,3 +306,5 @@ export function EditProjectModal({ project, onClose, onSave, loading = false }: 
     </AnimatePresence>
   );
 }
+
+

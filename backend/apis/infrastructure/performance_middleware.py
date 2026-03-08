@@ -8,7 +8,7 @@ import os
 from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
 from .cache_service import get_cache_service
-from .cosmos_service import cosmos_service
+from .storage_service import storage_service
 import json
 from typing import Dict, Any
 
@@ -58,11 +58,11 @@ class PerformanceTrackingMiddleware(MiddlewareMixin):
         
         # Add database and cache stats if available
         try:
-            cosmos_stats = cosmos_service.get_performance_stats()
+            db_stats = storage_service.get_performance_stats()
             cache_stats = self.cache_service.get_stats()
             perf_data.update({
-                'cosmos_requests': cosmos_stats.get('total_requests', 0),
-                'cosmos_success_rate': cosmos_stats.get('success_rate_percent', 0),
+                'db_requests': db_stats.get('total_requests', 0),
+                'db_success_rate': db_stats.get('success_rate_percent', 0),
                 'cache_hit_rate': cache_stats.get('hit_rate_percent', 0)
             })
         except Exception as e:
@@ -174,19 +174,19 @@ class PerformanceTrackingMiddleware(MiddlewareMixin):
 
 class DatabaseQueryCountMiddleware(MiddlewareMixin):
     """
-    Middleware to track database query counts (for Cosmos DB operations).
+    Middleware to track database query counts (for PostgreSQL operations).
     """
     
     def process_request(self, request):
         """Initialize query tracking."""
-        request.cosmos_query_count = 0
+        request.db_query_count = 0
         return None
 
     def process_response(self, request, response):
         """Log query count if significant."""
-        if hasattr(request, 'cosmos_query_count') and request.cosmos_query_count > 10:
+        if hasattr(request, 'db_query_count') and request.db_query_count > 10:
             logger.warning(
-                f"High Cosmos DB query count: {request.cosmos_query_count} queries "
+                f"High PostgreSQL query count: {request.db_query_count} queries "
                 f"for {request.method} {request.path}"
             )
         return response
@@ -233,5 +233,5 @@ def get_performance_summary() -> Dict[str, Any]:
         )[:10],
         'recent_requests_count': len(recent_requests),
         'cache_stats': cache_service.get_stats(),
-        'cosmos_stats': cosmos_service.get_performance_stats() if cosmos_service.is_enabled else {}
+        'db_stats': storage_service.get_performance_stats() if storage_service.is_enabled else {}
     }

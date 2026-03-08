@@ -75,16 +75,9 @@ export const fetchUserStoriesByProject = createAsyncThunk<
     if (params.userId) {
       queryParams.user_id = params.userId;
     }
-    
-    console.log('🔍 fetchUserStoriesByProject params:', params);
-    console.log('🔍 fetchUserStoriesByProject queryParams:', queryParams);
-    
+
     const response = await apiRequest('get', '/insights/user-stories/', queryParams, true);
-    console.log('🔍 fetchUserStoriesByProject response:', response);
-    console.log('🔍 fetchUserStoriesByProject response.data:', response.data);
-    console.log('🔍 fetchUserStoriesByProject response.data.data:', response.data.data);
-    console.log('🔍 fetchUserStoriesByProject user_stories:', response.data.data?.user_stories);
-    
+
     return {
       userStories: response.data.data.user_stories || [],
       projectId: params.projectId,
@@ -154,36 +147,6 @@ export const deleteUserStory = createAsyncThunk<
       errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {
       errorMessage = err.response?.data?.error || err.message;
-    }
-    return rejectWithValue(errorMessage);
-  }
-});
-
-// Async thunk for getting all user stories for a user
-export const fetchAllUserStories = createAsyncThunk<
-  { userStories: UserStory[]; userId: string },
-  { userId?: string },
-  { rejectValue: string }
->('userStories/fetchAllUserStories', async (params, { rejectWithValue }) => {
-  try {
-    const queryParams: any = {};
-    if (params.userId) {
-      queryParams.user_id = params.userId;
-    }
-
-    const response = await apiRequest('get', '/insights/user-stories/all/', queryParams, true);
-    return {
-      userStories: response.data.data.user_stories || [],
-      userId: params.userId || response.data.data.user_id
-    };
-  } catch (err: any) {
-    let errorMessage = 'Failed to load user stories.';
-    if (err.response?.status === 401) {
-      errorMessage = 'Authentication required. Please login again.';
-    } else if (err.response?.status >= 500) {
-      errorMessage = 'Server error. Please try again later.';
-    } else if (err.message) {
-      errorMessage = err.message;
     }
     return rejectWithValue(errorMessage);
   }
@@ -324,22 +287,6 @@ const userStoriesSlice = createSlice({
         state.userStories = updatedUserStories;
       })
       .addCase(fetchUserStoriesByProject.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || 'Failed to load user stories.';
-      })
-
-      // Fetch all user stories
-      .addCase(fetchAllUserStories.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchAllUserStories.fulfilled, (state, action) => {
-        state.loading = false;
-        state.error = null;
-        state.userStories = action.payload.userStories;
-        state.lastFetchedUserId = action.payload.userId;
-      })
-      .addCase(fetchAllUserStories.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Failed to load user stories.';
       })

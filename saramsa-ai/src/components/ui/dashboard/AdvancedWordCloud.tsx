@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "../card";
 import { Badge } from "../badge";
 import { Button } from "../button";
-import { Smile, Meh, Frown, RotateCcw } from "lucide-react";
+import { Smile, Meh, Frown, RotateCcw } from 'lucide-react';
 
 interface AdvancedWordCloudProps {
   positiveKeywords: string[];
@@ -335,3 +335,4 @@ export function AdvancedWordCloud({
     </Card>
   );
 }
+

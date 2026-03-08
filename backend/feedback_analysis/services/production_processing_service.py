@@ -17,7 +17,7 @@ Pipeline:
   5. Local sentiment classification
   6. Aggregate stats + keywords
   7. GPT-5-mini synthesis (optional, bounded)
-  8. Save to Cosmos DB
+  8. Save to PostgreSQL
   9. Return SUCCESS
 
 Performance targets:
