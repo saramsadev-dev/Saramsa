@@ -1,1197 +1,937 @@
 {
-    "version":  1,
-    "endpoints":  [
-                      {
-                          "name":  "auth_check_username_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/auth/check-username",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "auth_forgot_password_create",
-                          "method":  "POST",
-                          "path":  "/api/auth/forgot-password/",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "body":  {
-                                       "email":  "test@example.com"
-                                   },
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "Login",
-                          "method":  "POST",
-                          "path":  "/api/auth/login/",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "body":  {
-                                       "email":  "{{LOGIN_EMAIL}}",
-                                       "password":  "{{LOGIN_PASSWORD}}"
-                                   },
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "auth_me_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/auth/me/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "47ab4bd1ae11d2f8"
-                      },
-                      {
-                          "name":  "auth_me_partial_update",
-                          "method":  "PATCH",
-                          "path":  "/api/auth/me/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "47ab4bd1ae11d2f8"
-                      },
-                      {
-                          "name":  "auth_refresh_create",
-                          "method":  "POST",
-                          "path":  "/api/auth/refresh/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "b158d5218f6ccc8b"
-                      },
-                      {
-                          "name":  "auth_register_create",
-                          "method":  "POST",
-                          "path":  "/api/auth/register/",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  500,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "body":  {
-                                       "email":  "test_register@example.com",
-                                       "username":  "test_reg_user",
-                                       "password":  "TestPass123!"
-                                   },
-                          "schema_hash":  "6bedc662abf3f28d"
-                      },
-                      {
-                          "name":  "auth_register_request_otp_create",
-                          "method":  "POST",
-                          "path":  "/api/auth/register/request-otp/",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  [
-                                                  200,
-                                                  400
-                                              ],
-                          "expect_json_keys":  [
-
-                                               ],
-                          "body":  {
-                                       "email":  "test_register@example.com"
-                                   },
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "auth_reset_password_create",
-                          "method":  "POST",
-                          "path":  "/api/auth/reset-password/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "auth_token_create",
-                          "method":  "POST",
-                          "path":  "/api/auth/token/",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "body":  {
-                                       "email":  "{{LOGIN_EMAIL}}",
-                                       "password":  "{{LOGIN_PASSWORD}}"
-                                   },
-                          "schema_hash":  "a991b29c8c230d43"
-                      },
-                      {
-                          "name":  "auth_token_refresh_create",
-                          "method":  "POST",
-                          "path":  "/api/auth/token/refresh/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "b158d5218f6ccc8b"
-                      },
-                      {
-                          "name":  "auth_users_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/auth/users/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "47ab4bd1ae11d2f8"
-                      },
-                      {
-                          "name":  "auth_users_retrieve_2",
-                          "method":  "GET",
-                          "path":  "/api/auth/users/{user_id}/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "d39e7cbd1022fa45"
-                      },
-                      {
-                          "name":  "feedback_analysis_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/feedback/analysis/{analysis_id}/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "f7b840d2120786bf"
-                      },
-                      {
-                          "name":  "feedback_analysis_rename_create",
-                          "method":  "POST",
-                          "path":  "/api/feedback/analysis/{analysis_id}/rename/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "body":  {
-                                       "name":  "Sprint 3 Run"
-                                   },
-                          "schema_hash":  "f7b840d2120786bf",
-                          "schema_changed":  true,
-                          "prev_schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "feedback_history_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/feedback/history/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "feedback_history_compare_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/feedback/history/compare/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "feedback_history_cumulative_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/feedback/history/cumulative/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "feedback_history_quarter_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/feedback/history/quarter/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "health_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/health/",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  503,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0e0029880336e3cf"
-                      },
-                      {
-                          "name":  "insights_analyze_create",
-                          "method":  "POST",
-                          "path":  "/api/insights/analyze/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_comments_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/insights/comments/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "Ingestion Run Now",
-                          "method":  "POST",
-                          "path":  "/api/insights/ingestion/run-now/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "body":  {
-                                       "project_id":  "{{PROJECT_ID}}"
-                                   },
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_ingestion_schedule_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/insights/ingestion/schedule/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "Ingestion Schedule Save",
-                          "method":  "POST",
-                          "path":  "/api/insights/ingestion/schedule/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "body":  {
-                                       "project_id":  "{{PROJECT_ID}}",
-                                       "schedule":  {
-                                                        "enabled":  true,
-                                                        "cadence":  "daily",
-                                                        "hour_utc":  12
-                                                    }
-                                   },
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_review_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/insights/review/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_review_update_create",
-                          "method":  "POST",
-                          "path":  "/api/insights/review/update/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_rules_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/insights/rules/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_rules_create",
-                          "method":  "POST",
-                          "path":  "/api/insights/rules/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_rules_apply_create",
-                          "method":  "POST",
-                          "path":  "/api/insights/rules/apply/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_task_status_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/insights/task-status/{task_id}/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "8480a86c43fe0a3e"
-                      },
-                      {
-                          "name":  "insights_tasks_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/insights/tasks/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_upload_create",
-                          "method":  "POST",
-                          "path":  "/api/insights/upload/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_user_stories_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/insights/user-stories/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_user_stories_remove_work_items_update",
-                          "method":  "PUT",
-                          "path":  "/api/insights/user-stories/remove-work-items/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_user_story_creation_create",
-                          "method":  "POST",
-                          "path":  "/api/insights/user-story-creation/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_user_story_submission_create",
-                          "method":  "POST",
-                          "path":  "/api/insights/user-story-submission/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "insights_work_items_update_update",
-                          "method":  "PUT",
-                          "path":  "/api/insights/work-items/{work_item_id}/update/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "23b06620c4e77f35"
-                      },
-                      {
-                          "name":  "integrations_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_destroy",
-                          "method":  "DELETE",
-                          "path":  "/api/integrations/{account_id}/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "ac79f1bc3fd0331a"
-                      },
-                      {
-                          "name":  "integrations_test_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/{account_id}/test/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "aa22a56b6f04931a"
-                      },
-                      {
-                          "name":  "integrations_azure_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/azure/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_azure_projects_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/azure/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_azure_projects_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/azure/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_dashboard_azure_projects_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/dashboard/azure/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_dashboard_jira_projects_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/dashboard/jira/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_external_projects_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/external/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_external_projects_check_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/external/projects/check/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_jira_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/jira/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_jira_projects_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/jira/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_jira_projects_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/jira/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_projects_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_projects_retrieve_2",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/{project_id}/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "004a983cce540239"
-                      },
-                      {
-                          "name":  "integrations_projects_destroy",
-                          "method":  "DELETE",
-                          "path":  "/api/integrations/projects/{project_id}/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "f418519bcb2edda7"
-                      },
-                      {
-                          "name":  "integrations_projects_analysis_latest_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/{project_id}/analysis/latest/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "004a983cce540239"
-                      },
-                      {
-                          "name":  "integrations_projects_roles_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/{project_id}/roles/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "004a983cce540239"
-                      },
-                      {
-                          "name":  "integrations_projects_roles_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/projects/{project_id}/roles/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "004a983cce540239"
-                      },
-                      {
-                          "name":  "integrations_projects_roles_destroy",
-                          "method":  "DELETE",
-                          "path":  "/api/integrations/projects/{project_id}/roles/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "f418519bcb2edda7"
-                      },
-                      {
-                          "name":  "integrations_projects_trends_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/{project_id}/trends/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "004a983cce540239"
-                      },
-                      {
-                          "name":  "integrations_projects_trends_aspects_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/{project_id}/trends/aspects/{aspect_key}/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "49b7fb0a16706b26"
-                      },
-                      {
-                          "name":  "integrations_projects_create_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/create/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_projects_create_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/projects/create/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  400,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_projects_list_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/projects/list/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_slack_channels_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/slack/channels/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_slack_oauth_callback_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/slack/oauth/callback/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0e0029880336e3cf"
-                      },
-                      {
-                          "name":  "integrations_slack_oauth_start_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/slack/oauth/start/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_slack_test_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/slack/test/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_sources_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/integrations/sources/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "integrations_sources_retrieve_2",
-                          "method":  "GET",
-                          "path":  "/api/integrations/sources/{source_id}/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "f9c3103802abbe47"
-                      },
-                      {
-                          "name":  "integrations_sources_update",
-                          "method":  "PUT",
-                          "path":  "/api/integrations/sources/{source_id}/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "f9c3103802abbe47"
-                      },
-                      {
-                          "name":  "integrations_sources_destroy",
-                          "method":  "DELETE",
-                          "path":  "/api/integrations/sources/{source_id}/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "8fe179f6d16bbc48"
-                      },
-                      {
-                          "name":  "integrations_sources_sync_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/sources/{source_id}/sync/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "f9c3103802abbe47"
-                      },
-                      {
-                          "name":  "integrations_sources_create_create",
-                          "method":  "POST",
-                          "path":  "/api/integrations/sources/create/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "performance_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/performance/",
-                          "auth":  "none",
-                          "enabled":  true,
-                          "expected_status":  401,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/work-items/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_retrieve_2",
-                          "method":  "GET",
-                          "path":  "/api/work-items/{work_item_id}/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "23b06620c4e77f35"
-                      },
-                      {
-                          "name":  "work_items_update_update",
-                          "method":  "PUT",
-                          "path":  "/api/work-items/{work_item_id}/update/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "23b06620c4e77f35"
-                      },
-                      {
-                          "name":  "work_items_generate_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/generate/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_platform_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/work-items/platform/{platform}/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "schema_hash":  "4bc67461b49ee7e3"
-                      },
-                      {
-                          "name":  "work_items_quality_check_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/quality-check/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_quality_rules_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/work-items/quality-rules/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_quality_rules_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/quality-rules/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_remove_update",
-                          "method":  "PUT",
-                          "path":  "/api/work-items/remove/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/work-items/review/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_approve_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/review/approve/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_batch_approve_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/review/batch-approve/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_dismiss_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/review/dismiss/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_merge_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/review/merge/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_retry_push_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/review/retry-push/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_snooze_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/review/snooze/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_stats_retrieve",
-                          "method":  "GET",
-                          "path":  "/api/work-items/review/stats/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_review_update_update",
-                          "method":  "PUT",
-                          "path":  "/api/work-items/review/update/",
-                          "auth":  "bearer",
-                          "enabled":  false,
-                          "expected_status":  200,
-                          "expect_json_keys":  [
-                                                   "data"
-                                               ],
-                          "source":  "swagger",
-                          "discovered":  true,
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      },
-                      {
-                          "name":  "work_items_submit_create",
-                          "method":  "POST",
-                          "path":  "/api/work-items/submit/",
-                          "auth":  "bearer",
-                          "enabled":  true,
-                          "expected_status":  403,
-                          "expect_json_keys":  [
-                                                   "detail"
-                                               ],
-                          "schema_hash":  "0bf71857b5a3ce63"
-                      }
-                  ]
+  "version": 1,
+  "endpoints": [
+    {
+      "name": "auth_check_username_retrieve",
+      "method": "GET",
+      "path": "/api/auth/check-username",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "auth_forgot_password_create",
+      "method": "POST",
+      "path": "/api/auth/forgot-password/",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "body": {
+        "email": "test@example.com"
+      },
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "Login",
+      "method": "POST",
+      "path": "/api/auth/login/",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "body": {
+        "email": "{{LOGIN_EMAIL}}",
+        "password": "{{LOGIN_PASSWORD}}"
+      },
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "auth_me_retrieve",
+      "method": "GET",
+      "path": "/api/auth/me/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "47ab4bd1ae11d2f8"
+    },
+    {
+      "name": "auth_me_partial_update",
+      "method": "PATCH",
+      "path": "/api/auth/me/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "47ab4bd1ae11d2f8"
+    },
+    {
+      "name": "auth_refresh_create",
+      "method": "POST",
+      "path": "/api/auth/refresh/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "91da0d3e95f36d0e",
+      "schema_changed": true,
+      "prev_schema_hash": "b158d5218f6ccc8b"
+    },
+    {
+      "name": "auth_register_create",
+      "method": "POST",
+      "path": "/api/auth/register/",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": 500,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "body": {
+        "email": "test_register@example.com",
+        "username": "test_reg_user",
+        "password": "TestPass123!"
+      },
+      "schema_hash": "ebb151c080818257",
+      "schema_changed": true,
+      "prev_schema_hash": "6bedc662abf3f28d"
+    },
+    {
+      "name": "auth_register_request_otp_create",
+      "method": "POST",
+      "path": "/api/auth/register/request-otp/",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": [
+        200,
+        400
+      ],
+      "expect_json_keys": [],
+      "body": {
+        "email": "test_register@example.com"
+      },
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "auth_reset_password_create",
+      "method": "POST",
+      "path": "/api/auth/reset-password/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "auth_token_create",
+      "method": "POST",
+      "path": "/api/auth/token/",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "body": {
+        "email": "{{LOGIN_EMAIL}}",
+        "password": "{{LOGIN_PASSWORD}}"
+      },
+      "schema_hash": "dece3cb61aa0a99f",
+      "schema_changed": true,
+      "prev_schema_hash": "a991b29c8c230d43"
+    },
+    {
+      "name": "auth_token_refresh_create",
+      "method": "POST",
+      "path": "/api/auth/token/refresh/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "91da0d3e95f36d0e",
+      "schema_changed": true,
+      "prev_schema_hash": "b158d5218f6ccc8b"
+    },
+    {
+      "name": "auth_users_retrieve",
+      "method": "GET",
+      "path": "/api/auth/users/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "47ab4bd1ae11d2f8"
+    },
+    {
+      "name": "auth_users_retrieve_2",
+      "method": "GET",
+      "path": "/api/auth/users/{user_id}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "d39e7cbd1022fa45"
+    },
+    {
+      "name": "feedback_analysis_retrieve",
+      "method": "GET",
+      "path": "/api/feedback/analysis/{analysis_id}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "f7b840d2120786bf"
+    },
+    {
+      "name": "feedback_analysis_rename_create",
+      "method": "POST",
+      "path": "/api/feedback/analysis/{analysis_id}/rename/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "body": {
+        "name": "Sprint 3 Run"
+      },
+      "schema_hash": "f7b840d2120786bf",
+      "schema_changed": true,
+      "prev_schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "feedback_history_retrieve",
+      "method": "GET",
+      "path": "/api/feedback/history/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "feedback_history_compare_retrieve",
+      "method": "GET",
+      "path": "/api/feedback/history/compare/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "feedback_history_cumulative_retrieve",
+      "method": "GET",
+      "path": "/api/feedback/history/cumulative/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "feedback_history_quarter_retrieve",
+      "method": "GET",
+      "path": "/api/feedback/history/quarter/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "health_retrieve",
+      "method": "GET",
+      "path": "/api/health/",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": 503,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0e0029880336e3cf"
+    },
+    {
+      "name": "insights_analyze_create",
+      "method": "POST",
+      "path": "/api/insights/analyze/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_comments_retrieve",
+      "method": "GET",
+      "path": "/api/insights/comments/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "Ingestion Run Now",
+      "method": "POST",
+      "path": "/api/insights/ingestion/run-now/",
+      "auth": "bearer",
+      "enabled": true,
+      "body": {
+        "project_id": "{{PROJECT_ID}}"
+      },
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_ingestion_schedule_retrieve",
+      "method": "GET",
+      "path": "/api/insights/ingestion/schedule/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "Ingestion Schedule Save",
+      "method": "POST",
+      "path": "/api/insights/ingestion/schedule/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "body": {
+        "project_id": "{{PROJECT_ID}}",
+        "schedule": {
+          "enabled": true,
+          "cadence": "daily",
+          "hour_utc": 12
+        }
+      },
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_review_retrieve",
+      "method": "GET",
+      "path": "/api/insights/review/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_review_update_create",
+      "method": "POST",
+      "path": "/api/insights/review/update/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_rules_retrieve",
+      "method": "GET",
+      "path": "/api/insights/rules/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_rules_create",
+      "method": "POST",
+      "path": "/api/insights/rules/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_rules_apply_create",
+      "method": "POST",
+      "path": "/api/insights/rules/apply/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_task_status_retrieve",
+      "method": "GET",
+      "path": "/api/insights/task-status/{task_id}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "8480a86c43fe0a3e"
+    },
+    {
+      "name": "insights_tasks_retrieve",
+      "method": "GET",
+      "path": "/api/insights/tasks/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_upload_create",
+      "method": "POST",
+      "path": "/api/insights/upload/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_user_stories_retrieve",
+      "method": "GET",
+      "path": "/api/insights/user-stories/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_user_stories_remove_work_items_update",
+      "method": "PUT",
+      "path": "/api/insights/user-stories/remove-work-items/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_user_story_creation_create",
+      "method": "POST",
+      "path": "/api/insights/user-story-creation/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_user_story_submission_create",
+      "method": "POST",
+      "path": "/api/insights/user-story-submission/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_work_items_update_update",
+      "method": "PUT",
+      "path": "/api/insights/work-items/{work_item_id}/update/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "23b06620c4e77f35"
+    },
+    {
+      "name": "integrations_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_destroy",
+      "method": "DELETE",
+      "path": "/api/integrations/{account_id}/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "ac79f1bc3fd0331a"
+    },
+    {
+      "name": "integrations_test_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/{account_id}/test/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "aa22a56b6f04931a"
+    },
+    {
+      "name": "integrations_azure_create",
+      "method": "POST",
+      "path": "/api/integrations/azure/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_azure_projects_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/azure/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_azure_projects_create",
+      "method": "POST",
+      "path": "/api/integrations/azure/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_dashboard_azure_projects_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/dashboard/azure/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_dashboard_jira_projects_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/dashboard/jira/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_external_projects_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/external/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_external_projects_check_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/external/projects/check/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_jira_create",
+      "method": "POST",
+      "path": "/api/integrations/jira/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_jira_projects_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/jira/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_jira_projects_create",
+      "method": "POST",
+      "path": "/api/integrations/jira/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_projects_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/projects/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_projects_retrieve_2",
+      "method": "GET",
+      "path": "/api/integrations/projects/{project_id}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "004a983cce540239"
+    },
+    {
+      "name": "integrations_projects_destroy",
+      "method": "DELETE",
+      "path": "/api/integrations/projects/{project_id}/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "f418519bcb2edda7"
+    },
+    {
+      "name": "integrations_projects_analysis_latest_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/projects/{project_id}/analysis/latest/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "004a983cce540239"
+    },
+    {
+      "name": "integrations_projects_roles_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/projects/{project_id}/roles/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "004a983cce540239"
+    },
+    {
+      "name": "integrations_projects_roles_create",
+      "method": "POST",
+      "path": "/api/integrations/projects/{project_id}/roles/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "004a983cce540239"
+    },
+    {
+      "name": "integrations_projects_roles_destroy",
+      "method": "DELETE",
+      "path": "/api/integrations/projects/{project_id}/roles/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "f418519bcb2edda7"
+    },
+    {
+      "name": "integrations_projects_trends_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/projects/{project_id}/trends/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "004a983cce540239"
+    },
+    {
+      "name": "integrations_projects_trends_aspects_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/projects/{project_id}/trends/aspects/{aspect_key}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "49b7fb0a16706b26"
+    },
+    {
+      "name": "integrations_projects_create_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/projects/create/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_projects_create_create",
+      "method": "POST",
+      "path": "/api/integrations/projects/create/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "integrations_projects_list_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/projects/list/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "performance_retrieve",
+      "method": "GET",
+      "path": "/api/performance/",
+      "auth": "none",
+      "enabled": true,
+      "expected_status": 401,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "work_items_retrieve",
+      "method": "GET",
+      "path": "/api/work-items/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "work_items_retrieve_2",
+      "method": "GET",
+      "path": "/api/work-items/{work_item_id}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "23b06620c4e77f35"
+    },
+    {
+      "name": "work_items_update_update",
+      "method": "PUT",
+      "path": "/api/work-items/{work_item_id}/update/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "23b06620c4e77f35"
+    },
+    {
+      "name": "work_items_generate_create",
+      "method": "POST",
+      "path": "/api/work-items/generate/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "work_items_platform_retrieve",
+      "method": "GET",
+      "path": "/api/work-items/platform/{platform}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ],
+      "schema_hash": "4bc67461b49ee7e3"
+    },
+    {
+      "name": "work_items_quality_check_create",
+      "method": "POST",
+      "path": "/api/work-items/quality-check/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "work_items_quality_rules_retrieve",
+      "method": "GET",
+      "path": "/api/work-items/quality-rules/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "work_items_quality_rules_create",
+      "method": "POST",
+      "path": "/api/work-items/quality-rules/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "work_items_remove_update",
+      "method": "PUT",
+      "path": "/api/work-items/remove/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "work_items_submit_create",
+      "method": "POST",
+      "path": "/api/work-items/submit/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    }
+  ]
 }
