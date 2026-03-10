@@ -35,9 +35,9 @@ interface SentimentChartsProps {
 }
 
 const COLORS = {
-  positive: 'rgba(139, 95, 191, 0.75)',
-  negative: 'rgba(90, 55, 134, 0.7)',
-  neutral: 'rgba(100, 116, 139, 0.6)',
+  positive: 'var(--sentiment-positive)',
+  negative: 'var(--sentiment-negative)',
+  neutral: 'var(--sentiment-neutral)',
 } as const;
 
 const SENTIMENT_COLOR_MAP: Record<string, string> = {
@@ -179,7 +179,14 @@ export function SentimentCharts({
                     stroke="var(--muted-foreground)"
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{ color: 'var(--muted-foreground)' }}
+                    formatter={(value) => (
+                      <span style={{ color: 'var(--muted-foreground)' }}>
+                        {String(value)}
+                      </span>
+                    )}
+                  />
                   <Bar
                     dataKey="positive"
                     fill={COLORS.positive}
@@ -241,7 +248,14 @@ export function SentimentCharts({
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{ color: 'var(--muted-foreground)' }}
+                    formatter={(value) => (
+                      <span style={{ color: 'var(--muted-foreground)' }}>
+                        {String(value)}
+                      </span>
+                    )}
+                  />
                 </PieChart>
               </ResponsiveContainer>
 
