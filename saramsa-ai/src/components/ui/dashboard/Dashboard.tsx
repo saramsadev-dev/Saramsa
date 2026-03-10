@@ -1380,7 +1380,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       {/* Tabs + Panels in one seamless column */}
       <div className="w-full flex flex-col flex-1 min-h-0">
         {/* Two-Panel Layout */}
-        <div className="flex gap-6 items-stretch flex-1 min-h-0 pb-4">
+        <div className="flex gap-6 items-stretch flex-1 min-h-0">
           {/* Left Panel - Tasks */}
           <AnalysisRunList
             entries={analysisHistory}

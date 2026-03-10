@@ -5,19 +5,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/store/rootReducer";
 import { apiRequest } from "@/lib/apiRequest";
 import { getValidAccessToken } from "@/lib/auth";
-import {
-  Activity,
-  AlertCircle,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Loader2,
-  Upload,
-  Cpu,
-  Sparkles,
-  Wrench,
-} from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from "./utils";
 
 type StageStatus = "idle" | "pending" | "running" | "success" | "error";
@@ -50,21 +38,6 @@ const statusCopy: Record<StageStatus, { label: string; tone: string }> = {
   running: { label: "Processing", tone: "text-sky-600" },
   success: { label: "Completed", tone: "text-emerald-600" },
   error: { label: "Failed", tone: "text-rose-600" },
-};
-
-const iconForStatus = (status: StageStatus) => {
-  switch (status) {
-    case "running":
-      return <Loader2 className="h-4 w-4 animate-spin text-sky-600" />;
-    case "success":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
-    case "error":
-      return <AlertCircle className="h-4 w-4 text-rose-600" />;
-    case "pending":
-      return <Clock className="h-4 w-4 text-amber-600" />;
-    default:
-      return <Activity className="h-4 w-4 text-muted-foreground" />;
-  }
 };
 
 export function PipelineStatusWidget() {
@@ -244,13 +217,6 @@ export function PipelineStatusWidget() {
     }
   }, [analysisStatus]);
 
-  const stageIcons = [
-    <Upload key="ingestion" className="h-3.5 w-3.5" />,
-    <Cpu key="processing" className="h-3.5 w-3.5" />,
-    <Sparkles key="synthesis" className="h-3.5 w-3.5" />,
-    <Wrench key="work-items" className="h-3.5 w-3.5" />,
-  ];
-
   const commentCount = Array.isArray(loadedComments)
     ? loadedComments.length
     : analysisData?.analysisData?.comments_count ??
@@ -352,11 +318,11 @@ export function PipelineStatusWidget() {
                 ))}
               </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-muted-foreground">
-              {stages.map((stage, index) => (
+              {stages.map((stage) => (
                 <div
-                  key={`${stage.label}-icon`}
+                  key={`${stage.label}-status`}
                   className={cn(
-                    "group relative flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted-foreground",
+                    "inline-flex items-center rounded-md border border-border/60 bg-background/80 px-2 py-1 text-[10px] font-medium text-muted-foreground",
                     stage.status === "success"
                       ? "text-foreground"
                       : stage.status === "running"
@@ -366,10 +332,7 @@ export function PipelineStatusWidget() {
                       : "text-muted-foreground"
                   )}
                 >
-                  {stageIcons[index] ?? <Activity className="h-3.5 w-3.5" />}
-                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-border/60 bg-background/95 px-2 py-1 text-[10px] font-medium text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
-                    {stage.label} · {statusCopy[stage.status].label}
-                  </span>
+                  {stage.label}: {statusCopy[stage.status].label}
                 </div>
               ))}
               {(commentCount || processingMinutes) && (
@@ -403,9 +366,6 @@ export function PipelineStatusWidget() {
                     key={task.id}
                     className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2"
                   >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60">
-                      {iconForStatus(task.status)}
-                    </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-foreground">
                         {task.label}
@@ -415,6 +375,9 @@ export function PipelineStatusWidget() {
                       </p>
                     </div>
                     <div className="text-right">
+                      <p className={cn("text-[11px] font-medium", statusToneForTask(task))}>
+                        {statusLabelForTask(task)}
+                      </p>
                       {formatTaskMeta(task) && (
                         <p className="text-[11px] text-muted-foreground" title={buildHealthTooltip(task)}>
                           {formatTaskMeta(task)}
@@ -433,9 +396,6 @@ export function PipelineStatusWidget() {
                     key={task.id}
                     className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 px-3 py-2"
                   >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60">
-                      {iconForStatus(task.status)}
-                    </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-foreground">
                         {task.label}
@@ -445,6 +405,9 @@ export function PipelineStatusWidget() {
                       </p>
                     </div>
                     <div className="text-right">
+                      <p className={cn("text-[11px] font-medium", statusToneForTask(task))}>
+                        {statusLabelForTask(task)}
+                      </p>
                       {formatTaskMeta(task) && (
                         <p className="text-[11px] text-muted-foreground" title={buildHealthTooltip(task)}>
                           {formatTaskMeta(task)}
@@ -469,7 +432,7 @@ export function PipelineStatusWidget() {
         )}
         aria-label="Toggle pipeline status"
       >
-        <Activity className="h-6 w-6" />
+        <span className="text-xs font-semibold">P</span>
         <span
           className={cn(
             "absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-background",
@@ -487,7 +450,6 @@ export function PipelineStatusWidget() {
       {!open && (
         <div className="pointer-events-none mt-2 text-right">
           <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
             Pipeline
           </span>
         </div>
