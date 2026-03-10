@@ -99,7 +99,7 @@ export function KeywordCloud({
                 duration: 0.8,
                 delay: index * 0.1,
                 y: {
-                  duration: 2 + Math.random(),
+                  duration: 2 + (index % 3) * 0.4,
                   repeat: Infinity,
                   ease: "easeInOut",
                   delay: index * 0.3

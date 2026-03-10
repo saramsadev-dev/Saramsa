@@ -239,13 +239,13 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Register Form */}
-      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-8 xl:p-12 bg-card/70 md:border-l border-border/60 relative overflow-y-auto min-h-screen md:min-h-[60vh] lg:min-h-screen">
+      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-start justify-center pt-12 sm:pt-14 lg:pt-6 p-2 sm:p-3 md:p-5 lg:p-5 xl:p-6 bg-card/70 md:border-l border-border/60 relative min-h-screen md:min-h-[60vh] lg:min-h-screen">
 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8 }}
-          className="w-full max-w-md mx-auto space-y-6 sm:space-y-8"
+          className="w-full max-w-md mx-auto space-y-2.5 sm:space-y-3"
         >
           {/* Logo */}
           <div className="text-center">
@@ -253,20 +253,17 @@ export default function RegisterPage() {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="mb-6 sm:mb-8"
+              className="mb-1.5 sm:mb-2"
             >
-              <BrandLogo size="lg" className="justify-center" />
+              <BrandLogo size="md" className="justify-center" />
             </motion.div>
           </div>
 
           {/* Header */}
           <div className="text-center">
-            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-xl xl:text-lg 2xl:text-3xl font-semibold text-foreground leading-tight">
+            <h2 className="text-lg sm:text-xl md:text-2xl lg:text-xl xl:text-lg 2xl:text-3xl font-semibold text-foreground leading-tight">
               Create Your Account
             </h2>
-            <p className="mt-2 sm:mt-3  lg:mt-2 xl:mt-3 text-sm sm:text-base md:text-lg lg:text-sm xl:text-xs 2xl:text-base text-muted-foreground leading-relaxed px-2 sm:px-0">
-             Use AI to transform feedback
-            </p>
           </div>
 
           {/* Error Message */}
@@ -281,8 +278,8 @@ export default function RegisterPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
-            <div className="space-y-3 sm:space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-2 sm:space-y-2.5">
+            <div className="space-y-1.5 sm:space-y-2">
               {/* Username */}
               <div>
                 <label htmlFor="username" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
@@ -294,7 +291,7 @@ export default function RegisterPage() {
                     id="username"
                     type="text"
                     placeholder="Choose a username"
-                    className={`w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
+                    className={`w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
                       usernameStatus === 'available' ? 'border-green-500' : 
                       usernameStatus === 'unavailable' ? 'border-destructive' : ''
                     }`}
@@ -336,7 +333,7 @@ export default function RegisterPage() {
                     id="email"
                     type="email"
                     placeholder="Enter your email"
-                    className="w-full pl-8 sm:pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                    className="w-full pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                 </div>
@@ -363,7 +360,7 @@ export default function RegisterPage() {
                     onClick={handleSendOtp}
                     disabled={otpSending || otpCooldown > 0}
                     variant="outline"
-                    className="whitespace-nowrap"
+                    className="whitespace-nowrap h-9 px-3 text-xs sm:text-sm"
                   >
                     {otpSending ? 'Sending...' : otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Send code'}
                   </Button>
@@ -390,7 +387,7 @@ export default function RegisterPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Create a password"
-                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   <Button
@@ -419,7 +416,7 @@ export default function RegisterPage() {
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm your password"
-                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   <Button
@@ -443,7 +440,7 @@ export default function RegisterPage() {
               type="submit"
               disabled={isLoading}
               variant="saramsa"
-              className="w-full py-2.5 sm:py-3 text-sm sm:text-base md:text-lg lg:text-base xl:text-xs 2xl:text-base group"
+              className="w-full py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-xs 2xl:text-base group"
             >
               {isLoading ? (
                 <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />

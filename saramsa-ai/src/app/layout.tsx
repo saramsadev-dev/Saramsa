@@ -42,7 +42,7 @@ export default function RootLayout({
             <main className="flex-1 overflow-hidden">{children}</main>
             <PipelineWidgetGate />
             <Toaster 
-              position="top-right" 
+              position="bottom-right" 
               richColors 
               duration={2000}
               closeButton

@@ -145,6 +145,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
   const selectedProjectName = projects?.find((p: any) => p.id === (currentProjectId || projectId))?.name;
   const isProjectAnalyzing = isAnalyzing;
+  const isTaskViewLoading = useMemo(
+    () =>
+      historyLoading ||
+      fetchingAnalysisById ||
+      isAnalyzing ||
+      !!selectedAnalysisId?.startsWith('analyzing_'),
+    [historyLoading, fetchingAnalysisById, isAnalyzing, selectedAnalysisId]
+  );
   const selectedPlatform = useMemo((): 'azure' | 'jira' | null => {
     if (!projects || !projects.length) return null;
     const pid = currentProjectId || projectId || '';
@@ -1373,23 +1381,31 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       <div className="w-full flex flex-col flex-1 min-h-0">
         {/* Two-Panel Layout */}
         <div className="flex gap-6 items-stretch flex-1 min-h-0 pb-4">
-          {/* Left Panel - Analysis Run List + Upload */}
+          {/* Left Panel - Tasks */}
           <AnalysisRunList
             entries={analysisHistory}
             selectedId={selectedAnalysisId}
-            isLoading={historyLoading}
+            isLoading={isTaskViewLoading}
             onSelect={handleRunSelect}
             onRename={handleRunRename}
             projectName={selectedProjectName}
-            topFile={topFile}
-            topError={error || topError}
-            isAnalyzing={isAnalyzing}
-            onFileSelect={setTopFile}
-            onAnalyze={handleTopAnalyze}
           />
 
-          {/* Right Panel - Main Content */}
+          {/* Right Panel - Upload + Task Details */}
           <main className="flex-1 min-w-0 space-y-6 overflow-y-auto pr-2 scrollbar-thin">
+            <div className="w-full">
+              <UploadPanel
+                dbProjectId={currentProjectId}
+                topFile={topFile}
+                topError={error || topError}
+                loadedComments={loadedComments}
+                topUploading={isAnalyzing}
+                onFileSelect={setTopFile}
+                onAnalyze={handleTopAnalyze}
+                onCloudConnect={handleCloudConnect}
+                isAnalyzing={isAnalyzing}
+              />
+            </div>
 
             <>
               {/* Dismissible error banner above results */}
@@ -1413,7 +1429,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               )}
 
               {/* Analysis Results Section — only show loader when the selected run is the one being analyzed */}
-              {(selectedAnalysisId?.startsWith('analyzing_') || fetchingAnalysisById) ? (
+              {isTaskViewLoading ? (
                 <LoaderForDashboard />
               ) : (
                 <>

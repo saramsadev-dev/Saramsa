@@ -265,13 +265,17 @@ export function AdvancedWordCloud({
 
           {/* Floating Particles */}
           {Array.from({ length: 6 }, (_, i) => (
+            (() => {
+              const particlePos = seededPosition(`particle:${activeSentiment}:${i}`);
+              const duration = 4 + (i % 3) * 0.6;
+              return (
             <motion.div
               key={i}
               className="absolute w-2 h-2 rounded-full opacity-20"
               style={{ 
                 backgroundColor: currentWords[i % currentWords.length]?.color || 'var(--muted-foreground)',
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`
+                left: `${particlePos.x}%`,
+                top: `${particlePos.y}%`
               }}
               animate={{
                 y: [0, -20, 0],
@@ -279,12 +283,14 @@ export function AdvancedWordCloud({
                 opacity: [0.2, 0.6, 0.2]
               }}
               transition={{
-                duration: 4 + Math.random() * 2,
+                duration,
                 repeat: Infinity,
                 delay: i * 0.5,
                 ease: "easeInOut"
               }}
             />
+              );
+            })()
           ))}
 
           {/* Statistics Overlay */}
