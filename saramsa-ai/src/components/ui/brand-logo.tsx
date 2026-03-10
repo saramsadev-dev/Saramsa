@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { cn } from './utils';
 
@@ -12,7 +11,6 @@ interface BrandLogoProps {
 }
 
 export function BrandLogo({ className, size = 'md', showText = true }: BrandLogoProps) {
-  const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -35,19 +33,17 @@ export function BrandLogo({ className, size = 'md', showText = true }: BrandLogo
     );
   }
 
-  const logoSrc = resolvedTheme === 'dark'
-    ? 'https://res.cloudinary.com/do8i3k4ow/image/upload/v1757063313/saramsa-logo-dark_qzsgsm.png'
-    : 'https://res.cloudinary.com/do8i3k4ow/image/upload/v1757063691/saramsa-logo-light_izly6v.png';
+  const logoSrc = '/saramsa-logo-official.png';
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
       <div className={cn('relative', sizeClasses[size])}>
         <Image 
           src={logoSrc} 
-          alt="Saramsa AI" 
-          width={120}
-          height={32}
-          className="object-contain w-40 h-full" 
+          alt="Saramsa.ai" 
+          width={300}
+          height={60}
+          className="object-contain w-64 h-full"
           priority 
         />
       </div>
