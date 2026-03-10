@@ -49,20 +49,20 @@ export function AdvancedWordCloud({
               frequency: Math.max(50, 150 - index * 10),
               x: pos.x,
               y: pos.y,
-              color: ['rgba(139, 95, 191, 0.7)', 'rgba(139, 95, 191, 0.55)', 'rgba(139, 95, 191, 0.45)', 'rgba(139, 95, 191, 0.6)'][index % 4]
+              color: ['rgba(255, 137, 33, 0.75)', 'rgba(255, 137, 33, 0.55)', 'rgba(255, 137, 33, 0.45)', 'rgba(255, 137, 33, 0.6)'][index % 4]
             };
           })
         : [
-            { word: 'amazing', size: 40, frequency: 145, x: 20, y: 30, color: 'rgba(139, 95, 191, 0.7)' },
-            { word: 'excellent', size: 32, frequency: 120, x: 60, y: 15, color: 'rgba(139, 95, 191, 0.55)' },
-            { word: 'love', size: 36, frequency: 134, x: 15, y: 65, color: 'rgba(139, 95, 191, 0.45)' },
-            { word: 'fantastic', size: 28, frequency: 98, x: 70, y: 50, color: 'rgba(139, 95, 191, 0.6)' },
-            { word: 'great', size: 35, frequency: 128, x: 45, y: 40, color: 'rgba(139, 95, 191, 0.7)' },
-            { word: 'perfect', size: 30, frequency: 105, x: 25, y: 80, color: 'rgba(139, 95, 191, 0.55)' },
-            { word: 'helpful', size: 26, frequency: 89, x: 80, y: 25, color: 'rgba(139, 95, 191, 0.45)' },
-            { word: 'smooth', size: 24, frequency: 76, x: 55, y: 75, color: 'rgba(139, 95, 191, 0.6)' },
-            { word: 'intuitive', size: 22, frequency: 67, x: 10, y: 45, color: 'rgba(139, 95, 191, 0.7)' },
-            { word: 'fast', size: 20, frequency: 58, x: 85, y: 60, color: 'rgba(139, 95, 191, 0.55)' }
+            { word: 'amazing', size: 40, frequency: 145, x: 20, y: 30, color: 'rgba(255, 137, 33, 0.75)' },
+            { word: 'excellent', size: 32, frequency: 120, x: 60, y: 15, color: 'rgba(255, 137, 33, 0.55)' },
+            { word: 'love', size: 36, frequency: 134, x: 15, y: 65, color: 'rgba(255, 137, 33, 0.45)' },
+            { word: 'fantastic', size: 28, frequency: 98, x: 70, y: 50, color: 'rgba(255, 137, 33, 0.6)' },
+            { word: 'great', size: 35, frequency: 128, x: 45, y: 40, color: 'rgba(255, 137, 33, 0.75)' },
+            { word: 'perfect', size: 30, frequency: 105, x: 25, y: 80, color: 'rgba(255, 137, 33, 0.55)' },
+            { word: 'helpful', size: 26, frequency: 89, x: 80, y: 25, color: 'rgba(255, 137, 33, 0.45)' },
+            { word: 'smooth', size: 24, frequency: 76, x: 55, y: 75, color: 'rgba(255, 137, 33, 0.6)' },
+            { word: 'intuitive', size: 22, frequency: 67, x: 10, y: 45, color: 'rgba(255, 137, 33, 0.75)' },
+            { word: 'fast', size: 20, frequency: 58, x: 85, y: 60, color: 'rgba(255, 137, 33, 0.55)' }
           ],
       neutral: [
         { word: 'okay', size: 32, frequency: 156, x: 25, y: 35, color: 'rgba(100, 116, 139, 0.8)' },
@@ -85,20 +85,20 @@ export function AdvancedWordCloud({
               frequency: Math.max(30, 100 - index * 8),
               x: pos.x,
               y: pos.y,
-              color: ['rgba(90, 55, 134, 0.7)', 'rgba(90, 55, 134, 0.55)', 'rgba(90, 55, 134, 0.45)', 'rgba(90, 55, 134, 0.6)'][index % 4]
+              color: ['rgba(255, 47, 75, 0.75)', 'rgba(255, 47, 75, 0.55)', 'rgba(255, 47, 75, 0.45)', 'rgba(255, 47, 75, 0.6)'][index % 4]
             };
           })
         : [
-            { word: 'terrible', size: 38, frequency: 87, x: 30, y: 25, color: 'rgba(90, 55, 134, 0.7)' },
-            { word: 'slow', size: 34, frequency: 76, x: 15, y: 60, color: 'rgba(90, 55, 134, 0.55)' },
-            { word: 'confusing', size: 32, frequency: 71, x: 70, y: 40, color: 'rgba(90, 55, 134, 0.45)' },
-            { word: 'broken', size: 30, frequency: 65, x: 50, y: 70, color: 'rgba(90, 55, 134, 0.6)' },
-            { word: 'frustrating', size: 28, frequency: 59, x: 20, y: 80, color: 'rgba(90, 55, 134, 0.7)' },
-            { word: 'difficult', size: 26, frequency: 54, x: 80, y: 15, color: 'rgba(90, 55, 134, 0.55)' },
-            { word: 'buggy', size: 24, frequency: 48, x: 10, y: 40, color: 'rgba(90, 55, 134, 0.45)' },
-            { word: 'annoying', size: 22, frequency: 42, x: 65, y: 75, color: 'rgba(90, 55, 134, 0.6)' },
-            { word: 'complicated', size: 20, frequency: 38, x: 45, y: 30, color: 'rgba(90, 55, 134, 0.7)' },
-            { word: 'disappointing', size: 18, frequency: 34, x: 85, y: 55, color: 'rgba(90, 55, 134, 0.55)' }
+            { word: 'terrible', size: 38, frequency: 87, x: 30, y: 25, color: 'rgba(255, 47, 75, 0.75)' },
+            { word: 'slow', size: 34, frequency: 76, x: 15, y: 60, color: 'rgba(255, 47, 75, 0.55)' },
+            { word: 'confusing', size: 32, frequency: 71, x: 70, y: 40, color: 'rgba(255, 47, 75, 0.45)' },
+            { word: 'broken', size: 30, frequency: 65, x: 50, y: 70, color: 'rgba(255, 47, 75, 0.6)' },
+            { word: 'frustrating', size: 28, frequency: 59, x: 20, y: 80, color: 'rgba(255, 47, 75, 0.75)' },
+            { word: 'difficult', size: 26, frequency: 54, x: 80, y: 15, color: 'rgba(255, 47, 75, 0.55)' },
+            { word: 'buggy', size: 24, frequency: 48, x: 10, y: 40, color: 'rgba(255, 47, 75, 0.45)' },
+            { word: 'annoying', size: 22, frequency: 42, x: 65, y: 75, color: 'rgba(255, 47, 75, 0.6)' },
+            { word: 'complicated', size: 20, frequency: 38, x: 45, y: 30, color: 'rgba(255, 47, 75, 0.75)' },
+            { word: 'disappointing', size: 18, frequency: 34, x: 85, y: 55, color: 'rgba(255, 47, 75, 0.55)' }
           ]
     };
   }, [positiveKeywords, negativeKeywords]);
@@ -335,4 +335,5 @@ export function AdvancedWordCloud({
     </Card>
   );
 }
+
 

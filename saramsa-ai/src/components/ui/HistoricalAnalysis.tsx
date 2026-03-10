@@ -337,7 +337,7 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
                       <CardTitle className="text-sm">Quarters Covered</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-purple-600">
+                      <div className="text-2xl font-bold text-saramsa-gradient-to">
                         {cumulativeData.quarters_covered.length}
                       </div>
                     </CardContent>
@@ -461,5 +461,6 @@ export function HistoricalAnalysis({ projectId }: HistoricalAnalysisProps) {
     </Card>
   );
 }
+
 
 

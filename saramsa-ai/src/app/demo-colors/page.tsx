@@ -14,7 +14,7 @@ export default function DemoColorsPage() {
     {
       title: "Processing Speed",
       value: "2.3s",
-      color: "purple" as const,
+      color: "orange" as const,
       description: "Average analysis duration",
       status: "success" as const,
       duration: "Fast"
@@ -189,7 +189,7 @@ export default function DemoColorsPage() {
             {[
               { name: 'Success', color: 'bg-green-500', text: 'Green for success states' },
               { name: 'Failure', color: 'bg-red-500', text: 'Red for error states' },
-              { name: 'Processing', color: 'bg-purple-500', text: 'Purple for active processing' },
+              { name: 'Processing', color: 'bg-saramsa-brand', text: 'Brand orange for active processing' },
               { name: 'Pending', color: 'bg-blue-500', text: 'Blue for pending states' },
               { name: 'Warning', color: 'bg-orange-500', text: 'Orange for warnings' },
               { name: 'Info', color: 'bg-teal-500', text: 'Teal for information' },

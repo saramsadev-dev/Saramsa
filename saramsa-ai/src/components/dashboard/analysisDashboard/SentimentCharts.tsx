@@ -124,10 +124,7 @@ export function SentimentCharts({
 
     return sentimentData.map((item) => ({
       ...item,
-      color:
-        item.color ??
-        SENTIMENT_COLOR_MAP[item.name] ??
-        COLORS.neutral,
+      color: SENTIMENT_COLOR_MAP[item.name] ?? COLORS.neutral,
     }));
   }, [selectedFeatures, featureSentimentData, sentimentData]);
 

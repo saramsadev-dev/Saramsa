@@ -136,7 +136,7 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
                         workItem.type === 'Bug' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
                         workItem.type === 'Feature' ? 'bg-saramsa-brand/10 text-saramsa-brand dark:bg-saramsa-brand/20 dark:text-saramsa-brand' :
                         workItem.type === 'Task' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-                        'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+                        'bg-secondary/60 text-foreground dark:bg-secondary/50 dark:text-foreground'
                       }`}>
                         {workItem.type}
                       </Badge>
@@ -177,5 +177,6 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
     </Card>
   );
 }
+
 
 

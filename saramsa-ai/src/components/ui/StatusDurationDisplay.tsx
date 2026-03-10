@@ -47,17 +47,17 @@ export function StatusDurationDisplay({
       case 'processing':
         return {
           icon: Loader2,
-          bgColor: 'bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30',
-          borderColor: 'border-purple-300 dark:border-purple-600',
-          textColor: 'text-purple-800 dark:text-purple-300',
-          iconColor: 'text-purple-600 dark:text-purple-400',
-          durationBg: 'bg-purple-200 dark:bg-purple-800/50',
+          bgColor: 'bg-gradient-to-r from-saramsa-brand/10 to-saramsa-gradient-to/10 dark:from-saramsa-brand/20 dark:to-saramsa-gradient-to/20',
+          borderColor: 'border-saramsa-brand/30 dark:border-saramsa-brand/40',
+          textColor: 'text-saramsa-brand dark:text-saramsa-brand',
+          iconColor: 'text-saramsa-brand dark:text-saramsa-brand',
+          durationBg: 'bg-saramsa-brand/10 dark:bg-saramsa-brand/20',
           emoji: '⚙️'
         };
       case 'pending':
         return {
           icon: AlertCircle,
-          bgColor: 'bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30',
+          bgColor: 'bg-gradient-to-r from-saramsa-brand/10 to-saramsa-gradient-to/10 dark:from-saramsa-brand/20 dark:to-saramsa-gradient-to/20',
           borderColor: 'border-saramsa-brand/30 dark:border-saramsa-brand/40',
           textColor: 'text-saramsa-brand dark:text-saramsa-brand',
           iconColor: 'text-saramsa-brand dark:text-saramsa-brand',
@@ -249,5 +249,6 @@ export function StatusDurationExamples() {
     </div>
   );
 }
+
 
 
