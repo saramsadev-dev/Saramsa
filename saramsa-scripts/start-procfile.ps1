@@ -13,6 +13,7 @@ $script:CeleryOpsReady = $false
 $script:StartupSummaryPrinted = $false
 $script:StartupFailed = $false
 $script:StartupErrorPrinted = $false
+$script:StartupFailureReason = ""
 
 function Show-StartupSummary {
     if ($script:StartupSummaryPrinted) { return }
@@ -38,6 +39,9 @@ function Show-StartupError {
     if ($script:StartupErrorPrinted) { return }
     Write-Host ""
     Write-Host "[ERROR] Startup failed. See logs:" -ForegroundColor Red
+    if (-not [string]::IsNullOrWhiteSpace($script:StartupFailureReason)) {
+        Write-Host "Reason: $($script:StartupFailureReason)" -ForegroundColor Yellow
+    }
     Write-Host "  saramsa log all -f" -ForegroundColor Yellow
     Write-Host "  saramsa log system -f" -ForegroundColor Yellow
     Write-Host ""
@@ -91,6 +95,18 @@ function Write-HonchoLine {
 
     if (-not $script:StartupSummaryPrinted -and $Line -match 'system\s+\|.*stopped \(rc=') {
         $script:StartupFailed = $true
+        if ([string]::IsNullOrWhiteSpace($script:StartupFailureReason)) {
+            $script:StartupFailureReason = "A service exited during startup."
+        }
+        Show-StartupError
+    }
+
+    if (
+        -not $script:StartupSummaryPrinted -and
+        $Line -match 'backend\.1\s+\|.*(django\.db\.utils\.OperationalError|psycopg2\.OperationalError|could not translate host name|could not connect to server|connection refused|timeout expired)'
+    ) {
+        $script:StartupFailed = $true
+        $script:StartupFailureReason = "Backend failed to connect to Neon PostgreSQL (DATABASE_URL)."
         Show-StartupError
     }
 
@@ -227,7 +243,15 @@ try {
         while (-not $honchoProc.HasExited) {
             Flush-HonchoOutput -Path $HonchoRawOutLog -LineOffset ([ref]$offsetOut)
             Flush-HonchoOutput -Path $HonchoRawErrLog -LineOffset ([ref]$offsetErr)
+            if ($script:StartupFailed) {
+                break
+            }
             Start-Sleep -Milliseconds 200
+        }
+        if ($script:StartupFailed -and -not $honchoProc.HasExited) {
+            $null = & cmd.exe /c "taskkill /T /F /PID $($honchoProc.Id) >nul 2>&1"
+            $honchoProc.WaitForExit()
+            exit 1
         }
         Flush-HonchoOutput -Path $HonchoRawOutLog -LineOffset ([ref]$offsetOut)
         Flush-HonchoOutput -Path $HonchoRawErrLog -LineOffset ([ref]$offsetErr)
@@ -239,7 +263,7 @@ try {
     if ($_.Exception.GetType().Name -eq "PipelineStoppedException" -or $_.Exception.GetType().Name -eq "OperationCanceledException" -or $_.Exception.GetType().Name -eq "HostException") {
         try {
             if ($honchoProc -and -not $honchoProc.HasExited) {
-                $null = & taskkill /T /F /PID $honchoProc.Id 2>$null
+                $null = & cmd.exe /c "taskkill /T /F /PID $($honchoProc.Id) >nul 2>&1"
             }
         } catch { }
         Write-Host "`n[INFO] Interrupted. Exiting..." -ForegroundColor Yellow

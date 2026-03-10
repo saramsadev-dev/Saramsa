@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import ssl
 from datetime import timedelta
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -39,7 +40,6 @@ else:
     raise RuntimeError("ALLOWED_HOSTS must be set when DEBUG=False")
 
 if BACKEND_BASE_URL:
-    from urllib.parse import urlparse
     _backend_host = urlparse(BACKEND_BASE_URL).netloc or BACKEND_BASE_URL
     if _backend_host and _backend_host not in _allowed:
         _allowed.append(_backend_host)
@@ -212,9 +212,21 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL must be set. Neon PostgreSQL is required and no local DB fallback is supported."
+    )
+
+_database_host = (urlparse(DATABASE_URL).hostname or "").lower()
+if not _database_host.endswith(".neon.tech"):
+    raise RuntimeError(
+        f"DATABASE_URL must point to Neon PostgreSQL (.neon.tech). Current host: '{_database_host or 'missing'}'."
+    )
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+    "default": dj_database_url.parse(
+        DATABASE_URL,
         conn_max_age=600,
         ssl_require=_as_bool(os.getenv("DB_SSL_REQUIRE", "true")),
     )
