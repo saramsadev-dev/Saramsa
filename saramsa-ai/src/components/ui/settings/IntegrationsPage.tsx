@@ -32,9 +32,11 @@ import {
   Download,
   Folder,
   Users,
-} from 'lucide-react';
+  MessageSquare,
+} from "lucide-react";
 import { AzureIntegrationForm } from "@/components/ui/settings/AzureIntegrationForm";
 import { JiraIntegrationForm } from "@/components/ui/settings/JiraIntegrationForm";
+import { SlackIntegrationForm } from "@/components/ui/settings/SlackIntegrationForm";
 import { BaseModal } from "@/components/ui/modals/BaseModal";
 import type { IntegrationAccount } from "@/store/features/integrations/integrationsSlice";
 import { Button } from "@/components/ui/button";
@@ -53,9 +55,11 @@ export function IntegrationsPage() {
 
   const [showAzureForm, setShowAzureForm] = useState(false);
   const [showJiraForm, setShowJiraForm] = useState(false);
+  const [showSlackForm, setShowSlackForm] = useState(false);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
   const [accountPendingDeletion, setAccountPendingDeletion] = useState<IntegrationAccount | null>(null);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(null);
+  const [slackMessage, setSlackMessage] = useState<string | null>(null);
 
   // Check if integrations already exist
   const hasAzureIntegration = accounts.some(
@@ -64,10 +68,25 @@ export function IntegrationsPage() {
   const hasJiraIntegration = accounts.some(
     (account) => account.provider === "jira"
   );
+  const hasSlackIntegration = accounts.some(
+    (account) => (account.provider as string) === "slack"
+  );
 
   useEffect(() => {
     // Fetch integration accounts from the new API
     dispatch(fetchIntegrationAccounts());
+
+    // Handle Slack OAuth callback redirect
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("slack_connected") === "true") {
+        setSlackMessage("Slack workspace connected successfully!");
+        window.history.replaceState({}, "", window.location.pathname);
+      } else if (params.get("slack_error")) {
+        setSlackMessage(`Slack connection failed: ${params.get("slack_error")}`);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
   }, [dispatch]);
 
   const handleTestConnection = async (accountId: string) => {
@@ -151,7 +170,9 @@ export function IntegrationsPage() {
 
       // Handle both new project creation and existing project navigation
       if (res.data.already_exists) {
+        console.log("Project already exists, navigating to existing project");
       } else {
+        console.log("Project created successfully, navigating to dashboard");
       }
 
       // Navigate to dashboard
@@ -195,12 +216,27 @@ export function IntegrationsPage() {
             <span className="text-white text-sm font-bold">J</span>
           </div>
         );
+      case "slack":
+        return (
+          <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-lg">
+            <MessageSquare className="w-4 h-4 text-white" />
+          </div>
+        );
       default:
         return (
           <div className="w-8 h-8 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center shadow-lg">
             <Settings className="w-4 h-4 text-white" />
           </div>
         );
+    }
+  };
+
+  const getProviderLabel = (provider: string) => {
+    switch (provider) {
+      case "azure": return "Azure DevOps";
+      case "jira": return "Jira Cloud";
+      case "slack": return "Slack";
+      default: return provider;
     }
   };
 
@@ -236,9 +272,51 @@ export function IntegrationsPage() {
                 Add Jira
               </Button>
             )}
+            {!hasSlackIntegration && (
+              <Button
+                onClick={() => setShowSlackForm(true)}
+                variant="outline"
+                className="flex items-center gap-2 px-4 py-2 font-medium border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Add Slack
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Slack OAuth Message */}
+      {slackMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`rounded-xl p-4 ${
+            slackMessage.includes("successfully")
+              ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+              : "bg-destructive/10 border border-destructive/20"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {slackMessage.includes("successfully") ? (
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            ) : (
+              <XCircle className="w-5 h-5 text-destructive" />
+            )}
+            <span className={slackMessage.includes("successfully") ? "text-green-700 dark:text-green-400" : "text-destructive"}>
+              {slackMessage}
+            </span>
+            <Button
+              onClick={() => setSlackMessage(null)}
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+            >
+              x
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Error Display */}
       {error && (
@@ -279,8 +357,8 @@ export function IntegrationsPage() {
               No integrations configured
             </h3>
             <p className="text-muted-foreground mb-6">
-              Connect your Azure DevOps or Jira accounts to start importing
-              projects
+              Connect your Azure DevOps, Jira, or Slack accounts to start importing
+              projects and feedback
             </p>
             <div className="flex gap-3 justify-center">
               {!hasAzureIntegration && (
@@ -301,6 +379,16 @@ export function IntegrationsPage() {
                 >
                   <Plus className="w-4 h-4" />
                   Connect Jira
+                </Button>
+              )}
+              {!hasSlackIntegration && (
+                <Button
+                  onClick={() => setShowSlackForm(true)}
+                  variant="outline"
+                  className="flex items-center gap-2 px-4 py-2 border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Connect Slack
                 </Button>
               )}
             </div>
@@ -326,11 +414,7 @@ export function IntegrationsPage() {
                         {getStatusIcon(account.status)}
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground dark:text-muted-foreground">
-                        <span>
-                          {account.provider === "azure"
-                            ? "Azure DevOps"
-                            : "Jira Cloud"}
-                        </span>
+                        <span>{getProviderLabel(account.provider)}</span>
                         <span>|</span>
                         <span>
                           Connected{" "}
@@ -353,19 +437,21 @@ export function IntegrationsPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => handleFetchProjects(account.provider)}
-                      disabled={fetchingProjects[account.provider]}
-                      variant="saramsa"
-                      className="flex items-center gap-2 px-3 py-2 text-sm"
-                    >
-                      {fetchingProjects[account.provider] ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                      Fetch Projects
-                    </Button>
+                    {(account.provider as string) !== "slack" && (
+                      <Button
+                        onClick={() => handleFetchProjects(account.provider)}
+                        disabled={fetchingProjects[account.provider]}
+                        variant="saramsa"
+                        className="flex items-center gap-2 px-3 py-2 text-sm"
+                      >
+                        {fetchingProjects[account.provider] ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Fetch Projects
+                      </Button>
+                    )}
 
                     <Button
                       onClick={() => handleTestConnection(account.id)}
@@ -408,8 +494,8 @@ export function IntegrationsPage() {
                 <div className="mt-4 pt-4 border-t border-border/60 dark:border-border/60">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
                     <span className="font-medium">Permissions:</span>
-                    <div className="flex gap-2">
-                      {account.scopes.map((scope) => (
+                    <div className="flex gap-2 flex-wrap">
+                      {(account.scopes || []).map((scope) => (
                         <span
                           key={scope}
                           className="px-2 py-1 bg-saramsa-brand/10 text-saramsa-brand rounded text-xs font-medium"
@@ -579,6 +665,16 @@ export function IntegrationsPage() {
         />
       )}
 
+      {showSlackForm && (
+        <SlackIntegrationForm
+          onClose={() => setShowSlackForm(false)}
+          onSuccess={() => {
+            setShowSlackForm(false);
+            dispatch(fetchIntegrationAccounts());
+          }}
+        />
+      )}
+
       {accountPendingDeletion && (
         <BaseModal
           isOpen={!!accountPendingDeletion}
@@ -593,7 +689,7 @@ export function IntegrationsPage() {
           description={
             <>
               Deleting <strong>{accountPendingDeletion.displayName}</strong> will remove the{" "}
-              {accountPendingDeletion.provider === "azure" ? "Azure DevOps" : "Jira"} connection and all related data.
+              {getProviderLabel(accountPendingDeletion.provider)} connection and all related data.
             </>
           }
           footer={
@@ -645,4 +741,3 @@ export function IntegrationsPage() {
     </div>
   );
 }
-

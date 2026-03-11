@@ -9,6 +9,8 @@ from .integration_service import IntegrationService, get_integration_service
 from .project_service import ProjectService, get_project_service
 from .external_api_service import ExternalApiService, get_external_api_service
 from .encryption_service import EncryptionService, get_encryption_service
+from .slack_service import SlackService, get_slack_service
+from .source_service import SourceService, get_source_service
 
 __all__ = [
     'IntegrationService',
@@ -19,4 +21,8 @@ __all__ = [
     'get_external_api_service',
     'EncryptionService',
     'get_encryption_service',
+    'SlackService',
+    'get_slack_service',
+    'SourceService',
+    'get_source_service',
 ]

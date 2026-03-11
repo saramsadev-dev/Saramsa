@@ -31,6 +31,18 @@ from .external_views import (
     get_external_projects,
     check_external_project,
 )
+from .slack_views import (
+    slack_oauth_start,
+    slack_oauth_callback,
+    slack_list_channels,
+    slack_test_connection,
+)
+from .source_views import (
+    create_feedback_source,
+    list_feedback_sources,
+    feedback_source_detail,
+    feedback_source_sync_now,
+)
 
 __all__ = [
     # Integration views
@@ -54,4 +66,14 @@ __all__ = [
     'get_dashboard_jira_projects',
     'get_external_projects',
     'check_external_project',
+    # Slack views
+    'slack_oauth_start',
+    'slack_oauth_callback',
+    'slack_list_channels',
+    'slack_test_connection',
+    # Source views
+    'create_feedback_source',
+    'list_feedback_sources',
+    'feedback_source_detail',
+    'feedback_source_sync_now',
 ]

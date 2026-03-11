@@ -3,6 +3,7 @@ Work item repository for DevOps-related data operations.
 """
 
 from datetime import datetime
+import logging
 from typing import Any, Dict, List, Optional
 
 from django.forms.models import model_to_dict
@@ -11,6 +12,8 @@ from django.utils import timezone
 from authentication.models import UserAccount
 from integrations.models import Project
 from .models import UserStory, WorkItemQualityRule
+
+logger = logging.getLogger(__name__)
 
 
 def _iso(value):
@@ -158,6 +161,93 @@ class WorkItemRepository:
             "updatedAt": _iso(row.updated_at),
             **(row.payload or {}),
         }
+
+    def get_candidates_by_status(self, project_id: str, status: str) -> List[Dict[str, Any]]:
+        """Get embedded work item candidates filtered by review status."""
+        candidates: List[Dict[str, Any]] = []
+        rows = UserStory.objects.filter(project_id=str(project_id)).order_by("-generated_at", "-created_at")
+
+        for story in rows:
+            for item in story.work_items or []:
+                item_status = item.get("status") or item.get("review_status") or "pending"
+                if item_status != status:
+                    continue
+                candidate_id = item.get("id") or item.get("work_item_id")
+                if not candidate_id:
+                    continue
+                candidate = dict(item)
+                candidate["id"] = str(candidate_id)
+                candidate["projectId"] = str(project_id)
+                candidate.setdefault("createdAt", _iso(story.created_at))
+                candidate.setdefault("updatedAt", _iso(story.updated_at))
+                candidates.append(candidate)
+        return candidates
+
+    def update_candidate_status(self, candidate_id: str, project_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an embedded work item candidate by ID."""
+        rows = UserStory.objects.filter(project_id=str(project_id))
+        for story in rows:
+            items = story.work_items or []
+            for idx, item in enumerate(items):
+                current_id = str(item.get("id") or item.get("work_item_id") or "")
+                if current_id != str(candidate_id):
+                    continue
+                updated = {**item, **updates}
+                if "status" in updates:
+                    updated["review_status"] = updates["status"]
+                story.work_items[idx] = updated
+                story.updated_at = timezone.now()
+                story.save(update_fields=["work_items", "updated_at"])
+                result = dict(updated)
+                result["id"] = str(candidate_id)
+                result["projectId"] = str(project_id)
+                result.setdefault("updatedAt", _iso(story.updated_at))
+                result.setdefault("createdAt", _iso(story.created_at))
+                return result
+        raise ValueError(f"Candidate {candidate_id} not found")
+
+    def get_candidate_by_id(self, candidate_id: str, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single embedded candidate by ID."""
+        rows = UserStory.objects.filter(project_id=str(project_id))
+        for story in rows:
+            for item in story.work_items or []:
+                current_id = str(item.get("id") or item.get("work_item_id") or "")
+                if current_id == str(candidate_id):
+                    result = dict(item)
+                    result["id"] = str(candidate_id)
+                    result["projectId"] = str(project_id)
+                    result.setdefault("createdAt", _iso(story.created_at))
+                    result.setdefault("updatedAt", _iso(story.updated_at))
+                    return result
+        return None
+
+    def get_expired_snoozed_candidates(self) -> List[Dict[str, Any]]:
+        """Return snoozed candidates where snooze_until has already passed."""
+        now = timezone.now()
+        expired: List[Dict[str, Any]] = []
+        rows = UserStory.objects.all().order_by("-generated_at", "-created_at")
+
+        for story in rows:
+            for item in story.work_items or []:
+                item_status = item.get("status") or item.get("review_status") or "pending"
+                if item_status != "snoozed":
+                    continue
+                raw_until = item.get("snooze_until")
+                if not raw_until:
+                    continue
+                try:
+                    parsed_until = datetime.fromisoformat(str(raw_until).replace("Z", "+00:00"))
+                    if timezone.is_naive(parsed_until):
+                        parsed_until = timezone.make_aware(parsed_until, timezone.utc)
+                except Exception:
+                    logger.warning("Invalid snooze_until value for candidate %s: %s", item.get("id"), raw_until)
+                    continue
+                if parsed_until <= now:
+                    candidate = dict(item)
+                    candidate["id"] = str(item.get("id") or item.get("work_item_id"))
+                    candidate["projectId"] = str(story.project_id) if story.project_id else ""
+                    expired.append(candidate)
+        return expired
 
     def get_deep_analysis_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
         rows = UserStory.objects.filter(project_id=str(project_id), type="deep_analysis").order_by("-generated_at")

@@ -8,6 +8,7 @@ import jiraReducer from './features/jira/jiraSlice';
 import integrationsReducer from './features/integrations/integrationsSlice';
 import projectsReducer from './features/projects/projectsSlice';
 import userStoriesReducer from './features/userStories/userStoriesSlice';
+import reviewReducer from './features/review/reviewSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -19,6 +20,7 @@ const rootReducer = combineReducers({
   integrations: integrationsReducer,
   projects: projectsReducer,
   userStories: userStoriesReducer,
+  review: reviewReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

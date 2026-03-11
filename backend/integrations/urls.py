@@ -25,9 +25,31 @@ from .views import (
     get_dashboard_jira_projects,
     get_external_projects,
     check_external_project,
+    # Slack views
+    slack_oauth_start,
+    slack_oauth_callback,
+    slack_list_channels,
+    slack_test_connection,
+    # Source views
+    create_feedback_source,
+    list_feedback_sources,
+    feedback_source_detail,
+    feedback_source_sync_now,
 )
 
 urlpatterns = [
+    # Slack OAuth & channel endpoints
+    path('slack/oauth/start/', slack_oauth_start, name='slack_oauth_start'),
+    path('slack/oauth/callback/', slack_oauth_callback, name='slack_oauth_callback'),
+    path('slack/channels/', slack_list_channels, name='slack_list_channels'),
+    path('slack/test/', slack_test_connection, name='slack_test_connection'),
+
+    # Feedback source endpoints
+    path('sources/create/', create_feedback_source, name='create_feedback_source'),
+    path('sources/', list_feedback_sources, name='list_feedback_sources'),
+    path('sources/<str:source_id>/sync/', feedback_source_sync_now, name='feedback_source_sync_now'),
+    path('sources/<str:source_id>/', feedback_source_detail, name='feedback_source_detail'),
+
     # External provider project fetching (for configuration) - most specific first
     path('azure/projects/', get_azure_projects, name='get_azure_projects'),
     path('jira/projects/', get_jira_projects, name='get_jira_projects'),

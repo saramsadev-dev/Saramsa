@@ -17,12 +17,33 @@ from .work_item_views import (
     WorkItemQualityCheckView,
 )
 
+from .review_views import (
+    ReviewQueueListView,
+    ReviewQueueStatsView,
+    CandidateApproveView,
+    CandidateDismissView,
+    CandidateSnoozeView,
+    CandidateMergeView,
+    CandidateBatchApproveView,
+    CandidateUpdateView,
+    CandidateRetryPushView,
+)
+
 __all__ = [
     'WorkItemGenerationView',
-    'WorkItemSubmissionView', 
+    'WorkItemSubmissionView',
     'WorkItemsListView',
     'WorkItemDetailView',
     'WorkItemUpdateView',
     'WorkItemsByPlatformView',
     'WorkItemRemovalView',
+    'ReviewQueueListView',
+    'ReviewQueueStatsView',
+    'CandidateApproveView',
+    'CandidateDismissView',
+    'CandidateSnoozeView',
+    'CandidateMergeView',
+    'CandidateBatchApproveView',
+    'CandidateUpdateView',
+    'CandidateRetryPushView',
 ]

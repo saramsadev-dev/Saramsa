@@ -3,6 +3,7 @@ import ssl
 import sys
 import logging
 from celery import Celery
+from celery.schedules import crontab
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'apis.settings')
@@ -80,7 +81,12 @@ app.conf.task_send_sent_event = True
 
 # Scheduled ingestion task disabled for now.
 # To re-enable later, restore the beat entry below.
-app.conf.beat_schedule = {}
+app.conf.beat_schedule = {
+    "unsnooze-candidates": {
+        "task": "unsnooze_expired_candidates",
+        "schedule": crontab(minute=0, hour=9),
+    },
+}
 # app.conf.beat_schedule = {
 #     "run-scheduled-ingestions": {
 #         "task": "feedback_analysis.run_scheduled_ingestions",
