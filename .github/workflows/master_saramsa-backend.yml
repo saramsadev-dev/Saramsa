@@ -72,6 +72,7 @@ jobs:
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
           source .venv/bin/activate
+          export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
           python manage.py test
 
       - name: Run Django collectstatic
@@ -87,6 +88,7 @@ jobs:
           AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
           source .venv/bin/activate
+          export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
           python manage.py collectstatic --noinput
 
       - name: Create deployment bundle

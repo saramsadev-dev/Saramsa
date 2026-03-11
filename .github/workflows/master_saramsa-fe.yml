@@ -50,9 +50,21 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL_SECRET: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
           NEXT_PUBLIC_API_URL_VAR: ${{ vars.NEXT_PUBLIC_API_URL }}
           NEXT_PUBLIC_API_BASE_URL_VAR: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+          API_BASE_URL_SECRET: ${{ secrets.API_BASE_URL }}
+          API_BASE_URL_VAR: ${{ vars.API_BASE_URL }}
+          BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
           NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL_SECRET:-$NEXT_PUBLIC_API_URL_VAR}"
           NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL_SECRET:-$NEXT_PUBLIC_API_BASE_URL_VAR}"
+          API_BASE_URL="${API_BASE_URL_SECRET:-$API_BASE_URL_VAR}"
+
+          if [ -z "$API_BASE_URL" ] && [ -n "$BACKEND_HEALTH_URL" ]; then
+            API_BASE_URL="${BACKEND_HEALTH_URL%/api/health/}"
+            API_BASE_URL="${API_BASE_URL%/api/health}"
+          fi
+          if [ -z "$NEXT_PUBLIC_API_BASE_URL" ] && [ -n "$API_BASE_URL" ]; then
+            NEXT_PUBLIC_API_BASE_URL="${API_BASE_URL%/api}"
+          fi
 
           if [ -z "$NEXT_PUBLIC_API_BASE_URL" ] && [ -n "$NEXT_PUBLIC_API_URL" ]; then
             NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_URL%/api}"

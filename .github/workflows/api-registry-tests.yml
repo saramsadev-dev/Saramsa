@@ -37,10 +37,17 @@ jobs:
           API_BASE_URL_VAR: ${{ vars.API_BASE_URL }}
           BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
-          API_BASE_URL="${API_BASE_URL_SECRET:-$API_BASE_URL_VAR}"
-          if [ -z "$API_BASE_URL" ] && [ -n "$BACKEND_HEALTH_URL" ]; then
+          if [ -n "$BACKEND_HEALTH_URL" ]; then
             API_BASE_URL="${BACKEND_HEALTH_URL%/api/health/}"
             API_BASE_URL="${API_BASE_URL%/api/health}"
+          else
+            API_BASE_URL="${API_BASE_URL_SECRET:-$API_BASE_URL_VAR}"
+          fi
+          if [ -n "$API_BASE_URL" ] && [[ ! "$API_BASE_URL" =~ ^https?:// ]]; then
+            API_BASE_URL="https://$API_BASE_URL"
+          fi
+          if [[ "$API_BASE_URL" =~ ^http:// ]]; then
+            API_BASE_URL="https://${API_BASE_URL#http://}"
           fi
           if [ -z "$API_BASE_URL" ]; then
             echo "API_BASE_URL is not set in secrets/vars and BACKEND_HEALTH_URL fallback is unavailable."
