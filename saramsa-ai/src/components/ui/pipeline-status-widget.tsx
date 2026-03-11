@@ -266,7 +266,7 @@ export function PipelineStatusWidget() {
                 visibleTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2 transition hover:bg-muted/50"
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2 transition hover:bg-muted/50"
                     onClick={() => handleTaskClick(task)}
                   >
                     <div className="flex-shrink-0">
@@ -308,14 +308,6 @@ export function PipelineStatusWidget() {
         >
           <GitBranch className="h-5 w-5" />
         </button>
-
-        {!open && (
-          <div className="pointer-events-none absolute right-0 top-16 text-right">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-              Pipeline
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );

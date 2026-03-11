@@ -42,6 +42,8 @@ interface AnalysisState {
   fetchingAnalysisById: boolean;
 }
 
+const MAX_HISTORY_RUNS = 15;
+
 const initialState: AnalysisState = {
   analysisData: null,
   deepAnalysis: null,
@@ -461,7 +463,7 @@ const analysisSlice = createSlice({
       state.analysisHistory = [
         entry,
         ...state.analysisHistory.filter(e => e.id !== entry.id),
-      ];
+      ].slice(0, MAX_HISTORY_RUNS);
     },
     replaceInHistory: (state, action: PayloadAction<{ oldId: string; entry: AnalysisHistoryEntry }>) => {
       const idx = state.analysisHistory.findIndex(e => e.id === action.payload.oldId);
@@ -474,6 +476,7 @@ const analysisSlice = createSlice({
           ...state.analysisHistory,
         ];
       }
+      state.analysisHistory = state.analysisHistory.slice(0, MAX_HISTORY_RUNS);
     },
     removeFromHistory: (state, action: PayloadAction<string>) => {
       state.analysisHistory = state.analysisHistory.filter(e => e.id !== action.payload);
@@ -633,7 +636,7 @@ const analysisSlice = createSlice({
       })
       .addCase(fetchAnalysisHistory.fulfilled, (state, action) => {
         state.historyLoading = false;
-        state.analysisHistory = action.payload;
+        state.analysisHistory = action.payload.slice(0, MAX_HISTORY_RUNS);
       })
       .addCase(fetchAnalysisHistory.rejected, (state, action) => {
         state.historyLoading = false;

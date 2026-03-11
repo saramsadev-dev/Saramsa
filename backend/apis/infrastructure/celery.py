@@ -78,13 +78,15 @@ app.autodiscover_tasks()
 app.conf.worker_send_task_events = True
 app.conf.task_send_sent_event = True
 
-# Scheduled ingestion task (every 15 minutes)
-app.conf.beat_schedule = {
-    "run-scheduled-ingestions": {
-        "task": "feedback_analysis.run_scheduled_ingestions",
-        "schedule": 900.0,
-    }
-}
+# Scheduled ingestion task disabled for now.
+# To re-enable later, restore the beat entry below.
+app.conf.beat_schedule = {}
+# app.conf.beat_schedule = {
+#     "run-scheduled-ingestions": {
+#         "task": "feedback_analysis.run_scheduled_ingestions",
+#         "schedule": 900.0,
+#     }
+# }
 
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
