@@ -5,16 +5,11 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/store/rootReducer";
 import { apiRequest } from "@/lib/apiRequest";
 import { getValidAccessToken } from "@/lib/auth";
-import { ChevronDown } from 'lucide-react';
+import { usePathname, useRouter } from "next/navigation";
+import { AlertCircle, CheckCircle2, ChevronDown, GitBranch, Loader2 } from 'lucide-react';
 import { cn } from "./utils";
 
 type StageStatus = "idle" | "pending" | "running" | "success" | "error";
-
-type Stage = {
-  label: string;
-  detail: string;
-  status: StageStatus;
-};
 
 type TaskItem = {
   id: string;
@@ -36,20 +31,16 @@ const statusCopy: Record<StageStatus, { label: string; tone: string }> = {
   idle: { label: "Idle", tone: "text-muted-foreground" },
   pending: { label: "Queued", tone: "text-amber-600" },
   running: { label: "Processing", tone: "text-sky-600" },
-  success: { label: "Completed", tone: "text-emerald-600" },
+  success: { label: "Done", tone: "text-emerald-600" },
   error: { label: "Failed", tone: "text-rose-600" },
 };
 
 export function PipelineStatusWidget() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const analysisStatus = useSelector(
     (state: RootState) => state.analysis.analysisStatus
-  );
-  const loadedComments = useSelector(
-    (state: RootState) => state.analysis.loadedComments
-  );
-  const analysisData = useSelector(
-    (state: RootState) => state.analysis.analysisData
   );
   const taskId = useSelector((state: RootState) => state.analysis.taskId);
   const projectContext = useSelector(
@@ -101,10 +92,11 @@ export function PipelineStatusWidget() {
   useEffect(() => {
     let isMounted = true;
     const mapApiTask = (task: any): TaskItem => {
+      const routedId = task.insight_id || task.analysis_id || task.task_id;
       const raw = String(task?.status || "").toUpperCase();
       if (raw === "PARTIAL") {
         return {
-          id: task.task_id,
+          id: routedId,
           label: toLabel(task.project_id, task.file_name),
           detail: "Sentiment + synthesis pipeline",
           status: "error",
@@ -125,7 +117,7 @@ export function PipelineStatusWidget() {
           ? "error"
           : "pending";
       return {
-        id: task.task_id,
+        id: routedId,
         label: toLabel(task.project_id, task.file_name),
         detail: "Sentiment + synthesis pipeline",
         status,
@@ -171,69 +163,19 @@ export function PipelineStatusWidget() {
     };
   }, []);
 
-  const { overall, stages } = useMemo(() => {
+  const overall = useMemo(() => {
     switch (analysisStatus) {
       case "pending":
       case "processing":
-        return {
-          overall: "running" as StageStatus,
-          stages: [
-            { label: "Ingestion", detail: "Upload + parsing", status: "success" },
-            { label: "Processing", detail: "Sentiment + topics", status: "running" },
-            { label: "Synthesis", detail: "Insights + summary", status: "pending" },
-            { label: "Work Items", detail: "DevOps/Jira push", status: "pending" },
-          ],
-        };
+        return "running" as StageStatus;
       case "success":
-        return {
-          overall: "success" as StageStatus,
-          stages: [
-            { label: "Ingestion", detail: "Upload + parsing", status: "success" },
-            { label: "Processing", detail: "Sentiment + topics", status: "success" },
-            { label: "Synthesis", detail: "Insights + summary", status: "success" },
-            { label: "Work Items", detail: "DevOps/Jira push", status: "success" },
-          ],
-        };
+        return "success" as StageStatus;
       case "failure":
-        return {
-          overall: "error" as StageStatus,
-          stages: [
-            { label: "Ingestion", detail: "Upload + parsing", status: "success" },
-            { label: "Processing", detail: "Sentiment + topics", status: "error" },
-            { label: "Synthesis", detail: "Insights + summary", status: "idle" },
-            { label: "Work Items", detail: "DevOps/Jira push", status: "idle" },
-          ],
-        };
+        return "error" as StageStatus;
       default:
-        return {
-          overall: "idle" as StageStatus,
-          stages: [
-            { label: "Ingestion", detail: "Upload + parsing", status: "idle" },
-            { label: "Processing", detail: "Sentiment + topics", status: "idle" },
-            { label: "Synthesis", detail: "Insights + summary", status: "idle" },
-            { label: "Work Items", detail: "DevOps/Jira push", status: "idle" },
-          ],
-        };
+        return "idle" as StageStatus;
     }
   }, [analysisStatus]);
-
-  const commentCount = Array.isArray(loadedComments)
-    ? loadedComments.length
-    : analysisData?.analysisData?.comments_count ??
-      analysisData?.comments_count ??
-      analysisData?.analysisData?.counts?.total ??
-      analysisData?.counts?.total ??
-      null;
-
-  const processingSeconds =
-    analysisData?.analysisData?.processing_time ??
-    analysisData?.processing_time ??
-    null;
-
-  const processingMinutes =
-    typeof processingSeconds === "number"
-      ? Math.max(1, Math.round(processingSeconds / 60))
-      : null;
 
   const overallCopy = statusCopy[overall];
   const taskSource = apiTasks.length > 0 ? apiTasks : tasks;
@@ -243,9 +185,8 @@ export function PipelineStatusWidget() {
   const historyTasks = taskSource.filter(
     (task) => task.status !== "pending" && task.status !== "running"
   );
-  const orderedTasks = [...activeTasks, ...historyTasks].slice(0, 15);
-  const topTasks = orderedTasks.slice(0, 3);
-  const remainingTasks = orderedTasks.slice(3);
+  const visibleHistoryTasks = historyTasks.slice(0, 3);
+  const visibleTasks = [...activeTasks, ...visibleHistoryTasks];
 
   const buildHealthTooltip = (task: TaskItem) => {
     const errors = task.pipelineHealth?.errors;
@@ -259,6 +200,21 @@ export function PipelineStatusWidget() {
     task.statusLabel ?? statusCopy[task.status].label;
   const statusToneForTask = (task: TaskItem) =>
     task.statusTone ?? statusCopy[task.status].tone;
+  const statusIconForTask = (task: TaskItem) => {
+    if (task.status === "running") return <Loader2 className="h-4 w-4 animate-spin text-sky-600" />;
+    if (task.status === "pending") return <Loader2 className="h-4 w-4 text-amber-600" />;
+    if (task.status === "success") return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+    if (task.status === "error") return <AlertCircle className="h-4 w-4 text-rose-600" />;
+    return <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/50" />;
+  };
+  const handleTaskClick = (task: TaskItem) => {
+    if (!pathname || !task.id) return;
+    const segments = pathname.split("/").filter(Boolean);
+    if (segments[0] !== "projects" || !segments[1]) return;
+    const projectIdSegment = segments[1];
+    setOpen(false);
+    router.push(`/projects/${projectIdSegment}/dashboard?analysisId=${encodeURIComponent(task.id)}`);
+  };
   const formatTaskMeta = (task: TaskItem) => {
     const parts: string[] = [];
     if (typeof task.commentCount === "number") {
@@ -274,18 +230,12 @@ export function PipelineStatusWidget() {
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {open && (
-        <div className="mb-4 w-[380px] rounded-2xl border border-border/70 bg-background/95 p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
+        <div className="absolute bottom-20 right-0 w-[380px] rounded-2xl border border-border/70 bg-background/95 p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
                 Pipeline Status
               </p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className={cn("text-sm font-semibold", overallCopy.tone)}>
-                  {overallCopy.label}
-                </span>
-                <span className="text-xs text-muted-foreground">- Live view</span>
-              </div>
             </div>
             <button
               className="rounded-full border border-border/60 p-1 text-muted-foreground transition hover:text-foreground"
@@ -296,82 +246,35 @@ export function PipelineStatusWidget() {
             </button>
           </div>
 
-            <div className="mt-4">
-              <div className="flex items-center gap-2">
-                {stages.map((stage) => (
-                  <div key={`${stage.label}-bar`} className="flex-1">
-                    <div className="h-2 rounded-full bg-secondary/40 overflow-hidden border border-border/60">
-                      <div
-                        className={cn(
-                          "h-full transition-all duration-500",
-                          stage.status === "success"
-                            ? "w-full bg-foreground"
-                            : stage.status === "running"
-                            ? "w-3/4 bg-saramsa-brand/60"
-                            : stage.status === "error"
-                            ? "w-full bg-muted-foreground/40"
-                            : "w-1/5 bg-secondary/60"
-                        )}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div className="mt-2">
             <div className="mt-2 flex flex-wrap items-center gap-3 text-muted-foreground">
-              {stages.map((stage) => (
-                <div
-                  key={`${stage.label}-status`}
-                  className={cn(
-                    "inline-flex items-center rounded-md border border-border/60 bg-background/80 px-2 py-1 text-[10px] font-medium text-muted-foreground",
-                    stage.status === "success"
-                      ? "text-foreground"
-                      : stage.status === "running"
-                      ? "text-saramsa-brand"
-                      : stage.status === "error"
-                      ? "text-muted-foreground"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {stage.label}: {statusCopy[stage.status].label}
-                </div>
-              ))}
-              {(commentCount || processingMinutes) && (
-                <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-                  {commentCount ? (
-                    <span>{commentCount} comments</span>
-                  ) : null}
-                  {commentCount && processingMinutes ? <span>·</span> : null}
-                  {processingMinutes ? (
-                    <span>{processingMinutes} min</span>
-                  ) : null}
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="mt-5">
+          <div className="mt-3">
             <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted-foreground">
               <span>Tasks</span>
-              <span>{orderedTasks.length}/15</span>
+              <span>{visibleTasks.length}</span>
             </div>
 
             <div className="mt-3 space-y-2">
-              {topTasks.length === 0 ? (
+              {visibleTasks.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/60 px-3 py-3 text-xs text-muted-foreground">
                   No tasks yet.
                 </div>
               ) : (
-                topTasks.map((task) => (
+                visibleTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2"
+                    className="flex items-center gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2 transition hover:bg-muted/50"
+                    onClick={() => handleTaskClick(task)}
                   >
+                    <div className="flex-shrink-0">
+                      {statusIconForTask(task)}
+                    </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-foreground">
                         {task.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {task.detail}
                       </p>
                     </div>
                     <div className="text-right">
@@ -388,72 +291,32 @@ export function PipelineStatusWidget() {
                 ))
               )}
             </div>
-
-            {remainingTasks.length > 0 && (
-              <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-1">
-                {remainingTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/60 px-3 py-2"
-                  >
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {task.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {task.detail}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={cn("text-[11px] font-medium", statusToneForTask(task))}>
-                        {statusLabelForTask(task)}
-                      </p>
-                      {formatTaskMeta(task) && (
-                        <p className="text-[11px] text-muted-foreground" title={buildHealthTooltip(task)}>
-                          {formatTaskMeta(task)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      <button
-        onClick={() => setOpen((value) => !value)}
-        className={cn(
-          "group relative flex h-14 w-14 items-center justify-center rounded-full",
-          "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white",
-          "shadow-[0_18px_40px_-20px_rgba(15,23,42,0.75)]",
-          "transition hover:-translate-y-0.5 hover:shadow-[0_24px_55px_-24px_rgba(15,23,42,0.8)]"
-        )}
-        aria-label="Toggle pipeline status"
-      >
-        <span className="text-xs font-semibold">P</span>
-        <span
+      <div className="flex flex-col items-end">
+        <button
+          onClick={() => setOpen((value) => !value)}
           className={cn(
-            "absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-background",
-            overall === "running" || overall === "pending"
-              ? "bg-amber-400 animate-pulse"
-              : overall === "success"
-              ? "bg-emerald-400"
-              : overall === "error"
-              ? "bg-rose-500"
-              : "bg-muted-foreground/50"
+            "group relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full",
+            "bg-saramsa-brand text-white hover:bg-saramsa-brand-hover",
+            "shadow-[0_18px_40px_-20px_rgba(255,137,33,0.55)]",
+            "transition hover:-translate-y-0.5 hover:shadow-[0_24px_55px_-24px_rgba(15,23,42,0.8)]"
           )}
-        />
-      </button>
+          aria-label="Toggle pipeline status"
+        >
+          <GitBranch className="h-5 w-5" />
+        </button>
 
-      {!open && (
-        <div className="pointer-events-none mt-2 text-right">
-          <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-            Pipeline
-          </span>
-        </div>
-      )}
+        {!open && (
+          <div className="pointer-events-none absolute right-0 top-16 text-right">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+              Pipeline
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

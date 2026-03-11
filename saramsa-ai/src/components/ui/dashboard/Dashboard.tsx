@@ -33,7 +33,7 @@ import {
 
 import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
-import { Sparkles } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 import { UploadPanel } from './UploadPanel';
 import { MetricsCards } from './MetricsCards';
 import { FeatureSentimentsTable } from '../../dashboard/analysisDashboard/FeatureSentimentsTable';
@@ -43,7 +43,6 @@ import { AdvancedWordCloud } from './AdvancedWordCloud';
 // import { NavigationTabs } from './NavigationTabs'; // Inlined below
 import { UserStoryList } from '../userStoryList';
 
-import { LoaderForDashboard } from '@/components/dashboard/analysisDashboard/LoaderForDashboard';
 import { AnalysisRunList } from './AnalysisRunList';
 
 // Local interface for the component
@@ -64,6 +63,7 @@ interface DashboardProps {
   data?: AnalysisData;
   onProjectSelect?: (projectId: string) => void;
   initialProjectId?: string;
+  initialSelectedAnalysisId?: string | null;
   skipBootstrapFetches?: boolean; // when true, parent handles projects/integrations fetching
 }
 
@@ -84,7 +84,7 @@ function validateSelectedFile(file: File): { isValid: boolean; error?: string } 
   return { isValid: true };
 }
 
-export function DashboardComponent({ data, onProjectSelect, initialProjectId, skipBootstrapFetches = false }: DashboardProps) {
+export function DashboardComponent({ data, onProjectSelect, initialProjectId, initialSelectedAnalysisId, skipBootstrapFetches = false }: DashboardProps) {
   const dispatch = useDispatch<AppDispatch>();
   const {
     analysisData,
@@ -92,6 +92,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     loading,
     error,
     isAnalyzing,
+    analysisStatus,
     loadedComments,
     latestAnalysis,
     projectContext,
@@ -124,6 +125,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
   const lastFetchedProjectRef = useRef<string | null>(null);
   const lastProcessedAnalysisIdRef = useRef<string | null>(null);
   const lastHistoryProjectRef = useRef<string | null>(null);
+  const initialSelectionAppliedRef = useRef<string | null>(null);
   useEffect(() => {
     const contextProjectId = projectContext?.project_id;
     if (!contextProjectId) return;
@@ -140,18 +142,29 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
       localStorage.setItem('project_id', contextProjectId);
     }
   }, [projectContext]); // Removed currentProjectId from dependencies to prevent loop
+
+  useEffect(() => {
+    if (!initialSelectedAnalysisId) return;
+    if (initialSelectionAppliedRef.current === initialSelectedAnalysisId) return;
+    dispatch(setSelectedAnalysisId(initialSelectedAnalysisId));
+    lastProcessedAnalysisIdRef.current = null;
+    initialSelectionAppliedRef.current = initialSelectedAnalysisId;
+  }, [dispatch, initialSelectedAnalysisId]);
   const [wordCloudView, setWordCloudView] = useState<'split' | 'advanced'>('split');
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
   const selectedProjectName = projects?.find((p: any) => p.id === (currentProjectId || projectId))?.name;
   const isProjectAnalyzing = isAnalyzing;
+  const isTaskListLoading = useMemo(
+    () => historyLoading && analysisHistory.length === 0,
+    [historyLoading, analysisHistory.length]
+  );
   const isTaskViewLoading = useMemo(
     () =>
-      historyLoading ||
       fetchingAnalysisById ||
       isAnalyzing ||
       !!selectedAnalysisId?.startsWith('analyzing_'),
-    [historyLoading, fetchingAnalysisById, isAnalyzing, selectedAnalysisId]
+    [fetchingAnalysisById, isAnalyzing, selectedAnalysisId]
   );
   const selectedPlatform = useMemo((): 'azure' | 'jira' | null => {
     if (!projects || !projects.length) return null;
@@ -160,6 +173,71 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
     const provider = proj?.externalLinks?.[0]?.provider;
     return provider === 'jira' ? 'jira' : provider === 'azure' ? 'azure' : null;
   }, [projects, currentProjectId, projectId]);
+
+  const hasGeneratedWorkItems = useMemo(
+    () =>
+      Boolean(deepAnalysis?.work_items?.length) ||
+      Boolean(currentProjectUserStories?.some((story: any) => story?.work_items?.length)),
+    [deepAnalysis, currentProjectUserStories]
+  );
+
+  const analysisProgressUi = useMemo(() => {
+    switch (analysisStatus) {
+      case 'pending':
+        return { label: 'Queued', width: 'w-1/4', tone: 'bg-orange-400/80', text: 'text-orange-600 dark:text-orange-400' };
+      case 'processing':
+        return { label: 'Processing', width: 'w-2/3', tone: 'bg-orange-500/80', text: 'text-orange-600 dark:text-orange-400' };
+      case 'success':
+        if (isGeneratingUserStories) {
+          return { label: 'Generating Work Items', width: 'w-3/4', tone: 'bg-orange-600/80', text: 'text-orange-600 dark:text-orange-400' };
+        }
+        if (!hasGeneratedWorkItems) {
+          return { label: 'Insights Ready', width: 'w-3/4', tone: 'bg-orange-500/80', text: 'text-orange-600 dark:text-orange-400' };
+        }
+        return { label: 'Completed', width: 'w-full', tone: 'bg-orange-600/80', text: 'text-orange-600 dark:text-orange-400' };
+      case 'failure':
+        return { label: 'Failed', width: 'w-full', tone: 'bg-orange-700/80', text: 'text-orange-700 dark:text-orange-400' };
+      default:
+        return null;
+    }
+  }, [analysisStatus, isGeneratingUserStories, hasGeneratedWorkItems]);
+
+  const analysisProgressSteps = useMemo(() => {
+    const base = [
+      { label: 'Ingestion', status: 'idle' as 'idle' | 'running' | 'success' | 'error' },
+      { label: 'Processing', status: 'idle' as 'idle' | 'running' | 'success' | 'error' },
+      { label: 'Synthesis', status: 'idle' as 'idle' | 'running' | 'success' | 'error' },
+      { label: 'Work Items', status: 'idle' as 'idle' | 'running' | 'success' | 'error' },
+    ];
+
+    if (analysisStatus === 'pending') {
+      base[0].status = 'running';
+      return base;
+    }
+    if (analysisStatus === 'processing') {
+      base[0].status = 'success';
+      base[1].status = 'running';
+      return base;
+    }
+    if (analysisStatus === 'success') {
+      base[0].status = 'success';
+      base[1].status = 'success';
+      base[2].status = 'success';
+      base[3].status = isGeneratingUserStories
+        ? 'running'
+        : hasGeneratedWorkItems
+        ? 'success'
+        : 'idle';
+      return base;
+    }
+    if (analysisStatus === 'failure') {
+      base[0].status = 'success';
+      base[1].status = 'error';
+      return base;
+    }
+
+    return base;
+  }, [analysisStatus, hasGeneratedWorkItems, isGeneratingUserStories]);
 
 
   // Handle regeneration of analysis
@@ -1385,7 +1463,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
           <AnalysisRunList
             entries={analysisHistory}
             selectedId={selectedAnalysisId}
-            isLoading={isTaskViewLoading}
+            isLoading={isTaskListLoading}
             onSelect={handleRunSelect}
             onRename={handleRunRename}
             projectName={selectedProjectName}
@@ -1429,8 +1507,77 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
               )}
 
               {/* Analysis Results Section — only show loader when the selected run is the one being analyzed */}
+              {analysisProgressUi && (
+                <div className="rounded-xl border border-border/60 bg-card/80 p-3">
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="font-medium text-foreground">Analysis Progress</span>
+                    <span className={analysisProgressUi.text}>{analysisProgressUi.label}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-4 items-start gap-2">
+                    {analysisProgressSteps.map((step, idx) => (
+                      <div key={step.label} className="relative flex flex-col items-center text-center">
+                        {idx < analysisProgressSteps.length - 1 && (
+                          <div
+                            className={`absolute left-[calc(50%+12px)] top-[10px] h-[2px] w-[calc(100%-24px)] ${
+                              step.status === 'success' ? 'bg-orange-500/60' : 'bg-border/70'
+                            }`}
+                          />
+                        )}
+                        <div
+                          className={`z-10 h-5 w-5 rounded-full border ${
+                            step.status === 'success'
+                              ? 'border-orange-500/60 bg-orange-500/80'
+                              : step.status === 'running'
+                              ? 'border-orange-400/60 bg-orange-400/80'
+                              : step.status === 'error'
+                              ? 'border-orange-700/60 bg-orange-700/80'
+                              : 'border-border/70 bg-background'
+                          } flex items-center justify-center`}
+                        >
+                          {step.status === 'success' && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span
+                          className={`mt-1 text-[10px] font-medium ${
+                            step.status === 'success'
+                              ? 'text-orange-600 dark:text-orange-400'
+                              : step.status === 'running'
+                              ? 'text-orange-500 dark:text-orange-400'
+                              : step.status === 'error'
+                              ? 'text-orange-700 dark:text-orange-400'
+                              : 'text-muted-foreground'
+                          }`}
+                        >
+                          {step.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {isTaskViewLoading ? (
-                <LoaderForDashboard />
+                <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Preparing fresh analysis</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Fetching latest run data and rebuilding charts.
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-600 dark:text-orange-400">
+                      {analysisProgressUi?.label || 'Loading'}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="h-20 rounded-xl border border-border/60 bg-secondary/40 animate-pulse" />
+                    <div className="h-20 rounded-xl border border-border/60 bg-secondary/40 animate-pulse" />
+                    <div className="h-20 rounded-xl border border-border/60 bg-secondary/40 animate-pulse" />
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div className="h-4 w-40 rounded bg-secondary/50 animate-pulse" />
+                    <div className="h-36 rounded-xl border border-border/60 bg-secondary/30 animate-pulse" />
+                  </div>
+                </div>
               ) : (
                 <>
                   {/* Metrics Cards */}
@@ -1460,11 +1607,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             </>
 
             {/* User Stories Section */}
+            {!isTaskViewLoading && (
             <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
               {isGeneratingUserStories ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <LoaderForDashboard />
-                  <p className="mt-4 text-muted-foreground">Generating user stories from analysis...</p>
+                <div className="py-8 text-center">
+                  <p className="text-sm font-semibold text-foreground">Generating user stories</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Track progress in the Analysis Progress bar above.
+                  </p>
                 </div>
               ) : selectedPlatform === 'jira' ? (
                 /* Jira User Stories View */
@@ -1659,9 +1809,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
                 })()
               )}
             </div>
+            )}
 
             {/* Sentiment Charts */}
-            {hasAnalysisResults && (
+            {hasAnalysisResults && !isTaskViewLoading && (
               <SentimentCharts
                 featureSentimentData={featureSentimentData}
                 sentimentData={sentimentData}
@@ -1670,7 +1821,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             )}
 
             {/* Keywords Analysis */}
-            {hasAnalysisResults && (
+            {hasAnalysisResults && !isTaskViewLoading && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-foreground">
@@ -1709,7 +1860,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, sk
             )}
 
             {/* Summary Info */}
-            {hasAnalysisResults && (
+            {hasAnalysisResults && !isTaskViewLoading && (
               <div className="text-xs text-muted-foreground/70 text-right">
                 Analysis from {(() => {
                   const analysisDate = activeAnalysisData?.createdAt;

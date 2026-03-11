@@ -8,16 +8,16 @@ import { getValidAccessToken } from "@/lib/auth";
 export function PipelineWidgetGate() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setHasToken(Boolean(getValidAccessToken()));
   }, []);
 
   if (!mounted) {
     return null;
   }
+
+  const hasToken = Boolean(getValidAccessToken());
 
   if (!pathname || !pathname.startsWith("/projects/")) {
     return null;

@@ -15,6 +15,81 @@ $script:StartupFailed = $false
 $script:StartupErrorPrinted = $false
 $script:StartupFailureReason = ""
 
+function Test-NeonDbPreflight {
+    param(
+        [string]$PythonExe,
+        [int]$Attempts = 5,
+        [int]$DelaySeconds = 3
+    )
+
+    Write-Host "Checking Neon PostgreSQL connectivity..." -ForegroundColor Yellow
+    $script = @'
+import os
+import sys
+import time
+from pathlib import Path
+from urllib.parse import urlparse
+
+from dotenv import load_dotenv
+import psycopg2
+
+backend_dir = Path.cwd() / "backend"
+load_dotenv(backend_dir / ".env")
+database_url = os.getenv("DATABASE_URL", "").strip()
+if not database_url:
+    print("DATABASE_URL is missing.")
+    sys.exit(2)
+
+host = (urlparse(database_url).hostname or "").lower()
+if not host.endswith(".neon.tech"):
+    print(f"DATABASE_URL host is not Neon: {host or 'missing'}")
+    sys.exit(2)
+
+attempts = int(os.getenv("SARAMSA_DB_PREFLIGHT_ATTEMPTS", "5"))
+delay = int(os.getenv("SARAMSA_DB_PREFLIGHT_DELAY_SECONDS", "3"))
+timeout = int(os.getenv("SARAMSA_DB_CONNECT_TIMEOUT", "12"))
+
+for i in range(1, attempts + 1):
+    try:
+        conn = psycopg2.connect(database_url, connect_timeout=timeout)
+        cur = conn.cursor()
+        cur.execute("select 1")
+        cur.fetchone()
+        cur.close()
+        conn.close()
+        print("NEON_DB_OK")
+        sys.exit(0)
+    except Exception as exc:
+        print(f"attempt {i}/{attempts}: {type(exc).__name__}: {exc}")
+        if i < attempts:
+            time.sleep(delay)
+
+sys.exit(1)
+'@
+
+    $oldAttempts = $env:SARAMSA_DB_PREFLIGHT_ATTEMPTS
+    $oldDelay = $env:SARAMSA_DB_PREFLIGHT_DELAY_SECONDS
+    try {
+        $env:SARAMSA_DB_PREFLIGHT_ATTEMPTS = [string]$Attempts
+        $env:SARAMSA_DB_PREFLIGHT_DELAY_SECONDS = [string]$DelaySeconds
+        $output = $script | & $PythonExe - 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] Neon DB connection verified" -ForegroundColor Green
+            return $true
+        }
+        Write-Host "[ERROR] Neon DB preflight failed:" -ForegroundColor Red
+        foreach ($line in $output) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$line)) {
+                Write-Host "  $line" -ForegroundColor Yellow
+            }
+        }
+        return $false
+    } finally {
+        if ($null -eq $oldAttempts) { Remove-Item Env:SARAMSA_DB_PREFLIGHT_ATTEMPTS -ErrorAction SilentlyContinue } else { $env:SARAMSA_DB_PREFLIGHT_ATTEMPTS = $oldAttempts }
+        if ($null -eq $oldDelay) { Remove-Item Env:SARAMSA_DB_PREFLIGHT_DELAY_SECONDS -ErrorAction SilentlyContinue } else { $env:SARAMSA_DB_PREFLIGHT_DELAY_SECONDS = $oldDelay }
+    }
+}
+
 function Show-StartupSummary {
     if ($script:StartupSummaryPrinted) { return }
     Write-Host ""
@@ -103,10 +178,24 @@ function Write-HonchoLine {
 
     if (
         -not $script:StartupSummaryPrinted -and
-        $Line -match 'backend\.1\s+\|.*(django\.db\.utils\.OperationalError|psycopg2\.OperationalError|could not translate host name|could not connect to server|connection refused|timeout expired)'
+        $Line -match 'backend\.1\s+\|.*(django\.db\.utils\.OperationalError|psycopg2\.OperationalError|could not translate host name|could not connect to server|connection refused|timeout expired|timed out)'
     ) {
         $script:StartupFailed = $true
         $script:StartupFailureReason = "Backend failed to connect to Neon PostgreSQL (DATABASE_URL)."
+        Show-StartupError
+    }
+
+    if (
+        -not $script:StartupSummaryPrinted -and
+        $Line -match 'frontend\.1\s+\|.*(EADDRINUSE|address already in use).*3001'
+    ) {
+        $script:StartupFailed = $true
+        $frontendPid = Get-ListeningProcessId -Port 3001
+        if ($frontendPid) {
+            $script:StartupFailureReason = "Frontend failed to bind port 3001 (already in use by PID $frontendPid)."
+        } else {
+            $script:StartupFailureReason = "Frontend failed to bind port 3001 (already in use)."
+        }
         Show-StartupError
     }
 
@@ -177,6 +266,10 @@ try {
     }
 
     Start-Redis
+    if (-not (Test-NeonDbPreflight -PythonExe $pythonExe -Attempts 5 -DelaySeconds 3)) {
+        Write-Host "[ERROR] Aborting startup because Neon DB preflight failed." -ForegroundColor Red
+        exit 1
+    }
 
     if (Test-Path $CeleryOpsUIDir) {
         Write-Host "Checking Celery Ops React UI..." -ForegroundColor Yellow

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "@/store/store";
 import {
@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 export default function ProjectDashboardPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useDispatch<AppDispatch>();
 
   const { projects, loading: projectsLoading } = useSelector(
@@ -139,15 +140,17 @@ export default function ProjectDashboardPage() {
   // Enhanced DashboardComponent with project selection handling
   const EnhancedDashboard = useMemo(() => {
     if (!project || !isInitialized) return null;
+    const selectedAnalysisId = searchParams.get("analysisId");
 
     return (
       <DashboardComponent
         skipBootstrapFetches
         onProjectSelect={handleProjectSelect}
         initialProjectId={project.id}
+        initialSelectedAnalysisId={selectedAnalysisId}
       />
     );
-  }, [project?.id, isInitialized, handleProjectSelect]);
+  }, [project?.id, isInitialized, handleProjectSelect, searchParams]);
 
   // Loading state - only show full screen loader for initial project loading
   // Analysis loading is handled within the Dashboard component itself
