@@ -53,6 +53,7 @@ jobs:
             echo "API_BASE_URL is not set in secrets/vars and BACKEND_HEALTH_URL fallback is unavailable."
             exit 1
           fi
+          export API_BASE_URL
           echo "API_BASE_URL=$API_BASE_URL" >> "$GITHUB_ENV"
           python scripts/sync_api_registry_from_swagger.py
 

@@ -64,6 +64,7 @@ jobs:
           DJANGO_SETTINGS_MODULE: apis.settings
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ALLOWED_HOSTS: ${{ vars.ALLOWED_HOSTS }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
           AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
@@ -75,6 +76,10 @@ jobs:
           source .venv/bin/activate
           export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
           export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret is required for backend tests."
+            exit 1
+          fi
           python manage.py test
 
       - name: Run Django collectstatic
@@ -82,6 +87,7 @@ jobs:
           DJANGO_SETTINGS_MODULE: apis.settings
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ALLOWED_HOSTS: ${{ vars.ALLOWED_HOSTS }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
           AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
@@ -93,6 +99,10 @@ jobs:
           source .venv/bin/activate
           export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
           export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret is required for collectstatic."
+            exit 1
+          fi
           python manage.py collectstatic --noinput
 
       - name: Create deployment bundle
