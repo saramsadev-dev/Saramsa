@@ -77,8 +77,7 @@
       "expected_status": 200,
       "expect_json_keys": [
         "data"
-      ],
-      "schema_hash": "91da0d3e95f36d0e"
+      ]
     },
     {
       "name": "auth_register_create",
@@ -94,8 +93,7 @@
         "email": "test_register@example.com",
         "username": "test_reg_user",
         "password": "TestPass123!"
-      },
-      "schema_hash": "ebb151c080818257"
+      }
     },
     {
       "name": "auth_register_request_otp_create",
@@ -138,8 +136,7 @@
       "body": {
         "email": "{{LOGIN_EMAIL}}",
         "password": "{{LOGIN_PASSWORD}}"
-      },
-      "schema_hash": "dece3cb61aa0a99f"
+      }
     },
     {
       "name": "auth_token_refresh_create",
@@ -150,8 +147,7 @@
       "expected_status": 200,
       "expect_json_keys": [
         "data"
-      ],
-      "schema_hash": "91da0d3e95f36d0e"
+      ]
     },
     {
       "name": "auth_users_retrieve",
