@@ -63,6 +63,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: apis.settings
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALLOWED_HOSTS: ${{ vars.ALLOWED_HOSTS }}
           AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
           AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
@@ -73,12 +74,14 @@ jobs:
         run: |
           source .venv/bin/activate
           export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
+          export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}"
           python manage.py test
 
       - name: Run Django collectstatic
         env:
           DJANGO_SETTINGS_MODULE: apis.settings
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALLOWED_HOSTS: ${{ vars.ALLOWED_HOSTS }}
           AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
           AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
@@ -89,6 +92,7 @@ jobs:
         run: |
           source .venv/bin/activate
           export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
+          export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}"
           python manage.py collectstatic --noinput
 
       - name: Create deployment bundle

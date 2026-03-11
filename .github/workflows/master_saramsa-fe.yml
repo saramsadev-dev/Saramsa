@@ -141,8 +141,8 @@ jobs:
           FRONTEND_HEALTH_URL: ${{ secrets.FRONTEND_HEALTH_URL }}
         run: |
           if [ -z "$FRONTEND_HEALTH_URL" ]; then
-            echo "FRONTEND_HEALTH_URL is not set; failing workflow."
-            exit 1
+            FRONTEND_HEALTH_URL="https://saramsa-fe.azurewebsites.net"
+            echo "FRONTEND_HEALTH_URL not set; falling back to $FRONTEND_HEALTH_URL"
           fi
 
           echo "Checking frontend health at $FRONTEND_HEALTH_URL"

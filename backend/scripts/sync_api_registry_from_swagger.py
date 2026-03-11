@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import urllib.request
+from urllib.parse import urlparse
 
 
 REGISTRY_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "api-registry.json")
@@ -28,7 +29,13 @@ def _load_dotenv(path):
 
 
 def _fetch_schema(base_url):
-    normalized = base_url.rstrip("/")
+    normalized = (base_url or "").strip().rstrip("/")
+    if normalized and "://" not in normalized:
+        normalized = "https://" + normalized
+    parsed = urlparse(normalized)
+    if parsed.scheme == "http" and parsed.hostname not in ("127.0.0.1", "localhost"):
+        normalized = "https://" + normalized[len("http://"):]
+
     if normalized.endswith("/api"):
         url = normalized + "/schema/"
     else:
