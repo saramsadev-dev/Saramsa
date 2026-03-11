@@ -40,6 +40,7 @@ def _fetch_schema(base_url):
         url = normalized + "/schema/"
     else:
         url = normalized + "/api/schema/"
+    print(f"Fetching Swagger schema from: {url}")
     req = urllib.request.Request(url)
     req.add_header("Accept", "application/json")
     with urllib.request.urlopen(req, timeout=20) as resp:
