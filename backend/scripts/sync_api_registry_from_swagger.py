@@ -28,7 +28,11 @@ def _load_dotenv(path):
 
 
 def _fetch_schema(base_url):
-    url = base_url.rstrip("/") + "/api/schema/"
+    normalized = base_url.rstrip("/")
+    if normalized.endswith("/api"):
+        url = normalized + "/schema/"
+    else:
+        url = normalized + "/api/schema/"
     req = urllib.request.Request(url)
     req.add_header("Accept", "application/json")
     with urllib.request.urlopen(req, timeout=20) as resp:

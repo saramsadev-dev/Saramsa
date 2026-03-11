@@ -44,20 +44,34 @@ jobs:
       - name: Run lint
         run: npm run lint
 
-      - name: Validate frontend API env secrets
+      - name: Resolve frontend API env
         env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_URL_SECRET: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_BASE_URL_SECRET: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_URL_VAR: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_BASE_URL_VAR: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
         run: |
+          NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL_SECRET:-$NEXT_PUBLIC_API_URL_VAR}"
+          NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL_SECRET:-$NEXT_PUBLIC_API_BASE_URL_VAR}"
+
+          if [ -z "$NEXT_PUBLIC_API_BASE_URL" ] && [ -n "$NEXT_PUBLIC_API_URL" ]; then
+            NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_URL%/api}"
+          fi
+          if [ -z "$NEXT_PUBLIC_API_URL" ] && [ -n "$NEXT_PUBLIC_API_BASE_URL" ]; then
+            NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_BASE_URL%/}/api"
+          fi
+
           if [ -z "$NEXT_PUBLIC_API_URL" ] || [ -z "$NEXT_PUBLIC_API_BASE_URL" ]; then
-            echo "NEXT_PUBLIC_API_URL and NEXT_PUBLIC_API_BASE_URL secrets must be set."
+            echo "Set NEXT_PUBLIC_API_URL/NEXT_PUBLIC_API_BASE_URL in secrets or vars."
             exit 1
           fi
+          echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL" >> "$GITHUB_ENV"
 
       - name: Build Next.js standalone
         env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ env.NEXT_PUBLIC_API_BASE_URL }}
         run: npm run build
 
       - name: Prepare standalone package

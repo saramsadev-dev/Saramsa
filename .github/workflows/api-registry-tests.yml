@@ -33,17 +33,25 @@ jobs:
 
       - name: Sync registry from Swagger
         env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_BASE_URL_SECRET: ${{ secrets.API_BASE_URL }}
+          API_BASE_URL_VAR: ${{ vars.API_BASE_URL }}
+          BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
+          API_BASE_URL="${API_BASE_URL_SECRET:-$API_BASE_URL_VAR}"
+          if [ -z "$API_BASE_URL" ] && [ -n "$BACKEND_HEALTH_URL" ]; then
+            API_BASE_URL="${BACKEND_HEALTH_URL%/api/health/}"
+            API_BASE_URL="${API_BASE_URL%/api/health}"
+          fi
           if [ -z "$API_BASE_URL" ]; then
-            echo "API_BASE_URL is not set; failing API registry workflow."
+            echo "API_BASE_URL is not set in secrets/vars and BACKEND_HEALTH_URL fallback is unavailable."
             exit 1
           fi
+          echo "API_BASE_URL=$API_BASE_URL" >> "$GITHUB_ENV"
           python scripts/sync_api_registry_from_swagger.py
 
       - name: Run API registry tests (notify Slack on failures)
         env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_BASE_URL: ${{ env.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
           LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
           LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
