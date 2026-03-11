@@ -78,9 +78,7 @@
       "expect_json_keys": [
         "data"
       ],
-      "schema_hash": "91da0d3e95f36d0e",
-      "schema_changed": true,
-      "prev_schema_hash": "b158d5218f6ccc8b"
+      "schema_hash": "91da0d3e95f36d0e"
     },
     {
       "name": "auth_register_create",
@@ -97,9 +95,7 @@
         "username": "test_reg_user",
         "password": "TestPass123!"
       },
-      "schema_hash": "ebb151c080818257",
-      "schema_changed": true,
-      "prev_schema_hash": "6bedc662abf3f28d"
+      "schema_hash": "ebb151c080818257"
     },
     {
       "name": "auth_register_request_otp_create",
@@ -143,9 +139,7 @@
         "email": "{{LOGIN_EMAIL}}",
         "password": "{{LOGIN_PASSWORD}}"
       },
-      "schema_hash": "dece3cb61aa0a99f",
-      "schema_changed": true,
-      "prev_schema_hash": "a991b29c8c230d43"
+      "schema_hash": "dece3cb61aa0a99f"
     },
     {
       "name": "auth_token_refresh_create",
@@ -157,9 +151,7 @@
       "expect_json_keys": [
         "data"
       ],
-      "schema_hash": "91da0d3e95f36d0e",
-      "schema_changed": true,
-      "prev_schema_hash": "b158d5218f6ccc8b"
+      "schema_hash": "91da0d3e95f36d0e"
     },
     {
       "name": "auth_users_retrieve",
@@ -210,9 +202,7 @@
       "body": {
         "name": "Sprint 3 Run"
       },
-      "schema_hash": "f7b840d2120786bf",
-      "schema_changed": true,
-      "prev_schema_hash": "0bf71857b5a3ce63"
+      "schema_hash": "f7b840d2120786bf"
     },
     {
       "name": "feedback_history_retrieve",
@@ -430,6 +420,17 @@
       "schema_hash": "0bf71857b5a3ce63"
     },
     {
+      "name": "insights_tasks_stream_retrieve",
+      "method": "GET",
+      "path": "/api/insights/tasks/stream/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ]
+    },
+    {
       "name": "insights_upload_create",
       "method": "POST",
       "path": "/api/insights/upload/",
@@ -452,6 +453,17 @@
         "detail"
       ],
       "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_user_stories_all_retrieve",
+      "method": "GET",
+      "path": "/api/insights/user-stories/all/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ]
     },
     {
       "name": "insights_user_stories_remove_work_items_update",
