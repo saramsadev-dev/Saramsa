@@ -118,6 +118,7 @@ dmypy.json
 # Test files in subdirectories (ad-hoc test scripts, not in a tests/ folder)
 **/test_*.py
 !**/tests/test_*.py
+!scripts/test_api_registry.py
 
 # Specific files to ignore
 pyvenv.cfg 
