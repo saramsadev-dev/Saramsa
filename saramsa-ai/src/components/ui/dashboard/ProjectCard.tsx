@@ -10,9 +10,6 @@ import {
   MoreVertical, 
   Trash2,
   Cloud,
-  CheckCircle,
-  AlertCircle,
-  Clock,
   ArrowRight,
   Edit,
   RefreshCw,
@@ -76,19 +73,6 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
         return 'bg-secondary/80 text-foreground border border-border/60';
       default:
         return 'bg-secondary/60 text-foreground border border-border/60';
-    }
-  };
-
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-foreground" />;
-      case 'pending':
-        return <Clock className="w-4 h-4 text-muted-foreground" />;
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
-      default:
-        return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -223,36 +207,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
                 <span>{link.provider === 'azure' ? 'Azure DevOps' : 'Jira'}</span>
               </span>
             ))
-          ) : (
-            <span className="inline-flex items-center px-2 py-0.5 bg-muted text-foreground text-xs rounded-full h-5 border border-border/60">
-              Basic
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="px-6 py-3">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {project.metadata?.totalComments || 0}
-              </p>
-              <p className="text-xs text-muted-foreground">Comments</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {getStatusIcon(project.metadata?.analysisStatus)}
-            <div>
-              <p className="text-sm font-medium text-foreground capitalize">
-                {project.metadata?.analysisStatus || 'Not started'}
-              </p>
-              <p className="text-xs text-muted-foreground">Analysis</p>
-            </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
