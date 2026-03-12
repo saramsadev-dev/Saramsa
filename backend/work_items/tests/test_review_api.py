@@ -24,7 +24,7 @@ def _mock_user():
     user = MagicMock()
     user.id = 'test-user-id'
     user.is_authenticated = True
-    user.role = 'admin'
+    user.profile = MagicMock(role='admin')
     return user
 
 
