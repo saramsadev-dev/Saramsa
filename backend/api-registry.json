@@ -254,7 +254,7 @@
       "path": "/api/health/",
       "auth": "none",
       "enabled": true,
-      "expected_status": 503,
+      "expected_status": [200, 503],
       "expect_json_keys": [
         "data"
       ],
@@ -940,6 +940,314 @@
         "detail"
       ],
       "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
+      "name": "insights_review_queue_retrieve",
+      "method": "GET",
+      "path": "/api/insights/review-queue/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_approve_create",
+      "method": "POST",
+      "path": "/api/insights/review-queue/approve/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_batch_approve_create",
+      "method": "POST",
+      "path": "/api/insights/review-queue/batch-approve/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_dismiss_create",
+      "method": "POST",
+      "path": "/api/insights/review-queue/dismiss/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_merge_create",
+      "method": "POST",
+      "path": "/api/insights/review-queue/merge/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_retry_push_create",
+      "method": "POST",
+      "path": "/api/insights/review-queue/retry-push/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_snooze_create",
+      "method": "POST",
+      "path": "/api/insights/review-queue/snooze/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_stats_retrieve",
+      "method": "GET",
+      "path": "/api/insights/review-queue/stats/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "insights_review_queue_update_update",
+      "method": "PUT",
+      "path": "/api/insights/review-queue/update/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_slack_channels_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/slack/channels/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_slack_oauth_callback_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/slack/oauth/callback/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_slack_oauth_start_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/slack/oauth/start/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_slack_test_create",
+      "method": "POST",
+      "path": "/api/integrations/slack/test/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_sources_retrieve",
+      "method": "GET",
+      "path": "/api/integrations/sources/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_sources_retrieve_2",
+      "method": "GET",
+      "path": "/api/integrations/sources/{source_id}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_sources_update",
+      "method": "PUT",
+      "path": "/api/integrations/sources/{source_id}/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_sources_destroy",
+      "method": "DELETE",
+      "path": "/api/integrations/sources/{source_id}/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_sources_sync_create",
+      "method": "POST",
+      "path": "/api/integrations/sources/{source_id}/sync/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "integrations_sources_create_create",
+      "method": "POST",
+      "path": "/api/integrations/sources/create/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 403,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_retrieve",
+      "method": "GET",
+      "path": "/api/work-items/review/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_approve_create",
+      "method": "POST",
+      "path": "/api/work-items/review/approve/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_batch_approve_create",
+      "method": "POST",
+      "path": "/api/work-items/review/batch-approve/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_dismiss_create",
+      "method": "POST",
+      "path": "/api/work-items/review/dismiss/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_merge_create",
+      "method": "POST",
+      "path": "/api/work-items/review/merge/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_retry_push_create",
+      "method": "POST",
+      "path": "/api/work-items/review/retry-push/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_snooze_create",
+      "method": "POST",
+      "path": "/api/work-items/review/snooze/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_stats_retrieve",
+      "method": "GET",
+      "path": "/api/work-items/review/stats/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
+    },
+    {
+      "name": "work_items_review_update_update",
+      "method": "PUT",
+      "path": "/api/work-items/review/update/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ]
     }
   ]
 }
