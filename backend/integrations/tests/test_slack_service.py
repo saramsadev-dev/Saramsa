@@ -2,7 +2,7 @@
 Unit tests for SlackService.
 
 Covers: OAuth flow, message fetching, normalisation, dedup, and rate-limit retry.
-All external calls (Slack API, Cosmos DB) are mocked.
+All external calls (Slack API, database) are mocked.
 """
 
 import json
@@ -26,11 +26,11 @@ if not settings.configured:
         SLACK_SIGNING_SECRET="test_signing_secret",
         SLACK_REDIRECT_URI="http://localhost:8000/api/integrations/slack/oauth/callback/",
         FRONTEND_BASE_URL="http://localhost:3000",
-        COSMOS_DB_CONFIG={
-            "endpoint": "https://fake.documents.azure.com:443/",
-            "key": "fakekey==",
-            "database_name": "test-db",
-            "containers": {"integrations": "integrations", "analysis": "analysis"},
+        DATABASES={
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": ":memory:",
+            }
         },
     )
 
@@ -61,8 +61,9 @@ def slack_service():
 # 1. test_start_oauth_returns_valid_url
 # ---------------------------------------------------------------------------
 
-def test_start_oauth_returns_valid_url(slack_service):
-    slack_service.integrations_repo.cosmos_service.create_document = MagicMock()
+@patch("integrations.services.slack_service.OAuthState")
+def test_start_oauth_returns_valid_url(mock_oauth_state, slack_service):
+    mock_oauth_state.objects.create = MagicMock()
 
     url = slack_service.start_oauth("user_123")
 
@@ -70,7 +71,7 @@ def test_start_oauth_returns_valid_url(slack_service):
     assert "scope=" in url
     assert "redirect_uri=" in url
     assert "state=slack_" in url
-    slack_service.integrations_repo.cosmos_service.create_document.assert_called_once()
+    mock_oauth_state.objects.create.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -78,15 +79,16 @@ def test_start_oauth_returns_valid_url(slack_service):
 # ---------------------------------------------------------------------------
 
 @patch("integrations.services.slack_service.requests.post")
-def test_complete_oauth_stores_encrypted_token(mock_post, slack_service):
-    # State doc lookup
-    slack_service.integrations_repo.cosmos_service.get_document = MagicMock(
-        return_value={"id": "slack_abc", "userId": "user_123", "type": "oauth_state"}
-    )
+@patch("integrations.services.slack_service.OAuthState")
+def test_complete_oauth_stores_encrypted_token(mock_oauth_state, mock_post, slack_service):
+    # State lookup
+    mock_state_obj = MagicMock()
+    mock_state_obj.user_id = "user_123"
+    mock_oauth_state.objects.filter.return_value.first.return_value = mock_state_obj
+
     slack_service.integrations_repo.create_or_update_integration_account = MagicMock(
         return_value={"id": "ia_new", "provider": "slack"}
     )
-    slack_service.integrations_repo.cosmos_service.delete_document = MagicMock()
 
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
@@ -107,13 +109,9 @@ def test_complete_oauth_stores_encrypted_token(mock_post, slack_service):
 # 3. test_complete_oauth_rejects_invalid_state
 # ---------------------------------------------------------------------------
 
-def test_complete_oauth_rejects_invalid_state(slack_service):
-    slack_service.integrations_repo.cosmos_service.get_document = MagicMock(
-        side_effect=Exception("not found")
-    )
-    slack_service.integrations_repo.cosmos_service.query_documents = MagicMock(
-        return_value=[]
-    )
+@patch("integrations.services.slack_service.OAuthState")
+def test_complete_oauth_rejects_invalid_state(mock_oauth_state, slack_service):
+    mock_oauth_state.objects.filter.return_value.first.return_value = None
 
     with pytest.raises(ValueError, match="Invalid or expired OAuth state"):
         slack_service.complete_oauth("code", "bad_state")

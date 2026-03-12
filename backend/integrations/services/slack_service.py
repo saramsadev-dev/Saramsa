@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 from django.conf import settings
 from ..repositories import IntegrationsRepository
+from ..models import OAuthState
 from .encryption_service import get_encryption_service
 
 logger = logging.getLogger(__name__)
@@ -47,16 +48,10 @@ class SlackService:
         """Generate Slack OAuth URL and persist the state token."""
         state = f"slack_{uuid.uuid4().hex}"
 
-        # Store state in integrations container so we can validate on callback
-        state_doc = {
-            "id": state,
-            "type": "oauth_state",
-            "userId": user_id,
-            "provider": "slack",
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-        }
-        self.integrations_repo.cosmos_service.create_document(
-            self.integrations_repo.container_name, state_doc
+        OAuthState.objects.create(
+            id=state,
+            user_id=user_id,
+            provider="slack",
         )
 
         client_id = getattr(settings, "SLACK_CLIENT_ID", "") or ""
@@ -74,27 +69,11 @@ class SlackService:
     def complete_oauth(self, code: str, state: str) -> Dict[str, Any]:
         """Exchange authorization code for a bot token and store it."""
         # Validate state
-        state_doc = None
-        try:
-            state_doc = self.integrations_repo.cosmos_service.get_document(
-                self.integrations_repo.container_name, state, state
-            )
-        except Exception:
-            pass
-
-        if not state_doc:
-            # Fallback: query by id
-            results = self.integrations_repo.cosmos_service.query_documents(
-                self.integrations_repo.container_name,
-                "SELECT * FROM c WHERE c.id = @state AND c.type = 'oauth_state'",
-                [{"name": "@state", "value": state}],
-            )
-            state_doc = results[0] if results else None
-
-        if not state_doc:
+        state_obj = OAuthState.objects.filter(id=state).first()
+        if not state_obj:
             raise ValueError("Invalid or expired OAuth state")
 
-        user_id = state_doc["userId"]
+        user_id = state_obj.user_id
 
         # Exchange code for token
         client_id = getattr(settings, "SLACK_CLIENT_ID", "") or ""
@@ -149,11 +128,9 @@ class SlackService:
 
         result = self.integrations_repo.create_or_update_integration_account(account_doc)
 
-        # Clean up state document (best-effort)
+        # Clean up state record (best-effort)
         try:
-            self.integrations_repo.cosmos_service.delete_document(
-                self.integrations_repo.container_name, state, state
-            )
+            OAuthState.objects.filter(id=state).delete()
         except Exception:
             pass
 

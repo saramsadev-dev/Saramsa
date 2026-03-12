@@ -24,19 +24,11 @@ module backend './saramsa-backend.bicep' = {
   ]
 }
 
-// 4️⃣ Cosmos DB (Database + Containers)
-module cosmos './saramsa-cosmosdb.bicep' = {
-  name: 'cosmos-module'
-  dependsOn: [
-    backend
-  ]
-}
-
-// 5️⃣ Frontend Static Web App (React / Next.js)
+// 4️⃣ Frontend Static Web App (React / Next.js)
 module frontend './saramsa-fe.bicep' = {
   name: 'frontend-module'
   dependsOn: [
-    cosmos
+    backend
   ]
 }
 

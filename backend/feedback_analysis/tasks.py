@@ -241,51 +241,32 @@ def _sync_one_source(source, slack_service, source_service, analysis_repo):
 def _get_existing_source_ids(analysis_repo, project_id):
     """Query existing source_ids for a project where source=slack."""
     try:
-        query = (
-            "SELECT c.source_id FROM c "
-            "WHERE c.projectId = @pid AND c.source = 'slack'"
+        from integrations.models import SlackFeedbackItem
+        return set(
+            SlackFeedbackItem.objects.filter(
+                project_id=project_id,
+            ).values_list("source_id", flat=True)
         )
-        params = [{"name": "@pid", "value": project_id}]
-        results = analysis_repo.cosmos_service.query_documents(
-            analysis_repo.container_name, query, params
-        )
-        return {r["source_id"] for r in results if r.get("source_id")}
     except Exception:
         return set()
 
 
 def _store_feedback(analysis_repo, project_id, user_id, feedback_items):
-    """Persist normalised feedback items into the analysis container."""
+    """Persist normalised feedback items into the database."""
     import uuid
+    from integrations.models import SlackFeedbackItem
 
-    doc = {
-        "id": f"slack_feedback_{uuid.uuid4().hex[:12]}",
-        "type": "slack_feedback",
-        "projectId": project_id,
-        "userId": user_id,
-        "source": "slack",
-        "feedbackItems": feedback_items,
-        "count": len(feedback_items),
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-    }
-    # Also store individual source_ids for dedup queries
     for item in feedback_items:
-        item_doc = {
-            "id": f"sf_{uuid.uuid4().hex[:10]}",
-            "type": "slack_feedback_item",
-            "projectId": project_id,
-            "userId": user_id,
-            "source": "slack",
-            "source_id": item["source_id"],
-            "comment": item["comment"],
-            "source_channel": item["source_channel"],
-            "author": item["author"],
-            "created_at": item["created_at"],
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-        }
         try:
-            analysis_repo.cosmos_service.create_document(
-                analysis_repo.container_name, item_doc
+            SlackFeedbackItem.objects.create(
+                id=f"sf_{uuid.uuid4().hex[:10]}",
+                project_id=project_id,
+                user_id=user_id,
+                source_id=item["source_id"],
+                comment=item["comment"],
+                source_channel=item["source_channel"],
+                author=item["author"],
+                feedback_created_at=item["created_at"],
             )
         except Exception as e:
             logger.warning(f"Failed to store feedback item: {e}")
