@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, Clock, AlertCircle, Loader2 } from '@/components/ui/no-icons';
+import { Check, X, Clock, AlertCircle, Loader2 } from 'lucide-react';
 
 interface StatusBadgeProps {
   status: string;

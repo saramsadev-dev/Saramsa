@@ -13,7 +13,7 @@ import {
   Clock, 
   Search, 
   ArrowLeft 
-} from '@/components/ui/no-icons';
+} from 'lucide-react';
 
 // Types
 interface Task {
