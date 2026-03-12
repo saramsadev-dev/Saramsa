@@ -24,6 +24,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Python
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -47,9 +48,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: backend/.venv
-          key: venv-backend-${{ hashFiles('backend/requirements.txt') }}
+          key: venv-backend-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/requirements.txt') }}
           restore-keys: |
-            venv-backend-
+            venv-backend-py${{ steps.setup-python.outputs.python-version }}-
 
       - name: Install dependencies
         if: steps.cache-venv.outputs.cache-hit != 'true'
