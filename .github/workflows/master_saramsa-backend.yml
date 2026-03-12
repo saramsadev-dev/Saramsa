@@ -122,6 +122,20 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C697C79FBC764F689A085128FFFE94ED }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8F9192667DEA4388B79BA8566B01E14E }}
 
+      - name: Wait for any in-progress deployment
+        working-directory: .
+        run: |
+          for i in $(seq 1 6); do
+            STATUS=$(az webapp show --name saramsa-backend --slot Production \
+              --query "siteConfig.publishingState" -o tsv 2>/dev/null || echo "unknown")
+            echo "Publishing state: $STATUS"
+            if [ "$STATUS" != "Publishing" ]; then
+              break
+            fi
+            echo "Deployment in progress, waiting 30s..."
+            sleep 30
+          done
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
@@ -129,14 +143,6 @@ jobs:
           app-name: 'saramsa-backend'
           slot-name: 'Production'
           package: artifact/backend.zip
-        env:
-          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
-          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
-          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
-          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
-          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
-          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
 
       - name: Verify backend health
         env:

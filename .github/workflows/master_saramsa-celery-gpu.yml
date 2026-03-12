@@ -102,7 +102,7 @@ jobs:
           fi
           echo "Latest revision: $REVISION"
 
-          for i in 1 2 3 4 5; do
+          for i in $(seq 1 10); do
             STATE=$(az containerapp revision list \
               --name $CONTAINER_APP_NAME \
               --resource-group $RESOURCE_GROUP \
@@ -111,14 +111,18 @@ jobs:
               --name $CONTAINER_APP_NAME \
               --resource-group $RESOURCE_GROUP \
               --query "[?name=='$REVISION'] | [0].properties.runningState" -o tsv)
-            echo "Revision state: health='$STATE' running='$RUNNING'"
+            echo "Attempt $i/10 — Revision state: health='$STATE' running='$RUNNING'"
             if [ "$STATE" = "Healthy" ]; then
               echo "Container App is healthy."
               exit 0
             fi
-            echo "Revision health is '$STATE', retrying in 20s..."
-            sleep 20
+            if [ "$RUNNING" = "Failed" ]; then
+              echo "Revision entered Failed state, aborting."
+              exit 1
+            fi
+            echo "Revision health is '$STATE', retrying in 30s..."
+            sleep 30
           done
 
-          echo "Container App failed to reach Healthy revision state after retries."
+          echo "Container App failed to reach Healthy revision state after 10 retries (300s)."
           exit 1

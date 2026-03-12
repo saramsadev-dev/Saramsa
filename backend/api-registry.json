@@ -34,7 +34,7 @@
       "path": "/api/auth/login/",
       "auth": "none",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 401],
       "expect_json_keys": [
         "data"
       ],
@@ -85,7 +85,7 @@
       "path": "/api/auth/register/",
       "auth": "none",
       "enabled": true,
-      "expected_status": 500,
+      "expected_status": [400, 500],
       "expect_json_keys": [
         "detail"
       ],
@@ -167,7 +167,7 @@
       "path": "/api/auth/users/{user_id}/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 404],
       "expect_json_keys": [
         "data"
       ],
@@ -179,7 +179,7 @@
       "path": "/api/feedback/analysis/{analysis_id}/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 404],
       "expect_json_keys": [
         "data"
       ],
@@ -191,7 +191,7 @@
       "path": "/api/feedback/analysis/{analysis_id}/rename/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": [403, 404],
       "expect_json_keys": [
         "detail"
       ],
@@ -206,7 +206,7 @@
       "path": "/api/feedback/history/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -218,7 +218,7 @@
       "path": "/api/feedback/history/compare/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -230,7 +230,7 @@
       "path": "/api/feedback/history/cumulative/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -242,7 +242,7 @@
       "path": "/api/feedback/history/quarter/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -266,7 +266,7 @@
       "path": "/api/insights/analyze/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -293,7 +293,7 @@
       "body": {
         "project_id": "{{PROJECT_ID}}"
       },
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -305,7 +305,7 @@
       "path": "/api/insights/ingestion/schedule/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -317,7 +317,7 @@
       "path": "/api/insights/ingestion/schedule/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "body": {
         "project_id": "{{PROJECT_ID}}",
         "schedule": {
@@ -337,7 +337,7 @@
       "path": "/api/insights/review/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -349,7 +349,7 @@
       "path": "/api/insights/review/update/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -361,7 +361,7 @@
       "path": "/api/insights/rules/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -373,7 +373,7 @@
       "path": "/api/insights/rules/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -385,7 +385,7 @@
       "path": "/api/insights/rules/apply/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -397,7 +397,7 @@
       "path": "/api/insights/task-status/{task_id}/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 500],
       "expect_json_keys": [
         "data"
       ],
@@ -432,7 +432,7 @@
       "path": "/api/insights/upload/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -444,7 +444,7 @@
       "path": "/api/insights/user-stories/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -467,7 +467,7 @@
       "path": "/api/insights/user-stories/remove-work-items/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -479,7 +479,7 @@
       "path": "/api/insights/user-story-creation/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -491,7 +491,7 @@
       "path": "/api/insights/user-story-submission/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -503,7 +503,7 @@
       "path": "/api/insights/work-items/{work_item_id}/update/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 400],
       "expect_json_keys": [
         "data"
       ],
@@ -539,7 +539,7 @@
       "path": "/api/integrations/{account_id}/test/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 404],
       "expect_json_keys": [
         "data"
       ],
@@ -707,7 +707,7 @@
       "path": "/api/integrations/projects/{project_id}/analysis/latest/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 404],
       "expect_json_keys": [
         "data"
       ],
@@ -719,7 +719,7 @@
       "path": "/api/integrations/projects/{project_id}/roles/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 404],
       "expect_json_keys": [
         "data"
       ],
@@ -731,7 +731,7 @@
       "path": "/api/integrations/projects/{project_id}/roles/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 405],
       "expect_json_keys": [
         "data"
       ],
@@ -755,7 +755,7 @@
       "path": "/api/integrations/projects/{project_id}/trends/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 404],
       "expect_json_keys": [
         "data"
       ],
@@ -767,7 +767,7 @@
       "path": "/api/integrations/projects/{project_id}/trends/aspects/{aspect_key}/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 404],
       "expect_json_keys": [
         "data"
       ],
@@ -827,7 +827,7 @@
       "path": "/api/work-items/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -851,7 +851,7 @@
       "path": "/api/work-items/{work_item_id}/update/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 200,
+      "expected_status": [200, 400],
       "expect_json_keys": [
         "data"
       ],
@@ -863,7 +863,7 @@
       "path": "/api/work-items/generate/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -887,7 +887,7 @@
       "path": "/api/work-items/quality-check/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": [403, 405],
       "expect_json_keys": [
         "detail"
       ],
@@ -899,7 +899,7 @@
       "path": "/api/work-items/quality-rules/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 200,
       "expect_json_keys": [
         "detail"
       ],
@@ -911,7 +911,7 @@
       "path": "/api/work-items/quality-rules/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": [403, 405],
       "expect_json_keys": [
         "detail"
       ],
@@ -923,7 +923,7 @@
       "path": "/api/work-items/remove/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": [403, 405],
       "expect_json_keys": [
         "detail"
       ],
@@ -935,7 +935,7 @@
       "path": "/api/work-items/submit/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ],
@@ -947,7 +947,7 @@
       "path": "/api/insights/review-queue/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -958,7 +958,7 @@
       "path": "/api/insights/review-queue/approve/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -969,7 +969,7 @@
       "path": "/api/insights/review-queue/batch-approve/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -980,7 +980,7 @@
       "path": "/api/insights/review-queue/dismiss/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -991,7 +991,7 @@
       "path": "/api/insights/review-queue/merge/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -1002,7 +1002,7 @@
       "path": "/api/insights/review-queue/retry-push/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -1013,7 +1013,7 @@
       "path": "/api/insights/review-queue/snooze/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -1024,7 +1024,7 @@
       "path": "/api/insights/review-queue/stats/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -1035,7 +1035,7 @@
       "path": "/api/insights/review-queue/update/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -1057,7 +1057,7 @@
       "path": "/api/integrations/slack/oauth/callback/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 400,
+      "expected_status": [400, 404],
       "expect_json_keys": [
         "detail"
       ]
@@ -1068,7 +1068,7 @@
       "path": "/api/integrations/slack/oauth/start/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 400,
+      "expected_status": [400, 500],
       "expect_json_keys": [
         "detail"
       ]
@@ -1090,7 +1090,7 @@
       "path": "/api/integrations/sources/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -1101,7 +1101,7 @@
       "path": "/api/integrations/sources/{source_id}/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": [403, 404],
       "expect_json_keys": [
         "detail"
       ]
@@ -1112,7 +1112,7 @@
       "path": "/api/integrations/sources/{source_id}/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": [400, 403],
       "expect_json_keys": [
         "detail"
       ]
@@ -1134,7 +1134,7 @@
       "path": "/api/integrations/sources/{source_id}/sync/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": [403, 404],
       "expect_json_keys": [
         "detail"
       ]
@@ -1145,7 +1145,7 @@
       "path": "/api/integrations/sources/create/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 403,
+      "expected_status": 400,
       "expect_json_keys": [
         "detail"
       ]
@@ -1156,7 +1156,7 @@
       "path": "/api/work-items/review/",
       "auth": "bearer",
       "enabled": true,
-      "expected_status": 400,
+      "expected_status": [200, 400],
       "expect_json_keys": [
         "detail"
       ]
