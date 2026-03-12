@@ -34,6 +34,7 @@ COPY --from=ui-builder /app/build ./celery_ops/celery_ops/ui/react/build/
 RUN AZURE_API_KEY=x AZURE_ENDPOINT_URL=x AZURE_DEPLOYMENT_NAME=x \
     AZURE_API_VERSION=x AZURE_DEVOPS_ORGANIZATION=x AZURE_DEVOPS_PROJECT=x \
     AZURE_DEVOPS_PAT=x DJANGO_SETTINGS_MODULE=apis.settings \
+    DATABASE_URL=postgresql://x:x@x.neon.tech/x \
     python manage.py collectstatic --noinput
 
 EXPOSE 8000
