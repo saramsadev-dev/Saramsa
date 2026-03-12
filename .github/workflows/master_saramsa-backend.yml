@@ -80,7 +80,7 @@ jobs:
             echo "DATABASE_URL secret is required for backend tests."
             exit 1
           fi
-          python manage.py test
+          python manage.py test --keepdb
 
       - name: Run Django collectstatic
         env:
