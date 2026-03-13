@@ -12,8 +12,21 @@ from .models import PasswordResetToken, RegistrationOtp, UserAccount
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:
+    """
+    Convert a datetime to ISO 8601 string.
+
+    In some environments/serialization paths, datetime-like fields may already
+    be strings when they reach this helper. To keep the repository layer
+    resilient and avoid AttributeError on .utcoffset(), we accept strings as-is.
+    """
     if not dt:
         return None
+
+    # If the value is already a string, assume it's an ISO-like representation
+    # and return it directly.
+    if isinstance(dt, str):
+        return dt
+
     if timezone.is_naive(dt):
         dt = timezone.make_aware(dt, timezone.utc)
     return dt.isoformat()
