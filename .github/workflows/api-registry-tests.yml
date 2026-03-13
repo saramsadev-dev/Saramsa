@@ -31,33 +31,55 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Sync registry from Swagger
+      - name: Resolve API base URL
         env:
           API_BASE_URL_SECRET: ${{ secrets.API_BASE_URL }}
           API_BASE_URL_VAR: ${{ vars.API_BASE_URL }}
           BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
+          # Derive API_BASE_URL from available secrets/vars
           if [ -n "$BACKEND_HEALTH_URL" ]; then
             API_BASE_URL="${BACKEND_HEALTH_URL%/api/health/}"
             API_BASE_URL="${API_BASE_URL%/api/health}"
           else
             API_BASE_URL="${API_BASE_URL_SECRET:-$API_BASE_URL_VAR}"
           fi
+
+          # Ensure https scheme
           if [ -n "$API_BASE_URL" ] && [[ ! "$API_BASE_URL" =~ ^https?:// ]]; then
             API_BASE_URL="https://$API_BASE_URL"
           fi
           if [[ "$API_BASE_URL" =~ ^http:// ]]; then
             API_BASE_URL="https://${API_BASE_URL#http://}"
           fi
+
+          # Strip trailing slash
+          API_BASE_URL="${API_BASE_URL%/}"
+
           if [ -z "$API_BASE_URL" ]; then
-            echo "API_BASE_URL is not set in secrets/vars and BACKEND_HEALTH_URL fallback is unavailable."
+            echo "::error::API_BASE_URL is not set. Configure one of: secrets.API_BASE_URL, vars.API_BASE_URL, or secrets.BACKEND_HEALTH_URL"
             exit 1
           fi
-          export API_BASE_URL
-          echo "API_BASE_URL=$API_BASE_URL" >> "$GITHUB_ENV"
-          python scripts/sync_api_registry_from_swagger.py
 
-      - name: Run API registry tests (notify Slack on failures)
+          echo "API_BASE_URL=$API_BASE_URL" >> "$GITHUB_ENV"
+          echo "Resolved API_BASE_URL (length=${#API_BASE_URL})"
+
+      - name: Verify backend is reachable
+        run: |
+          echo "Checking backend health at: $API_BASE_URL/api/health/"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$API_BASE_URL/api/health/" || echo "000")
+          if [ "$HTTP_CODE" = "000" ]; then
+            echo "::error::Backend is unreachable at $API_BASE_URL/api/health/ — check that the server is running and the URL is correct."
+            exit 1
+          fi
+          echo "Backend responded with HTTP $HTTP_CODE"
+
+      - name: Sync registry from Swagger
+        env:
+          API_BASE_URL: ${{ env.API_BASE_URL }}
+        run: python scripts/sync_api_registry_from_swagger.py
+
+      - name: Run API registry tests
         env:
           API_BASE_URL: ${{ env.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
@@ -65,9 +87,4 @@ jobs:
           LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          if [ -z "$API_BASE_URL" ]; then
-            echo "API_BASE_URL is not set; failing API registry workflow."
-            exit 1
-          fi
-          python scripts/test_api_registry.py --notify-slack
+        run: python scripts/test_api_registry.py --notify-slack

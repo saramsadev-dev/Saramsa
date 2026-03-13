@@ -94,7 +94,7 @@ export default function SettingsPage() {
               <p className="text-muted-foreground text-sm">Your account details</p>
             </div>
 
-            <div className="rounded-lg border border-border/60 bg-secondary/50 dark:bg-background/60 p-4">
+            <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60 p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground mb-1">Username</p>

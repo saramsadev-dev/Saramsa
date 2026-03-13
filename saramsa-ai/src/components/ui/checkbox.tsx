@@ -60,10 +60,10 @@ function Checkbox({
   return (
     <div 
       className={cn(
-        "relative w-4 h-4 border-2 border-border/70 rounded transition-all duration-200 cursor-pointer select-none",
-        checked 
+        "relative w-4 h-4 border-2 border-border rounded transition-all duration-200 cursor-pointer select-none dark:border-border/70",
+        checked
           ? "bg-saramsa-brand border-saramsa-brand"
-          : "bg-background/80 hover:border-saramsa-brand/40",
+          : "bg-background hover:border-saramsa-brand/60 dark:bg-background/80 dark:hover:border-saramsa-brand/40",
         "focus:ring-2 focus:ring-saramsa-brand/30 focus:border-saramsa-brand/40",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,

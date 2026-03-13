@@ -30,7 +30,10 @@ def _load_dotenv(path):
 
 def _fetch_schema(base_url):
     normalized = (base_url or "").strip().rstrip("/")
-    if normalized and "://" not in normalized:
+    if not normalized:
+        print("ERROR: base_url is empty. Cannot fetch Swagger schema.")
+        sys.exit(1)
+    if "://" not in normalized:
         normalized = "https://" + normalized
     parsed = urlparse(normalized)
     if parsed.scheme == "http" and parsed.hostname not in ("127.0.0.1", "localhost"):
@@ -43,8 +46,21 @@ def _fetch_schema(base_url):
     print(f"Fetching Swagger schema from: {url}")
     req = urllib.request.Request(url)
     req.add_header("Accept", "application/json")
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        print(f"ERROR: Swagger schema fetch failed with HTTP {e.code}: {e.reason}")
+        print(f"  URL: {url}")
+        sys.exit(1)
+    except urllib.error.URLError as e:
+        print(f"ERROR: Cannot reach Swagger schema endpoint: {e.reason}")
+        print(f"  URL: {url}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: Unexpected error fetching Swagger schema: {e}")
+        print(f"  URL: {url}")
+        sys.exit(1)
 
 
 def _load_registry():
@@ -123,7 +139,14 @@ def _schema_hash(meta):
 
 def main():
     _load_dotenv(DOTENV_PATH)
-    base_url = os.getenv("API_BASE_URL") or "http://127.0.0.1:8000"
+    base_url = os.getenv("API_BASE_URL", "").strip()
+    if not base_url:
+        # Only fall back to localhost when running locally (not in CI)
+        if os.getenv("CI") or os.getenv("GITHUB_ACTIONS"):
+            print("ERROR: API_BASE_URL is not set. Required in CI.")
+            return 1
+        base_url = "http://127.0.0.1:8000"
+        print(f"API_BASE_URL not set, using local fallback: {base_url}")
     schema = _fetch_schema(base_url)
     registry = _load_registry()
 

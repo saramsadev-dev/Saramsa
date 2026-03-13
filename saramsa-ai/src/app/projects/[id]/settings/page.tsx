@@ -217,7 +217,7 @@ export default function ProjectSettingsPage() {
                 {sortedRoles.map((entry) => (
                   <div
                     key={`${entry.user_id}-${entry.role}`}
-                    className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/40 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg border border-border bg-secondary/70 px-3 py-2 dark:border-border/60 dark:bg-secondary/40"
                   >
                     <div className="text-sm">
                       <div className="font-medium text-foreground">{entry.user_id}</div>

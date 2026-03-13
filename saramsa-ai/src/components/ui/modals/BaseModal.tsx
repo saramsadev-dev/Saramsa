@@ -106,7 +106,7 @@ export function BaseModal({
             aria-modal="true"
             aria-labelledby={title ? titleId : undefined}
             aria-describedby={description ? descriptionId : undefined}
-            className={`w-full ${sizeClass} rounded-3xl bg-card/95 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.7)] border border-border/60 backdrop-blur-sm ${className}`}
+            className={`w-full ${sizeClass} rounded-3xl bg-card shadow-[0_30px_90px_-40px_rgba(15,23,42,0.2)] border border-border backdrop-blur-sm dark:bg-card/95 dark:shadow-[0_30px_90px_-40px_rgba(15,23,42,0.7)] dark:border-border/60 ${className}`}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -114,7 +114,7 @@ export function BaseModal({
             onClick={handlePanelClick}
           >
             {(title || description || icon || headerContent || !hideCloseButton) && (
-              <div className="flex items-start justify-between gap-4 p-6 border-b border-border/60">
+              <div className="flex items-start justify-between gap-4 p-6 border-b border-border dark:border-border/60">
                 {headerContent ?? (
                   <div className="flex items-start gap-4">
                     {icon && <div className="flex-shrink-0">{icon}</div>}
@@ -150,7 +150,7 @@ export function BaseModal({
             <div className="p-6">{children}</div>
 
             {footer && (
-              <div className="p-6 border-t border-border/60">
+              <div className="p-6 border-t border-border dark:border-border/60">
                 {footer}
               </div>
             )}

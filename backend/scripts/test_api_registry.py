@@ -39,6 +39,10 @@ def _json_request(url, method="GET", headers=None, body=None, timeout=30):
             except json.JSONDecodeError:
                 parsed = None
         return e.code, parsed, raw
+    except urllib.error.URLError as e:
+        return 0, None, f"Connection error: {e.reason}"
+    except Exception as e:
+        return 0, None, f"Request error: {e}"
 
 
 def _load_registry():
@@ -125,6 +129,7 @@ def main():
     token = _resolve_token(base_url)
 
     failures = []
+    passed = 0
     for ep in endpoints:
         method = str(ep.get("method", "GET")).upper()
         path = _fill_path_params(str(ep.get("path", "")))
@@ -140,6 +145,10 @@ def main():
         body = _replace_placeholders(ep.get("body")) if "body" in ep else None
         status, data, raw = _json_request(url, method=method, headers=headers, body=body)
 
+        if status == 0:
+            failures.append(f"{method} {path} -> {raw}")
+            continue
+
         expected = ep.get("expected_status", 200)
         expected_set = set(expected) if isinstance(expected, list) else {expected}
         if status not in expected_set:
@@ -151,18 +160,21 @@ def main():
             if not isinstance(data, dict):
                 failures.append(f"{method} {path} -> expected JSON object, got: {raw[:160]}")
                 continue
-            for k in expected_keys:
-                if k not in data:
-                    failures.append(f"{method} {path} -> missing key '{k}'")
-                    break
+            missing = [k for k in expected_keys if k not in data]
+            if missing:
+                failures.append(f"{method} {path} -> missing key(s): {', '.join(missing)}")
+                continue
+
+        passed += 1
 
     if failures:
-        print("API registry test failures:")
+        print(f"API registry test results: {passed} passed, {len(failures)} failed")
+        print("Failures:")
         for f in failures:
-            print(f" - {f}")
+            print(f"  - {f}")
         return 1
 
-    print(f"API registry tests passed for {len(endpoints)} enabled endpoint(s).")
+    print(f"API registry tests passed for {passed}/{len(endpoints)} enabled endpoint(s).")
     return 0
 
 
