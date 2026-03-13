@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 const registerSchema = z.object({
   username: z.string().min(2, 'User name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
-  otp: z.string().min(6, 'Enter the 6-digit code').max(6, 'Enter the 6-digit code'),
+  otp: z.string().optional().default(''),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -116,9 +116,17 @@ export default function RegisterPage() {
   };
 
   const onSubmit = async (data: RegisterFormData) => {
+    if (!otpSent) {
+      setError('Please verify your email by clicking "Send code" first.');
+      return;
+    }
+    if (!data.otp || data.otp.length !== 6) {
+      setError('Please enter the 6-digit verification code sent to your email.');
+      return;
+    }
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const result = await registerUser({
         username: data.username,
