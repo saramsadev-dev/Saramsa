@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Check, X } from 'lucide-react';
@@ -52,6 +52,7 @@ export default function RegisterPage() {
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
+  const otpInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { register: registerUser } = useAuth();
 
@@ -108,6 +109,7 @@ export default function RegisterPage() {
       setOtpSent(true);
       setOtpCooldown(result.cooldown_seconds || 60);
       setOtpMessage('Code sent. Check your email.');
+      setTimeout(() => otpInputRef.current?.focus(), 350);
     } catch (err: any) {
       setError(err?.message || 'Failed to send code.');
     } finally {
@@ -120,8 +122,8 @@ export default function RegisterPage() {
       setError('Please verify your email by clicking "Send code" first.');
       return;
     }
-    if (!data.otp || data.otp.length !== 6) {
-      setError('Please enter the 6-digit verification code sent to your email.');
+    if (!data.otp || !/^\d{6}$/.test(data.otp)) {
+      setError('Please enter a valid 6-digit numeric verification code.');
       return;
     }
     setIsLoading(true);
@@ -387,10 +389,15 @@ export default function RegisterPage() {
                   </label>
                   <Input
                     {...register('otp')}
+                    ref={(e) => {
+                      register('otp').ref(e);
+                      (otpInputRef as React.MutableRefObject<HTMLInputElement | null>).current = e;
+                    }}
                     id="otp"
                     type="text"
                     inputMode="numeric"
                     maxLength={6}
+                    autoFocus
                     placeholder="Enter 6-digit code"
                     className="w-full pl-3 py-1.5 sm:py-2 text-sm tracking-widest bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground placeholder:tracking-normal shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />

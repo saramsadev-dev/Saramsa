@@ -196,7 +196,7 @@ export default function ForgotPasswordPage() {
               <p className="text-sm text-muted-foreground">
                 If an account exists with this email, you will receive a password reset link shortly.
               </p>
-              {resetLink && (
+              {resetLink && process.env.NODE_ENV === 'development' && (
                 <div className="mt-3 space-y-2">
                   <p className="text-xs text-muted-foreground">
                     Development link:
