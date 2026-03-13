@@ -239,13 +239,13 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Register Form */}
-      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-start justify-center pt-12 sm:pt-14 lg:pt-6 p-2 sm:p-3 md:p-5 lg:p-5 xl:p-6 bg-card/70 md:border-l border-border/60 relative min-h-screen md:min-h-[60vh] lg:min-h-screen">
+      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-2 sm:p-3 md:p-5 lg:p-5 xl:p-6 bg-card/70 md:border-l border-border/60 relative min-h-screen md:min-h-[60vh] lg:min-h-screen">
 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8 }}
-          className="w-full max-w-md mx-auto space-y-2.5 sm:space-y-3"
+          className="w-full max-w-[420px] mx-auto space-y-2.5 sm:space-y-3"
         >
           {/* Logo */}
           <div className="text-center">
@@ -322,59 +322,75 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              {/* Email */}
+              {/* Email + Send Code inline */}
               <div>
                 <label htmlFor="email" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
                   Email address
                 </label>
-                <div className="relative">
-                  <Input
-                    {...register('email')}
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    className="w-full pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
-                  />
-                  <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
-                </div>
-                {errors.email && (
-                  <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.email.message}</p>
-                )}
-              </div>
-
-              {/* OTP */}
-              <div>
-                <label htmlFor="otp" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
-                  Verification code
-                </label>
                 <div className="flex items-center gap-2">
-                  <Input
-                    {...register('otp')}
-                    id="otp"
-                    type="text"
-                    placeholder="6-digit code"
-                    className="w-full bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      {...register('email')}
+                      id="email"
+                      type="email"
+                      placeholder="Enter your email"
+                      className="w-full pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                    />
+                    <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
+                  </div>
                   <Button
                     type="button"
                     onClick={handleSendOtp}
                     disabled={otpSending || otpCooldown > 0}
                     variant="outline"
-                    className="whitespace-nowrap h-9 px-3 text-xs sm:text-sm"
+                    className="whitespace-nowrap h-9 px-3 text-xs sm:text-sm flex-shrink-0"
                   >
-                    {otpSending ? 'Sending...' : otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Send code'}
+                    {otpSending ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 border-2 border-muted border-t-saramsa-brand rounded-full animate-spin" />
+                        Sending…
+                      </span>
+                    ) : otpCooldown > 0 ? (
+                      `Resend in ${otpCooldown}s`
+                    ) : otpSent ? (
+                      'Resend code'
+                    ) : (
+                      'Send code'
+                    )}
                   </Button>
                 </div>
-                {errors.otp && (
-                  <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.otp.message}</p>
+                {errors.email && (
+                  <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.email.message}</p>
                 )}
                 {otpMessage && (
                   <p className="mt-1 text-xs sm:text-sm text-green-600">{otpMessage}</p>
                 )}
-                {otpSent && !otpMessage && (
-                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">Check your inbox for the code.</p>
-                )}
               </div>
+
+              {/* OTP — appears only after code is sent */}
+              {otpSent && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <label htmlFor="otp" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
+                    Verification code
+                  </label>
+                  <Input
+                    {...register('otp')}
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="Enter 6-digit code"
+                    className="w-full pl-3 py-1.5 sm:py-2 text-sm tracking-widest bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground placeholder:tracking-normal shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                  />
+                  {errors.otp && (
+                    <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.otp.message}</p>
+                  )}
+                </motion.div>
+              )}
 
               {/* Password */}
               <div>
