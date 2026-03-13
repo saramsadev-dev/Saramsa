@@ -306,15 +306,61 @@ class CacheService:
         return stats
     
     def health_check(self) -> Dict[str, Any]:
-        """Check cache health."""
+        """Check cache health with detailed Redis diagnostics."""
+        import time as _time
+
+        if not self.redis_client:
+            return {
+                'status': 'healthy',
+                'backend': 'memory',
+                'cache_stats': self.cache_stats,
+            }
+
         try:
-            if self.redis_client:
-                self.redis_client.ping()
-                return {'status': 'healthy', 'backend': 'redis'}
-            else:
-                return {'status': 'healthy', 'backend': 'memory'}
+            # Latency
+            start = _time.time()
+            self.redis_client.ping()
+            latency_ms = round((_time.time() - start) * 1000, 1)
+
+            # Server info
+            server_info = self.redis_client.info('server')
+            memory_info = self.redis_client.info('memory')
+            clients_info = self.redis_client.info('clients')
+
+            # Read/write probe
+            probe_key = 'saramsa:health_probe'
+            self.redis_client.set(probe_key, 'ok', ex=30)
+            probe_ok = self.redis_client.get(probe_key) == 'ok'
+
+            result: Dict[str, Any] = {
+                'status': 'healthy',
+                'backend': 'redis',
+                'host': self.redis_client.connection_pool.connection_kwargs.get('host', 'unknown'),
+                'port': self.redis_client.connection_pool.connection_kwargs.get('port', 'unknown'),
+                'ssl': self.redis_client.connection_pool.connection_kwargs.get('ssl', False),
+                'latency_ms': latency_ms,
+                'redis_version': server_info.get('redis_version'),
+                'uptime_days': server_info.get('uptime_in_days'),
+                'used_memory': memory_info.get('used_memory_human'),
+                'peak_memory': memory_info.get('used_memory_peak_human'),
+                'connected_clients': clients_info.get('connected_clients'),
+                'read_write_test': 'pass' if probe_ok else 'fail',
+                'cache_stats': self.cache_stats,
+            }
+
+            if not probe_ok:
+                result['status'] = 'degraded'
+                logger.warning("Redis health check: read/write probe failed")
+
+            return result
         except Exception as e:
-            return {'status': 'unhealthy', 'error': str(e), 'backend': 'redis' if self.redis_client else 'memory'}
+            logger.error(f"Redis health check failed: {e}")
+            return {
+                'status': 'unhealthy',
+                'backend': 'redis',
+                'error': str(e),
+                'cache_stats': self.cache_stats,
+            }
 
 
 # Global cache instance

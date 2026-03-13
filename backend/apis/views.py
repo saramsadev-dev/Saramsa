@@ -65,6 +65,32 @@ def health_check(request):
         }
         health_status['status'] = 'degraded'
     
+    # Check Celery Broker (Redis)
+    try:
+        from apis.infrastructure.celery import app as celery_app
+        import time as _time
+        conn = celery_app.connection()
+        start = _time.time()
+        conn.ensure_connection(max_retries=1, timeout=5)
+        latency_ms = round((_time.time() - start) * 1000, 1)
+        broker_url = celery_app.conf.broker_url or ''
+        # Mask password in URL for display
+        import re
+        masked_url = re.sub(r'://:[^@]+@', '://***@', broker_url)
+        health_status['components']['celery_broker'] = {
+            'status': 'healthy',
+            'broker': masked_url.split('?')[0] if masked_url else 'unknown',
+            'latency_ms': latency_ms,
+        }
+        conn.close()
+    except Exception as e:
+        health_status['components']['celery_broker'] = {
+            'status': 'unhealthy',
+            'error': str(e)
+        }
+        health_status['status'] = 'degraded'
+        logger.warning(f"Celery broker health check failed: {e}")
+
     # Check AI Service
     try:
         azure_client = get_azure_client()

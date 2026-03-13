@@ -229,6 +229,16 @@ function Install-RedisWindows {
 }
 
 function Start-Redis {
+    # Check if REDIS_URL points to a remote (non-localhost) Redis (e.g. Azure Redis)
+    $envFile = Join-Path $BackendDir ".env"
+    if (Test-Path $envFile) {
+        $redisUrl = Get-Content $envFile | Where-Object { $_ -match '^\s*REDIS_URL\s*=' -and $_ -notmatch '^\s*#' } | Select-Object -Last 1
+        if ($redisUrl -and $redisUrl -match 'rediss?://.*\.(redis\.cache\.windows\.net|redis\.cloud|upstash\.io|railway\.app)') {
+            Write-Host "[OK] Using remote Redis (Azure/cloud) from REDIS_URL" -ForegroundColor Green
+            return
+        }
+    }
+
     Write-Host "Checking Redis (Windows)..." -ForegroundColor Cyan
     if (Check-Redis) { Write-Host "[OK] Redis is already running" -ForegroundColor Green; return }
     $win = Check-WindowsRedis
