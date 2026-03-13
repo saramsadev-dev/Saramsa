@@ -52,7 +52,7 @@ export function NewProjectDropdown({
       initial={{ opacity: 0, scale: 0.95, y: -10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-      className="absolute top-12 right-0 bg-popover/95 border border-border/60 rounded-2xl shadow-md z-50 w-72"
+      className="absolute top-12 right-0 bg-popover border border-border/60 rounded-2xl shadow-lg dark:bg-popover/95 z-50 w-72"
     >
       <div className="p-2">
         {/* Create Project */}

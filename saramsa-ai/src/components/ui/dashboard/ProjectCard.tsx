@@ -135,7 +135,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
             </Button>
             
             {showMenu && (
-              <div className="absolute right-0 top-8 bg-popover/95 border border-border/60 rounded-xl shadow-md z-10 min-w-[160px] py-1">
+              <div className="absolute right-0 top-8 bg-popover border border-border/60 rounded-xl shadow-lg dark:bg-popover/95 z-10 min-w-[160px] py-1">
                 {onEdit && (
                   <Button
                     onClick={(e) => {
@@ -212,7 +212,7 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 border-t border-border/60 bg-secondary/40 rounded-b-2xl mt-auto">
+      <div className="px-6 py-3 border-t border-border/60 bg-secondary/60 dark:bg-secondary/40 rounded-b-2xl mt-auto">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />

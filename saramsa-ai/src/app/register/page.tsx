@@ -160,8 +160,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Left Visual Pane - Hidden on mobile, visible on tablet+ */}
-      <div className="hidden md:flex md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 relative bg-gradient-to-br from-background via-muted/60 to-accent/40 overflow-hidden min-h-[40vh] lg:min-h-screen">
-        <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/10 via-transparent to-saramsa-gradient-to/10" />
+      <div className="hidden md:flex md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 relative bg-gradient-to-br from-background via-secondary/80 to-saramsa-brand/20 dark:from-background dark:via-muted/60 dark:to-accent/40 overflow-hidden min-h-[40vh] lg:min-h-screen">
+        <div className="absolute inset-0 bg-gradient-to-br from-saramsa-brand/15 via-transparent to-saramsa-gradient-to/15 dark:from-saramsa-brand/10 dark:to-saramsa-gradient-to/10" />
         
         {/* Data Stream Animation - Hidden on tablet/iPad */}
         {/* <div className="hidden lg:block">
@@ -249,7 +249,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Register Form */}
-      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-2 sm:p-3 md:p-5 lg:p-5 xl:p-6 bg-card/70 md:border-l border-border/60 relative min-h-screen md:min-h-[60vh] lg:min-h-screen">
+      <div className="w-full md:w-full lg:w-1/2 xl:w-1/2 2xl:w-1/2 flex items-center justify-center p-2 sm:p-3 md:p-5 lg:p-5 xl:p-6 bg-card md:border-l border-border/60 dark:bg-card/70 relative min-h-screen md:min-h-[60vh] lg:min-h-screen">
 
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -301,7 +301,7 @@ export default function RegisterPage() {
                     id="username"
                     type="text"
                     placeholder="Choose a username"
-                    className={`w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
+                    className={`w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
                       usernameStatus === 'available' ? 'border-green-500' : 
                       usernameStatus === 'unavailable' ? 'border-destructive' : ''
                     }`}
@@ -344,7 +344,7 @@ export default function RegisterPage() {
                       id="email"
                       type="email"
                       placeholder="Enter your email"
-                      className="w-full pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                      className="w-full pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                     />
                     <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   </div>
@@ -399,7 +399,7 @@ export default function RegisterPage() {
                     maxLength={6}
                     autoFocus
                     placeholder="Enter 6-digit code"
-                    className="w-full pl-3 py-1.5 sm:py-2 text-sm tracking-widest bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground placeholder:tracking-normal shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                    className="w-full pl-3 py-1.5 sm:py-2 text-sm tracking-widest bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground placeholder:tracking-normal shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   {errors.otp && (
                     <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.otp.message}</p>
@@ -418,7 +418,7 @@ export default function RegisterPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Create a password"
-                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   <Button
@@ -447,7 +447,7 @@ export default function RegisterPage() {
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm your password"
-                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
+                    className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-xs 2xl:text-base bg-background/80 border border-border/60 rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]"
                   />
                   <Lock className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                   <Button

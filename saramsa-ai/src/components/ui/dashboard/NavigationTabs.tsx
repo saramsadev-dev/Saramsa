@@ -9,7 +9,7 @@ interface NavigationTabsProps {
 
 export function NavigationTabs({ activeView, onViewChange }: NavigationTabsProps) {
   return (
-    <div className="flex bg-secondary/70 rounded-2xl p-1 border border-border/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+    <div className="flex bg-secondary/70 rounded-2xl p-1 border border-border/60 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
       <Button
         onClick={() => onViewChange('dashboard')}
         variant="ghost"

@@ -315,7 +315,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-20 bg-card/80 rounded-2xl border border-dashed border-border/70 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.6)]"
+            className="text-center py-20 bg-card rounded-2xl border border-dashed border-border/70 shadow-md dark:bg-card/80"
           >
             <FolderPlus className="w-16 h-16 text-muted-foreground mx-auto mb-6" />
             <h3 className="text-xl font-semibold text-foreground mb-2">
@@ -347,7 +347,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             </div>
             
             {accounts.length === 0 && (
-              <div className="mt-6 p-4 bg-secondary/60 rounded-2xl max-w-md mx-auto border border-border/60">
+              <div className="mt-6 p-4 bg-secondary/80 dark:bg-secondary/60 rounded-2xl max-w-md mx-auto border border-border/60">
                 <p className="text-sm text-muted-foreground">
                   Tip: Connect your Azure DevOps or Jira accounts in{' '}
                   <a href="/settings" className="underline hover:no-underline">

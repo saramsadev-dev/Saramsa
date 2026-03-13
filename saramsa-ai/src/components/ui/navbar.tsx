@@ -69,7 +69,7 @@ export function Navbar() {
 
   return (
     <>
-    <nav className="z-100 w-full sticky top-0 bg-background border-b border-border/60 shadow-sm">
+    <nav className="z-100 w-full sticky top-0 bg-card dark:bg-background border-b border-border/60 shadow-md dark:shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
           <div className="flex justify-between items-center h-16 lg:h-18">
             {/* Logo */}
@@ -103,8 +103,8 @@ export function Navbar() {
                     />
                   </Button>
                   {open && (
-                    <div className="absolute z-50 right-0 mt-2 w-60 rounded-2xl border border-border/60 bg-popover/95 shadow-md animate-in slide-in-from-top-2 duration-200">
-                      <div className="px-4 py-3 border-b border-border/60 bg-secondary/60">
+                    <div className="absolute z-50 right-0 mt-2 w-60 rounded-2xl border border-border/60 bg-popover shadow-lg dark:bg-popover/95 animate-in slide-in-from-top-2 duration-200">
+                      <div className="px-4 py-3 border-b border-border/60 bg-secondary/80 dark:bg-secondary/60">
                         <div className="text-sm font-medium text-popover-foreground">
                           {currentUser.username || currentUser.email || 'User'}
                         </div>
