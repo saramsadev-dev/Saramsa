@@ -5,9 +5,8 @@ Celery tasks for feedback analysis.
 
 import logging
 import uuid
-import os
 from datetime import datetime, timezone
-from celery import shared_task
+from celery import shared_task, current_task
 
 from .services.ingestion_schedule_service import get_ingestion_schedule_service
 
@@ -49,8 +48,8 @@ def sync_slack_sources():
 
     for source in sources:
         try:
-            count = _sync_one_source(source, slack_service, source_service, analysis_repo)
-            total_messages += count
+            sync_result = _sync_one_source(source, slack_service, source_service, analysis_repo)
+            total_messages += int(sync_result.get("messages_synced", 0))
             sources_synced += 1
         except Exception as e:
             logger.error(f"Error syncing source {source.get('id')}: {e}", exc_info=True)
@@ -83,8 +82,8 @@ def sync_single_slack_source(source_id: str, user_id: str):
         logger.error(f"Source {source_id} not found for user {user_id}")
         return {"error": "source_not_found"}
 
-    count = _sync_one_source(source, slack_service, source_service, analysis_repo)
-    return {"source_id": source_id, "messages_synced": count}
+    sync_result = _sync_one_source(source, slack_service, source_service, analysis_repo)
+    return {"source_id": source_id, **sync_result}
 
 
 # ---------------------------------------------------------------------------
@@ -100,26 +99,37 @@ def _sync_one_source(source, slack_service, source_service, analysis_repo):
     config = source.get("config", {})
     channels = config.get("channels", [])
     oldest = config.get("last_sync_cursor")
+    sync_cursors_by_channel = dict(config.get("last_sync_cursors") or {})
 
     # Collect existing source_ids for dedup
     existing_ids = _get_existing_source_ids(analysis_repo, project_id)
 
     total_new = 0
+    analysis_triggered = False
+    analysis_insight_id = None
     latest_ts = oldest
     analysis_comments = []
-    channel_names = []
     last_analyzed_ts = config.get("last_analyzed_ts")
     last_analyzed_at = config.get("last_analyzed_at")
-    last_analysis_enqueued_at = config.get("last_analysis_enqueued_at")
-    cooldown_seconds = int(os.getenv("SLACK_AUTO_ANALYSIS_COOLDOWN_SECONDS", "3600"))
-    min_interval_seconds = int(os.getenv("SLACK_AUTO_ANALYSIS_MIN_INTERVAL_SECONDS", "1800"))
+    analyzed_ts_by_channel = dict(config.get("last_analyzed_ts_by_channel") or {})
+
+    def _max_ts_str(current, candidate):
+        if not candidate:
+            return current
+        if not current:
+            return candidate
+        try:
+            return candidate if float(candidate) > float(current) else current
+        except Exception:
+            return candidate if candidate > current else current
 
     for ch in channels:
         channel_id = ch.get("id", "")
         channel_name = ch.get("name", channel_id)
+        channel_oldest = sync_cursors_by_channel.get(channel_id) or oldest
 
         raw_messages = slack_service.fetch_channel_messages(
-            user_id, account_id, channel_id, oldest=oldest,
+            user_id, account_id, channel_id, oldest=channel_oldest,
         )
 
         # Deduplicate
@@ -145,13 +155,15 @@ def _sync_one_source(source, slack_service, source_service, analysis_repo):
                 text = m.get("text")
                 ts = m.get("slack_ts")
                 if text and ts:
-                    analysis_comments.append({"ts": ts, "text": text})
-            channel_names.append(channel_name)
+                    analysis_comments.append({"ts": ts, "text": text, "channel_id": channel_id})
 
             # Track latest timestamp for cursor
             for m in new_messages:
-                if latest_ts is None or m["slack_ts"] > latest_ts:
-                    latest_ts = m["slack_ts"]
+                latest_ts = _max_ts_str(latest_ts, m.get("slack_ts"))
+                sync_cursors_by_channel[channel_id] = _max_ts_str(
+                    sync_cursors_by_channel.get(channel_id),
+                    m.get("slack_ts"),
+                ) or sync_cursors_by_channel.get(channel_id)
 
             # Add to existing set so cross-channel dedup works within same run
             for m in new_messages:
@@ -164,12 +176,17 @@ def _sync_one_source(source, slack_service, source_service, analysis_repo):
 
     # Update cursor
     now_iso = datetime.now(timezone.utc).isoformat()
-    source_service.update_sync_cursor(source_id, user_id, latest_ts, now_iso)
+    source_service.update_sync_cursor(
+        source_id,
+        user_id,
+        latest_ts,
+        now_iso,
+        cursors_by_channel=sync_cursors_by_channel,
+    )
 
     # Auto-analyze newly synced Slack comments (create analysis run)
     if analysis_comments:
         try:
-            from .services.task_service import process_feedback_task
             cutoff_ts = None
             if last_analyzed_ts:
                 try:
@@ -188,34 +205,19 @@ def _sync_one_source(source, slack_service, source_service, analysis_repo):
                     ts_val = float(item["ts"])
                 except Exception:
                     continue
-                if cutoff_ts is None or ts_val > cutoff_ts:
+                channel_cutoff = analyzed_ts_by_channel.get(item.get("channel_id", ""))
+                effective_cutoff = cutoff_ts
+                if channel_cutoff:
+                    try:
+                        effective_cutoff = float(channel_cutoff)
+                    except Exception:
+                        effective_cutoff = cutoff_ts
+                if effective_cutoff is None or ts_val > effective_cutoff:
                     new_for_analysis.append(item)
-
-            # Cooldown guard
-            if last_analyzed_at:
-                try:
-                    last_dt = datetime.fromisoformat(str(last_analyzed_at).replace("Z", "+00:00"))
-                    if (datetime.now(timezone.utc) - last_dt).total_seconds() < cooldown_seconds:
-                        new_for_analysis = []
-                except Exception:
-                    pass
-            # Enqueue throttle guard
-            if last_analysis_enqueued_at:
-                try:
-                    enqueued_dt = datetime.fromisoformat(str(last_analysis_enqueued_at).replace("Z", "+00:00"))
-                    if (datetime.now(timezone.utc) - enqueued_dt).total_seconds() < min_interval_seconds:
-                        new_for_analysis = []
-                except Exception:
-                    pass
 
             if new_for_analysis:
                 analysis_id = uuid.uuid4().hex
-                unique_channels = sorted({c for c in channel_names if c})
-                channel_label = ", ".join(unique_channels[:3])
-                if len(unique_channels) > 3:
-                    channel_label += f" +{len(unique_channels) - 3}"
                 comments_only = [c["text"] for c in new_for_analysis]
-                latest_new_ts = max(float(c["ts"]) for c in new_for_analysis)
                 enqueued_at = datetime.now(timezone.utc).isoformat()
                 source_service.update_analysis_status(
                     source_id,
@@ -224,24 +226,75 @@ def _sync_one_source(source, slack_service, source_service, analysis_repo):
                     error=None,
                     enqueued_at=enqueued_at,
                 )
-                process_feedback_task.delay(
+                task_id = None
+                try:
+                    task_id = getattr(current_task.request, "id", None)
+                except Exception:
+                    task_id = None
+
+                from .services import get_task_service
+
+                task_service = get_task_service()
+                analysis_result = task_service.process_feedback_background(
                     comments_only,
                     None,
                     user_id,
                     project_id,
                     analysis_id,
-                    None,
+                    task_id=task_id,
+                    suggested_aspects=None,
                 )
+                if isinstance(analysis_result, dict):
+                    analysis_insight_id = analysis_result.get("insight_id")
+
+                latest_new_ts = None
+                try:
+                    latest_new_ts = str(max(float(c["ts"]) for c in new_for_analysis))
+                except Exception:
+                    latest_new_ts = None
+
+                source_service.update_analysis_cursor(
+                    source_id,
+                    user_id,
+                    datetime.now(timezone.utc).isoformat(),
+                    latest_new_ts,
+                    analyzed_ts_by_channel={
+                        **analyzed_ts_by_channel,
+                        **{
+                            str(chid): str(max(float(c["ts"]) for c in new_for_analysis if c.get("channel_id") == chid))
+                            for chid in {c.get("channel_id") for c in new_for_analysis if c.get("channel_id")}
+                        },
+                    },
+                )
+                source_service.update_analysis_status(
+                    source_id,
+                    user_id,
+                    "success",
+                    error=None,
+                )
+                analysis_triggered = True
         except Exception as e:
             logger.error(f"Error triggering Slack analysis: {e}", exc_info=True)
+            source_service.update_analysis_status(
+                source_id,
+                user_id,
+                "failed",
+                error=str(e),
+                failed_at=datetime.now(timezone.utc).isoformat(),
+            )
 
-    return total_new
+    return {
+        "messages_synced": total_new,
+        "analysis_triggered": analysis_triggered,
+        "insight_id": analysis_insight_id,
+    }
 
 
 def _get_existing_source_ids(analysis_repo, project_id):
     """Query existing source_ids for a project where source=slack."""
     try:
         from integrations.models import SlackFeedbackItem
+
         return set(
             SlackFeedbackItem.objects.filter(
                 project_id=project_id,
@@ -270,6 +323,18 @@ def _store_feedback(analysis_repo, project_id, user_id, feedback_items):
             )
         except Exception as e:
             logger.warning(f"Failed to store feedback item: {e}")
+
+
+@shared_task(name="send_weekly_digest")
+def send_weekly_digest():
+    """Weekly task: send digest emails summarising the past 7 days."""
+    from .services.digest_service import run_weekly_digest
+    result = run_weekly_digest()
+    logger.info(
+        "Weekly digest: sent=%s skipped=%s failed=%s",
+        result.get("sent"), result.get("skipped"), result.get("failed"),
+    )
+    return result
 
 
 @shared_task(name="unsnooze_expired_candidates")

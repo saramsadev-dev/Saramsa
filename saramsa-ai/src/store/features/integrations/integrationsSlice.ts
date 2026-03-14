@@ -3,7 +3,7 @@ import { apiRequest } from '@/lib/apiRequest';
 
 export interface IntegrationAccount {
   id: string;
-  provider: 'azure' | 'jira';
+  provider: 'azure' | 'jira' | 'slack';
   displayName: string;
   status: 'active' | 'revoked' | 'expired' | 'error';
   metadata: {
@@ -11,6 +11,10 @@ export interface IntegrationAccount {
     domain?: string;
     email?: string;
     baseUrl?: string;
+    teamId?: string;
+    teamName?: string;
+    workspace?: string;
+    team?: string;
   };
   scopes: string[];
   savedAt: string;
@@ -26,22 +30,57 @@ export interface ExternalProject {
   templateName?: string;
 }
 
+export interface SlackChannel {
+  id: string;
+  name: string;
+  is_private: boolean;
+  num_members: number;
+}
+
+export interface FeedbackSource {
+  id: string;
+  projectId: string;
+  provider: string;
+  accountId: string;
+  config: {
+    channels: { id: string; name: string }[];
+    sync_frequency: string;
+    last_synced_at: string | null;
+    last_analysis_status: string | null;
+  };
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface IntegrationsState {
   accounts: IntegrationAccount[];
   externalProjects: ExternalProject[];
+  slackChannels: SlackChannel[];
+  feedbackSources: FeedbackSource[];
   loading: boolean;
   error: string | null;
   testingConnection: { [accountId: string]: boolean };
   fetchingProjects: { [provider: string]: boolean };
+  fetchingChannels: boolean;
+  fetchingSources: boolean;
+  creatingSource: boolean;
+  syncingSource: { [sourceId: string]: boolean };
 }
 
 const initialState: IntegrationsState = {
   accounts: [],
   externalProjects: [],
+  slackChannels: [],
+  feedbackSources: [],
   loading: false,
   error: null,
   testingConnection: {},
   fetchingProjects: {},
+  fetchingChannels: false,
+  fetchingSources: false,
+  creatingSource: false,
+  syncingSource: {},
 };
 
 // Async thunks
@@ -189,6 +228,48 @@ export const fetchAzureProjects = createAsyncThunk(
   }
 );
 
+// Slack channel & feedback source thunks
+export const fetchSlackChannels = createAsyncThunk(
+  'integrations/fetchSlackChannels',
+  async (data: { accountId: string }) => {
+    const response = await apiRequest('get', `/integrations/slack/channels/?account_id=${data.accountId}`, undefined, true);
+    return response.data.data.channels as SlackChannel[];
+  }
+);
+
+export const fetchFeedbackSources = createAsyncThunk(
+  'integrations/fetchFeedbackSources',
+  async (data: { projectId: string }) => {
+    const response = await apiRequest('get', `/integrations/sources/?project_id=${data.projectId}`, undefined, true);
+    return response.data.data.sources as FeedbackSource[];
+  }
+);
+
+export const createFeedbackSource = createAsyncThunk(
+  'integrations/createFeedbackSource',
+  async (data: { projectId: string; accountId: string; channels: { id: string; name: string }[]; syncFrequency?: string }) => {
+    const response = await apiRequest('post', '/integrations/sources/create/', {
+      project_id: data.projectId,
+      provider: 'slack',
+      account_id: data.accountId,
+      channels: data.channels,
+      sync_frequency: data.syncFrequency || 'hourly',
+    }, true);
+    return response.data.data.source as FeedbackSource;
+  }
+);
+
+export const syncFeedbackSource = createAsyncThunk(
+  'integrations/syncFeedbackSource',
+  async (data: { sourceId: string }) => {
+    const response = await apiRequest('post', `/integrations/sources/${data.sourceId}/sync/`, undefined, true);
+    return {
+      sourceId: data.sourceId,
+      taskId: response.data?.data?.task_id as string | undefined,
+    };
+  }
+);
+
 export const fetchJiraProjects = createAsyncThunk(
   'integrations/fetchJiraProjects',
   async (credentials: { domain: string; email: string; api_token: string }) => {
@@ -215,6 +296,12 @@ const integrationsSlice = createSlice({
     },
     clearExternalProjects: (state) => {
       state.externalProjects = [];
+    },
+    clearSlackChannels: (state) => {
+      state.slackChannels = [];
+    },
+    clearFeedbackSources: (state) => {
+      state.feedbackSources = [];
     },
   },
   extraReducers: (builder) => {
@@ -355,9 +442,60 @@ const integrationsSlice = createSlice({
       .addCase(fetchJiraProjects.rejected, (state, action) => {
         state.fetchingProjects['jira'] = false;
         state.error = action.error.message || 'Failed to fetch Jira projects';
+      })
+
+      // Slack channels
+      .addCase(fetchSlackChannels.pending, (state) => {
+        state.fetchingChannels = true;
+      })
+      .addCase(fetchSlackChannels.fulfilled, (state, action) => {
+        state.fetchingChannels = false;
+        state.slackChannels = action.payload;
+      })
+      .addCase(fetchSlackChannels.rejected, (state, action) => {
+        state.fetchingChannels = false;
+        state.error = action.error.message || 'Failed to fetch Slack channels';
+      })
+
+      // Feedback sources
+      .addCase(fetchFeedbackSources.pending, (state) => {
+        state.fetchingSources = true;
+      })
+      .addCase(fetchFeedbackSources.fulfilled, (state, action) => {
+        state.fetchingSources = false;
+        state.feedbackSources = action.payload;
+      })
+      .addCase(fetchFeedbackSources.rejected, (state, action) => {
+        state.fetchingSources = false;
+        state.error = action.error.message || 'Failed to fetch feedback sources';
+      })
+
+      // Create feedback source
+      .addCase(createFeedbackSource.pending, (state) => {
+        state.creatingSource = true;
+      })
+      .addCase(createFeedbackSource.fulfilled, (state, action) => {
+        state.creatingSource = false;
+        state.feedbackSources.push(action.payload);
+      })
+      .addCase(createFeedbackSource.rejected, (state, action) => {
+        state.creatingSource = false;
+        state.error = action.error.message || 'Failed to create feedback source';
+      })
+
+      // Sync feedback source
+      .addCase(syncFeedbackSource.pending, (state, action) => {
+        state.syncingSource[action.meta.arg.sourceId] = true;
+      })
+      .addCase(syncFeedbackSource.fulfilled, (state, action) => {
+        state.syncingSource[action.payload.sourceId] = false;
+      })
+      .addCase(syncFeedbackSource.rejected, (state, action) => {
+        state.syncingSource[action.meta.arg.sourceId] = false;
+        state.error = action.error.message || 'Failed to sync feedback source';
       });
   },
 });
 
-export const { clearError, setTestingConnection, clearExternalProjects } = integrationsSlice.actions;
+export const { clearError, setTestingConnection, clearExternalProjects, clearSlackChannels, clearFeedbackSources } = integrationsSlice.actions;
 export default integrationsSlice.reducer;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Upload, BarChart3, FileText, FolderOpen, Trash2 } from 'lucide-react';
+import { Upload, BarChart3, FileText, FolderOpen, Trash2, MessageSquare, Plus } from 'lucide-react';
 import { Button } from "../button";
 import { Input } from "../input";
 
@@ -11,6 +11,9 @@ interface UploadPanelProps {
   topError: string | null;
   loadedComments: string[] | null;
   topUploading: boolean;
+  integrationsLoading?: boolean;
+  slackConnected?: boolean;
+  slackDisplayName?: string | null;
   onFileSelect: (file: File | null) => void;
   onAnalyze: () => Promise<void>;
   onCloudConnect: () => void;
@@ -23,6 +26,9 @@ export function UploadPanel({
   topError,
   loadedComments,
   topUploading,
+  integrationsLoading = false,
+  slackConnected = false,
+  slackDisplayName = null,
   onFileSelect,
   onAnalyze,
   onCloudConnect,
@@ -106,19 +112,42 @@ export function UploadPanel({
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground">No file selected</p>
               <p className="text-xs text-muted-foreground truncate">Drag and drop a file or click Browse</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {integrationsLoading
+                  ? "Checking integrations..."
+                  : slackConnected
+                  ? `Slack connected${slackDisplayName ? `: ${slackDisplayName}` : ""}`
+                  : "Slack not connected"}
+              </p>
             </div>
-            <Button
-              variant="saramsa"
-              size="sm"
-              className="shrink-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                document.getElementById("file-upload")?.click();
-              }}
-            >
-              <FolderOpen className="w-4 h-4" />
-              Browse
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloudConnect();
+                }}
+                title={slackConnected ? "Manage Slack integration" : "Connect Slack integration"}
+              >
+                <Plus className="w-4 h-4" />
+                <MessageSquare className="w-4 h-4" />
+                {slackConnected ? "Slack" : "Connect Slack"}
+              </Button>
+              <Button
+                variant="saramsa"
+                size="sm"
+                className="shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById("file-upload")?.click();
+                }}
+              >
+                <FolderOpen className="w-4 h-4" />
+                Browse
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">

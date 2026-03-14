@@ -10,28 +10,16 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 
-from ..models import FeedbackSource
+from ..repositories import IntegrationsRepository
 
 logger = logging.getLogger(__name__)
 
 
-def _source_to_dict(source: FeedbackSource) -> Dict[str, Any]:
-    return {
-        "id": source.id,
-        "type": "feedbackSource",
-        "userId": source.user_id,
-        "projectId": source.project_id,
-        "provider": source.provider,
-        "accountId": source.account_id,
-        "config": source.config or {},
-        "status": source.status,
-        "createdAt": source.created_at.isoformat() if source.created_at else None,
-        "updatedAt": source.updated_at.isoformat() if source.updated_at else None,
-    }
-
-
 class SourceService:
     """Service for feedback source configuration."""
+
+    def __init__(self):
+        self.repo = IntegrationsRepository()
 
     # ------------------------------------------------------------------
     # CRUD
@@ -46,19 +34,23 @@ class SourceService:
         sync_frequency: str = "hourly",
     ) -> Dict[str, Any]:
         """Create a new Slack feedback source for a project."""
-        source = FeedbackSource.objects.create(
-            id=f"source_{uuid.uuid4().hex[:12]}",
-            user_id=user_id,
-            project_id=project_id,
-            provider="slack",
-            account_id=account_id,
-            config={
+        now = datetime.now(timezone.utc).isoformat()
+        doc = {
+            "id": f"source_{uuid.uuid4().hex[:12]}",
+            "type": "feedbackSource",
+            "userId": user_id,
+            "projectId": project_id,
+            "provider": "slack",
+            "accountId": account_id,
+            "config": {
                 "channels": channels,
                 "sync_frequency": sync_frequency,
                 "last_synced_at": None,
                 "last_sync_cursor": None,
+                "last_sync_cursors": {},
                 "last_analyzed_at": None,
                 "last_analyzed_ts": None,
+                "last_analyzed_ts_by_channel": {},
                 "last_analysis_status": None,
                 "last_analysis_error": None,
                 "last_analysis_enqueued_at": None,
@@ -68,46 +60,44 @@ class SourceService:
                 "last_range_analysis_to": None,
                 "last_range_analysis_count": None,
             },
-            status="active",
-        )
-        return _source_to_dict(source)
+            "status": "active",
+            "createdAt": now,
+            "updatedAt": now,
+        }
+        return self.repo.create_feedback_source(doc)
 
     def get_sources_by_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all feedback sources for a project."""
-        sources = FeedbackSource.objects.filter(
-            project_id=project_id,
-        ).order_by("-created_at")
-        return [_source_to_dict(s) for s in sources]
+        return self.repo.get_feedback_sources_by_project(project_id)
 
     def get_source(self, source_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get a single feedback source with ownership check."""
-        source = FeedbackSource.objects.filter(
-            id=source_id, user_id=user_id,
-        ).first()
-        return _source_to_dict(source) if source else None
+        return self.repo.get_feedback_source(source_id, user_id)
 
     def update_source_channels(
         self, source_id: str, user_id: str, channels: List[Dict[str, str]]
     ) -> Optional[Dict[str, Any]]:
         """Update channels on an existing source."""
-        source = FeedbackSource.objects.filter(
-            id=source_id, user_id=user_id,
-        ).first()
+        source = self.get_source(source_id, user_id)
         if not source:
             return None
-        config = source.config or {}
-        config["channels"] = channels
-        source.config = config
-        source.updated_at = datetime.now(timezone.utc)
-        source.save(update_fields=["config", "updated_at"])
-        return _source_to_dict(source)
+        source["config"]["channels"] = channels
+        source["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def delete_source(self, source_id: str, user_id: str) -> bool:
         """Delete a feedback source."""
-        deleted, _ = FeedbackSource.objects.filter(
-            id=source_id, user_id=user_id,
-        ).delete()
-        return deleted > 0
+        source = self.get_source(source_id, user_id)
+        if not source:
+            return False
+        try:
+            return self.repo.delete_feedback_source(source_id, user_id)
+        except Exception as e:
+            logger.error(f"Error deleting source {source_id}: {e}")
+            return False
 
     def update_sync_cursor(
         self,
@@ -115,20 +105,21 @@ class SourceService:
         user_id: str,
         cursor: Optional[str],
         synced_at: str,
+        cursors_by_channel: Optional[Dict[str, str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Update sync cursor and last_synced_at after a sync run."""
-        source = FeedbackSource.objects.filter(
-            id=source_id, user_id=user_id,
-        ).first()
+        source = self.get_source(source_id, user_id)
         if not source:
             return None
-        config = source.config or {}
-        config["last_sync_cursor"] = cursor
-        config["last_synced_at"] = synced_at
-        source.config = config
-        source.updated_at = datetime.now(timezone.utc)
-        source.save(update_fields=["config", "updated_at"])
-        return _source_to_dict(source)
+        source["config"]["last_sync_cursor"] = cursor
+        if cursors_by_channel is not None:
+            source["config"]["last_sync_cursors"] = cursors_by_channel
+        source["config"]["last_synced_at"] = synced_at
+        source["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def update_analysis_cursor(
         self,
@@ -136,20 +127,21 @@ class SourceService:
         user_id: str,
         analyzed_at: Optional[str],
         analyzed_ts: Optional[str],
+        analyzed_ts_by_channel: Optional[Dict[str, str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Update last analyzed marker after a Slack analysis run."""
-        source = FeedbackSource.objects.filter(
-            id=source_id, user_id=user_id,
-        ).first()
+        source = self.get_source(source_id, user_id)
         if not source:
             return None
-        config = source.config or {}
-        config["last_analyzed_at"] = analyzed_at
-        config["last_analyzed_ts"] = analyzed_ts
-        source.config = config
-        source.updated_at = datetime.now(timezone.utc)
-        source.save(update_fields=["config", "updated_at"])
-        return _source_to_dict(source)
+        source["config"]["last_analyzed_at"] = analyzed_at
+        source["config"]["last_analyzed_ts"] = analyzed_ts
+        if analyzed_ts_by_channel is not None:
+            source["config"]["last_analyzed_ts_by_channel"] = analyzed_ts_by_channel
+        source["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def update_analysis_status(
         self,
@@ -161,24 +153,22 @@ class SourceService:
         failed_at: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Update analysis status metadata for a source."""
-        source = FeedbackSource.objects.filter(
-            id=source_id, user_id=user_id,
-        ).first()
+        source = self.get_source(source_id, user_id)
         if not source:
             return None
-        config = source.config or {}
-        config["last_analysis_status"] = status
-        config["last_analysis_error"] = error
+        source["config"]["last_analysis_status"] = status
+        source["config"]["last_analysis_error"] = error
         if enqueued_at:
-            config["last_analysis_enqueued_at"] = enqueued_at
+            source["config"]["last_analysis_enqueued_at"] = enqueued_at
         if failed_at:
-            config["last_analysis_failed_at"] = failed_at
+            source["config"]["last_analysis_failed_at"] = failed_at
         if status in ("queued", "success") and failed_at is None:
-            config["last_analysis_failed_at"] = None
-        source.config = config
-        source.updated_at = datetime.now(timezone.utc)
-        source.save(update_fields=["config", "updated_at"])
-        return _source_to_dict(source)
+            source["config"]["last_analysis_failed_at"] = None
+        source["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def update_range_analysis_meta(
         self,
@@ -190,27 +180,22 @@ class SourceService:
         count: Optional[int],
     ) -> Optional[Dict[str, Any]]:
         """Persist last manual range analysis metadata."""
-        source = FeedbackSource.objects.filter(
-            id=source_id, user_id=user_id,
-        ).first()
+        source = self.get_source(source_id, user_id)
         if not source:
             return None
-        config = source.config or {}
-        config["last_range_analysis_at"] = analyzed_at
-        config["last_range_analysis_from"] = from_iso
-        config["last_range_analysis_to"] = to_iso
-        config["last_range_analysis_count"] = count
-        source.config = config
-        source.updated_at = datetime.now(timezone.utc)
-        source.save(update_fields=["config", "updated_at"])
-        return _source_to_dict(source)
+        source["config"]["last_range_analysis_at"] = analyzed_at
+        source["config"]["last_range_analysis_from"] = from_iso
+        source["config"]["last_range_analysis_to"] = to_iso
+        source["config"]["last_range_analysis_count"] = count
+        source["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def get_active_sources_by_provider(self, provider: str) -> List[Dict[str, Any]]:
         """Get all active sources for a given provider (used by scheduler)."""
-        sources = FeedbackSource.objects.filter(
-            provider=provider, status="active",
-        )
-        return [_source_to_dict(s) for s in sources]
+        return self.repo.get_active_feedback_sources_by_provider(provider)
 
 
 # ---------------------------------------------------------------------------

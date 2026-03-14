@@ -3,10 +3,12 @@ Feedback source views for managing source configurations and triggering syncs.
 """
 
 import logging
+from datetime import datetime
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
+from apis.infrastructure.cache_service import get_cache_service
 
 from ..services.source_service import get_source_service
 
@@ -112,8 +114,29 @@ def feedback_source_sync_now(request, source_id):
 
     from feedback_analysis.tasks import sync_single_slack_source
 
-    sync_single_slack_source.delay(source_id, user_id)
+    task = sync_single_slack_source.delay(source_id, user_id)
+    try:
+        cache = get_cache_service()
+        started_at = datetime.now().isoformat()
+        cache.set(f"task_start:{task.id}", started_at, ttl=3600)
+        tasks_key = f"tasks:{user_id}"
+        existing = cache.get(tasks_key, default=[])
+        if not isinstance(existing, list):
+            existing = []
+        existing = [t for t in existing if t.get("task_id") != task.id]
+        existing.insert(0, {
+            "task_id": task.id,
+            "analysis_id": None,
+            "project_id": source.get("projectId"),
+            "file_name": "Slack sync",
+            "started_at": started_at,
+            "comment_count": None,
+        })
+        cache.set(tasks_key, existing[:15], ttl=86400)
+    except Exception:
+        logger.warning("Failed to record Slack sync task history", exc_info=True)
+
     return StandardResponse.success(
-        data={"source_id": source_id},
-        message="Sync triggered – check back shortly for results",
+        data={"source_id": source_id, "task_id": task.id},
+        message="Slack sync and analysis started",
     )

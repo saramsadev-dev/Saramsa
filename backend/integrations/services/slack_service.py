@@ -14,13 +14,10 @@ import uuid
 import logging
 import requests
 from typing import Dict, List, Optional, Any, Set
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
-from django.db import connection
-from django.utils import timezone as dj_timezone
 from ..repositories import IntegrationsRepository
-from ..models import OAuthState
 from .encryption_service import get_encryption_service
 
 logger = logging.getLogger(__name__)
@@ -48,11 +45,23 @@ class SlackService:
 
     def start_oauth(self, user_id: str) -> str:
         """Generate Slack OAuth URL and persist the state token."""
-        state = f"slack_{uuid.uuid4().hex}"
-        self._create_oauth_state(state=state, user_id=user_id, provider="slack")
-
         client_id = getattr(settings, "SLACK_CLIENT_ID", "") or ""
         redirect_uri = getattr(settings, "SLACK_REDIRECT_URI", "") or ""
+        team_id = getattr(settings, "SLACK_TEAM_ID", "") or ""
+        if not client_id:
+            raise ValueError("Slack OAuth is not configured: SLACK_CLIENT_ID is missing.")
+        if not redirect_uri:
+            raise ValueError("Slack OAuth is not configured: SLACK_REDIRECT_URI is missing.")
+
+        state = f"slack_{uuid.uuid4().hex}"
+
+        # Persist state in ORM for callback validation (15 minutes TTL).
+        self.integrations_repo.create_oauth_state(
+            state_id=state,
+            user_id=user_id,
+            provider="slack",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        )
 
         oauth_url = (
             f"{SLACK_OAUTH_AUTHORIZE_URL}"
@@ -61,67 +70,28 @@ class SlackService:
             f"&redirect_uri={redirect_uri}"
             f"&state={state}"
         )
+        if team_id:
+            oauth_url += f"&team={team_id}"
         return oauth_url
-
-    def _create_oauth_state(self, state: str, user_id: str, provider: str) -> None:
-        """
-        Persist OAuth state with compatibility for legacy tables that may include
-        additional NOT NULL columns (e.g. `status`).
-        """
-        table_name = OAuthState._meta.db_table
-        now = dj_timezone.now()
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT column_name
-                    FROM information_schema.columns
-                    WHERE table_name = %s
-                    """,
-                    [table_name],
-                )
-                columns = {row[0] for row in cursor.fetchall()}
-
-                insert_columns = ["id", "user_id", "provider"]
-                values = [state, user_id, provider]
-
-                if "status" in columns:
-                    insert_columns.append("status")
-                    values.append("active")
-                if "created_at" in columns:
-                    insert_columns.append("created_at")
-                    values.append(now)
-                if "updated_at" in columns:
-                    insert_columns.append("updated_at")
-                    values.append(now)
-
-                placeholders = ", ".join(["%s"] * len(values))
-                sql = f"INSERT INTO {table_name} ({', '.join(insert_columns)}) VALUES ({placeholders})"
-                cursor.execute(sql, values)
-                return
-        except Exception as exc:
-            logger.warning("Falling back to ORM OAuthState create due to schema drift: %s", exc)
-
-        # Fallback for environments where the table exactly matches the Django model.
-        OAuthState.objects.create(
-            id=state,
-            user_id=user_id,
-            provider=provider,
-        )
 
     def complete_oauth(self, code: str, state: str) -> Dict[str, Any]:
         """Exchange authorization code for a bot token and store it."""
         # Validate state
-        state_obj = OAuthState.objects.filter(id=state).first()
-        if not state_obj:
+        state_doc = self.integrations_repo.get_oauth_state(state)
+
+        if not state_doc:
             raise ValueError("Invalid or expired OAuth state")
 
-        user_id = state_obj.user_id
+        user_id = state_doc["userId"]
 
         # Exchange code for token
         client_id = getattr(settings, "SLACK_CLIENT_ID", "") or ""
         client_secret = getattr(settings, "SLACK_CLIENT_SECRET", "") or ""
         redirect_uri = getattr(settings, "SLACK_REDIRECT_URI", "") or ""
+        if not client_id or not client_secret or not redirect_uri:
+            raise ValueError(
+                "Slack OAuth is not configured: set SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, and SLACK_REDIRECT_URI."
+            )
 
         resp = requests.post(
             SLACK_OAUTH_ACCESS_URL,
@@ -171,9 +141,9 @@ class SlackService:
 
         result = self.integrations_repo.create_or_update_integration_account(account_doc)
 
-        # Clean up state record (best-effort)
+        # Clean up state document (best-effort)
         try:
-            OAuthState.objects.filter(id=state).delete()
+            self.integrations_repo.delete_oauth_state(state)
         except Exception:
             pass
 

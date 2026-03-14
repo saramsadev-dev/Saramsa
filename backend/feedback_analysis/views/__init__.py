@@ -38,6 +38,11 @@ from .ingestion_schedule_views import (
 from .file_upload_views import (
     FeedbackFileUploadView,
 )
+from .digest_views import (
+    DigestPreferenceView,
+    DigestPreviewView,
+    DigestSendNowView,
+)
 
 __all__ = [
     # Analysis views
@@ -59,5 +64,9 @@ __all__ = [
     'UserStoriesView',
     # File upload views
     'FeedbackFileUploadView',
+    # Digest views
+    'DigestPreferenceView',
+    'DigestPreviewView',
+    'DigestSendNowView',
 ]
 

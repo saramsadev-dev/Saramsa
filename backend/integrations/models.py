@@ -156,3 +156,59 @@ class ProjectRole(TimestampedModel):
             models.Index(fields=["user", "role"]),
         ]
 
+
+class OAuthState(TimestampedModel):
+    id = models.CharField(max_length=128, primary_key=True)
+    user = models.ForeignKey(
+        "authentication.UserAccount",
+        on_delete=models.CASCADE,
+        related_name="oauth_states",
+        db_column="user_id",
+        null=True,
+        blank=True,
+    )
+    provider = models.CharField(max_length=64, db_index=True)
+    status = models.CharField(max_length=32, default="active", db_index=True)
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "oauth_states"
+        indexes = [
+            models.Index(fields=["provider", "status", "created_at"]),
+        ]
+
+
+class FeedbackSource(TimestampedModel):
+    id = models.CharField(max_length=64, primary_key=True)
+    user = models.ForeignKey(
+        "authentication.UserAccount",
+        on_delete=models.CASCADE,
+        related_name="feedback_sources",
+        db_column="user_id",
+        null=True,
+        blank=True,
+    )
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="feedback_sources",
+        db_column="project_id",
+        null=True,
+        blank=True,
+    )
+    type = models.CharField(max_length=64, default="feedbackSource", db_index=True)
+    provider = models.CharField(max_length=64, db_index=True)
+    account_id = models.CharField(max_length=64, db_index=True)
+    status = models.CharField(max_length=32, default="active", db_index=True)
+    config = models.JSONField(default=dict, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "feedback_sources"
+        indexes = [
+            models.Index(fields=["provider", "status", "created_at"]),
+            models.Index(fields=["project", "created_at"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
+

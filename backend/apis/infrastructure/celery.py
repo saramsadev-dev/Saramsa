@@ -86,6 +86,10 @@ app.conf.beat_schedule = {
         "task": "unsnooze_expired_candidates",
         "schedule": crontab(minute=0, hour=9),
     },
+    "weekly-digest-email": {
+        "task": "send_weekly_digest",
+        "schedule": crontab(minute=0, hour=9, day_of_week=1),  # Every Monday 9 AM UTC
+    },
 }
 # app.conf.beat_schedule = {
 #     "run-scheduled-ingestions": {

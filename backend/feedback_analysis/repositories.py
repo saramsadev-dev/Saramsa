@@ -14,6 +14,8 @@ from work_items.models import UserStory
 
 logger = logging.getLogger(__name__)
 
+EXCLUDED_ANALYSIS_HISTORY_TYPES = {"slack_feedback", "slack_feedback_item"}
+
 
 def _parse_dt(value: Any):
     if not value:
@@ -183,7 +185,12 @@ class AnalysisRepository:
         return [_doc_from_analysis(row) for row in qs]
 
     def get_recent_by_project(self, project_id: str, limit: int = 20) -> List[Dict[str, Any]]:
-        qs = Analysis.objects.filter(project_id=str(project_id)).exclude(result={}).order_by("-created_at")[:limit]
+        qs = (
+            Analysis.objects.filter(project_id=str(project_id))
+            .exclude(type__in=EXCLUDED_ANALYSIS_HISTORY_TYPES)
+            .exclude(result={})
+            .order_by("-created_at")[:limit]
+        )
         return [_doc_from_analysis(row) for row in qs]
 
     def get_cumulative_data_by_user(self, user_id: str) -> Dict[str, Any]:
@@ -362,7 +369,11 @@ class AnalysisRepository:
             return None
 
     def get_analysis_history_for_project(self, project_id: str) -> List[Dict[str, Any]]:
-        qs = Analysis.objects.filter(project_id=str(project_id)).order_by("-created_at")
+        qs = (
+            Analysis.objects.filter(project_id=str(project_id))
+            .exclude(type__in=EXCLUDED_ANALYSIS_HISTORY_TYPES)
+            .order_by("-created_at")
+        )
         return [_doc_from_analysis(row) for row in qs]
 
     def get_analysis_by_quarter(self, project_id: str, quarter: str) -> Optional[Dict[str, Any]]:

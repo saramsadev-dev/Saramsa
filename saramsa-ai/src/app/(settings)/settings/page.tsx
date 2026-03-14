@@ -13,6 +13,15 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile>({});
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      if (tab === "integrations") {
+        setActiveTab("integrations");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     (async () => {
       try {
         const me = await apiRequest("get", "/auth/me/", undefined, true);
