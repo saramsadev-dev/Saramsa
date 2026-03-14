@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X } from 'lucide-react';
 import { cn } from "./utils";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/bodyScrollLock";
 
 interface DialogProps {
   open: boolean;
@@ -35,14 +36,14 @@ const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
 
     if (open) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      lockBodyScroll();
     } else {
-      document.body.style.overflow = 'unset';
+      unlockBodyScroll();
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      unlockBodyScroll();
     };
   }, [open, onOpenChange]);
 

@@ -9,6 +9,7 @@ import { fetchIntegrationAccounts } from '@/store/features/integrations/integrat
 import { PlatformSelectionScreen } from '@/components/config/PlatformSelectionScreen';
 import { AzureDevOpsConfigScreen } from '@/components/config/azure/AzureDevOpsConfigScreen';
 import { JiraConfigScreen } from '@/components/config/jira/JiraConfigScreen';
+import { forceUnlockBodyScroll } from '@/lib/bodyScrollLock';
 
 
 export default function ConfigPage() {
@@ -19,6 +20,7 @@ export default function ConfigPage() {
 
   // Fetch integration accounts once at the parent level
   useEffect(() => {
+    forceUnlockBodyScroll();
     dispatch(fetchIntegrationAccounts());
   }, [dispatch]);
 
@@ -64,7 +66,7 @@ export default function ConfigPage() {
 
   if (!selectedPlatform) {
     return (
-      <div className="h-full bg-background z-0">
+      <div className="h-full overflow-y-auto bg-background z-0">
         <PlatformSelectionScreen 
           onPlatformSelect={handlePlatformSelect}
           onSkipConfig={handleSkipConfig}
@@ -76,7 +78,7 @@ export default function ConfigPage() {
   // Show Azure DevOps config for Azure platform
   if (selectedPlatform === 'azure') {
     return (
-      <div className="">
+      <div className="h-full overflow-y-auto bg-background">
         <AzureDevOpsConfigScreen 
           onContinue={handleContinue}
           onBack={handleBackToPlatformSelection}
@@ -88,7 +90,7 @@ export default function ConfigPage() {
   // Show Jira config for Jira platform
   if (selectedPlatform === 'jira') {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="h-full overflow-y-auto bg-background">
         <JiraConfigScreen 
           onContinue={handleContinue}
           onBack={handleBackToPlatformSelection}

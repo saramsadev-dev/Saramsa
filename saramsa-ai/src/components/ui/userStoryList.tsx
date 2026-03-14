@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, CSSProperties } from "react";
-import { motion } from "framer-motion";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   toggleActionSelection,

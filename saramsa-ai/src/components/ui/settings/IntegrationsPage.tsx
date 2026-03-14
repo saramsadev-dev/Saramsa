@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import type { AppDispatch, RootState } from "@/store/store";
 import {
   fetchIntegrationAccounts,
-  createAzureIntegration,
-  createJiraIntegration,
   deleteIntegrationAccount,
   testIntegrationConnection,
   clearError,
@@ -15,6 +13,7 @@ import {
   clearExternalProjects,
 } from "@/store/features/integrations/integrationsSlice";
 import { apiRequest } from "@/lib/apiRequest";
+import { encryptProjectId } from "@/lib/encryption";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -34,9 +33,8 @@ import {
   Users,
   MessageSquare,
 } from "lucide-react";
-import { AzureIntegrationForm } from "@/components/ui/settings/AzureIntegrationForm";
-import { JiraIntegrationForm } from "@/components/ui/settings/JiraIntegrationForm";
 import { SlackIntegrationForm } from "@/components/ui/settings/SlackIntegrationForm";
+import { DashboardIntegrationModal } from "@/components/ui/dashboard/DashboardIntegrationModal";
 import { BaseModal } from "@/components/ui/modals/BaseModal";
 import type { IntegrationAccount } from "@/store/features/integrations/integrationsSlice";
 import { Button } from "@/components/ui/button";
@@ -53,8 +51,7 @@ export function IntegrationsPage() {
     fetchingProjects,
   } = useSelector((state: RootState) => state.integrations);
 
-  const [showAzureForm, setShowAzureForm] = useState(false);
-  const [showJiraForm, setShowJiraForm] = useState(false);
+  const [showDashboardIntegrationModal, setShowDashboardIntegrationModal] = useState(false);
   const [showSlackForm, setShowSlackForm] = useState(false);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
   const [accountPendingDeletion, setAccountPendingDeletion] = useState<IntegrationAccount | null>(null);
@@ -91,6 +88,15 @@ export function IntegrationsPage() {
 
   const handleTestConnection = async (accountId: string) => {
     await dispatch(testIntegrationConnection(accountId));
+  };
+
+  const handleOpenDashboardIntegrationModal = () => {
+    setShowDashboardIntegrationModal(true);
+  };
+
+  const handleCloseDashboardIntegrationModal = () => {
+    setShowDashboardIntegrationModal(false);
+    dispatch(fetchIntegrationAccounts());
   };
 
   const handleDeleteAccount = (account: IntegrationAccount) => {
@@ -144,7 +150,7 @@ export function IntegrationsPage() {
           description: `Imported from ${
             project.provider === "azure" ? "Azure DevOps" : "Jira"
           }`,
-          platform: project.provider,
+          platform: project.provider === "azure" ? "azure_devops" : "jira",
           external_project_id: project.id,
           external_url: project.url || "",
           integration_account_id: account.id,
@@ -159,24 +165,30 @@ export function IntegrationsPage() {
       );
 
       if (!res.data.success) {
-        throw new Error(res.data.error || "Failed to create project");
+        throw new Error(res.data.detail || res.data.error || "Failed to create project");
       }
 
-      const createdProject = res.data.project;
+      const payload = res.data?.data ?? {};
+      const createdProject = payload.project ?? payload;
 
-      // Store project info in localStorage for dashboard navigation
+      if (!createdProject?.id) {
+        throw new Error("Project created but response did not include a project id");
+      }
+
+      // Store project info in localStorage for compatibility
       localStorage.setItem("project_id", createdProject.id);
       localStorage.setItem("selected_project_name", project.name);
 
       // Handle both new project creation and existing project navigation
-      if (res.data.already_exists) {
+      if (payload.already_exists || res.data.already_exists) {
         console.log("Project already exists, navigating to existing project");
       } else {
         console.log("Project created successfully, navigating to dashboard");
       }
 
-      // Navigate to dashboard
-      router.push("/dashboard");
+      // Navigate to project dashboard
+      const encryptedProjectId = encryptProjectId(createdProject.id);
+      router.push(`/projects/${encryptedProjectId}/dashboard`);
     } catch (error: any) {
       console.error("Failed to create/navigate to project:", error);
       alert(
@@ -184,6 +196,7 @@ export function IntegrationsPage() {
           error.message || "Unknown error"
         }`
       );
+      router.push("/projects");
     } finally {
       setCreatingProject(null);
     }
@@ -252,24 +265,14 @@ export function IntegrationsPage() {
         </div>
         {accounts.length > 0 && (
           <div className="flex gap-3">
-            {!hasAzureIntegration && (
+            {(!hasAzureIntegration || !hasJiraIntegration) && (
               <Button
-                onClick={() => setShowAzureForm(true)}
+                onClick={handleOpenDashboardIntegrationModal}
                 variant="saramsa"
                 className="flex items-center gap-2 px-4 py-2 font-medium"
               >
                 <Plus className="w-4 h-4" />
-                Add Azure DevOps
-              </Button>
-            )}
-            {!hasJiraIntegration && (
-              <Button
-                onClick={() => setShowJiraForm(true)}
-                variant="outline"
-                className="flex items-center gap-2 px-4 py-2 font-medium border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
-              >
-                <Plus className="w-4 h-4" />
-                Add Jira
+                Add Integration
               </Button>
             )}
             {!hasSlackIntegration && (
@@ -361,24 +364,14 @@ export function IntegrationsPage() {
               projects and feedback
             </p>
             <div className="flex gap-3 justify-center">
-              {!hasAzureIntegration && (
+              {(!hasAzureIntegration || !hasJiraIntegration) && (
                 <Button
-                  onClick={() => setShowAzureForm(true)}
+                  onClick={handleOpenDashboardIntegrationModal}
                   variant="saramsa"
                   className="flex items-center gap-2 px-4 py-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Connect Azure DevOps
-                </Button>
-              )}
-              {!hasJiraIntegration && (
-                <Button
-                  onClick={() => setShowJiraForm(true)}
-                  variant="outline"
-                  className="flex items-center gap-2 px-4 py-2 border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
-                >
-                  <Plus className="w-4 h-4" />
-                  Connect Jira
+                  Configure Integration
                 </Button>
               )}
               {!hasSlackIntegration && (
@@ -645,25 +638,11 @@ export function IntegrationsPage() {
       )}
 
       {/* Integration Forms */}
-      {showAzureForm && (
-        <AzureIntegrationForm
-          onClose={() => setShowAzureForm(false)}
-          onSuccess={() => {
-            setShowAzureForm(false);
-            dispatch(fetchIntegrationAccounts());
-          }}
-        />
-      )}
-
-      {showJiraForm && (
-        <JiraIntegrationForm
-          onClose={() => setShowJiraForm(false)}
-          onSuccess={() => {
-            setShowJiraForm(false);
-            dispatch(fetchIntegrationAccounts());
-          }}
-        />
-      )}
+      <DashboardIntegrationModal
+        isOpen={showDashboardIntegrationModal}
+        onClose={handleCloseDashboardIntegrationModal}
+        projectId=""
+      />
 
       {showSlackForm && (
         <SlackIntegrationForm

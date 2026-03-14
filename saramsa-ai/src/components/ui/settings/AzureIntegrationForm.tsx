@@ -5,9 +5,10 @@ import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '@/store/store';
 import { createAzureIntegration } from '@/store/features/integrations/integrationsSlice';
 import { motion } from 'framer-motion';
-import { X, ExternalLink, Eye, EyeOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { BaseModal } from '@/components/ui/modals/BaseModal';
 
 interface AzureIntegrationFormProps {
   onClose: () => void;
@@ -75,46 +76,48 @@ export function AzureIntegrationForm({ onClose, onSuccess }: AzureIntegrationFor
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-card/90 dark:bg-card/95 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border/60 dark:border-border/60">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold">Az</span>
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
-                Connect Azure DevOps
-              </h2>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                Add your Azure DevOps organization to import projects
-              </p>
-            </div>
-          </div>
+    <BaseModal
+      isOpen={true}
+      onClose={onClose}
+      size="md"
+      className="max-h-[90vh] overflow-y-auto"
+      icon={
+        <div className="w-10 h-10 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-xl flex items-center justify-center">
+          <span className="text-white font-bold">Az</span>
+        </div>
+      }
+      title="Connect Azure DevOps"
+      description="Add your Azure DevOps organization to import projects"
+      footer={
+        <div className="flex gap-3">
           <Button
+            type="button"
+            variant="outline"
             onClick={onClose}
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 hover:bg-accent/60 dark:hover:bg-accent/60"
+            className="flex-1 h-12"
           >
-            <X className="w-5 h-5" />
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="azure-integration-form"
+            variant="saramsa"
+            disabled={loading}
+            className="flex-1 h-12"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              'Connect Azure DevOps'
+            )}
           </Button>
         </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      }
+    >
+      <form id="azure-integration-form" onSubmit={handleSubmit} className="space-y-6">
           {/* Error Display */}
           {error && (
             <motion.div
@@ -229,36 +232,8 @@ export function AzureIntegrationForm({ onClose, onSuccess }: AzureIntegrationFor
               </div>
             </div>
           </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1 h-12"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="saramsa"
-              disabled={loading}
-              className="flex-1 h-12"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                'Connect Azure DevOps'
-              )}
-            </Button>
-          </div>
-        </form>
-      </motion.div>
-    </motion.div>
+      </form>
+    </BaseModal>
   );
 }
 

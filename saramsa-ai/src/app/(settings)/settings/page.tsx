@@ -28,8 +28,8 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto bg-background text-foreground">
+      <div className="min-h-full max-w-4xl mx-auto space-y-6 p-6">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white shadow-lg">

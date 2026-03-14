@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode, MouseEvent } from "react";
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from 'lucide-react';
 import { Button } from "../button";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/bodyScrollLock";
 
 type ModalSize = "sm" | "md" | "lg";
 
@@ -80,6 +81,25 @@ export function BaseModal({
 }: BaseModalProps) {
   const titleId = useId();
   const descriptionId = useId();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    lockBodyScroll();
+    return () => {
+      unlockBodyScroll();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
 
   const handleOverlayClick = () => {
     onClose();

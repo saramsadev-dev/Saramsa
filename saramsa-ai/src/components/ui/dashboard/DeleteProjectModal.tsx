@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Trash2 } from 'lucide-react';
 import type { Project } from '@/store/features/projects/projectsSlice';
 import { Button } from '@/components/ui/button';
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/bodyScrollLock';
 
 interface DeleteProjectModalProps {
   project: Project;
@@ -27,8 +28,7 @@ export function DeleteProjectModal({
   useEffect(() => {
     if (!modalRoot || !isOpen) return;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    lockBodyScroll();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -40,7 +40,7 @@ export function DeleteProjectModal({
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      unlockBodyScroll();
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, modalRoot, onCancel]);

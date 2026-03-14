@@ -39,6 +39,7 @@ export function PipelineStatusWidget() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const analysisStatus = useSelector(
     (state: RootState) => state.analysis.analysisStatus
   );
@@ -163,6 +164,23 @@ export function PipelineStatusWidget() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const syncDrawerState = () => {
+      setIsDrawerOpen(document.body.getAttribute("data-edit-drawer-open") === "true");
+    };
+
+    syncDrawerState();
+    const observer = new MutationObserver(syncDrawerState);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-edit-drawer-open"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const overall = useMemo(() => {
     switch (analysisStatus) {
       case "pending":
@@ -227,8 +245,12 @@ export function PipelineStatusWidget() {
     return parts.join(" · ");
   };
 
+  if (isDrawerOpen) {
+    return null;
+  }
+
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="pipeline-status-widget-fab fixed bottom-6 right-6 z-[100]">
       {open && (
         <div className="absolute bottom-20 right-0 w-[380px] rounded-2xl border border-border/70 bg-background/95 p-4 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.6)] backdrop-blur">
           <div className="flex items-start justify-between gap-3">

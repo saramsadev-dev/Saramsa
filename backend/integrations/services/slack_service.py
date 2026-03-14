@@ -17,6 +17,8 @@ from typing import Dict, List, Optional, Any, Set
 from datetime import datetime, timezone
 
 from django.conf import settings
+from django.db import connection
+from django.utils import timezone as dj_timezone
 from ..repositories import IntegrationsRepository
 from ..models import OAuthState
 from .encryption_service import get_encryption_service
@@ -47,12 +49,7 @@ class SlackService:
     def start_oauth(self, user_id: str) -> str:
         """Generate Slack OAuth URL and persist the state token."""
         state = f"slack_{uuid.uuid4().hex}"
-
-        OAuthState.objects.create(
-            id=state,
-            user_id=user_id,
-            provider="slack",
-        )
+        self._create_oauth_state(state=state, user_id=user_id, provider="slack")
 
         client_id = getattr(settings, "SLACK_CLIENT_ID", "") or ""
         redirect_uri = getattr(settings, "SLACK_REDIRECT_URI", "") or ""
@@ -65,6 +62,52 @@ class SlackService:
             f"&state={state}"
         )
         return oauth_url
+
+    def _create_oauth_state(self, state: str, user_id: str, provider: str) -> None:
+        """
+        Persist OAuth state with compatibility for legacy tables that may include
+        additional NOT NULL columns (e.g. `status`).
+        """
+        table_name = OAuthState._meta.db_table
+        now = dj_timezone.now()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = %s
+                    """,
+                    [table_name],
+                )
+                columns = {row[0] for row in cursor.fetchall()}
+
+                insert_columns = ["id", "user_id", "provider"]
+                values = [state, user_id, provider]
+
+                if "status" in columns:
+                    insert_columns.append("status")
+                    values.append("active")
+                if "created_at" in columns:
+                    insert_columns.append("created_at")
+                    values.append(now)
+                if "updated_at" in columns:
+                    insert_columns.append("updated_at")
+                    values.append(now)
+
+                placeholders = ", ".join(["%s"] * len(values))
+                sql = f"INSERT INTO {table_name} ({', '.join(insert_columns)}) VALUES ({placeholders})"
+                cursor.execute(sql, values)
+                return
+        except Exception as exc:
+            logger.warning("Falling back to ORM OAuthState create due to schema drift: %s", exc)
+
+        # Fallback for environments where the table exactly matches the Django model.
+        OAuthState.objects.create(
+            id=state,
+            user_id=user_id,
+            provider=provider,
+        )
 
     def complete_oauth(self, code: str, state: str) -> Dict[str, Any]:
         """Exchange authorization code for a bot token and store it."""

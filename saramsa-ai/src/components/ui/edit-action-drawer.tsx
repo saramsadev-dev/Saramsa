@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Trash2, ExternalLink } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
 import { Textarea } from './textarea';
 import { Label } from './label';
 import { Badge } from './badge';
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/bodyScrollLock';
 
 interface ActionItem {
   id: string;
@@ -36,6 +38,7 @@ interface EditActionDrawerProps {
 export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditActionDrawerProps) => {
   const [formData, setFormData] = useState<ActionItem | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const modalRoot = typeof document !== 'undefined' ? document.body : null;
 
   useEffect(() => {
     if (action) {
@@ -43,6 +46,40 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
       setHasChanges(false);
     }
   }, [action]);
+
+  useEffect(() => {
+    if (!isOpen || !modalRoot) return;
+
+    const previousDrawerFlag = document.body.getAttribute('data-edit-drawer-open');
+    lockBodyScroll();
+    document.body.setAttribute('data-edit-drawer-open', 'true');
+
+    const closeWithGuard = () => {
+      if (hasChanges) {
+        const confirmClose = window.confirm('You have unsaved changes. Are you sure you want to close?');
+        if (!confirmClose) return;
+      }
+      onClose();
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeWithGuard();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      unlockBodyScroll();
+      if (previousDrawerFlag === null) {
+        document.body.removeAttribute('data-edit-drawer-open');
+      } else {
+        document.body.setAttribute('data-edit-drawer-open', previousDrawerFlag);
+      }
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, modalRoot, hasChanges, onClose]);
 
   const handleInputChange = (field: keyof ActionItem, value: string) => {
     if (!formData) return;
@@ -68,140 +105,124 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
     onClose();
   };
 
-  if (!action || !formData) return null;
+  if (!action || !formData || !isOpen || !modalRoot) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {/* Backdrop */}
+      <motion.div
+        key="work-item-edit-backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[900] bg-[rgba(0,0,0,0.55)]"
+        onClick={handleCancel}
+      />
+
+      {/* Drawer */}
+      <motion.aside
+        key="work-item-edit-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit work item"
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+        className="fixed top-0 right-0 z-[1000] h-[100vh] w-screen sm:w-[420px] flex flex-col"
+        style={{
+          background: '#0f0f0f',
+          boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border/60 px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Edit Action</h2>
+            {hasChanges && (
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400">
+                Unsaved changes
+              </Badge>
+            )}
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={handleCancel}
-            className="fixed inset-0 bg-black/50 z-40"
-          />
-          
-          {/* Drawer */}
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-full max-w-2xl bg-card/95 dark:bg-background shadow-2xl z-50 overflow-hidden"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
           >
-            <div className="flex flex-col h-full">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-border/60 dark:border-border/60 bg-secondary/40 dark:bg-card/95">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-semibold text-foreground dark:text-foreground">
-                    Edit Action
-                  </h2>
-                  {hasChanges && (
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400">
-                      Unsaved changes
-                    </Badge>
-                  )}
-                </div>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancel}
-                  className="text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-foreground"
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
 
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Action Title */}
-                <div className="space-y-2">
-                  <Label htmlFor="title" className="text-sm font-medium">
-                    Action Title
-                  </Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
-                    placeholder="Enter action title"
-                    className="flex-1"
-                  />
-                </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-sm font-medium">
+              Action Title
+            </Label>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => handleInputChange('title', e.target.value)}
+              placeholder="Enter action title"
+            />
+          </div>
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-sm font-medium">
-                    Description
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    placeholder="Enter detailed description"
-                    rows={4}
-                    className="resize-none"
-                  />
-                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                    Provide a clear description of what needs to be done
-                  </p>
-                </div>
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-sm font-medium">
+              Description
+            </Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              placeholder="Enter detailed description"
+              rows={5}
+              className="resize-none"
+            />
+          </div>
 
-                {/* Acceptance Criteria */}
-                <div className="space-y-2">
-                  <Label htmlFor="acceptance" className="text-sm font-medium">
-                    Acceptance Criteria
-                  </Label>
-                  <Textarea
-                    id="acceptance"
-                    value={formData.acceptance || ''}
-                    onChange={(e) => handleInputChange('acceptance', e.target.value)}
-                    placeholder="Define acceptance criteria"
-                    rows={4}
-                    className="resize-none"
-                  />
-                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                    Specify the conditions that must be met for this action to be accepted
-                  </p>
-                </div>
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="acceptance" className="text-sm font-medium">
+              Acceptance Criteria
+            </Label>
+            <Textarea
+              id="acceptance"
+              value={formData.acceptance || ''}
+              onChange={(e) => handleInputChange('acceptance', e.target.value)}
+              placeholder="Define acceptance criteria"
+              rows={5}
+              className="resize-none"
+            />
+          </div>
+        </div>
 
-              {/* Footer Actions */}
-              <div className="flex items-center justify-between p-6 border-t border-border/60 dark:border-border/60 bg-secondary/40 dark:bg-card/95">
-                <Button
-                  variant="outline"
-                  onClick={() => {}}
-                  className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Action
-                </Button>
-
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleCancel}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSave}
-                    disabled={!hasChanges}
-                    className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </>
-      )}
+        {/* Footer */}
+        <div className="mt-auto border-t border-border/60 px-4 py-4 sm:px-6">
+          <div className="flex items-center justify-end gap-2 sm:gap-3">
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={!hasChanges}
+              className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </motion.aside>
     </AnimatePresence>
+    ,
+    modalRoot
   );
-}; 
+};
 
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useState } from "react";
+import { useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import {
   Download,
@@ -11,8 +11,7 @@ import {
   ArrowRight,
   CheckCircle,
 } from 'lucide-react';
-import type { AppDispatch, RootState } from "@/store/store";
-import { fetchIntegrationAccounts } from "@/store/features/integrations/integrationsSlice";
+import type { RootState } from "@/store/store";
 import { Button } from "@/components/ui/button";
 
 interface PlatformSelectionScreenProps {
@@ -24,16 +23,10 @@ export function PlatformSelectionScreen({
   onPlatformSelect,
   onSkipConfig,
 }: PlatformSelectionScreenProps) {
-  const dispatch = useDispatch<AppDispatch>();
   const { accounts } = useSelector((state: RootState) => state.integrations);
   const [selectedPlatform, setSelectedPlatform] = useState<
     "azure" | "jira" | null
   >(null);
-
-  useEffect(() => {
-    // Integration accounts are now fetched at the parent level
-    // This component just reads from Redux state
-  }, []);
 
   // Check if integrations already exist
   const hasAzureIntegration = accounts.some(
@@ -89,16 +82,15 @@ export function PlatformSelectionScreen({
   };
 
   return (
-    <div className="h-full bg-background overflow-hidden">
-      <div className="h-[calc(100vh-65px)] flex flex-col">
-        {/* Left Panel - Platform Selection (60% on desktop, full width on mobile) */}
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="min-h-full w-full grid place-items-center px-4 py-8 sm:px-6 sm:py-10">
         <motion.div
-          className="flex-1 w-full flex items-center justify-center bg-card/60 dark:bg-background/50 backdrop-blur-sm order-2 lg:order-1"
+          className="w-full max-w-2xl rounded-3xl border border-border/60 bg-card/60 p-6 shadow-sm backdrop-blur-sm sm:p-8"
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         >
-          <div className="max-w-md space-y-8">
+          <div className="mx-auto w-full max-w-xl space-y-8">
             {/* Header */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}

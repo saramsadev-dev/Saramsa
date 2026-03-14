@@ -60,7 +60,7 @@ export const createIntegrationAccount = createAsyncThunk(
     credentials: any;
     metadata: any;
   }) => {
-    const response = await apiRequest('post', `/integrations/${data.provider}`, {
+    const response = await apiRequest('post', `/integrations/${data.provider}/`, {
       credentials: data.credentials,
       metadata: data.metadata,
     }, true);
@@ -75,7 +75,7 @@ export const updateIntegrationAccount = createAsyncThunk(
     credentials?: any;
     metadata?: any;
   }) => {
-    const response = await apiRequest('patch', `/integrations/${data.accountId}`, {
+    const response = await apiRequest('patch', `/integrations/${data.accountId}/`, {
       credentials: data.credentials,
       metadata: data.metadata,
     }, true);
@@ -86,7 +86,7 @@ export const updateIntegrationAccount = createAsyncThunk(
 export const deleteIntegrationAccount = createAsyncThunk(
   'integrations/deleteAccount',
   async (accountId: string) => {
-    await apiRequest('delete', `/integrations/${accountId}`, undefined, true);
+    await apiRequest('delete', `/integrations/${accountId}/`, undefined, true);
     return accountId;
   }
 );
@@ -94,7 +94,7 @@ export const deleteIntegrationAccount = createAsyncThunk(
 export const testIntegrationConnection = createAsyncThunk(
   'integrations/testConnection',
   async (accountId: string) => {
-    const response = await apiRequest('post', `/integrations/${accountId}/test`, undefined, true);
+    const response = await apiRequest('get', `/integrations/${accountId}/test/`, undefined, true);
     return { accountId, result: response.data.data }; // StandardResponse format
   }
 );

@@ -15,12 +15,12 @@ import { fetchIntegrationAccounts } from "@/store/features/integrations/integrat
 
 interface DashboardPlatformSelectionProps {
   onPlatformSelect: (platform: "azure" | "jira") => void;
-  projectId: string;
+  className?: string;
 }
 
 export function DashboardPlatformSelection({
   onPlatformSelect,
-  projectId,
+  className = "",
 }: DashboardPlatformSelectionProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { accounts } = useSelector((state: RootState) => state.integrations);
@@ -74,7 +74,7 @@ export function DashboardPlatformSelection({
   ];
 
   return (
-    <div className="p-6">
+    <div className={`p-6 ${className}`}>
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <motion.div
