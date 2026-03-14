@@ -426,6 +426,12 @@ JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 JIRA_PROJECT_KEY = os.getenv('JIRA_PROJECT_KEY')
 JIRA_DOMAIN = os.getenv('JIRA_DOMAIN')
 
+# Slack OAuth Configuration
+SLACK_CLIENT_ID = os.getenv('SLACK_CLIENT_ID', '').strip()
+SLACK_CLIENT_SECRET = os.getenv('SLACK_CLIENT_SECRET', '').strip()
+SLACK_REDIRECT_URI = os.getenv('SLACK_REDIRECT_URI', '').strip()
+SLACK_TEAM_ID = os.getenv('SLACK_TEAM_ID', '').strip()
+
 # Swagger/OpenAPI Configuration
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Saramsa API',

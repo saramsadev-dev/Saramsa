@@ -10,6 +10,9 @@ from .views import (
     AnalysisByQuarterView,
     CumulativeAnalysisView,
     AnalysisComparisonView,
+    DigestPreferenceView,
+    DigestPreviewView,
+    DigestSendNowView,
 )
 
 urlpatterns = [
@@ -28,6 +31,11 @@ urlpatterns = [
     path('history/quarter/', AnalysisByQuarterView.as_view(), name='analysis_by_quarter'),
     path('history/cumulative/', CumulativeAnalysisView.as_view(), name='cumulative_analysis'),
     path('history/compare/', AnalysisComparisonView.as_view(), name='analysis_comparison'),
+
+    # Weekly digest endpoints
+    path('digest/preferences/', DigestPreferenceView.as_view(), name='digest_preferences'),
+    path('digest/preview/', DigestPreviewView.as_view(), name='digest_preview'),
+    path('digest/send-now/', DigestSendNowView.as_view(), name='digest_send_now'),
 ]
 
 # Endpoints moved to /api/insights/ aliases in apis/urls.py:

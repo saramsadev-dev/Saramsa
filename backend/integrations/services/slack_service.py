@@ -14,7 +14,7 @@ import uuid
 import logging
 import requests
 from typing import Dict, List, Optional, Any, Set
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
 from ..repositories import IntegrationsRepository
@@ -45,22 +45,23 @@ class SlackService:
 
     def start_oauth(self, user_id: str) -> str:
         """Generate Slack OAuth URL and persist the state token."""
-        state = f"slack_{uuid.uuid4().hex}"
-
-        # Store state in integrations container so we can validate on callback
-        state_doc = {
-            "id": state,
-            "type": "oauth_state",
-            "userId": user_id,
-            "provider": "slack",
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-        }
-        self.integrations_repo.cosmos_service.create_document(
-            self.integrations_repo.container_name, state_doc
-        )
-
         client_id = getattr(settings, "SLACK_CLIENT_ID", "") or ""
         redirect_uri = getattr(settings, "SLACK_REDIRECT_URI", "") or ""
+        team_id = getattr(settings, "SLACK_TEAM_ID", "") or ""
+        if not client_id:
+            raise ValueError("Slack OAuth is not configured: SLACK_CLIENT_ID is missing.")
+        if not redirect_uri:
+            raise ValueError("Slack OAuth is not configured: SLACK_REDIRECT_URI is missing.")
+
+        state = f"slack_{uuid.uuid4().hex}"
+
+        # Persist state in ORM for callback validation (15 minutes TTL).
+        self.integrations_repo.create_oauth_state(
+            state_id=state,
+            user_id=user_id,
+            provider="slack",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        )
 
         oauth_url = (
             f"{SLACK_OAUTH_AUTHORIZE_URL}"
@@ -69,27 +70,14 @@ class SlackService:
             f"&redirect_uri={redirect_uri}"
             f"&state={state}"
         )
+        if team_id:
+            oauth_url += f"&team={team_id}"
         return oauth_url
 
     def complete_oauth(self, code: str, state: str) -> Dict[str, Any]:
         """Exchange authorization code for a bot token and store it."""
         # Validate state
-        state_doc = None
-        try:
-            state_doc = self.integrations_repo.cosmos_service.get_document(
-                self.integrations_repo.container_name, state, state
-            )
-        except Exception:
-            pass
-
-        if not state_doc:
-            # Fallback: query by id
-            results = self.integrations_repo.cosmos_service.query_documents(
-                self.integrations_repo.container_name,
-                "SELECT * FROM c WHERE c.id = @state AND c.type = 'oauth_state'",
-                [{"name": "@state", "value": state}],
-            )
-            state_doc = results[0] if results else None
+        state_doc = self.integrations_repo.get_oauth_state(state)
 
         if not state_doc:
             raise ValueError("Invalid or expired OAuth state")
@@ -100,6 +88,10 @@ class SlackService:
         client_id = getattr(settings, "SLACK_CLIENT_ID", "") or ""
         client_secret = getattr(settings, "SLACK_CLIENT_SECRET", "") or ""
         redirect_uri = getattr(settings, "SLACK_REDIRECT_URI", "") or ""
+        if not client_id or not client_secret or not redirect_uri:
+            raise ValueError(
+                "Slack OAuth is not configured: set SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, and SLACK_REDIRECT_URI."
+            )
 
         resp = requests.post(
             SLACK_OAUTH_ACCESS_URL,
@@ -151,9 +143,7 @@ class SlackService:
 
         # Clean up state document (best-effort)
         try:
-            self.integrations_repo.cosmos_service.delete_document(
-                self.integrations_repo.container_name, state, state
-            )
+            self.integrations_repo.delete_oauth_state(state)
         except Exception:
             pass
 

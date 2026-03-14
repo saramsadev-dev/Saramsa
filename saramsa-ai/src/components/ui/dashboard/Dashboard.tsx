@@ -36,6 +36,7 @@ import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
 import { Check, Sparkles } from 'lucide-react';
 import { UploadPanel } from './UploadPanel';
+import { SlackChannelPanel } from './SlackChannelPanel';
 import { MetricsCards } from './MetricsCards';
 import { FeatureSentimentsTable } from '../../dashboard/analysisDashboard/FeatureSentimentsTable';
 import { SentimentCharts } from '../../dashboard/analysisDashboard/SentimentCharts';
@@ -105,6 +106,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
   
   const { analysis: jiraAnalysis, isAnalyzing: isJiraAnalyzing } = useSelector((state: RootState) => state.jira);
   const { projects, loading: projectsLoading } = useSelector((state: RootState) => state.projects);
+  const { accounts: integrationAccounts, loading: integrationsLoading } = useSelector((state: RootState) => state.integrations);
   const { user } = useSelector((state: RootState) => state.auth);
   const { 
     currentProjectUserStories, 
@@ -155,6 +157,19 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
   const selectedProjectName = projects?.find((p: any) => p.id === (currentProjectId || projectId))?.name;
+  const slackAccount = useMemo(() => {
+    return integrationAccounts.find((account: any) => account.provider === 'slack' && account.status === 'active');
+  }, [integrationAccounts]);
+  const slackDisplayName = useMemo(() => {
+    if (!slackAccount) return null;
+    return (
+      slackAccount.metadata?.workspace ||
+      slackAccount.metadata?.team ||
+      slackAccount.metadata?.domain ||
+      slackAccount.displayName ||
+      null
+    );
+  }, [slackAccount]);
   const isProjectAnalyzing = isAnalyzing;
   const isTaskListLoading = useMemo(
     () => historyLoading && analysisHistory.length === 0,
@@ -749,7 +764,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
   }, [currentProjectId, dispatch]);
 
   const handleCloudConnect = () => {
-    alert('Cloud connect functionality would be implemented here');
+    if (typeof window !== 'undefined') {
+      window.location.href = '/settings?tab=integrations';
+    }
   };
 
   // Analyze loaded comments using the backend analyze endpoint
@@ -1417,11 +1434,21 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                   topError={error || topError}
                   loadedComments={loadedComments}
                   topUploading={isAnalyzing}
+                  integrationsLoading={integrationsLoading}
+                  slackConnected={!!slackAccount}
+                  slackDisplayName={slackDisplayName}
                   onFileSelect={setTopFile}
                   onAnalyze={handleTopAnalyze}
                   onCloudConnect={handleCloudConnect}
                   isAnalyzing={isAnalyzing}
                 />
+                {slackAccount && currentProjectId && (
+                  <SlackChannelPanel
+                    projectId={currentProjectId}
+                    slackAccountId={slackAccount.id}
+                    slackDisplayName={slackDisplayName}
+                  />
+                )}
               </>
             ) : activeView === 'user-stories' ? (
               /* User Stories View Loading */
@@ -1479,11 +1506,21 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                 topError={error || topError}
                 loadedComments={loadedComments}
                 topUploading={isAnalyzing}
+                integrationsLoading={integrationsLoading}
+                slackConnected={!!slackAccount}
+                slackDisplayName={slackDisplayName}
                 onFileSelect={setTopFile}
                 onAnalyze={handleTopAnalyze}
                 onCloudConnect={handleCloudConnect}
                 isAnalyzing={isAnalyzing}
               />
+              {slackAccount && currentProjectId && (
+                <SlackChannelPanel
+                  projectId={currentProjectId}
+                  slackAccountId={slackAccount.id}
+                  slackDisplayName={slackDisplayName}
+                />
+              )}
             </div>
 
             <>
@@ -1507,6 +1544,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                 </div>
               )}
 
+              <div id="analysis-results-section">
               {/* Analysis Results Section — only show loader when the selected run is the one being analyzed */}
               {analysisProgressUi && (
                 <div className="rounded-xl border border-border/60 bg-card/80 p-3">
@@ -1605,6 +1643,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                   )}
                 </>
               )}
+              </div>
             </>
 
             {/* User Stories Section */}

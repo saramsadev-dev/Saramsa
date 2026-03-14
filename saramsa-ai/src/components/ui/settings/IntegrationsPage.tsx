@@ -420,13 +420,13 @@ export function IntegrationsPage() {
                           Connected{" "}
                           {new Date(account.savedAt).toLocaleDateString()}
                         </span>
-                        {account.metadata.organization && (
+                        {account.metadata?.organization && (
                           <>
                             <span>|</span>
                             <span>{account.metadata.organization}</span>
                           </>
                         )}
-                        {account.metadata.domain && (
+                        {account.metadata?.domain && (
                           <>
                             <span>|</span>
                             <span>{account.metadata.domain}</span>
@@ -439,7 +439,7 @@ export function IntegrationsPage() {
                   <div className="flex items-center gap-2">
                     {(account.provider as string) !== "slack" && (
                       <Button
-                        onClick={() => handleFetchProjects(account.provider)}
+                        onClick={() => handleFetchProjects(account.provider as "azure" | "jira")}
                         disabled={fetchingProjects[account.provider]}
                         variant="saramsa"
                         className="flex items-center gap-2 px-3 py-2 text-sm"
@@ -467,9 +467,9 @@ export function IntegrationsPage() {
                       Test
                     </Button>
 
-                    {account.metadata.baseUrl && (
+                    {account.metadata?.baseUrl && (
                       <a
-                        href={account.metadata.baseUrl}
+                        href={account.metadata?.baseUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-2 px-3 py-2 text-sm border-2 border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10 transition-all duration-300 rounded-xl"

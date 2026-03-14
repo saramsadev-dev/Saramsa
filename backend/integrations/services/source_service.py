@@ -47,8 +47,10 @@ class SourceService:
                 "sync_frequency": sync_frequency,
                 "last_synced_at": None,
                 "last_sync_cursor": None,
+                "last_sync_cursors": {},
                 "last_analyzed_at": None,
                 "last_analyzed_ts": None,
+                "last_analyzed_ts_by_channel": {},
                 "last_analysis_status": None,
                 "last_analysis_error": None,
                 "last_analysis_enqueued_at": None,
@@ -62,36 +64,15 @@ class SourceService:
             "createdAt": now,
             "updatedAt": now,
         }
-        return self.repo.cosmos_service.create_document(
-            self.repo.container_name, doc
-        )
+        return self.repo.create_feedback_source(doc)
 
     def get_sources_by_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all feedback sources for a project."""
-        query = (
-            "SELECT * FROM c "
-            "WHERE c.projectId = @project_id AND c.type = 'feedbackSource' "
-            "ORDER BY c.createdAt DESC"
-        )
-        params = [{"name": "@project_id", "value": project_id}]
-        return self.repo.cosmos_service.query_documents(
-            self.repo.container_name, query, params
-        )
+        return self.repo.get_feedback_sources_by_project(project_id)
 
     def get_source(self, source_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get a single feedback source with ownership check."""
-        query = (
-            "SELECT * FROM c "
-            "WHERE c.id = @source_id AND c.userId = @user_id AND c.type = 'feedbackSource'"
-        )
-        params = [
-            {"name": "@source_id", "value": source_id},
-            {"name": "@user_id", "value": user_id},
-        ]
-        results = self.repo.cosmos_service.query_documents(
-            self.repo.container_name, query, params
-        )
-        return results[0] if results else None
+        return self.repo.get_feedback_source(source_id, user_id)
 
     def update_source_channels(
         self, source_id: str, user_id: str, channels: List[Dict[str, str]]
@@ -102,9 +83,10 @@ class SourceService:
             return None
         source["config"]["channels"] = channels
         source["updatedAt"] = datetime.now(timezone.utc).isoformat()
-        return self.repo.cosmos_service.update_document(
-            self.repo.container_name, source_id, source["userId"], source
-        )
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def delete_source(self, source_id: str, user_id: str) -> bool:
         """Delete a feedback source."""
@@ -112,10 +94,7 @@ class SourceService:
         if not source:
             return False
         try:
-            self.repo.cosmos_service.delete_document(
-                self.repo.container_name, source_id, source["userId"]
-            )
-            return True
+            return self.repo.delete_feedback_source(source_id, user_id)
         except Exception as e:
             logger.error(f"Error deleting source {source_id}: {e}")
             return False
@@ -126,17 +105,21 @@ class SourceService:
         user_id: str,
         cursor: Optional[str],
         synced_at: str,
+        cursors_by_channel: Optional[Dict[str, str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Update sync cursor and last_synced_at after a sync run."""
         source = self.get_source(source_id, user_id)
         if not source:
             return None
         source["config"]["last_sync_cursor"] = cursor
+        if cursors_by_channel is not None:
+            source["config"]["last_sync_cursors"] = cursors_by_channel
         source["config"]["last_synced_at"] = synced_at
         source["updatedAt"] = datetime.now(timezone.utc).isoformat()
-        return self.repo.cosmos_service.update_document(
-            self.repo.container_name, source_id, source["userId"], source
-        )
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def update_analysis_cursor(
         self,
@@ -144,6 +127,7 @@ class SourceService:
         user_id: str,
         analyzed_at: Optional[str],
         analyzed_ts: Optional[str],
+        analyzed_ts_by_channel: Optional[Dict[str, str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Update last analyzed marker after a Slack analysis run."""
         source = self.get_source(source_id, user_id)
@@ -151,10 +135,13 @@ class SourceService:
             return None
         source["config"]["last_analyzed_at"] = analyzed_at
         source["config"]["last_analyzed_ts"] = analyzed_ts
+        if analyzed_ts_by_channel is not None:
+            source["config"]["last_analyzed_ts_by_channel"] = analyzed_ts_by_channel
         source["updatedAt"] = datetime.now(timezone.utc).isoformat()
-        return self.repo.cosmos_service.update_document(
-            self.repo.container_name, source_id, source["userId"], source
-        )
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def update_analysis_status(
         self,
@@ -178,9 +165,10 @@ class SourceService:
         if status in ("queued", "success") and failed_at is None:
             source["config"]["last_analysis_failed_at"] = None
         source["updatedAt"] = datetime.now(timezone.utc).isoformat()
-        return self.repo.cosmos_service.update_document(
-            self.repo.container_name, source_id, source["userId"], source
-        )
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def update_range_analysis_meta(
         self,
@@ -200,20 +188,14 @@ class SourceService:
         source["config"]["last_range_analysis_to"] = to_iso
         source["config"]["last_range_analysis_count"] = count
         source["updatedAt"] = datetime.now(timezone.utc).isoformat()
-        return self.repo.cosmos_service.update_document(
-            self.repo.container_name, source_id, source["userId"], source
-        )
+        return self.repo.update_feedback_source(source_id, {
+            "config": source.get("config", {}),
+            "metadata": source.get("metadata", {}),
+        })
 
     def get_active_sources_by_provider(self, provider: str) -> List[Dict[str, Any]]:
         """Get all active sources for a given provider (used by scheduler)."""
-        query = (
-            "SELECT * FROM c "
-            "WHERE c.provider = @provider AND c.type = 'feedbackSource' AND c.status = 'active'"
-        )
-        params = [{"name": "@provider", "value": provider}]
-        return self.repo.cosmos_service.query_documents(
-            self.repo.container_name, query, params
-        )
+        return self.repo.get_active_feedback_sources_by_provider(provider)
 
 
 # ---------------------------------------------------------------------------
