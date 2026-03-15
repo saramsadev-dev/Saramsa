@@ -5,12 +5,22 @@ import { Settings, UserRound, PlugZap } from 'lucide-react';
 import { apiRequest } from "@/lib/apiRequest";
 import { IntegrationsPage } from "@/components/ui/settings/IntegrationsPage";
 import { Button } from "@/components/ui/button";
+import {
+  createStripeBillingPortalSession,
+  createStripeCheckoutSession,
+  getStripeSubscriptionStatus,
+  type SubscriptionStatus,
+} from "@/lib/billingService";
 
 type Profile = { email?: string; username?: string };
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"profile" | "integrations">("profile");
   const [profile, setProfile] = useState<Profile>({});
+  const [billing, setBilling] = useState<SubscriptionStatus | null>(null);
+  const [billingLoading, setBillingLoading] = useState<boolean>(true);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  const [billingActionLoading, setBillingActionLoading] = useState<"checkout" | "portal" | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -35,6 +45,49 @@ export default function SettingsPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setBillingLoading(true);
+        setBillingError(null);
+        const status = await getStripeSubscriptionStatus();
+        setBilling(status);
+      } catch (e: any) {
+        setBillingError(e?.message || "Failed to load billing status.");
+      } finally {
+        setBillingLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleStartSubscription = async () => {
+    try {
+      setBillingActionLoading("checkout");
+      const data = await createStripeCheckoutSession();
+      if (data?.checkout_url) {
+        window.location.href = data.checkout_url;
+      }
+    } catch (e: any) {
+      setBillingError(e?.message || "Failed to start checkout.");
+    } finally {
+      setBillingActionLoading(null);
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    try {
+      setBillingActionLoading("portal");
+      const data = await createStripeBillingPortalSession();
+      if (data?.portal_url) {
+        window.location.href = data.portal_url;
+      }
+    } catch (e: any) {
+      setBillingError(e?.message || "Failed to open billing portal.");
+    } finally {
+      setBillingActionLoading(null);
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-background text-foreground">
@@ -114,6 +167,44 @@ export default function SettingsPage() {
                   <p className="font-medium text-foreground">{profile.email || "-"}</p>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Subscription Billing</p>
+                  <p className="text-xs text-muted-foreground">
+                    {billingLoading
+                      ? "Loading billing status..."
+                      : billing?.is_active
+                      ? `Active (${billing.status})`
+                      : `Not active (${billing?.status || "inactive"})`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {!billing?.is_active && (
+                    <Button
+                      variant="saramsa"
+                      size="sm"
+                      onClick={handleStartSubscription}
+                      disabled={billingActionLoading !== null}
+                    >
+                      {billingActionLoading === "checkout" ? "Starting..." : "Start Subscription"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenBillingPortal}
+                    disabled={billingActionLoading !== null}
+                  >
+                    {billingActionLoading === "portal" ? "Opening..." : "Manage Billing"}
+                  </Button>
+                </div>
+              </div>
+              {billingError && (
+                <p className="text-xs text-red-600 dark:text-red-400">{billingError}</p>
+              )}
             </div>
           </div>
         )}

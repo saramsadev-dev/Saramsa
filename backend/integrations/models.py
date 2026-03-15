@@ -63,100 +63,6 @@ class IntegrationAccount(TimestampedModel):
         ]
 
 
-class FeedbackSource(TimestampedModel):
-    id = models.CharField(max_length=64, primary_key=True)
-    user = models.ForeignKey(
-        "authentication.UserAccount",
-        on_delete=models.CASCADE,
-        related_name="feedback_sources",
-        db_column="user_id",
-        null=True,
-        blank=True,
-    )
-    project = models.ForeignKey(
-        Project,
-        on_delete=models.CASCADE,
-        related_name="feedback_sources",
-        null=True,
-        blank=True,
-    )
-    provider = models.CharField(max_length=64, db_index=True)
-    account_id = models.CharField(max_length=64, blank=True, default="")
-    config = models.JSONField(default=dict, blank=True)
-    status = models.CharField(max_length=32, default="active", db_index=True)
-
-    class Meta:
-        db_table = "feedback_sources"
-        indexes = [
-            models.Index(fields=["project", "provider"]),
-            models.Index(fields=["provider", "status"]),
-        ]
-
-
-class OAuthState(TimestampedModel):
-    id = models.CharField(max_length=128, primary_key=True)
-    user = models.ForeignKey(
-        "authentication.UserAccount",
-        on_delete=models.CASCADE,
-        related_name="oauth_states",
-        db_column="user_id",
-        null=True,
-        blank=True,
-    )
-    provider = models.CharField(max_length=64, db_index=True)
-
-    class Meta:
-        db_table = "oauth_states"
-
-
-class SlackFeedbackItem(TimestampedModel):
-    id = models.CharField(max_length=64, primary_key=True)
-    project = models.ForeignKey(
-        Project,
-        on_delete=models.CASCADE,
-        related_name="slack_feedback_items",
-        null=True,
-        blank=True,
-    )
-    user = models.ForeignKey(
-        "authentication.UserAccount",
-        on_delete=models.CASCADE,
-        related_name="slack_feedback_items",
-        db_column="user_id",
-        null=True,
-        blank=True,
-    )
-    source_id = models.CharField(max_length=255, db_index=True)
-    comment = models.TextField(blank=True, default="")
-    source_channel = models.CharField(max_length=255, blank=True, default="")
-    author = models.CharField(max_length=255, blank=True, default="")
-    feedback_created_at = models.CharField(max_length=64, blank=True, default="")
-
-    class Meta:
-        db_table = "slack_feedback_items"
-        indexes = [
-            models.Index(fields=["project", "source_id"]),
-        ]
-
-
-class ProjectRole(TimestampedModel):
-    id = models.CharField(max_length=128, primary_key=True)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="project_roles")
-    user = models.ForeignKey("authentication.UserAccount", on_delete=models.CASCADE, related_name="project_roles")
-    role = models.CharField(max_length=32, db_index=True)
-    actor_id = models.CharField(max_length=64, blank=True, default="")
-
-    class Meta:
-        db_table = "project_roles"
-        constraints = [
-            models.UniqueConstraint(fields=["project", "user"], name="uq_project_user_role"),
-        ]
-        indexes = [
-            models.Index(fields=["project", "role"]),
-            models.Index(fields=["user", "role"]),
-        ]
-
-
 class OAuthState(TimestampedModel):
     id = models.CharField(max_length=128, primary_key=True)
     user = models.ForeignKey(
@@ -210,5 +116,53 @@ class FeedbackSource(TimestampedModel):
             models.Index(fields=["provider", "status", "created_at"]),
             models.Index(fields=["project", "created_at"]),
             models.Index(fields=["user", "created_at"]),
+        ]
+
+
+class SlackFeedbackItem(TimestampedModel):
+    id = models.CharField(max_length=64, primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="slack_feedback_items",
+        null=True,
+        blank=True,
+    )
+    user = models.ForeignKey(
+        "authentication.UserAccount",
+        on_delete=models.CASCADE,
+        related_name="slack_feedback_items",
+        db_column="user_id",
+        null=True,
+        blank=True,
+    )
+    source_id = models.CharField(max_length=255, db_index=True)
+    comment = models.TextField(blank=True, default="")
+    source_channel = models.CharField(max_length=255, blank=True, default="")
+    author = models.CharField(max_length=255, blank=True, default="")
+    feedback_created_at = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        db_table = "slack_feedback_items"
+        indexes = [
+            models.Index(fields=["project", "source_id"]),
+        ]
+
+
+class ProjectRole(TimestampedModel):
+    id = models.CharField(max_length=128, primary_key=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="project_roles")
+    user = models.ForeignKey("authentication.UserAccount", on_delete=models.CASCADE, related_name="project_roles")
+    role = models.CharField(max_length=32, db_index=True)
+    actor_id = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        db_table = "project_roles"
+        constraints = [
+            models.UniqueConstraint(fields=["project", "user"], name="uq_project_user_role"),
+        ]
+        indexes = [
+            models.Index(fields=["project", "role"]),
+            models.Index(fields=["user", "role"]),
         ]
 

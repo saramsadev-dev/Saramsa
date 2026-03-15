@@ -251,6 +251,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'authentication',
     'integrations',
+    'billing',
 ]
 
 # Custom authentication backend for PostgreSQL
@@ -431,6 +432,12 @@ SLACK_CLIENT_ID = os.getenv('SLACK_CLIENT_ID', '').strip()
 SLACK_CLIENT_SECRET = os.getenv('SLACK_CLIENT_SECRET', '').strip()
 SLACK_REDIRECT_URI = os.getenv('SLACK_REDIRECT_URI', '').strip()
 SLACK_TEAM_ID = os.getenv('SLACK_TEAM_ID', '').strip()
+
+# Stripe Billing Configuration
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '').strip()
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '').strip()
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '').strip()
+STRIPE_DEFAULT_PRICE_ID = os.getenv('STRIPE_DEFAULT_PRICE_ID', '').strip()
 
 # Swagger/OpenAPI Configuration
 SPECTACULAR_SETTINGS = {

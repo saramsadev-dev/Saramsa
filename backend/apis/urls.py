@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/work-items/', include('work_items.urls')),
     path('api/auth/', include('authentication.urls')),
     path('api/integrations/', include('integrations.urls')),
+    path('api/billing/', include('billing.urls')),
     # Insights endpoints (aliased from feedback_analysis and work_items for frontend compatibility)
     path('api/insights/analyze/', AnalyzeCommentsView.as_view(), name='insights_analyze'),
     path('api/insights/task-status/<str:task_id>/', TaskStatusView.as_view(), name='insights_task_status'),
