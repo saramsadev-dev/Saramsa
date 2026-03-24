@@ -406,6 +406,30 @@ export const fetchAnalysisById = createAsyncThunk<
   }
 });
 
+// Async thunk for deleting an analysis run
+export const deleteAnalysisRun = createAsyncThunk<
+  string,
+  string,
+  { rejectValue: string }
+>('analysis/deleteAnalysisRun', async (analysisId, { rejectWithValue }) => {
+  try {
+    await apiRequest('delete', `/feedback/analysis/${encodeURIComponent(analysisId)}/`, undefined, true);
+    return analysisId;
+  } catch (err: any) {
+    let errorMessage = 'Failed to delete analysis.';
+    if (err.response?.status === 401) {
+      errorMessage = 'Authentication required. Please login again.';
+    } else if (err.response?.status === 403) {
+      errorMessage = 'You do not have permission to delete this analysis.';
+    } else if (err.response?.status === 404) {
+      errorMessage = 'Analysis not found.';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    return rejectWithValue(errorMessage);
+  }
+});
+
 // Async thunk for renaming an analysis run
 export const renameAnalysisRun = createAsyncThunk<
   { id: string; name: string | null },
@@ -653,6 +677,17 @@ const analysisSlice = createSlice({
       .addCase(fetchAnalysisById.rejected, (state, action) => {
         state.fetchingAnalysisById = false;
         state.error = action.payload || 'Failed to load analysis.';
+      })
+      // Delete analysis run
+      .addCase(deleteAnalysisRun.fulfilled, (state, action) => {
+        state.analysisHistory = state.analysisHistory.filter(e => e.id !== action.payload);
+        // Clear current analysis if it was the deleted one
+        if (state.selectedAnalysisId === action.payload) {
+          state.selectedAnalysisId = null;
+          state.analysisData = null;
+          state.deepAnalysis = null;
+          state.loadedComments = null;
+        }
       })
       // Rename analysis run
       .addCase(renameAnalysisRun.fulfilled, (state, action) => {

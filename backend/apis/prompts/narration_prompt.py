@@ -2,7 +2,7 @@
 Unified narration prompt for Phase-3.
 
 This single prompt covers analysis narratives (insights + feature descriptions)
-and optional work-item narratives (from deterministic candidates).
+and rich work-item narratives (from deterministic candidates + sampled comments).
 """
 
 import json
@@ -12,37 +12,53 @@ from typing import Dict, Any
 def create_narration_prompt(narration_input: Dict[str, Any]) -> str:
     """Create the narration prompt with a fixed JSON output schema."""
     serialized = json.dumps(narration_input, ensure_ascii=True)
-    return f"""
-You are a concise product analyst. You ONLY provide narrative text.
-You MUST NOT create, remove, or change any candidates, priorities, types, or metrics.
+    return f"""You are a senior product analyst creating actionable work items from customer feedback.
 
-INPUT (JSON):
+## YOUR TASK
+For each work_item_candidate in the input, generate a rich, specific work item using the analysis metrics AND the sampled customer comments provided.
+
+## INPUT
+The JSON below contains:
+- "overall": overall sentiment breakdown
+- "features": feature-level sentiment data with keywords
+- "work_item_candidates": deterministic candidates (each has candidate_id, aspect_key, type, priority, reason)
+- "comment_samples": actual customer feedback quotes mapped by candidate_id
+
 {serialized}
 
-OUTPUT MUST BE VALID JSON WITH THIS EXACT SCHEMA:
+## OUTPUT — VALID JSON WITH THIS EXACT SCHEMA
 
 {{
-  "insights": ["..."],
+  "insights": [
+    "max 5 high-level observations about the feedback trends"
+  ],
   "features": [
     {{
       "aspect_key": "pricing",
-      "description": "..."
+      "description": "1-2 sentence summary of what customers are saying about this feature"
     }}
   ],
   "work_items": [
     {{
-      "candidate_id": "uuid",
-      "title": "...",
-      "description": "..."
+      "candidate_id": "must match a candidate_id from the input",
+      "title": "Specific, actionable title (max 100 chars). Reference the actual problem, not generic 'Improve X'",
+      "description": "2-4 sentences synthesizing the key themes from customer comments. Quote specific customer phrases when available. End with a recommended action.",
+      "acceptance_criteria": "3-5 measurable bullet points separated by ' | ' that define when this work item is done",
+      "business_value": "Impact statement using the actual metrics from the input (comment count, negative %, proportion of total feedback)"
     }}
   ]
 }}
 
-RULES:
-- insights: max 5 items.
-- features: only for provided aspect_key values.
-- work_items: only for provided candidate_id values.
-- Do not include extra keys.
-- Do not include metrics, priorities, or types.
-- Return empty lists if nothing is provided.
+## STRICT RULES
+1. Output one work_item for EACH candidate_id in the input. Do NOT add or remove candidates.
+2. Do NOT change type, priority, or any metric values — you only write narrative text.
+3. Do NOT include priority, type, or metric numbers in the title.
+4. For "title": Be specific. BAD: "Improve Pricing based on feedback". GOOD: "Restructure pricing tiers to address cost concerns".
+5. For "description": Reference actual customer language from comment_samples. Group feedback into 2-3 themes. End with a concrete recommendation.
+6. For "acceptance_criteria": Write measurable outcomes, not vague goals. BAD: "Fix the issue". GOOD: "Billing page shows itemized breakdown before charge".
+7. For "business_value": Always reference the actual numbers (e.g. "350 comments, 55% negative, largest feedback category").
+8. insights: max 5 items.
+9. features: only for aspect_key values present in the input.
+10. If comment_samples is empty for a candidate, still generate rich text based on the aspect_key, keywords, and metrics available.
+11. Return ONLY valid JSON. No explanation or commentary outside the JSON.
 """

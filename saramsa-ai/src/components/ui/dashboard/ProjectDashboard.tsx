@@ -234,7 +234,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
                   <FolderPlus className="w-4 h-4 text-saramsa-brand" />
                   <div className="flex items-baseline gap-1">
                     <span className="text-lg font-semibold text-foreground">{projects.length}</span>
-                    <span className="text-xs text-muted-foreground">Projects</span>
+                    <span className="text-xs text-muted-foreground">{projects.length === 1 ? 'Project' : 'Projects'}</span>
                   </div>
                 </div>
                 <div className="bg-card/80 border border-border/60 rounded-2xl px-3 py-2 flex items-center gap-2 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.45)]">
@@ -243,7 +243,9 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
                     <span className="text-lg font-semibold text-foreground">
                       {projects.filter(p => p.externalLinks && p.externalLinks.length > 0).length}
                     </span>
-                    <span className="text-xs text-muted-foreground">Integrations</span>
+                    <span className="text-xs text-muted-foreground">
+                      {projects.filter(p => p.externalLinks && p.externalLinks.length > 0).length === 1 ? 'Integration' : 'Integrations'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -328,7 +330,7 @@ export function ProjectDashboard({ onNavigateToAnalysis, onGoToProject }: Projec
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
-                onClick={() => handleCreateProject('My First Project', 'A sample project to get started')}
+                onClick={() => setShowCreateModal(true)}
                 variant="saramsa"
                 className="flex items-center gap-2 px-6 py-3"
               >

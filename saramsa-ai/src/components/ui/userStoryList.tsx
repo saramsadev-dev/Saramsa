@@ -256,8 +256,8 @@ export const UserStoryList = ({
           createdAt: 'created_at' in item ? item.created_at : new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           tags: item.tags || item.labels || [],
-          acceptance: item.acceptancecriteria || item.acceptance_criteria || item.acceptance || '',
-          featureArea: item.feature_area || item.featureArea || item.feature || item.feature_name || '',
+          acceptance: item.acceptance_criteria || item.acceptancecriteria || item.acceptance || '',
+          featureArea: item.feature_area || item.featurearea || '',
         };
         dispatch(addActionItem(actionItem));
       });

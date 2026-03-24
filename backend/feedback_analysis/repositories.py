@@ -249,6 +249,18 @@ class AnalysisRepository:
             logger.error(f"Error getting analysis by ID: {e}")
             return None
 
+    def delete_analysis(self, analysis_id: str, user_id: str) -> bool:
+        """Delete an analysis by ID (owner-only)."""
+        try:
+            normalized = self._normalize_analysis_id(analysis_id)
+            deleted, _ = Analysis.objects.filter(id=normalized, user_id=str(user_id)).delete()
+            if not deleted and normalized != analysis_id:
+                deleted, _ = Analysis.objects.filter(id=str(analysis_id), user_id=str(user_id)).delete()
+            return deleted > 0
+        except Exception as e:
+            logger.error(f"Error deleting analysis {analysis_id}: {e}")
+            return False
+
     def get_analysis_by_id_any(self, analysis_id: str) -> Optional[Dict[str, Any]]:
         try:
             normalized = self._normalize_analysis_id(analysis_id)

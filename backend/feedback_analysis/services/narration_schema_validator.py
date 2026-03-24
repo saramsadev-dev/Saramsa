@@ -71,6 +71,8 @@ def validate_narration_output(
                 "candidate_id": candidate_id,
                 "title": str(wi.get("title") or "").strip(),
                 "description": str(wi.get("description") or "").strip(),
+                "acceptance_criteria": str(wi.get("acceptance_criteria") or "").strip(),
+                "business_value": str(wi.get("business_value") or "").strip(),
             })
         # Ignore unexpected candidate ids instead of failing the whole narration
 

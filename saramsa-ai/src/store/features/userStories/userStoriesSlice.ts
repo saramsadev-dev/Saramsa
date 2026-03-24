@@ -25,15 +25,15 @@ export interface WorkItem {
   priority: string;
   tags: string[];
   labels?: string[];
-  acceptancecriteria: string;
-  acceptance_criteria?: string;
-  acceptance?: string; // For backward compatibility
-  businessvalue: string;
-  business_value?: string; // Alternative field name
-  effortestimate: string;
-  effort_estimate?: string; // Alternative field name
-  featurearea: string;
-  feature_area?: string; 
+  acceptance_criteria: string;
+  acceptancecriteria?: string; // Legacy field name
+  acceptance?: string; // Legacy field name
+  business_value: string;
+  businessvalue?: string; // Legacy field name
+  effort_estimate: string;
+  effortestimate?: string; // Legacy field name
+  feature_area: string;
+  featurearea?: string; // Legacy field name
   id: string;
   created_at: string;
   project_id: string;

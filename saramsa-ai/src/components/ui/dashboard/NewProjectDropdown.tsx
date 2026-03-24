@@ -52,7 +52,7 @@ export function NewProjectDropdown({
       initial={{ opacity: 0, scale: 0.95, y: -10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -10 }}
-      className="absolute top-12 right-0 bg-popover border border-border/60 rounded-2xl shadow-lg dark:bg-popover/95 z-50 w-72"
+      className="absolute top-12 right-0 bg-popover border border-border/60 rounded-xl shadow-lg dark:bg-popover/95 z-50 w-72"
     >
       <div className="p-2">
         {/* Create Project */}
@@ -61,8 +61,8 @@ export function NewProjectDropdown({
           variant="ghost"
           className="flex items-center gap-3 w-full px-3 py-3 text-left hover:bg-accent/60 rounded-xl transition-colors"
         >
-          <div className="w-8 h-8 bg-secondary/70 border border-border/60 rounded-xl flex items-center justify-center">
-            <FolderPlus className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 bg-saramsa-brand/15 border border-saramsa-brand/30 rounded-xl flex items-center justify-center">
+            <FolderPlus className="w-4 h-4 text-saramsa-brand" />
           </div>
           <div>
             <p className="font-medium text-foreground">Create Project</p>
@@ -80,7 +80,7 @@ export function NewProjectDropdown({
           className="flex items-center gap-3 w-full px-3 py-3 text-left hover:bg-accent/60 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-8 h-8 bg-secondary/70 border border-border/60 rounded-xl flex items-center justify-center">
-            <Cloud className="w-4 h-4 text-white" />
+            <Cloud className="w-4 h-4 text-foreground" />
           </div>
           <div className="flex-1">
             <p className="font-medium text-foreground">Import from Azure DevOps</p>
@@ -104,7 +104,7 @@ export function NewProjectDropdown({
           className="flex items-center gap-3 w-full px-3 py-3 text-left hover:bg-accent/60 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="w-8 h-8 bg-secondary/70 border border-border/60 rounded-xl flex items-center justify-center">
-            <span className="text-white text-sm font-bold">J</span>
+            <span className="text-foreground text-sm font-bold">J</span>
           </div>
           <div className="flex-1">
             <p className="font-medium text-foreground">Import from Jira</p>

@@ -65,9 +65,13 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
     }
   }, [selectedProvider, azureIntegrations, jiraIntegrations]);
 
+  const isDuplicateName = projects.some(
+    p => p.name.toLowerCase() === name.trim().toLowerCase()
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
+    if (name.trim() && !isDuplicateName) {
       let externalLink = undefined;
       if (selectedProvider !== 'none' && selectedExternalProject && selectedAccount) {
         externalLink = {
@@ -133,6 +137,11 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                 disabled={loading}
                 autoFocus
               />
+              {isDuplicateName && (
+                <p className="text-xs text-red-500 mt-1">
+                  A project with this name already exists. Please choose a different name.
+                </p>
+              )}
             </div>
 
             <div>
@@ -366,7 +375,7 @@ export function CreateProjectModal({ onClose, onCreate, onImport, integrations, 
                 type="submit"
                 variant="saramsa"
                 className="flex-1 gap-2"
-                disabled={loading || !name.trim()}
+                disabled={loading || !name.trim() || isDuplicateName}
               >
                 <FolderPlus className="w-4 h-4" />
                 {loading ? 'Creating...' : 'Create Project'}

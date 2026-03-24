@@ -736,6 +736,28 @@ class AnalysisByIdView(APIView):
             message="Analysis retrieved successfully"
         )
 
+    @handle_service_errors
+    def delete(self, request, analysis_id: str):
+        analysis_service = get_analysis_service()
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        if not user_id:
+            return StandardResponse.unauthorized(
+                detail="Authentication required",
+                instance=request.path
+            )
+
+        deleted = analysis_service.delete_analysis(analysis_id, str(user_id))
+        if not deleted:
+            return StandardResponse.not_found(
+                detail="Analysis not found or you do not have permission to delete it.",
+                instance=request.path
+            )
+
+        return StandardResponse.success(
+            data={"id": analysis_id, "deleted": True},
+            message="Analysis deleted successfully"
+        )
+
     def _group_work_items_by_feature(self, work_items: list) -> dict:
         """Groups work items by their 'feature_area' or 'featurearea' attribute."""
         grouped_items = {}

@@ -25,12 +25,24 @@ class WorkItemCandidateService:
     # Rule Group D thresholds
     TAXONOMY_GAP_UNMAPPED_THRESHOLD = 0.15
 
+    # Rule Group B thresholds (volume-based sub-theme splitting)
+    VOLUME_SPLIT_MIN_COMMENTS = 50       # Only split features with ≥50 comments
+    VOLUME_SPLIT_COMMENTS_PER_ITEM = 100 # 1 extra candidate per 100 comments beyond base
+    VOLUME_SPLIT_MAX_EXTRA = 4           # Max extra candidates per feature from volume
+    VOLUME_SPLIT_MIN_KEYWORDS = 2        # Need at least 2 keywords to split into sub-themes
+
     # Rule Group E thresholds (overall-level negative sentiment)
     OVERALL_NEGATIVE_THRESHOLD = 0.25
     OVERALL_MIN_COMMENTS = 10
 
-    # Known bug aspect keys (project-specific in future)
-    KNOWN_BUG_ASPECT_KEYS = set()  # TODO(phase-3): load from project config
+    # Known bug aspect keys — aspects that indicate a defect rather than an improvement
+    KNOWN_BUG_ASPECT_KEYS = {
+        "bugs", "bug", "crashes", "crash", "errors", "error",
+        "broken", "defect", "defects", "glitch", "glitches",
+        "reliability", "stability", "downtime", "outage",
+        "data_loss", "security", "authentication", "login_issues",
+        "performance", "latency", "slow", "timeout",
+    }
 
     PRIORITY_ORDER = ["P3", "P2", "P1", "P0"]
 
@@ -57,6 +69,18 @@ class WorkItemCandidateService:
             comment_count = metrics.get("comment_count", 0)
             confidence_p95 = metrics.get("confidence_p95")
 
+            if neg_pct < self.NEGATIVE_CREATE_THRESHOLD or comment_count < self.NEGATIVE_MIN_COMMENTS:
+                reason_parts = []
+                if neg_pct < self.NEGATIVE_CREATE_THRESHOLD:
+                    reason_parts.append(f"neg_pct {neg_pct:.1%} < threshold {self.NEGATIVE_CREATE_THRESHOLD:.0%}")
+                if comment_count < self.NEGATIVE_MIN_COMMENTS:
+                    reason_parts.append(f"comment_count {comment_count} < min {self.NEGATIVE_MIN_COMMENTS}")
+                logger.debug(
+                    "Candidate REJECTED for '%s': %s",
+                    aspect_key, "; ".join(reason_parts),
+                )
+                continue
+
             if neg_pct >= self.NEGATIVE_CREATE_THRESHOLD and comment_count >= self.NEGATIVE_MIN_COMMENTS:
                 priority = self._priority_from_negative(neg_pct)
                 candidate_type = "bug" if aspect_key in self.KNOWN_BUG_ASPECT_KEYS else "improvement"
@@ -76,6 +100,61 @@ class WorkItemCandidateService:
                     },
                     evidence=self._extract_evidence(feature),
                 ))
+
+        # Rule Group B — Volume-based sub-theme splitting
+        # High-volume features generate additional candidates from their keywords/sub-themes
+        volume_candidates: List[Dict[str, Any]] = []
+        for feature in features:
+            aspect_key, metrics = self._feature_metrics(feature)
+            if not aspect_key:
+                continue
+            neg_pct = metrics.get("neg_pct", 0.0)
+            comment_count = metrics.get("comment_count", 0)
+            # Only split features that already qualify as candidates
+            if neg_pct < self.NEGATIVE_CREATE_THRESHOLD or comment_count < self.VOLUME_SPLIT_MIN_COMMENTS:
+                continue
+            # Check if this feature already has a candidate
+            if not any(c.get("aspect_key") == aspect_key for c in candidates):
+                continue
+            keywords = self._extract_keywords(feature)
+            if len(keywords) < self.VOLUME_SPLIT_MIN_KEYWORDS:
+                continue
+            # Calculate how many extra items based on volume
+            extra_count = min(
+                (comment_count - self.VOLUME_SPLIT_MIN_COMMENTS) // self.VOLUME_SPLIT_COMMENTS_PER_ITEM + 1,
+                self.VOLUME_SPLIT_MAX_EXTRA,
+                len(keywords),  # Can't create more sub-themes than keywords
+            )
+            if extra_count <= 0:
+                continue
+            base_priority = self._priority_from_negative(neg_pct)
+            for i, keyword in enumerate(keywords[:extra_count]):
+                sub_key = f"{aspect_key}:{keyword}"
+                candidate_type = "bug" if aspect_key in self.KNOWN_BUG_ASPECT_KEYS else "improvement"
+                volume_candidates.append(self._build_candidate(
+                    project_id=project_id,
+                    analysis_id=analysis_id,
+                    taxonomy_id=taxonomy_id,
+                    taxonomy_version=taxonomy_version,
+                    aspect_key=sub_key,
+                    candidate_type=candidate_type,
+                    priority=base_priority,
+                    reason={
+                        "neg_pct": neg_pct,
+                        "comment_count": comment_count,
+                        "trend": "flat",
+                        "confidence_p95": None,
+                        "sub_theme": keyword,
+                        "parent_aspect": aspect_key,
+                    },
+                    evidence=[f"Keyword: {keyword}"],
+                ))
+            if volume_candidates:
+                logger.info(
+                    "Volume split for '%s' (%d comments): +%d sub-theme candidates from keywords %s",
+                    aspect_key, comment_count, extra_count, keywords[:extra_count],
+                )
+        candidates.extend(volume_candidates)
 
         # Rule Group D — Taxonomy gaps
         unmapped_rate = self._extract_unmapped_rate(analysis)
@@ -102,6 +181,16 @@ class WorkItemCandidateService:
         overall_neg = self._extract_overall_negative(analysis)
         total_comments = self._total_comment_count(analysis)
         feature_candidate_count = sum(1 for c in candidates if c.get("type") not in ("taxonomy_gap",))
+        if not (overall_neg >= self.OVERALL_NEGATIVE_THRESHOLD
+                and total_comments >= self.OVERALL_MIN_COMMENTS
+                and feature_candidate_count == 0):
+            if feature_candidate_count > 0:
+                logger.debug("Overall candidate SKIPPED: %d feature candidates already exist", feature_candidate_count)
+            elif overall_neg < self.OVERALL_NEGATIVE_THRESHOLD:
+                logger.debug("Overall candidate SKIPPED: overall_neg %.1f%% < threshold %.0f%%", overall_neg * 100, self.OVERALL_NEGATIVE_THRESHOLD * 100)
+            elif total_comments < self.OVERALL_MIN_COMMENTS:
+                logger.debug("Overall candidate SKIPPED: total_comments %d < min %d", total_comments, self.OVERALL_MIN_COMMENTS)
+
         if (overall_neg >= self.OVERALL_NEGATIVE_THRESHOLD
                 and total_comments >= self.OVERALL_MIN_COMMENTS
                 and feature_candidate_count == 0):
@@ -126,7 +215,69 @@ class WorkItemCandidateService:
         # Rule Group C — Trend escalation
         candidates = [self._apply_trend_escalation(c, previous_map) for c in candidates]
 
+        # Deduplicate similar candidates (e.g. "pricing" and "price")
+        candidates = self._deduplicate_candidates(candidates)
+
+        logger.info(
+            "Candidate generation complete: %d candidates from %d features (project=%s)",
+            len(candidates), len(features), project_id,
+        )
         return candidates
+
+    def _deduplicate_candidates(self, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Merge candidates whose aspect keys are near-duplicates (e.g. 'price' vs 'pricing').
+
+        Keeps the candidate with the higher priority (lower P-number).
+        Only deduplicates top-level feature candidates — sub-themes (containing ':')
+        and special keys like __taxonomy__ are kept as-is.
+        """
+        special_keys = {"__taxonomy__", "__overall__"}
+        # Sub-theme candidates (aspect_key contains ':') are intentional splits, not duplicates
+        sub_theme_candidates = [c for c in candidates if ":" in str(c.get("aspect_key", ""))]
+        top_level_candidates = [c for c in candidates
+                                if c.get("aspect_key") not in special_keys
+                                and ":" not in str(c.get("aspect_key", ""))]
+        other_candidates = [c for c in candidates if c.get("aspect_key") in special_keys]
+
+        if len(top_level_candidates) <= 1:
+            return candidates
+
+        # Group by stem (first 4 chars of aspect_key) as a simple similarity heuristic
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for c in top_level_candidates:
+            key = c.get("aspect_key", "")
+            stem = key[:4] if len(key) >= 4 else key
+            # Also check if one key starts with another (e.g. 'price' vs 'pricing')
+            merged = False
+            for existing_stem, group in groups.items():
+                existing_key = group[0].get("aspect_key", "")
+                if key.startswith(existing_key) or existing_key.startswith(key):
+                    group.append(c)
+                    merged = True
+                    break
+            if not merged:
+                if stem in groups:
+                    groups[stem].append(c)
+                else:
+                    groups[stem] = [c]
+
+        deduplicated = []
+        for stem, group in groups.items():
+            if len(group) == 1:
+                deduplicated.append(group[0])
+            else:
+                # Keep the one with highest priority (lowest P-number)
+                group.sort(key=lambda c: self.PRIORITY_ORDER.index(c.get("priority", "P3"))
+                           if c.get("priority") in self.PRIORITY_ORDER else -1, reverse=True)
+                winner = group[0]
+                merged_keys = [c.get("aspect_key") for c in group[1:]]
+                logger.info(
+                    "Deduplicated candidates: kept '%s', merged %s",
+                    winner.get("aspect_key"), merged_keys,
+                )
+                deduplicated.append(winner)
+
+        return deduplicated + sub_theme_candidates + other_candidates
 
     def _apply_trend_escalation(self, candidate: Dict[str, Any], previous_map: Dict[str, float]) -> Dict[str, Any]:
         """Escalate priority if negative sentiment rose >=10% vs previous analysis."""
@@ -269,6 +420,23 @@ class WorkItemCandidateService:
         keywords = feature.get("keywords") if isinstance(feature, dict) else None
         if isinstance(keywords, list) and keywords:
             return [f"Keyword: {k}" for k in keywords[:2]]
+        return []
+
+    def _extract_keywords(self, feature: Dict[str, Any]) -> List[str]:
+        """Extract keyword strings from a feature for sub-theme splitting."""
+        if not isinstance(feature, dict):
+            return []
+        keywords = feature.get("keywords") or feature.get("negative_keywords") or []
+        if isinstance(keywords, list):
+            result = []
+            for kw in keywords:
+                if isinstance(kw, str):
+                    result.append(kw.strip().lower())
+                elif isinstance(kw, dict):
+                    word = kw.get("word") or kw.get("keyword") or kw.get("text") or ""
+                    if word:
+                        result.append(str(word).strip().lower())
+            return result
         return []
 
     def _build_previous_neg_map(self, previous_analysis: Optional[Dict[str, Any]]) -> Dict[str, float]:

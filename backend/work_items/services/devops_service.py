@@ -12,6 +12,7 @@ from apis.prompts import WORK_ITEM_TYPES_BY_TEMPLATE
 from feedback_analysis.services.narration_service import get_narration_service
 import logging
 from .work_item_candidate_service import get_work_item_candidate_service
+from .comment_sampler import sample_comments_for_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +23,12 @@ class DevOpsService:
     def __init__(self):
         self.work_item_repo = WorkItemRepository()
     
-    async def generate_work_items_from_analysis(self, analysis_data: Dict[str, Any], 
-                                              platform: str = "azure", 
+    async def generate_work_items_from_analysis(self, analysis_data: Dict[str, Any],
+                                              platform: str = "azure",
                                               process_template: str = "Agile",
                                               company_name: str = None,
-                                              project_metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+                                              project_metadata: Dict[str, Any] = None,
+                                              comments: List[str] = None) -> Dict[str, Any]:
         """Generate work items from analysis data using deterministic candidates + optional AI narration."""
         try:
             # Phase-2: deterministic candidates from analysis metrics (LLM does not decide existence/priority/type)
@@ -45,16 +47,23 @@ class DevOpsService:
                 }
 
             # Generate work item narration using unified NarrationService (optional)
-            narration_service = get_narration_service()
+            # Falls back to deterministic template text if narration fails or budget exceeded
+
+            # Sample relevant comments for each candidate
+            comment_samples = {}
+            if comments:
+                comment_samples = sample_comments_for_candidates(comments, candidates)
+
             narration_input = {
                 "project_id": analysis_data.get("project_id") if isinstance(analysis_data, dict) else None,
                 "analysis_id": analysis_data.get("analysis_id") if isinstance(analysis_data, dict) else None,
                 "taxonomy_id": analysis_data.get("taxonomy_id") if isinstance(analysis_data, dict) else None,
                 "taxonomy_version": analysis_data.get("taxonomy_version") if isinstance(analysis_data, dict) else None,
                 "overall": analysis_data.get("overall") if isinstance(analysis_data, dict) else None,
-                "features": [],
+                "features": self._extract_features_for_narration(analysis_data),
                 "evidence": [],
                 "work_item_candidates": candidates,
+                "comment_samples": comment_samples,
             }
             narratives = None
             cached_narration = None
@@ -63,7 +72,15 @@ class DevOpsService:
             if isinstance(cached_narration, dict) and cached_narration.get("work_items"):
                 narratives = cached_narration
             else:
-                narratives = narration_service.generate_narratives(narration_input)
+                try:
+                    narration_service = get_narration_service()
+                    narratives = narration_service.generate_narratives(narration_input)
+                except Exception as narration_err:
+                    logger.warning(
+                        "Narration failed, falling back to deterministic text: %s",
+                        narration_err,
+                    )
+                    narratives = None
             work_items_llm = narratives.get("work_items", []) if isinstance(narratives, dict) else []
             result = narratives
 
@@ -391,9 +408,9 @@ class DevOpsService:
             item.setdefault("effort_estimate", "3 story points")
             item.setdefault("feature_area", "General")
             
-            # Clean text fields
-            item["title"] = str(item["title"]).strip()[:100]  # Limit title length
-            item["description"] = str(item["description"]).strip()[:500]  # Limit description length
+            # Clean text fields (truncate at word boundary)
+            item["title"] = self._truncate_at_word_boundary(str(item["title"]).strip(), 100, "title")
+            item["description"] = self._truncate_at_word_boundary(str(item["description"]).strip(), 500, "description")
             
             valid_work_items.append(item)
         
@@ -412,20 +429,28 @@ class DevOpsService:
         work_items = []
         for c in candidates:
             aspect_key = c.get("aspect_key")
-            label = aspect_labels.get(aspect_key, self._humanize_aspect(aspect_key))
+            # For sub-theme candidates (e.g. "pricing:expensive"), use parent aspect label
+            parent_key = c.get("reason", {}).get("parent_aspect") or aspect_key
+            if ":" in str(aspect_key):
+                parent_key = str(aspect_key).split(":")[0]
+            label = aspect_labels.get(parent_key, self._humanize_aspect(parent_key))
             item_type = self._map_candidate_type(c.get("type"), process_template)
             priority = self._map_candidate_priority(c.get("priority"))
             title, description = self._template_text(c, label)
             # Use human-readable tag, not internal keys like __taxonomy__
             tag = label.lower().replace(" ", "-") if label else "customer-feedback"
+            reason = c.get("reason") or {}
+            neg_pct = reason.get("neg_pct", 0)
+            comment_count = reason.get("comment_count", 0)
+            pct_str = f"{neg_pct:.0%}" if isinstance(neg_pct, float) else str(neg_pct)
             work_items.append({
                 "type": item_type,
                 "title": title,
                 "description": description,
                 "priority": priority,
                 "tags": [tag, "customer-feedback"],
-                "acceptance_criteria": "Define acceptance criteria based on analysis metrics",
-                "business_value": "Reduce negative feedback and improve customer satisfaction",
+                "acceptance_criteria": f"Investigate top customer concerns in {label} | Identify root causes from {comment_count} feedback comments | Define measurable improvement targets | Implement changes and validate with follow-up feedback",
+                "business_value": f"{label} has {pct_str} negative sentiment across {comment_count} comments. Addressing this area will directly reduce customer dissatisfaction.",
                 "effort_estimate": "3",
                 "feature_area": label,
                 "candidate_id": c.get("candidate_id"),
@@ -446,11 +471,31 @@ class DevOpsService:
                 llm_item = llm_map[candidate_id]
                 llm_title = llm_item.get("title")
                 llm_desc = llm_item.get("description")
+                llm_ac = llm_item.get("acceptance_criteria")
+                llm_bv = llm_item.get("business_value")
                 if llm_title:
-                    item["title"] = str(llm_title).strip()[:100]
+                    item["title"] = self._truncate_at_word_boundary(str(llm_title).strip(), 100, "title")
                 if llm_desc:
-                    item["description"] = str(llm_desc).strip()[:500]
+                    item["description"] = self._truncate_at_word_boundary(str(llm_desc).strip(), 500, "description")
+                if llm_ac:
+                    item["acceptance_criteria"] = self._truncate_at_word_boundary(str(llm_ac).strip(), 500, "acceptance_criteria")
+                if llm_bv:
+                    item["business_value"] = self._truncate_at_word_boundary(str(llm_bv).strip(), 300, "business_value")
         return work_items
+
+    @staticmethod
+    def _truncate_at_word_boundary(text: str, max_len: int, field_name: str = "text") -> str:
+        """Truncate text at a word boundary instead of mid-word."""
+        if len(text) <= max_len:
+            return text
+        truncated = text[:max_len].rsplit(" ", 1)[0]
+        if not truncated:
+            truncated = text[:max_len]
+        logger.warning(
+            "LLM %s truncated from %d to %d chars: '%s...'",
+            field_name, len(text), len(truncated), truncated[:60],
+        )
+        return truncated
 
     def _warn_on_llm_candidate_mutation(self, candidates: List[Dict[str, Any]], llm_items: List[Dict[str, Any]]) -> None:
         """Warn if LLM output attempts to add/remove/change deterministic candidates."""
@@ -524,6 +569,38 @@ class DevOpsService:
         # Normalize keys to aspect_key style
         return {self._normalize_feature_key(k): v for k, v in labels.items()}
 
+    def _extract_features_for_narration(self, analysis_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract feature-level data for the narration prompt."""
+        features_out = []
+        if not isinstance(analysis_data, dict):
+            return features_out
+        for source in (analysis_data, analysis_data.get("analysisData"), analysis_data.get("result")):
+            if not isinstance(source, dict):
+                continue
+            feats = source.get("features") or source.get("feature_asba") or source.get("featureasba") or []
+            if not isinstance(feats, list):
+                continue
+            for f in feats:
+                if not isinstance(f, dict):
+                    continue
+                name = f.get("name") or f.get("key") or f.get("feature")
+                if not name:
+                    continue
+                sentiment = f.get("sentiment") or {}
+                keywords = f.get("keywords") or f.get("negative_keywords") or []
+                if isinstance(keywords, list):
+                    keywords = keywords[:5]
+                features_out.append({
+                    "aspect_key": self._normalize_feature_key(name),
+                    "name": str(name),
+                    "sentiment": sentiment,
+                    "comment_count": f.get("comment_count") or f.get("total_mentions") or 0,
+                    "keywords": keywords,
+                })
+            if features_out:
+                break
+        return features_out
+
     @staticmethod
     def _normalize_feature_key(value: Optional[str]) -> str:
         if not value:
@@ -552,6 +629,19 @@ class DevOpsService:
                 "Investigate high negative sentiment in customer feedback",
                 f"Overall analysis of {comment_count} comments shows {pct_str} negative sentiment. "
                 "Review the top negative feedback themes, identify root causes, and create targeted improvement plans.",
+            )
+        # Sub-theme candidates (from volume splitting) have aspect_key like "pricing:expensive"
+        sub_theme = reason.get("sub_theme")
+        if sub_theme:
+            parent_label = label
+            sub_label = str(sub_theme).replace("_", " ").title()
+            neg_pct = reason.get("neg_pct", 0)
+            comment_count = reason.get("comment_count", 0)
+            pct_str = f"{neg_pct:.0%}" if isinstance(neg_pct, float) else str(neg_pct)
+            return (
+                f"Address '{sub_label}' issues in {parent_label}",
+                f"'{sub_label}' is a recurring concern within {parent_label} ({pct_str} negative sentiment, "
+                f"{comment_count} comments). Investigate this specific theme and create targeted improvements.",
             )
         neg_pct = reason.get("neg_pct", 0)
         comment_count = reason.get("comment_count", 0)

@@ -27,7 +27,7 @@ class NarrationService:
 
     MAX_EVIDENCE = 30
     MAX_KEYWORDS_PER_ASPECT = 5
-    MAX_OUTPUT_TOKENS = 1200
+    MAX_OUTPUT_TOKENS = 2500
     last_status = None
     last_errors = None
     last_cost = None

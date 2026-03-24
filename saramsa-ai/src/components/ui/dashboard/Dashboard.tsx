@@ -21,6 +21,7 @@ import {
   replaceInHistory,
   removeFromHistory,
   renameAnalysisRun,
+  deleteAnalysisRun,
 } from '../../../store/features/analysis/analysisSlice';
 import type { AnalysisHistoryEntry } from '../../../store/features/analysis/analysisSlice';
 import { fetchProjects } from '../../../store/features/projects/projectsSlice';
@@ -1388,6 +1389,15 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     }
   };
 
+  const handleRunDelete = async (id: string) => {
+    try {
+      await dispatch(deleteAnalysisRun(id)).unwrap();
+    } catch (err: any) {
+      console.error('Failed to delete analysis:', err);
+      alert(typeof err === 'string' ? err : 'Failed to delete analysis.');
+    }
+  };
+
   // Show loader while:
   // - projects are still loading (initial load only)
   // Note: We don't show full-screen loader for analysis loading anymore
@@ -1494,6 +1504,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
             isLoading={isTaskListLoading}
             onSelect={handleRunSelect}
             onRename={handleRunRename}
+            onDelete={handleRunDelete}
             projectName={selectedProjectName}
           />
 
@@ -1544,7 +1555,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                 </div>
               )}
 
-              <div id="analysis-results-section">
+              <div id="analysis-results-section" className="space-y-6">
               {/* Analysis Results Section — only show loader when the selected run is the one being analyzed */}
               {analysisProgressUi && (
                 <div className="rounded-xl border border-border/60 bg-card/80 p-3">

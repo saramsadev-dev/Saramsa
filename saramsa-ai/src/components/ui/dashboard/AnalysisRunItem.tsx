@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Pencil, Check, X } from 'lucide-react';
+import { Loader2, Pencil, Check, X, Trash2 } from 'lucide-react';
 import type { AnalysisHistoryEntry } from '@/store/features/analysis/analysisSlice';
 
 interface AnalysisRunItemProps {
@@ -10,13 +10,17 @@ interface AnalysisRunItemProps {
   isActive: boolean;
   onClick: () => void;
   onRename: (id: string, name: string) => void;
+  onDelete?: (id: string) => Promise<void>;
   index: number;
+  totalCount?: number;
 }
 
-export function AnalysisRunItem({ entry, isActive, onClick, onRename, index }: AnalysisRunItemProps) {
+export function AnalysisRunItem({ entry, isActive, onClick, onRename, onDelete, index, totalCount }: AnalysisRunItemProps) {
   const isPending = entry.status === 'analyzing';
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const formattedDate = (() => {
@@ -37,7 +41,12 @@ export function AnalysisRunItem({ entry, isActive, onClick, onRename, index }: A
       /^run\s+\d{4}-\d{2}-\d{2}/i.test(cleaned) ||
       /\butc\b/i.test(cleaned) ||
       /^\d{4}-\d{2}-\d{2}/.test(cleaned);
-    return looksAutoRun ? 'Feedback Review' : cleaned;
+    if (looksAutoRun) {
+      // Use reverse index so newest = highest number
+      const number = totalCount != null ? totalCount - index : index + 1;
+      return `Feedback Review #${number}`;
+    }
+    return cleaned;
   };
 
   const displayName = toPMFriendlyName(entry.name);
@@ -124,16 +133,30 @@ export function AnalysisRunItem({ entry, isActive, onClick, onRename, index }: A
               {isPending ? 'Analyzing...' : displayName}
             </span>
             {!isPending && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={startEditing}
-                onKeyDown={e => { if (e.key === 'Enter') startEditing(e as any); }}
-                className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground ml-auto flex-shrink-0 cursor-pointer"
-                title="Rename"
-              >
-                <Pencil className="w-3 h-3" />
-              </span>
+              <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={startEditing}
+                  onKeyDown={e => { if (e.key === 'Enter') startEditing(e as any); }}
+                  className="p-0.5 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                  title="Rename"
+                >
+                  <Pencil className="w-3 h-3" />
+                </span>
+                {onDelete && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setShowDeleteConfirm(true); } }}
+                    className="p-0.5 rounded text-muted-foreground hover:text-destructive cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </span>
+                )}
+              </div>
             )}
             {isPending && (
               <span className="text-[10px] font-medium text-amber-500 ml-auto">In Progress</span>
@@ -160,6 +183,45 @@ export function AnalysisRunItem({ entry, isActive, onClick, onRename, index }: A
           <></>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      {showDeleteConfirm && (
+        <div className="mt-2 px-2 py-2 bg-destructive/10 border border-destructive/30 rounded-md" onClick={e => e.stopPropagation()}>
+          {isDeleting ? (
+            <div className="flex items-center gap-2 py-1">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-destructive" />
+              <span className="text-xs text-destructive">Deleting...</span>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-destructive mb-2">Delete this analysis?</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    setIsDeleting(true);
+                    try {
+                      await onDelete?.(entry.id);
+                    } catch {
+                      setIsDeleting(false);
+                      setShowDeleteConfirm(false);
+                    }
+                  }}
+                  className="px-2 py-1 text-xs bg-destructive text-destructive-foreground rounded hover:bg-destructive/90"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(false); }}
+                  className="px-2 py-1 text-xs bg-secondary text-foreground rounded hover:bg-secondary/80"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

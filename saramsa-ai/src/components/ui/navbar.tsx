@@ -70,7 +70,7 @@ export function Navbar() {
   return (
     <>
     <nav className="z-100 w-full sticky top-0 bg-card dark:bg-background border-b border-border dark:border-border/60 shadow-md dark:shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
+        <div className="px-4 sm:px-6 lg:px-10">
           <div className="flex justify-between items-center h-16 lg:h-18">
             {/* Logo */}
             <div className="flex-shrink-0">
@@ -103,8 +103,8 @@ export function Navbar() {
                     />
                   </Button>
                   {open && (
-                    <div className="absolute z-50 right-0 mt-2 w-60 rounded-2xl border border-border bg-popover shadow-lg dark:border-border/60 dark:bg-popover/95 animate-in slide-in-from-top-2 duration-200">
-                      <div className="px-4 py-3 border-b border-border bg-secondary dark:border-border/60 dark:bg-secondary/60">
+                    <div className="absolute z-50 right-0 mt-2 w-60 rounded-xl border border-border/60 bg-popover shadow-lg dark:bg-popover/95 animate-in slide-in-from-top-2 duration-200">
+                      <div className="px-4 py-3 border-b border-border/60 bg-secondary/60 dark:bg-secondary/40 rounded-t-xl">
                         <div className="text-sm font-medium text-popover-foreground">
                           {currentUser.username || currentUser.email || 'User'}
                         </div>
@@ -119,17 +119,17 @@ export function Navbar() {
                             window.location.href = "/settings";
                           }}
                           variant="ghost"
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-popover-foreground hover:bg-accent/70 transition-all duration-300 group"
+                          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent/60 transition-colors"
                         >
-                          <Settings className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+                          <Settings className="w-4 h-4" />
                           Settings
                         </Button>
                         <Button
                           onClick={handleLogout}
                           variant="ghost"
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-all duration-300 group"
+                          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
                         >
-                          <LogOut className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                          <LogOut className="w-4 h-4" />
                           Logout
                         </Button>
                       </div>

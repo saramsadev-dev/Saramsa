@@ -361,6 +361,14 @@ class AnalysisService:
             logger.error(f"Error getting analysis by ID (any user): {e}")
             return None
 
+    def delete_analysis(self, analysis_id: str, user_id: str) -> bool:
+        """Delete an analysis by ID (owner-only)."""
+        try:
+            return self.analysis_repo.delete_analysis(analysis_id, user_id)
+        except Exception as e:
+            logger.error(f"Error deleting analysis: {e}")
+            return False
+
     def update_analysis_name(self, analysis_id: str, user_id: str, name: Optional[str]) -> Optional[Dict[str, Any]]:
         """Update a stored analysis run name (owner-only)."""
         try:

@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  Label,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -76,7 +77,11 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
           />
           <span className="text-muted-foreground">{entry.name}:</span>
           <span className="text-foreground font-medium">
-            {entry.value ?? 0}
+            {typeof entry.value === 'number'
+              ? Number.isInteger(entry.value)
+                ? entry.value
+                : entry.value.toFixed(2)
+              : entry.value ?? 0}
           </span>
         </div>
       ))}
@@ -128,82 +133,89 @@ export function SentimentCharts({
     }));
   }, [selectedFeatures, featureSentimentData, sentimentData]);
 
-  const totalSentiment = useMemo(
-    () => aggregatedSentimentData.reduce((sum, item) => sum + item.value, 0),
-    [aggregatedSentimentData]
-  );
+  const totalSentiment = useMemo(() => {
+    const total = aggregatedSentimentData.reduce((sum, item) => sum + item.value, 0);
+    return Number.isInteger(total) ? total : parseFloat(total.toFixed(2));
+  }, [aggregatedSentimentData]);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Feature Sentiment Bar Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        {/* Feature Sentiment Horizontal Bar Chart */}
         <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden">
           <div className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Feature Sentiment Distribution
-            </h3>
-            <div className="h-96">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">
+                Feature Sentiment Distribution
+              </h3>
+              <div className="flex items-center gap-4">
+                {[
+                  { label: 'Positive', color: COLORS.positive },
+                  { label: 'Negative', color: COLORS.negative },
+                  { label: 'Neutral', color: COLORS.neutral },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-1.5">
+                    <div
+                      className="w-2.5 h-2.5 rounded-sm"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ height: `${Math.max(300, featureSentimentData.length * 52)}px` }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={featureSentimentData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="var(--border)"
-                    opacity={0.35}
+                    opacity={0.2}
+                    horizontal={false}
                   />
                   <XAxis
-                    dataKey="name"
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                    tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                    stroke="var(--muted-foreground)"
+                    type="number"
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                    stroke="var(--border)"
+                    tickFormatter={(v) => (Number.isInteger(v) ? `${v}%` : `${v.toFixed(1)}%`)}
                   />
                   <YAxis
-                    label={{
-                      value: 'Value',
-                      angle: -90,
-                      position: 'insideLeft',
-                      style: {
-                        textAnchor: 'middle',
-                        fill: 'var(--muted-foreground)',
-                        fontSize: 12,
-                      },
-                    }}
+                    type="category"
+                    dataKey="name"
+                    width={140}
                     tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                    stroke="var(--muted-foreground)"
+                    stroke="none"
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend
-                    wrapperStyle={{ color: 'var(--muted-foreground)' }}
-                    formatter={(value) => (
-                      <span style={{ color: 'var(--muted-foreground)' }}>
-                        {String(value)}
-                      </span>
-                    )}
-                  />
                   <Bar
                     dataKey="positive"
                     fill={COLORS.positive}
                     name="Positive"
-                    radius={[4, 4, 0, 0]}
+                    radius={[0, 4, 4, 0]}
                     animationDuration={800}
+                    barSize={14}
                   />
                   <Bar
                     dataKey="negative"
                     fill={COLORS.negative}
                     name="Negative"
-                    radius={[4, 4, 0, 0]}
+                    radius={[0, 4, 4, 0]}
                     animationDuration={800}
+                    barSize={14}
                   />
                   <Bar
                     dataKey="neutral"
                     fill={COLORS.neutral}
                     name="Neutral"
-                    radius={[4, 4, 0, 0]}
+                    radius={[0, 4, 4, 0]}
                     animationDuration={800}
+                    barSize={14}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -212,8 +224,8 @@ export function SentimentCharts({
         </div>
 
         {/* Pie Chart */}
-        <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden">
-          <div className="p-6">
+        <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden flex flex-col">
+          <div className="p-6 flex flex-col flex-1">
             <h3 className="text-lg font-semibold text-foreground mb-4">
               {selectedFeatures.length === 0
                 ? 'Overall Sentiment Distribution'
@@ -222,15 +234,15 @@ export function SentimentCharts({
                   })`}
             </h3>
 
-            <div className="h-64 relative">
+            <div className="flex-1 min-h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={aggregatedSentimentData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
+                    innerRadius={65}
+                    outerRadius={115}
                     paddingAngle={2}
                     dataKey="value"
                     animationDuration={800}
@@ -243,30 +255,56 @@ export function SentimentCharts({
                         strokeWidth={2}
                       />
                     ))}
+                    <Label
+                      content={({ viewBox }) => {
+                        if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                          return (
+                            <text
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                            >
+                              <tspan
+                                x={viewBox.cx}
+                                y={viewBox.cy}
+                                className="fill-foreground"
+                                style={{ fontSize: '24px', fontWeight: 700 }}
+                              >
+                                {totalSentiment}
+                              </tspan>
+                              <tspan
+                                x={viewBox.cx}
+                                y={(viewBox.cy || 0) + 26}
+                                className="fill-muted-foreground"
+                                style={{ fontSize: '14px' }}
+                              >
+                                Total
+                              </tspan>
+                            </text>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend
-                    wrapperStyle={{ color: 'var(--muted-foreground)' }}
-                    formatter={(value) => (
-                      <span style={{ color: 'var(--muted-foreground)' }}>
-                        {String(value)}
-                      </span>
-                    )}
-                  />
                 </PieChart>
               </ResponsiveContainer>
-
-              {/* Center floating stats */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-background/80 rounded-full p-4 border border-border/70">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-foreground">
-                      {totalSentiment}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Total</div>
-                  </div>
+            </div>
+            {/* Legend below the chart */}
+            <div className="flex items-center justify-center gap-4 mt-3">
+              {aggregatedSentimentData.map((entry) => (
+                <div key={entry.name} className="flex items-center gap-1.5">
+                  <div
+                    className="w-3 h-3 rounded-sm"
+                    style={{ backgroundColor: entry.color }}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {entry.name}
+                  </span>
                 </div>
-              </div>
+              ))}
             </div>
 
             {selectedFeatures.length > 0 && (

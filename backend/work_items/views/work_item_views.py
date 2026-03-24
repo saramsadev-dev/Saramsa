@@ -45,6 +45,7 @@ class WorkItemGenerationView(APIView):
         platform = request.data.get("platform", "azure")
         company_name = request.data.get("company_name")
         project_metadata = request.data.get("project_metadata")
+        comments = request.data.get("comments", [])
         
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
@@ -85,7 +86,8 @@ class WorkItemGenerationView(APIView):
                 platform=platform,
                 process_template=process_template,
                 company_name=company_name,
-                project_metadata=project_metadata
+                project_metadata=project_metadata,
+                comments=comments if isinstance(comments, list) else [],
             )
         except ConnectionError:
             raise
