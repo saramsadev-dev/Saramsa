@@ -778,7 +778,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     }
     const validation = validateSelectedFile(topFile);
     if (!validation.isValid) {
-      setTopError(validation.error);
+      setTopError(validation.error ?? null);
       return;
     }
     const tempId = `analyzing_${Date.now()}`;
@@ -1872,7 +1872,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                     </p>
                   </div>
                   <a
-                    href={`/projects/${encryptProjectId(currentProjectId)}/review`}
+                    href={`/projects/${encryptProjectId(currentProjectId)}/review/`}
                     className="inline-flex items-center rounded-lg bg-saramsa-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-saramsa-brand-hover"
                   >
                     Open Review Queue

@@ -1,3 +1,5 @@
+import os
+
 from django.db import models
 from django.utils import timezone
 
@@ -49,4 +51,43 @@ class BillingWebhookEvent(TimestampedModel):
             models.Index(fields=["processed"]),
             models.Index(fields=["created_at"]),
         ]
+
+
+class UsageRecord(TimestampedModel):
+    """
+    Tracks per-user consumption of expensive operations (analysis runs,
+    work-item generation, LLM calls) so quotas can be enforced.
+    One row per user per calendar month.
+    """
+
+    user_id = models.CharField(max_length=64, db_index=True)
+    period = models.CharField(
+        max_length=7, db_index=True,
+        help_text="YYYY-MM period key, e.g. 2026-03",
+    )
+
+    analysis_count = models.PositiveIntegerField(default=0)
+    work_item_gen_count = models.PositiveIntegerField(default=0)
+    llm_tokens_used = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        db_table = "billing_usage_records"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user_id", "period"],
+                name="uq_usage_user_period",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["user_id", "period"]),
+        ]
+
+    # Defaults — override per plan via BillingProfile.metadata or env vars
+    @staticmethod
+    def default_limits():
+        return {
+            "analysis_limit": int(os.getenv("QUOTA_ANALYSIS_PER_MONTH", "50")),
+            "work_item_gen_limit": int(os.getenv("QUOTA_WORK_ITEMS_PER_MONTH", "100")),
+            "llm_token_limit": int(os.getenv("QUOTA_LLM_TOKENS_PER_MONTH", "500000")),
+        }
 

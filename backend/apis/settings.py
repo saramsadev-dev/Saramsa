@@ -72,7 +72,7 @@ LOGGING = {
             'formatter': 'verbose',
         },
         'file': {
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'class': 'logging.FileHandler',
             'filename': BASE_DIR / 'logs' / 'django.log',
             'formatter': 'verbose',
@@ -86,7 +86,7 @@ LOGGING = {
         },
         'django.request': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'WARNING',
             'propagate': False,
         },
         'apis.infrastructure.middleware': {
@@ -107,13 +107,12 @@ LOGGING = {
         },
         'feedback_analysis.services': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        # ML Pipeline logging (detailed debugging for local ML services)
         'feedback_analysis.services.ml': {
             'handlers': ['console', 'file'],
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         'feedback_analysis.services.ml.embedding_service': {
@@ -227,16 +226,36 @@ if not _database_host.endswith(".neon.tech"):
 DATABASES = {
     "default": dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=600,
+        conn_max_age=int(os.getenv("DB_CONN_MAX_AGE", "600")),
         ssl_require=_as_bool(os.getenv("DB_SSL_REQUIRE", "true")),
     )
 }
+
+# Neon best-practice: use the *-pooler.* hostname in DATABASE_URL so PgBouncer
+# handles connection reuse.  CONN_HEALTH_CHECKS avoids handing a stale pooled
+# connection to a request (Django 4.1+).
+CONN_HEALTH_CHECKS = True
+if "-pooler." not in _database_host:
+    import warnings
+    warnings.warn(
+        "DATABASE_URL does not use the Neon connection-pooler hostname "
+        "(expected '-pooler.' in host). Cold-start latency will be higher. "
+        "See https://neon.tech/docs/connect/connection-pooling",
+        stacklevel=1,
+    )
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = _as_bool(os.getenv("SECURE_SSL_REDIRECT", "true"))
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
@@ -244,6 +263,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'drf_spectacular',
     'aiCore',
     'feedback_analysis',
@@ -315,6 +335,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("DATA_UPLOAD_MAX_MEMORY_SIZE", str(10 * 1024 * 1024)))  # 10 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MEMORY_SIZE", str(10 * 1024 * 1024)))  # 10 MB
+
 # Default primary key field type
 # PostgreSQL is used for all data storage - no Django models needed
 
@@ -328,11 +351,14 @@ CORS_ALLOWED_ORIGINS = [
     'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
     'https://saramsa-chi.vercel.app',
     'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:8000',
-    'http://localhost',
 ]
+if DEBUG:
+    CORS_ALLOWED_ORIGINS += [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:8000',
+        'http://localhost',
+    ]
 # Extra CORS origins from env (comma-separated), e.g. production frontend URL
 _cors_extra = os.getenv('CORS_EXTRA_ORIGINS', '')
 if _cors_extra:
@@ -363,11 +389,14 @@ CSRF_TRUSTED_ORIGINS = [
     'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
     'https://saramsa-chi.vercel.app',
     'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:8000',
-    'http://localhost',
 ]
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS += [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:8000',
+        'http://localhost',
+    ]
 # Extra CSRF origins from env (comma-separated), e.g. production frontend URL
 _csrf_extra = os.getenv('CSRF_EXTRA_ORIGINS', '')
 if _csrf_extra:
@@ -376,11 +405,24 @@ if _csrf_extra:
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'authentication.authentication.AppJWTAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # Fallback
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': int(os.getenv('DEFAULT_PAGE_SIZE', '50')),
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': os.getenv('THROTTLE_RATE_USER', '120/minute'),
+        'anon': os.getenv('THROTTLE_RATE_ANON', '30/minute'),
+        'analysis': os.getenv('THROTTLE_RATE_ANALYSIS', '10/hour'),
+        'upload': os.getenv('THROTTLE_RATE_UPLOAD', '20/hour'),
+        'work_items': os.getenv('THROTTLE_RATE_WORK_ITEMS', '30/hour'),
+    },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'EXCEPTION_HANDLER': 'apis.core.exceptions.custom_exception_handler',
 }
@@ -482,5 +524,5 @@ REGISTRATION_OTP_EMAIL_SUBJECT = os.getenv('REGISTRATION_OTP_EMAIL_SUBJECT', 'Yo
 REGISTRATION_OTP_TTL_MINUTES = int(os.getenv('REGISTRATION_OTP_TTL_MINUTES', '10'))
 REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv('REGISTRATION_OTP_RESEND_COOLDOWN_SECONDS', '60'))
 REGISTRATION_OTP_MAX_ATTEMPTS = int(os.getenv('REGISTRATION_OTP_MAX_ATTEMPTS', '5'))
-REGISTRATION_OTP_BYPASS = os.getenv('REGISTRATION_OTP_BYPASS', '').lower() in ('true', '1', 'yes')
+REGISTRATION_OTP_BYPASS = DEBUG and os.getenv('REGISTRATION_OTP_BYPASS', '').lower() in ('true', '1', 'yes')
 

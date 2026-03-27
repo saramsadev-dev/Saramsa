@@ -23,27 +23,44 @@ function Test-NeonDbPreflight {
     )
 
     Write-Host "Checking Neon PostgreSQL connectivity..." -ForegroundColor Yellow
-    $script = @'
+    $pyCheckScript = @'
 import os
 import sys
 import time
+import socket
 from pathlib import Path
 from urllib.parse import urlparse
 
-from dotenv import load_dotenv
-import psycopg2
+
+def load_env_file(path: Path) -> dict[str, str]:
+    data: dict[str, str] = {}
+    if not path.exists():
+        return data
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            data[key] = value
+    return data
+
 
 backend_dir = Path.cwd() / "backend"
-load_dotenv(backend_dir / ".env")
-database_url = os.getenv("DATABASE_URL", "").strip()
+env_file = load_env_file(backend_dir / ".env")
+database_url = (os.getenv("DATABASE_URL") or env_file.get("DATABASE_URL", "")).strip()
 if not database_url:
     print("DATABASE_URL is missing.")
     sys.exit(2)
 
-host = (urlparse(database_url).hostname or "").lower()
+parsed = urlparse(database_url)
+host = (parsed.hostname or "").lower()
 if not host.endswith(".neon.tech"):
     print(f"DATABASE_URL host is not Neon: {host or 'missing'}")
     sys.exit(2)
+port = parsed.port or 5432
 
 attempts = int(os.getenv("SARAMSA_DB_PREFLIGHT_ATTEMPTS", "5"))
 delay = int(os.getenv("SARAMSA_DB_PREFLIGHT_DELAY_SECONDS", "3"))
@@ -51,14 +68,22 @@ timeout = int(os.getenv("SARAMSA_DB_CONNECT_TIMEOUT", "12"))
 
 for i in range(1, attempts + 1):
     try:
-        conn = psycopg2.connect(database_url, connect_timeout=timeout)
-        cur = conn.cursor()
-        cur.execute("select 1")
-        cur.fetchone()
-        cur.close()
-        conn.close()
+        with socket.create_connection((host, port), timeout=timeout):
+            pass
         print("NEON_DB_OK")
         sys.exit(0)
+    except PermissionError as exc:
+        print(f"attempt {i}/{attempts}: {type(exc).__name__}: {exc}")
+        print("Socket access denied by local environment/policy (WinError 10013). Failing fast.")
+        sys.exit(1)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 10013:
+            print(f"attempt {i}/{attempts}: {type(exc).__name__}: {exc}")
+            print("Socket access denied by local environment/policy (WinError 10013). Failing fast.")
+            sys.exit(1)
+        print(f"attempt {i}/{attempts}: {type(exc).__name__}: {exc}")
+        if i < attempts:
+            time.sleep(delay)
     except Exception as exc:
         print(f"attempt {i}/{attempts}: {type(exc).__name__}: {exc}")
         if i < attempts:
@@ -72,8 +97,15 @@ sys.exit(1)
     try {
         $env:SARAMSA_DB_PREFLIGHT_ATTEMPTS = [string]$Attempts
         $env:SARAMSA_DB_PREFLIGHT_DELAY_SECONDS = [string]$DelaySeconds
-        $output = $script | & $PythonExe - 2>&1
-        if ($LASTEXITCODE -eq 0) {
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = $pyCheckScript | & $PythonExe - 2>&1
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldErrorActionPreference
+        }
+        if ($exitCode -eq 0) {
             Write-Host "[OK] Neon DB connection verified" -ForegroundColor Green
             return $true
         }
@@ -87,6 +119,210 @@ sys.exit(1)
     } finally {
         if ($null -eq $oldAttempts) { Remove-Item Env:SARAMSA_DB_PREFLIGHT_ATTEMPTS -ErrorAction SilentlyContinue } else { $env:SARAMSA_DB_PREFLIGHT_ATTEMPTS = $oldAttempts }
         if ($null -eq $oldDelay) { Remove-Item Env:SARAMSA_DB_PREFLIGHT_DELAY_SECONDS -ErrorAction SilentlyContinue } else { $env:SARAMSA_DB_PREFLIGHT_DELAY_SECONDS = $oldDelay }
+    }
+}
+
+function Ensure-BackendDotEnv {
+    $dotEnvPath = Join-Path $BackendDir ".env"
+    if (Test-Path $dotEnvPath) { return }
+
+    $legacyEnvPath = Join-Path $BackendDir "env"
+    $exampleEnvPath = Join-Path $BackendDir ".env.example"
+
+    if (Test-Path $legacyEnvPath) {
+        Copy-Item -Path $legacyEnvPath -Destination $dotEnvPath -Force
+        Write-Host "[INFO] Created backend/.env from backend/env" -ForegroundColor Yellow
+        return
+    }
+
+    if (Test-Path $exampleEnvPath) {
+        Copy-Item -Path $exampleEnvPath -Destination $dotEnvPath -Force
+        Write-Host "[INFO] Created backend/.env from backend/.env.example" -ForegroundColor Yellow
+        Write-Host "[WARNING] Review backend/.env and set real values before use." -ForegroundColor Yellow
+    }
+}
+
+function Test-PythonModule {
+    param(
+        [string]$PythonExe,
+        [string]$ModuleName
+    )
+
+    try {
+        & $PythonExe -c "import $ModuleName" *> $null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Test-PythonSnippet {
+    param(
+        [string]$PythonExe,
+        [string]$Code
+    )
+
+    try {
+        & $PythonExe -c $Code *> $null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Ensure-BackendDependencies {
+    param([string]$PythonExe)
+
+    $requirementsPath = Join-Path $BackendDir "requirements.txt"
+    if (-not (Test-Path $requirementsPath)) {
+        Write-Host "[WARNING] backend/requirements.txt not found; skipping dependency check." -ForegroundColor Yellow
+        return
+    }
+
+    $requiredModules = @("django", "celery", "celery_ops")
+    $missing = @()
+    foreach ($module in $requiredModules) {
+        if (-not (Test-PythonModule -PythonExe $PythonExe -ModuleName $module)) {
+            $missing += $module
+        }
+    }
+
+    if ($missing.Count -eq 0) { return }
+
+    Write-Host "[INFO] Missing backend Python modules: $($missing -join ', ')" -ForegroundColor Yellow
+    Write-Host "[INFO] Installing backend dependencies from backend/requirements.txt..." -ForegroundColor Yellow
+    $installed = $false
+    try {
+        & $PythonExe -m pip install --disable-pip-version-check -r $requirementsPath
+        if ($LASTEXITCODE -eq 0) { $installed = $true }
+    } catch {
+        $installed = $false
+    }
+
+    if (-not $installed) {
+        Write-Host "[WARNING] Full requirements install failed; retrying with local celery_ops fallback..." -ForegroundColor Yellow
+        $tmpRequirements = Join-Path $env:TEMP ("saramsa-requirements-no-vcs-" + [System.Guid]::NewGuid().ToString() + ".txt")
+        try {
+            $filteredRequirements = foreach ($line in Get-Content $requirementsPath) {
+                if (
+                    -not $line -or
+                    $line -match '^\s*-e\s+git\+' -or
+                    $line -match '^\s*git\+' -or
+                    $line -match 'celery_ops'
+                ) {
+                    continue
+                }
+
+                # GPU/local-version Torch pins such as 2.6.0+cu124 are often unavailable
+                # from the default PyPI index on Windows. Fall back to the base release so
+                # local startup can bootstrap a usable environment automatically.
+                if ($line -match '^(\s*)torch==([0-9][^+\s]*)\+[^\s]+(\s*(#.*)?)$') {
+                    $leadingWhitespace = $matches[1]
+                    $baseTorchVersion = $matches[2]
+                    $lineSuffix = $matches[3]
+                    "{0}torch=={1}{2}" -f $leadingWhitespace, $baseTorchVersion, $lineSuffix
+                    continue
+                }
+
+                $line
+            }
+
+            $filteredRequirements | Set-Content -Path $tmpRequirements -Encoding UTF8
+
+            & $PythonExe -m pip install --disable-pip-version-check -r $tmpRequirements
+            if ($LASTEXITCODE -ne 0) { throw "filtered requirements install failed" }
+
+            $localCeleryOpsPath = Join-Path $ScriptDir "celery_ops"
+            if (Test-Path $localCeleryOpsPath) {
+                & $PythonExe -m pip install --disable-pip-version-check --no-deps -e $localCeleryOpsPath
+                if ($LASTEXITCODE -ne 0) { throw "local celery_ops install failed" }
+            } else {
+                throw "local celery_ops folder not found"
+            }
+            $installed = $true
+        } catch {
+            $installed = $false
+        } finally {
+            Remove-Item $tmpRequirements -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $stillMissing = @()
+    foreach ($module in $requiredModules) {
+        if (-not (Test-PythonModule -PythonExe $PythonExe -ModuleName $module)) {
+            $stillMissing += $module
+        }
+    }
+
+    if ($stillMissing.Count -gt 0) {
+        Write-Host "[INFO] Repairing missing startup modules: $($stillMissing -join ', ')" -ForegroundColor Yellow
+        try {
+            if ($stillMissing -contains "django") {
+                & $PythonExe -m pip install --disable-pip-version-check "Django==4.2.20"
+                if ($LASTEXITCODE -ne 0) { throw "failed to install Django" }
+            }
+            if ($stillMissing -contains "celery") {
+                & $PythonExe -m pip install --disable-pip-version-check "celery==5.3.4"
+                if ($LASTEXITCODE -ne 0) { throw "failed to install Celery" }
+            }
+            if ($stillMissing -contains "celery_ops") {
+                $localCeleryOpsPath = Join-Path $ScriptDir "celery_ops"
+                if (-not (Test-Path $localCeleryOpsPath)) { throw "local celery_ops folder not found" }
+                & $PythonExe -m pip install --disable-pip-version-check --no-deps -e $localCeleryOpsPath
+                if ($LASTEXITCODE -ne 0) { throw "failed to install local celery_ops" }
+            }
+        } catch {
+            Write-Host "[ERROR] Failed to repair startup dependencies automatically." -ForegroundColor Red
+            Write-Host "Missing modules: $($stillMissing -join ', ')" -ForegroundColor Yellow
+            exit 1
+        }
+    }
+
+    $finalMissing = @()
+    foreach ($module in $requiredModules) {
+        if (-not (Test-PythonModule -PythonExe $PythonExe -ModuleName $module)) {
+            $finalMissing += $module
+        }
+    }
+
+    if ($finalMissing.Count -gt 0) {
+        Write-Host "[ERROR] Backend Python environment is still missing required modules: $($finalMissing -join ', ')" -ForegroundColor Red
+        Write-Host "Run: backend\\venv\\Scripts\\python.exe -m pip install -r backend\\requirements.txt" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $celeryOpsRuntimeOk = Test-PythonSnippet -PythonExe $PythonExe -Code "from fastapi import FastAPI; from celery_ops.app import create_app"
+    if (-not $celeryOpsRuntimeOk) {
+        Write-Host "[INFO] Repairing Celery Ops runtime dependencies..." -ForegroundColor Yellow
+        try {
+            & $PythonExe -m pip install --disable-pip-version-check `
+                "fastapi==0.128.0" `
+                "starlette==0.50.0" `
+                "pydantic==2.11.3" `
+                "pydantic_core==2.33.1" `
+                "typing-inspection==0.4.0"
+            if ($LASTEXITCODE -ne 0) { throw "failed to repair FastAPI/Pydantic runtime" }
+
+            $localCeleryOpsPath = Join-Path $ScriptDir "celery_ops"
+            if (-not (Test-Path $localCeleryOpsPath)) { throw "local celery_ops folder not found" }
+            & $PythonExe -m pip install --disable-pip-version-check --no-deps -e $localCeleryOpsPath
+            if ($LASTEXITCODE -ne 0) { throw "failed to reinstall local celery_ops" }
+        } catch {
+            Write-Host "[ERROR] Failed to repair Celery Ops runtime automatically." -ForegroundColor Red
+            Write-Host "Run: backend\\venv\\Scripts\\python.exe -m pip install fastapi==0.128.0 starlette==0.50.0 pydantic==2.11.3 pydantic_core==2.33.1 typing-inspection==0.4.0" -ForegroundColor Yellow
+            exit 1
+        }
+
+        if (-not (Test-PythonSnippet -PythonExe $PythonExe -Code "from fastapi import FastAPI; from celery_ops.app import create_app")) {
+            Write-Host "[ERROR] Celery Ops runtime is still broken after repair." -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    if (-not $installed) {
+        Write-Host "[ERROR] Failed to install backend dependencies automatically." -ForegroundColor Red
+        Write-Host "Run: backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt" -ForegroundColor Yellow
+        exit 1
     }
 }
 
@@ -237,17 +473,32 @@ try {
     }
 
     $pythonExe = Get-PythonExe
+    $honchoReady = $false
     try {
         & $pythonExe -m honcho --help *> $null
-        if ($LASTEXITCODE -ne 0) { throw "honcho unavailable" }
+        if ($LASTEXITCODE -eq 0) { $honchoReady = $true }
     } catch {
-        Write-Host "[ERROR] honcho not installed in the project Python." -ForegroundColor Red
-        Write-Host "Install it with: backend\venv\Scripts\python.exe -m pip install honcho" -ForegroundColor Yellow
-        exit 1
+        $honchoReady = $false
+    }
+    if (-not $honchoReady) {
+        Write-Host "[INFO] honcho not found in project Python; installing..." -ForegroundColor Yellow
+        try {
+            & $pythonExe -m pip install --disable-pip-version-check honcho
+            if ($LASTEXITCODE -ne 0) { throw "pip install honcho failed" }
+            & $pythonExe -m honcho --help *> $null
+            if ($LASTEXITCODE -ne 0) { throw "honcho still unavailable after install" }
+            Write-Host "[OK] Installed honcho" -ForegroundColor Green
+        } catch {
+            Write-Host "[ERROR] Failed to install honcho automatically." -ForegroundColor Red
+            Write-Host "Run: backend\venv\Scripts\python.exe -m pip install honcho" -ForegroundColor Yellow
+            exit 1
+        }
     }
 
     if (-not (Test-Path $FrontendDir)) { Write-Host "[ERROR] Frontend not found: $FrontendDir" -ForegroundColor Red; exit 1 }
     if (-not (Test-Path $BackendDir)) { Write-Host "[ERROR] Backend not found: $BackendDir" -ForegroundColor Red; exit 1 }
+    Ensure-BackendDotEnv
+    Ensure-BackendDependencies -PythonExe $pythonExe
 
     try { $nv = node --version 2>$null; $npm = npm --version 2>$null; if ($nv -and $npm) { Write-Host "[OK] Node.js $nv, npm $npm" -ForegroundColor Green } } catch { Write-Host "[WARNING] Node/npm not found. Frontend may not start." -ForegroundColor Yellow }
     try { $pv = & $pythonExe --version 2>&1; if ($pv) { Write-Host "[OK] $pv" -ForegroundColor Green } } catch { Write-Host "[WARNING] Python not found. Backend may not start." -ForegroundColor Yellow }
@@ -256,13 +507,31 @@ try {
 
     $conflicts = Get-PortConflictSummary
     if ($conflicts.Count -gt 0) {
-        Write-Host "[ERROR] Required ports are already in use:" -ForegroundColor Red
-        foreach ($conflict in $conflicts) {
-            $owner = if ($conflict.IsSaramsa) { "Saramsa" } else { "non-Saramsa" }
-            Write-Host "  Port $($conflict.Port): PID $($conflict.ProcessId) ($owner)" -ForegroundColor Yellow
+        $saramsaConflicts = @($conflicts | Where-Object { $_.IsSaramsa })
+        $foreignConflicts = @($conflicts | Where-Object { -not $_.IsSaramsa })
+
+        if ($foreignConflicts.Count -gt 0) {
+            Write-Host "[ERROR] Required ports are already in use:" -ForegroundColor Red
+            foreach ($conflict in $conflicts) {
+                $owner = if ($conflict.IsSaramsa) { "Saramsa" } else { "non-Saramsa" }
+                Write-Host "  Port $($conflict.Port): PID $($conflict.ProcessId) ($owner)" -ForegroundColor Yellow
+            }
+            Write-Host "Run 'saramsa kill' to stop existing Saramsa services, or free the ports manually." -ForegroundColor Yellow
+            exit 1
         }
-        Write-Host "Run 'saramsa kill' to stop existing Saramsa services, or free the ports manually." -ForegroundColor Yellow
-        exit 1
+
+        Write-Host "[INFO] Found stale Saramsa listeners on required ports. Stopping them before restart..." -ForegroundColor Yellow
+        Stop-SaramsaServices
+        Start-Sleep -Seconds 1
+        $remainingConflicts = Get-PortConflictSummary
+        if ($remainingConflicts.Count -gt 0) {
+            Write-Host "[ERROR] Required ports are still in use after cleanup:" -ForegroundColor Red
+            foreach ($conflict in $remainingConflicts) {
+                $owner = if ($conflict.IsSaramsa) { "Saramsa" } else { "non-Saramsa" }
+                Write-Host "  Port $($conflict.Port): PID $($conflict.ProcessId) ($owner)" -ForegroundColor Yellow
+            }
+            exit 1
+        }
     }
 
     Start-Redis

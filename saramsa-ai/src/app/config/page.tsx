@@ -48,15 +48,15 @@ export default function ConfigPage() {
         // Import encryption function
         const { encryptProjectId } = await import('@/lib/encryption');
         const encryptedId = encryptProjectId(projectId);
-        router.push(`/projects/${encryptedId}/dashboard`);
+        router.push(`/projects/${encryptedId}/dashboard/`);
       } else {
         // Fallback to projects page if no project ID
-        router.push('/projects');
+        router.push('/projects/');
       }
     } catch (e) {
       console.error('Navigation error', e);
       // Fallback to projects page on error
-      router.push('/projects');
+      router.push('/projects/');
     }
   };
 

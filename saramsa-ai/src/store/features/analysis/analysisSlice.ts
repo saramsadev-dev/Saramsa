@@ -116,66 +116,109 @@ export const analyzeComments = createAsyncThunk<
       throw new Error('No task ID received from server');
     }
 
-    // Start polling for task status
-    return new Promise((resolve, reject) => {
-      const pollInterval = setInterval(async () => {
-        try {
-          const statusResult = await dispatch(pollTaskStatus(taskId)).unwrap();
+    // Helper to resolve the final analysis once we have a terminal status
+    const resolveAnalysis = async (statusResult: any) => {
+      const taskResult = statusResult.result;
+      if (taskResult?.insight_id) {
+        const analysisRes = await apiRequest(
+          'get',
+          `/feedback/analysis/${taskResult.insight_id}/`,
+          undefined,
+          true
+        );
+        const analysisData = analysisRes.data?.data;
+        if (analysisData?.exists && analysisData?.analysis) {
+          const analysis = analysisData.analysis;
+          return {
+            id: analysis.id || taskResult.insight_id,
+            analysisData: analysis.analysisData ?? analysis.result ?? analysis
+          };
+        }
+        throw new Error('Analysis saved but not found by ID.');
+      }
+      const rawData = taskResult?.result ?? taskResult;
+      return {
+        id: taskResult?.insight_id || `analysis_${Date.now()}`,
+        analysisData: rawData
+      };
+    };
 
-          const terminalStatus = statusResult.status;
-          if (terminalStatus === 'SUCCESS' || terminalStatus === 'PARTIAL') {
-            clearInterval(pollInterval);
-            const taskResult = statusResult.result;
+    // Try SSE first for efficient streaming, fall back to polling
+    const { getValidAccessToken: getToken } = await import('@/lib/auth');
+    const token = await getToken();
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '')
+      || (process.env.NEXT_PUBLIC_API_BASE_URL ? `${process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/$/, '')}/api` : 'http://127.0.0.1:8000/api');
+    const sseUrl = `${API_BASE}/insights/task-status/${taskId}/`;
 
-            // Preferred: fetch the exact analysis by ID (avoids "latest" race conditions)
-            if (taskResult?.insight_id) {
-              try {
-                const analysisRes = await apiRequest(
-                  'get',
-                  `/feedback/analysis/${taskResult.insight_id}/`,
-                  undefined,
-                  true
-                );
-                const analysisData = analysisRes.data?.data;
-                if (analysisData?.exists && analysisData?.analysis) {
-                  const analysis = analysisData.analysis;
-                  resolve({
-                    id: analysis.id || taskResult.insight_id,
-                    analysisData: analysis.analysisData ?? analysis.result ?? analysis
-                  });
-                  return;
-                }
-                reject('Analysis saved but not found by ID.');
-                return;
-              } catch (fetchErr: any) {
-                reject(fetchErr?.message || 'Analysis saved but failed to load by ID.');
-                return;
+    return new Promise(async (resolve, reject) => {
+      try {
+        const sseResponse = await fetch(sseUrl, {
+          headers: {
+            'Accept': 'text/event-stream',
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (sseResponse.ok && sseResponse.headers.get('content-type')?.includes('text/event-stream')) {
+          const reader = sseResponse.body?.getReader();
+          if (!reader) throw new Error('No stream reader');
+          const decoder = new TextDecoder();
+          let buffer = '';
+          const timeout = setTimeout(() => { reader.cancel(); reject('Analysis timeout'); }, 900000);
+
+          const processStream = async () => {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                  const statusResult = JSON.parse(line.slice(6));
+                  dispatch(pollTaskStatus.fulfilled(statusResult, '', taskId));
+                  const s = statusResult.status;
+                  if (s === 'SUCCESS' || s === 'PARTIAL') {
+                    clearTimeout(timeout);
+                    resolve(await resolveAnalysis(statusResult));
+                    return;
+                  }
+                  if (s === 'FAILURE' || s === 'FAILED') {
+                    clearTimeout(timeout);
+                    reject(statusResult.error || 'Analysis failed');
+                    return;
+                  }
+                } catch { /* skip malformed line */ }
               }
             }
-
-            // Legacy: task included full result (e.g. older backend)
-            const rawData = taskResult?.result ?? taskResult;
-            const wrappedData = {
-              id: taskResult?.insight_id || `analysis_${Date.now()}`,
-              analysisData: rawData
-            };
-            resolve(wrappedData);
-          } else if (terminalStatus === 'FAILURE' || terminalStatus === 'FAILED') {
-            clearInterval(pollInterval);
-            reject(statusResult.error || 'Analysis failed');
-          }
-          // Continue polling if status is PENDING or STARTED
-        } catch (error) {
-          clearInterval(pollInterval);
-          reject(error);
+            clearTimeout(timeout);
+            reject('SSE stream ended without terminal status');
+          };
+          await processStream();
+          return;
         }
-      }, 2000); // Poll every 2 seconds
-
-      // Timeout after 15 minutes (for large datasets with NLI processing)
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        reject('Analysis timeout - task took too long');
-      }, 900000); // 15 minutes timeout
+        throw new Error('SSE not supported');
+      } catch {
+        // Fallback: classic polling
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusResult = await dispatch(pollTaskStatus(taskId)).unwrap();
+            const s = statusResult.status;
+            if (s === 'SUCCESS' || s === 'PARTIAL') {
+              clearInterval(pollInterval);
+              resolve(await resolveAnalysis(statusResult));
+            } else if (s === 'FAILURE' || s === 'FAILED') {
+              clearInterval(pollInterval);
+              reject(statusResult.error || 'Analysis failed');
+            }
+          } catch (error) {
+            clearInterval(pollInterval);
+            reject(error);
+          }
+        }, 2000);
+        setTimeout(() => { clearInterval(pollInterval); reject('Analysis timeout'); }, 900000);
+      }
     });
   } catch (err: any) {
     let errorMessage = 'Sentiment analysis failed. Please try again.';

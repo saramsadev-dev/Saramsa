@@ -24,11 +24,11 @@ function ProjectsPage() {
   const handleGoToProject = useCallback((project: Project) => {
     try {
       const encryptedId = encryptProjectId(project.id);
-      router.push(`/projects/${encryptedId}/dashboard`);
+      router.push(`/projects/${encryptedId}/dashboard/`);
     } catch (error) {
       console.error('Failed to navigate to project:', error);
       // Fallback to unencrypted ID if encryption fails
-      router.push(`/projects/${project.id}/dashboard`);
+      router.push(`/projects/${project.id}/dashboard/`);
     }
   }, [router]);
 

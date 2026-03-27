@@ -89,6 +89,9 @@ ai_failures/
 # Local JSON DB (temporary Cosmos replacement)
 backend/local_db/
 
+# Load test scripts with credentials
+load_test.py
+
 # OS generated files
 .DS_Store
 .DS_Store?

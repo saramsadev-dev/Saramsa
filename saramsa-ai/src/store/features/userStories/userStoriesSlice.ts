@@ -266,6 +266,7 @@ const userStoriesSlice = createSlice({
       .addCase(fetchUserStoriesByProject.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.currentProjectUserStories = [];
       })
       .addCase(fetchUserStoriesByProject.fulfilled, (state, action) => {
         state.loading = false;

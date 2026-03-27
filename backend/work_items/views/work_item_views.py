@@ -30,7 +30,12 @@ logger = logging.getLogger(__name__)
 class WorkItemGenerationView(APIView):
     """Generate work items from analysis data - CONSOLIDATED from feedback_analysis"""
     permission_classes = [IsProjectEditor]
-    
+    throttle_classes = []
+
+    def get_throttles(self):
+        from apis.core.throttling import WorkItemGenerationThrottle
+        return [WorkItemGenerationThrottle()]
+
     @handle_service_errors
     @async_to_sync
     async def post(self, request):
@@ -38,7 +43,13 @@ class WorkItemGenerationView(APIView):
         Generate work items based on analysis data and template (Azure DevOps or Jira)
         """
         logger.info("WorkItemGenerationView called")
-        
+
+        from billing.quota import check_quota, record_usage, QuotaExceeded
+        try:
+            check_quota(request.user.id, "work_item_gen")
+        except QuotaExceeded as exc:
+            return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)
+
         analysis_data = request.data.get("analysis_data")
         process_template = request.data.get("process_template", "Agile")
         incoming_project_id = request.data.get("project_id")
@@ -137,6 +148,8 @@ class WorkItemGenerationView(APIView):
         result["work_items_by_feature"] = await sync_to_async(
             devops_service.group_work_items_by_feature, thread_sensitive=True
         )(work_items)
+
+        record_usage(user_id_str, "work_item_gen")
 
         return StandardResponse.success(data=result, message="Work items generated successfully")
 

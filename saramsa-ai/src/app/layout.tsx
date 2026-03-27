@@ -7,6 +7,7 @@ import { Navbar } from "@/components/ui/navbar";
 import { Providers } from "@/components/providers/providers";
 import { Toaster } from "sonner";
 import { PipelineWidgetGate } from "@/components/ui/pipeline-widget-gate";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -38,9 +39,11 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.className} ${spaceGrotesk.variable} ${ibmPlexMono.variable} flex flex-col h-screen`}>
         <Providers>
           <StoreProvider>
-            <Navbar/>
-            <main className="flex-1 overflow-hidden">{children}</main>
-            <PipelineWidgetGate />
+            <ErrorBoundary>
+              <Navbar/>
+              <main className="flex-1 overflow-hidden">{children}</main>
+              <PipelineWidgetGate />
+            </ErrorBoundary>
             <Toaster 
               position="bottom-right" 
               richColors 

@@ -34,11 +34,22 @@ logger = logging.getLogger(__name__)
 
 class AnalyzeCommentsView(APIView):
     permission_classes = [IsProjectEditor]
-    
+    throttle_classes = []
+
+    def get_throttles(self):
+        from apis.core.throttling import AnalysisRateThrottle
+        return [AnalysisRateThrottle()]
+
     @handle_service_errors
     def post(self, request):
         logger.info("AnalyzeCommentsView called (Background Mode)")
-        
+
+        from billing.quota import check_quota, record_usage, QuotaExceeded
+        try:
+            check_quota(request.user.id, "analysis")
+        except QuotaExceeded as exc:
+            return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)
+
         comments = request.data.get("comments")
         incoming_project_id = request.data.get("project_id")
         file_name = request.data.get("file_name")
@@ -146,7 +157,9 @@ class AnalyzeCommentsView(APIView):
             logger.warning(f"Failed to record task history: {e}")
         hour_key = datetime.now().strftime("%Y-%m-%d-%H")
         cache.incr(f"analyses_hour:{project_id}:{hour_key}", 1, ttl=3600)
-        
+
+        record_usage(user_id_str, "analysis")
+
         response = StandardResponse.success(
             data={
                 "task_id": task.id,
@@ -528,10 +541,10 @@ class GetUserCommentsView(APIView):
 
 
 class TaskStatusView(APIView):
-    """View to check the status of a Celery task"""
+    """View to check the status of a Celery task (JSON or SSE)."""
     permission_classes = [IsAdminOrUser]
-    
-    def get(self, request, task_id):
+
+    def _build_status(self, task_id):
         res = AsyncResult(task_id)
         cache = get_cache_service()
         max_runtime = int(os.getenv("ANALYSIS_TASK_MAX_RUNTIME_SECONDS", "1800"))
@@ -545,7 +558,7 @@ class TaskStatusView(APIView):
             except Exception:
                 elapsed = None
         if res.status in ("PENDING", "STARTED") and elapsed is not None and elapsed > max_runtime:
-            return StandardResponse.success(data={
+            return {
                 "task_id": task_id,
                 "status": "FAILED",
                 "ready": False,
@@ -553,14 +566,13 @@ class TaskStatusView(APIView):
                     "status": "FAILED",
                     "errors": {"timeout": f"Exceeded max runtime {max_runtime}s"},
                     "started_at": started_at,
-                }
-            })
+                },
+            }, True
         response_data = {
             "task_id": task_id,
-            "status": res.status,  # PENDING, STARTED, SUCCESS, FAILURE
+            "status": res.status,
             "ready": res.ready(),
         }
-        
         if res.ready():
             if res.successful():
                 result = res.result or {}
@@ -581,8 +593,53 @@ class TaskStatusView(APIView):
             response_data["status"] = "RUNNING"
         if pipeline_health:
             response_data["pipeline_health"] = pipeline_health
-                
-        return StandardResponse.success(data=response_data)
+        terminal = response_data.get("ready", False) or response_data["status"] in ("SUCCESS", "PARTIAL", "FAILED")
+        return response_data, terminal
+
+    def _user_owns_task(self, request, task_id):
+        user_id = getattr(request.user, "id", None)
+        if not user_id:
+            return False
+        cache = get_cache_service()
+        tasks = cache.get(f"tasks:{user_id}", default=[])
+        if not isinstance(tasks, list):
+            return False
+        return any(t.get("task_id") == task_id for t in tasks)
+
+    def get(self, request, task_id):
+        if not self._user_owns_task(request, task_id):
+            return StandardResponse.error(
+                title="Forbidden",
+                detail="You do not have access to this task.",
+                status_code=403,
+                error_type="forbidden",
+                instance=request.path,
+            )
+        accept = request.META.get("HTTP_ACCEPT", "")
+        if "text/event-stream" in accept:
+            return self._stream_sse(task_id)
+        data, _ = self._build_status(task_id)
+        return StandardResponse.success(data=data)
+
+    def _stream_sse(self, task_id):
+        import json as _json, time
+        from django.http import StreamingHttpResponse
+
+        def event_stream():
+            poll_interval = 2
+            max_polls = 450
+            for _ in range(max_polls):
+                data, terminal = self._build_status(task_id)
+                yield f"data: {_json.dumps(data)}\n\n"
+                if terminal:
+                    return
+                time.sleep(poll_interval)
+            yield f"data: {_json.dumps({'task_id': task_id, 'status': 'TIMEOUT', 'ready': False})}\n\n"
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
 
 class TaskListView(APIView):

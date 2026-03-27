@@ -127,11 +127,11 @@ export default function ProjectDashboardPage() {
     (newProjectId: string) => {
       try {
         const encryptedId = encryptProjectId(newProjectId);
-        router.replace(`/projects/${encryptedId}/dashboard`);
+        router.replace(`/projects/${encryptedId}/dashboard/`);
       } catch (error) {
         console.error("Failed to navigate to new project:", error);
         // Fallback to unencrypted ID
-        router.replace(`/projects/${newProjectId}/dashboard`);
+        router.replace(`/projects/${newProjectId}/dashboard/`);
       }
     },
     [router]
@@ -185,7 +185,7 @@ export default function ProjectDashboardPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              onClick={() => router.push("/projects")}
+              onClick={() => router.push("/projects/")}
               variant="saramsa"
               className="px-6 py-3"
             >
@@ -193,7 +193,7 @@ export default function ProjectDashboardPage() {
               Back to Projects
             </Button>
             <Button
-              onClick={() => router.push("/projects")}
+              onClick={() => router.push("/projects/")}
               variant="outline"
               className="px-6 py-3 text-muted-foreground"
             >
@@ -219,7 +219,7 @@ export default function ProjectDashboardPage() {
             or you may not have access to it.
           </p>
           <Button
-            onClick={() => router.push("/projects")}
+            onClick={() => router.push("/projects/")}
             variant="saramsa"
             className="px-6 py-3 mx-auto"
           >

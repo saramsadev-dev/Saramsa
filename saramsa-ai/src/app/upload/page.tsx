@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 export default function UploadPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace('/dashboard');
+    router.replace('/dashboard/');
   }, [router]);
   return null;
 }

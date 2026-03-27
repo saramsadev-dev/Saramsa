@@ -27,6 +27,7 @@ interface SentimentData {
   name: string;
   value: number;
   color?: string;
+  [key: string]: string | number | undefined;
 }
 
 interface SentimentChartsProps {

@@ -1,9 +1,5 @@
 from django.urls import path, include
-from drf_spectacular.views import (
-    SpectacularAPIView,
-    SpectacularSwaggerView,
-    SpectacularRedocView,
-)
+from django.conf import settings
 from .views import health_check, performance_metrics, reset_performance_stats
 from feedback_analysis.views import UserStoriesView, AnalyzeCommentsView, TaskStatusView, TaskListView, GetUserCommentsView, FeedbackFileUploadView
 from feedback_analysis.views import InsightReviewListView, InsightReviewUpdateView, InsightRulesView, InsightRulesApplyView
@@ -57,8 +53,16 @@ urlpatterns = [
     path('api/insights/review-queue/update/', CandidateUpdateView.as_view(), name='insights_review_update'),
     path('api/insights/review-queue/retry-push/', CandidateRetryPushView.as_view(), name='insights_review_retry_push'),
 
-    # Swagger/OpenAPI URLs
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
+
+if settings.DEBUG:
+    from drf_spectacular.views import (
+        SpectacularAPIView,
+        SpectacularSwaggerView,
+        SpectacularRedocView,
+    )
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+        path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    ]

@@ -94,7 +94,7 @@ function ResetPasswordContent() {
         setSuccess(true);
         // Redirect to login after 2 seconds
         setTimeout(() => {
-          router.push('/login');
+          router.push('/login/');
         }, 2000);
       } else {
         setError(result.data?.error || 'Failed to reset password. Please try again.');

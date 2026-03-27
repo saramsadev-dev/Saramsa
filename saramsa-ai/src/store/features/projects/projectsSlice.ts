@@ -272,7 +272,7 @@ const projectsSlice = createSlice({
       })
       .addCase(fetchProjects.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to fetch projects';
+        state.error = (action.payload as string) || action.error?.message || 'Failed to fetch projects';
       })
       
       // Create project
@@ -299,7 +299,7 @@ const projectsSlice = createSlice({
       })
       .addCase(createProject.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to create project';
+        state.error = (action.payload as string) || action.error?.message || 'Failed to create project';
       })
       
       // Import project from external

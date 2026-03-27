@@ -79,11 +79,11 @@ export const JiraFormPanel = ({
     try {
       const { encryptProjectId } = await import('@/lib/encryption');
       const encryptedId = encryptProjectId(projectId);
-      router.push(`/projects/${encryptedId}/dashboard`);
+      router.push(`/projects/${encryptedId}/dashboard/`);
     } catch (error) {
       console.error('Navigation error:', error);
       // Fallback to unencrypted ID if encryption fails
-      router.push(`/projects/${projectId}/dashboard`);
+      router.push(`/projects/${projectId}/dashboard/`);
     }
   };
 
