@@ -256,6 +256,8 @@ class TaskService:
             company_name=company_name,
             suggested_aspects=resolved_aspects,  # Pass frozen aspect list
             comments=comments,  # Pass list directly — batched by token count
+            user_id=user_id_str,
+            project_id=project_id,
         )
         
         # 4. Validate and parse LLM extractions from all chunks (uses locked schema)

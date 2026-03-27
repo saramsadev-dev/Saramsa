@@ -89,7 +89,7 @@ class RequestResponseLoggingMiddleware(MiddlewareMixin):
         return None
 
     def process_response(self, request, response):
-        """Add request ID to response headers and clean up context"""
+        """Add request ID to response headers, enrich OTel span, and clean up context."""
         # Echo X-Request-ID in response for client correlation
         try:
             if hasattr(request, 'request_id') and request.request_id:
@@ -97,13 +97,28 @@ class RequestResponseLoggingMiddleware(MiddlewareMixin):
         except Exception:
             pass
 
-        # Clear contextvar for safety
+        # Enrich the active OTel span with token usage from the request context
+        try:
+            token_usage = token_usage_var.get()
+            if token_usage:
+                span = trace.get_current_span()
+                if span and span.is_recording():
+                    for key in ('user_id', 'project_id', 'task_type', 'model',
+                                'input_tokens', 'output_tokens', 'total_tokens',
+                                'cost_usd', 'latency_ms'):
+                        val = token_usage.get(key)
+                        if val is not None:
+                            span.set_attribute(f"saramsa.genai.{key}", val)
+        except Exception:
+            pass
+
+        # Clear contextvars for safety
         try:
             request_id_var.set(None)
             token_usage_var.set(None)
         except Exception:
             pass
-        
+
         return response
 
 

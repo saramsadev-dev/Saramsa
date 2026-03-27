@@ -20,7 +20,8 @@ class UsageService:
         self.container_name = 'usage'
 
     def record_narration_usage(self, project_id: str, period: str, input_tokens: int,
-                               output_tokens: int, cache_hit: bool = False) -> Dict[str, Any]:
+                               output_tokens: int, cache_hit: bool = False,
+                               user_id: str = None) -> Dict[str, Any]:
         """Upsert usage document for a project-period bucket."""
         doc_id = f"usage:{project_id}:{period}"
         existing = None
@@ -35,6 +36,15 @@ class UsageService:
         cache_hits = (existing.get('cache_hits') if existing else 0) + (1 if cache_hit else 0)
         cache_rate = (cache_hits / narration_calls) if narration_calls else 0.0
 
+        # Track per-user contribution within this project-period bucket
+        per_user = existing.get('per_user', {}) if existing else {}
+        if user_id:
+            user_entry = per_user.get(user_id, {"calls": 0, "input_tokens": 0, "output_tokens": 0})
+            user_entry["calls"] = user_entry.get("calls", 0) + 1
+            user_entry["input_tokens"] = user_entry.get("input_tokens", 0) + input_tokens
+            user_entry["output_tokens"] = user_entry.get("output_tokens", 0) + output_tokens
+            per_user[user_id] = user_entry
+
         data = {
             "id": doc_id,
             "projectId": project_id,
@@ -46,6 +56,8 @@ class UsageService:
             "estimated_cost": self._estimate_cost_usd(input_total, output_total),
             "cache_hits": cache_hits,
             "cache_hit_rate": cache_rate,
+            "per_user": per_user,
+            "last_user_id": user_id,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         try:
