@@ -149,11 +149,18 @@ def performance_metrics(request):
 @permission_classes([IsAuthenticated])
 def reset_performance_stats(request):
     """
-    Reset performance statistics.
-    
-    Returns:
-        Confirmation of reset
+    Reset performance statistics (admin only).
     """
+    from authentication.permissions import _get_role_from_user
+    if _get_role_from_user(request.user) != "admin":
+        return StandardResponse.error(
+            title="Forbidden",
+            detail="Only admins can reset performance statistics.",
+            status_code=403,
+            error_type="forbidden",
+            instance=request.path,
+        )
+
     try:
         # Reset PostgreSQL stats
         if storage_service.is_enabled:

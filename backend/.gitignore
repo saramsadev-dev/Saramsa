@@ -106,9 +106,8 @@ dmypy.json
 *.cosmos
 *.cosmosdb
 
-# Migration files (since we're using Cosmos DB)
-*/migrations/*.py
-!*/migrations/__init__.py
+# Migration files are now committed (PostgreSQL requires version-controlled schema)
+# Previously ignored when using Cosmos DB — no longer applicable.
 
 # Local development / test files (root-level only for dev/local scripts)
 /local_*

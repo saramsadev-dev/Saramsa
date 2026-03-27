@@ -17,7 +17,7 @@ from feedback_analysis.models import (
     UserData,
 )
 from integrations.models import Project, ProjectRole
-from work_items.models import UserStory, WorkItemQualityRule
+from work_items.models import UserStory, WorkItemCandidate, WorkItemQualityRule
 
 
 def _now_iso() -> str:
@@ -122,7 +122,7 @@ class StorageService:
                 "title": obj.title,
                 "description": obj.description,
                 "generated_at": obj.generated_at.isoformat() if obj.generated_at else None,
-                "work_items": obj.work_items or [],
+                "work_items": [c.to_dict() for c in obj.candidates.all().order_by("-created_at")],
             })
         return d
 
@@ -204,6 +204,8 @@ class StorageService:
             )
             return self._doc(container_name, obj)
         if container_name == "user_stories":
+            from work_items.repositories import _dict_to_candidate_kwargs
+            raw_items = data.get("work_items") or []
             obj, _ = UserStory.objects.update_or_create(
                 id=str(item_id),
                 defaults={
@@ -214,11 +216,26 @@ class StorageService:
                     "title": data.get("title", ""),
                     "description": data.get("description", ""),
                     "generated_at": _as_dt(data.get("generated_at")) if data.get("generated_at") else None,
-                    "work_items": data.get("work_items") or [],
+                    "work_items": [],
                     "payload": data,
                     "updated_at": timezone.now(),
                 },
             )
+            if raw_items:
+                project_id = str(data.get("projectId") or obj.project_id or "")
+                obj.candidates.all().delete()
+                candidates = []
+                for d in raw_items:
+                    item_id_val = d.get("id") or d.get("work_item_id")
+                    kwargs = _dict_to_candidate_kwargs(d, project_id, obj)
+                    c = WorkItemCandidate(**kwargs)
+                    if item_id_val:
+                        try:
+                            c.id = item_id_val
+                        except (ValueError, AttributeError):
+                            pass
+                    candidates.append(c)
+                WorkItemCandidate.objects.bulk_create(candidates, ignore_conflicts=True)
             return self._doc(container_name, obj)
         model = self.containers.get(container_name)
         if not model:
@@ -313,51 +330,33 @@ class StorageService:
         return self.update_document("user_stories", user_story_id, partition_key, doc)
 
     def update_embedded_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any], project_id: Optional[str] = None):
-        qs = UserStory.objects.filter(user_id=str(user_id))
-        if project_id:
-            qs = qs.filter(project_id=str(project_id))
-        for story in qs:
-            items = story.work_items or []
-            for i, wi in enumerate(items):
-                if str(wi.get("id")) == str(work_item_id):
-                    items[i] = {**wi, **updated_data}
-                    story.work_items = items
-                    story.updated_at = timezone.now()
-                    story.save(update_fields=["work_items", "updated_at"])
-                    return self._doc("user_stories", story)
-        return None
+        from work_items.repositories import WorkItemRepository
+        repo = WorkItemRepository()
+        return repo.update_embedded_work_item(work_item_id, user_id, updated_data, project_id=project_id)
 
     def delete_embedded_work_items(self, work_item_ids: List[str], user_id: str):
-        count = 0
-        for wid in work_item_ids:
-            if self.remove_embedded_work_item(wid, user_id):
-                count += 1
-        return count
+        deleted, _ = WorkItemCandidate.objects.filter(
+            id__in=[str(wid) for wid in work_item_ids],
+        ).delete()
+        return deleted
 
     def remove_embedded_work_item(self, work_item_id: str, user_id: str, project_id: Optional[str] = None):
-        qs = UserStory.objects.filter(user_id=str(user_id))
+        qs = WorkItemCandidate.objects.filter(id=str(work_item_id))
         if project_id:
             qs = qs.filter(project_id=str(project_id))
-        for story in qs:
-            old = story.work_items or []
-            new = [w for w in old if str(w.get("id")) != str(work_item_id)]
-            if len(new) != len(old):
-                story.work_items = new
-                story.updated_at = timezone.now()
-                story.save(update_fields=["work_items", "updated_at"])
-                return True
-        return False
+        deleted, _ = qs.delete()
+        return deleted > 0
 
     def delete_work_items_from_user_story(self, user_story_id: str, work_item_ids: List[str], user_id: str):
         story = UserStory.objects.filter(id=str(user_story_id), user_id=str(user_id)).first()
         if not story:
             return {"deleted_count": 0, "remaining_count": 0}
-        old = story.work_items or []
-        new = [w for w in old if str(w.get("id")) not in {str(i) for i in work_item_ids}]
-        story.work_items = new
-        story.updated_at = timezone.now()
-        story.save(update_fields=["work_items", "updated_at"])
-        return {"deleted_count": len(old) - len(new), "remaining_count": len(new)}
+        id_set = {str(i) for i in work_item_ids}
+        deleted, _ = WorkItemCandidate.objects.filter(
+            user_story=story, id__in=id_set,
+        ).delete()
+        remaining = story.candidates.count()
+        return {"deleted_count": deleted, "remaining_count": remaining}
 
     def get_work_items_by_project(self, project_id: str):
         return [self._doc("user_stories", r) for r in UserStory.objects.filter(project_id=str(project_id)).order_by("-generated_at", "-created_at")]

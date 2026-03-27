@@ -36,20 +36,18 @@ def get_integration_accounts(request):
     )
 
 
-@api_view(['GET', 'POST'])
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @handle_service_errors
 def create_azure_integration(request):
     """
-    Azure DevOps integration endpoint.
-    - GET: Fetch Azure DevOps projects (with organization and pat_token query params)
-    - POST: 
-      - If 'action=fetch_projects' query param or only credentials provided: Fetch Azure DevOps projects
-      - Otherwise: Create Azure DevOps integration account
+    Azure DevOps integration endpoint (POST only).
+    - action=fetch_projects in body: Fetch Azure DevOps projects
+    - create_integration=true in body: Create integration account
+    - Default (POST without flags): Fetch projects
     """
-    # Get credentials from query params (GET) or request body (POST)
-    organization = request.GET.get('organization') or request.data.get('organization', '').strip()
-    pat_token = request.GET.get('pat_token') or request.data.get('pat_token', '').strip()
+    organization = request.data.get('organization', '').strip()
+    pat_token = request.data.get('pat_token', '').strip()
     
     if not organization or not pat_token:
         return StandardResponse.validation_error(
@@ -65,16 +63,13 @@ def create_azure_integration(request):
     # Default behavior: GET fetches projects, POST with only credentials fetches projects
     # To create integration via POST, pass create_integration=true
     create_integration = (
-        request.GET.get('create_integration') == 'true' or
         request.data.get('create_integration') == 'true' or
         request.data.get('create_integration') is True
     )
     
     fetch_projects = (
-        request.method == 'GET' or 
-        request.GET.get('action') == 'fetch_projects' or
         request.data.get('action') == 'fetch_projects' or
-        (request.method == 'POST' and not create_integration)
+        not create_integration
     )
     
     # If fetching projects (GET or POST without create_integration flag)

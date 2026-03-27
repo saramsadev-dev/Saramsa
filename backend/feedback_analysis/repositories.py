@@ -107,7 +107,7 @@ def _doc_from_user_story(obj: UserStory) -> Dict[str, Any]:
             "title": obj.title,
             "description": obj.description,
             "generated_at": obj.generated_at.isoformat() if obj.generated_at else None,
-            "work_items": obj.work_items or [],
+            "work_items": [c.to_dict() for c in obj.candidates.all().order_by("-created_at")],
             "createdAt": obj.created_at.isoformat() if obj.created_at else None,
             "updatedAt": obj.updated_at.isoformat() if obj.updated_at else None,
         },

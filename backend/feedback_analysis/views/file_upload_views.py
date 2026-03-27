@@ -8,8 +8,6 @@ Moved from old uploadFile app to feedback_analysis app for better organization.
 from datetime import datetime
 import os
 from rest_framework.views import APIView
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from http import HTTPStatus
 import json
 import csv
@@ -23,10 +21,14 @@ from apis.core.response import StandardResponse
 
 logger = logging.getLogger(__name__)
 
-@method_decorator(csrf_exempt, name='dispatch')
 class FeedbackFileUploadView(APIView):
     """Handle feedback file uploads and processing."""
     permission_classes = [IsProjectEditor]
+    throttle_classes = []
+
+    def get_throttles(self):
+        from apis.core.throttling import UploadRateThrottle
+        return [UploadRateThrottle()]
     
     def extract_comments_from_data(self, data, file_type):
         """Extract comments from uploaded data"""
@@ -125,11 +127,20 @@ class FeedbackFileUploadView(APIView):
             "is_draft": is_draft,
         }
 
+        ext = os.path.splitext(file.name or '')[1].lower()
+        allowed_extensions = {'.json', '.csv'}
+        if ext not in allowed_extensions:
+            return StandardResponse.validation_error(
+                detail='Unsupported file type. Please upload a .json or .csv file.',
+                errors=[{"field": "file", "message": "Only .json and .csv files are supported."}],
+                instance=request.path
+            )
+
         file_type = file.content_type
         try:
-            if file_type == 'application/json':
+            if ext == '.json' or file_type == 'application/json':
                 return await self._process_json_file(file, user_id, project_id, project_context, request)
-            elif file_type in ['text/csv', 'application/vnd.ms-excel']:
+            elif ext == '.csv' or file_type in ['text/csv', 'application/vnd.ms-excel']:
                 return await self._process_csv_file(file, user_id, project_id, project_context, request)
             else:
                 return StandardResponse.validation_error(

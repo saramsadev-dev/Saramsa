@@ -19,6 +19,7 @@ class AppUser:
     def __init__(self, user_data):
         self.user_data = user_data
         self.id = user_data.get('id')
+        self.pk = self.id
         self.username = user_data.get('username')
         self.email = user_data.get('email')
         self.first_name = user_data.get('first_name', '')

@@ -87,10 +87,10 @@ export function ProjectCard({ project, onClick, onDelete, onEdit, onSync, onGoTo
   const navigateToSettings = () => {
     try {
       const encryptedId = encryptProjectId(project.id);
-      router.push(`/projects/${encryptedId}/settings`);
+      router.push(`/projects/${encryptedId}/settings/`);
     } catch (error) {
       console.error('Failed to navigate to project settings:', error);
-      router.push(`/projects/${project.id}/settings`);
+      router.push(`/projects/${project.id}/settings/`);
     }
   };
 

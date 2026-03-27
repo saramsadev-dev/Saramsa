@@ -188,7 +188,7 @@ export function IntegrationsPage() {
 
       // Navigate to project dashboard
       const encryptedProjectId = encryptProjectId(createdProject.id);
-      router.push(`/projects/${encryptedProjectId}/dashboard`);
+      router.push(`/projects/${encryptedProjectId}/dashboard/`);
     } catch (error: any) {
       console.error("Failed to create/navigate to project:", error);
       alert(
@@ -196,7 +196,7 @@ export function IntegrationsPage() {
           error.message || "Unknown error"
         }`
       );
-      router.push("/projects");
+      router.push("/projects/");
     } finally {
       setCreatingProject(null);
     }

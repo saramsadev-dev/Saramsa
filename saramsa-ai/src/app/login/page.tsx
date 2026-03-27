@@ -105,13 +105,13 @@ export default function LoginPage() {
                 if (hasAzureIntegration) {
                   router.push('/');
                 } else {
-                  router.push('/config');
+                  router.push('/config/');
                 }
               } else {
-                router.push('/config');
+                router.push('/config/');
               }
             } catch {
-              router.push('/config');
+              router.push('/config/');
             }
           }
         } catch {

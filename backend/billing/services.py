@@ -73,6 +73,19 @@ class StripeBillingService:
             "return_url": f"{base}/settings?tab=integrations",
         }
 
+    def _validate_redirect_url(self, url: Optional[str]) -> Optional[str]:
+        if not url:
+            return None
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        allowed_base = self.frontend_base_url or "http://localhost:3001"
+        allowed_parsed = urlparse(allowed_base)
+        if parsed.scheme not in ("http", "https"):
+            return None
+        if parsed.netloc != allowed_parsed.netloc:
+            return None
+        return url
+
     def create_checkout_session(
         self,
         user_id: str,
@@ -91,14 +104,16 @@ class StripeBillingService:
 
         stripe = self._stripe()
         urls = self._default_urls()
+        safe_success = self._validate_redirect_url(success_url) or urls["success_url"]
+        safe_cancel = self._validate_redirect_url(cancel_url) or urls["cancel_url"]
         session = stripe.checkout.Session.create(
             mode="subscription",
             customer=customer_id,
             line_items=[{"price": chosen_price, "quantity": 1}],
             allow_promotion_codes=True,
             billing_address_collection="auto",
-            success_url=success_url or urls["success_url"],
-            cancel_url=cancel_url or urls["cancel_url"],
+            success_url=safe_success,
+            cancel_url=safe_cancel,
             client_reference_id=str(user.id),
             metadata={"user_id": str(user.id)},
             subscription_data={"metadata": {"user_id": str(user.id)}},

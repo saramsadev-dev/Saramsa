@@ -1,4 +1,4 @@
-﻿
+
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -35,40 +35,40 @@ export function useAuth(): HookResult {
   const auth = useAppSelector((s) => s.auth);
   const [hydrating, setHydrating] = useState(true);
 
-  // On first mount (client only), hydrate auth state from localStorage tokens/user
   useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
       try {
         const tokens = getTokens();
         const storedUser = getStoredUser();
-        
-        if (storedUser && tokens) {
-          // Check if we have valid tokens
-          const validToken = await authService.getValidToken();
-          if (validToken) {
-            if (!cancelled) {
-              setStoredUser(storedUser);
-              dispatch(setUser(storedUser));
-            }
-          } else {
-            // Tokens are invalid, clear them
-            if (!cancelled) {
-              clientLogout();
-            }
+
+        if (!tokens) {
+          return;
+        }
+
+        let validToken = await authService.getValidToken();
+        if (!validToken) {
+          validToken = await authService.refreshTokenIfNeeded();
+        }
+
+        if (!validToken) {
+          if (!cancelled) clientLogout();
+          return;
+        }
+
+        if (storedUser) {
+          if (!cancelled) {
+            dispatch(setUser(storedUser));
           }
-        } else if (tokens?.access) {
+        } else {
           try {
-            const user = await getCurrentUser(tokens.access);
+            const user = await getCurrentUser(validToken);
             if (!cancelled) {
               setStoredUser(user);
               dispatch(setUser(user));
             }
           } catch {
-            // Token is invalid, ignore; user remains unauthenticated
-            if (!cancelled) {
-              clientLogout();
-            }
+            if (!cancelled) clientLogout();
           }
         }
       } finally {

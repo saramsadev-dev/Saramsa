@@ -99,7 +99,6 @@ const authSlice = createSlice({
       state.user = null;
       state.isAuthenticated = false;
       state.error = null;
-      authApi.logout();
     },
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {

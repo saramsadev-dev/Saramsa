@@ -37,7 +37,7 @@ export function ProjectSelector({
         <div className="flex items-center gap-3 text-xs text-amber-600 dark:text-amber-400">
           <span>Azure DevOps is not configured. Please configure it first.</span>
           <Button
-            onClick={() => router.push('/config')}
+            onClick={() => router.push('/config/')}
             variant="outline"
             size="sm"
             className="px-3 py-1 border-amber-300/60 text-amber-700 dark:text-amber-300 hover:bg-amber-50/70 dark:hover:bg-amber-900/20"

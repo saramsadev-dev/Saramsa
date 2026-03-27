@@ -115,14 +115,16 @@ export const UserStoryList = ({
   const [qualityLoading, setQualityLoading] = useState(false);
 
   const insightsList = useMemo(() => {
+    const data = analysisData as Record<string, unknown> | null;
+    const nested = data?.analysisData as Record<string, unknown> | undefined;
     const rawInsights =
-      analysisData?.insights ||
-      analysisData?.analysisData?.insights ||
-      analysisData?.analysisData?.pipeline_insights ||
-      analysisData?.analysisData?.pipelineInsights ||
+      data?.insights ||
+      nested?.insights ||
+      nested?.pipeline_insights ||
+      nested?.pipelineInsights ||
       [];
     return Array.isArray(rawInsights)
-      ? rawInsights.map((insight) => String(insight)).filter(Boolean)
+      ? rawInsights.map((insight: unknown) => String(insight)).filter(Boolean)
       : [];
   }, [analysisData]);
 

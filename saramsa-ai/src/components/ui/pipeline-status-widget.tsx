@@ -231,7 +231,7 @@ export function PipelineStatusWidget() {
     if (segments[0] !== "projects" || !segments[1]) return;
     const projectIdSegment = segments[1];
     setOpen(false);
-    router.push(`/projects/${projectIdSegment}/dashboard?analysisId=${encodeURIComponent(task.id)}`);
+    router.push(`/projects/${projectIdSegment}/dashboard/?analysisId=${encodeURIComponent(task.id)}`);
   };
   const formatTaskMeta = (task: TaskItem) => {
     const parts: string[] = [];

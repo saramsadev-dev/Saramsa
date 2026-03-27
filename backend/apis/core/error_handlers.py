@@ -92,7 +92,6 @@ def handle_service_errors(func: Callable) -> Callable:
                 error_type="resource-not-found"
             )
         except ConnectionError as e:
-            # External service connection errors (Azure OpenAI, Redis, etc.)
             func_name = getattr(func, '__name__', 'unknown_function')
             logger.error(f"Connection error in {func_name}: {e}")
             detail = str(e).strip() or "Unable to connect to external service. Please try again later."
@@ -103,11 +102,23 @@ def handle_service_errors(func: Callable) -> Callable:
                 error_type="service-unavailable"
             )
         except Exception as e:
-            # Unexpected errors
+            try:
+                import requests as _requests
+                if isinstance(e, _requests.exceptions.ConnectionError):
+                    func_name = getattr(func, '__name__', 'unknown_function')
+                    logger.error(f"HTTP connection error in {func_name}: {e}")
+                    return StandardResponse.error(
+                        title="Service unavailable",
+                        detail="Unable to connect to external service. Please try again later.",
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        error_type="service-unavailable"
+                    )
+            except ImportError:
+                pass
+
             func_name = getattr(func, '__name__', 'unknown_function')
             logger.error(f"Unexpected error in {func_name}: {e}", exc_info=True)
             
-            # Include actual error details in DEBUG mode for easier debugging
             if settings.DEBUG:
                 error_detail = f"{e.__class__.__name__}: {str(e)}"
             else:
@@ -178,7 +189,6 @@ def handle_async_service_errors(func: Callable) -> Callable:
                 error_type="resource-not-found"
             )
         except ConnectionError as e:
-            # External service connection errors (Azure OpenAI, Redis, etc.)
             func_name = getattr(func, '__name__', 'unknown_function')
             logger.error(f"Connection error in {func_name}: {e}")
             detail = str(e).strip() or "Unable to connect to external service. Please try again later."
@@ -189,11 +199,23 @@ def handle_async_service_errors(func: Callable) -> Callable:
                 error_type="service-unavailable"
             )
         except Exception as e:
-            # Unexpected errors
+            try:
+                import requests as _requests
+                if isinstance(e, _requests.exceptions.ConnectionError):
+                    func_name = getattr(func, '__name__', 'unknown_function')
+                    logger.error(f"HTTP connection error in {func_name}: {e}")
+                    return StandardResponse.error(
+                        title="Service unavailable",
+                        detail="Unable to connect to external service. Please try again later.",
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        error_type="service-unavailable"
+                    )
+            except ImportError:
+                pass
+
             func_name = getattr(func, '__name__', 'unknown_function')
             logger.error(f"Unexpected error in {func_name}: {e}", exc_info=True)
             
-            # Include actual error details in DEBUG mode for easier debugging
             if settings.DEBUG:
                 error_detail = f"{e.__class__.__name__}: {str(e)}"
             else:

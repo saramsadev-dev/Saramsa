@@ -5,15 +5,26 @@ const nextConfig = {
   output: 'standalone',
   trailingSlash: true,
 
-  // Set tracing root to this directory so standalone output is flat (not nested under saramsa-ai/)
   outputFileTracingRoot: path.resolve(__dirname),
-  
-  // Enable React strict mode
   reactStrictMode: true,
+
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
+        ],
+      },
+    ];
+  },
   
-  // Configure images
+  // Configure images — optimized by default (Next.js will auto-resize/compress)
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -22,6 +33,7 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
   },
   
   // Webpack configuration for path aliases
@@ -36,14 +48,11 @@ const nextConfig = {
     return config;
   },
   
-  // Disable TypeScript type checking during build (handled by CI)
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
-  
-  // Disable ESLint during build (handled by CI)
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
 }
 

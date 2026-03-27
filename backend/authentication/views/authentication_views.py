@@ -22,7 +22,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 from django.conf import settings
 from ..serializers import (
@@ -45,17 +45,12 @@ class RegisterView(generics.CreateAPIView):
     
     def get(self, request):
         return StandardResponse.success(
-            data={
-                "db_engine": "postgresql",
-                "db_name": "saramsa-db",
-                "container": "users",
-            },
-            message="Database configuration retrieved"
+            data={"status": "ok"},
+            message="Registration endpoint is available"
         )
 
     @handle_service_errors
     def create(self, request, *args, **kwargs):
-        self.logger.info(f"Register payload: {request.data}")
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -254,14 +249,22 @@ class UserListView(APIView):
     
     @handle_service_errors
     def get(self, request):
-        """Get all users using service layer"""
+        """Get all users - admin only."""
+        from authentication.permissions import _get_role_from_user
+        if _get_role_from_user(request.user) != "admin":
+            return StandardResponse.error(
+                title="Forbidden",
+                detail="Only admins can list all users.",
+                status_code=403,
+                error_type="forbidden",
+                instance=request.path,
+            )
+
         auth_service = get_authentication_service()
         users = auth_service.get_all_users()
         
-        # Remove password hashes from response for security
         for user in users:
-            if 'password' in user:
-                user['password'] = '***HIDDEN***'
+            user.pop('password', None)
         
         return StandardResponse.success(
             data={
@@ -278,7 +281,16 @@ class UserDetailView(APIView):
     
     @handle_service_errors
     def get(self, request, user_id):
-        """Get specific user by ID using service layer"""
+        """Get specific user by ID - restricted to own profile or admin."""
+        if str(user_id) != str(request.user.id):
+            return StandardResponse.error(
+                title="Forbidden",
+                detail="You can only view your own profile.",
+                status_code=403,
+                error_type="forbidden",
+                instance=request.path,
+            )
+
         auth_service = get_authentication_service()
         user_data = auth_service.get_user_by_id(user_id)
         
@@ -288,9 +300,8 @@ class UserDetailView(APIView):
                 instance=request.path
             )
         
-        # Remove password hash from response for security
         if 'password' in user_data:
-            user_data['password'] = '***HIDDEN***'
+            del user_data['password']
         
         return StandardResponse.success(
             data=user_data,
@@ -375,8 +386,7 @@ class ForgotPasswordView(APIView):
             # Generate secure token
             token = secrets.token_urlsafe(32)
             
-            # Set expiration (1 hour from now)
-            expires_at = (datetime.now() + timedelta(hours=1)).isoformat()
+            expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
             
             # Save reset token using service layer
             auth_service.save_reset_token(email, token, expires_at)
@@ -445,9 +455,10 @@ class ResetPasswordView(APIView):
                     instance=request.path
                 )
             
-            # Check if token is expired
             expires_at = datetime.fromisoformat(token_data['expires_at'])
-            if datetime.now() > expires_at:
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > expires_at:
                 return StandardResponse.error(
                     title="Token expired",
                     detail="This reset link has expired",

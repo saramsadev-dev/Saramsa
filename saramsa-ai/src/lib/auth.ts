@@ -1,4 +1,4 @@
-﻿
+
 
 export type User = {
   id?: string;
@@ -186,22 +186,16 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
 
   const data = response.data;
 
-  // Debug logging
-  console.log('🔍 getCurrentUser - API response:', response);
-  console.log('🔍 getCurrentUser - data.user_id:', data.user_id);
-  console.log('🔍 getCurrentUser - data.username:', data.username);
-
   const user: User = {
-    id: data.user_id, // Map user_id from backend to id field
-    user_id: data.user_id, // Keep for backward compatibility
+    id: data.user_id,
+    user_id: data.user_id,
     username: data.username,
     email: data.email,
     role: data.role,
     first_name: data.first_name,
     last_name: data.last_name,
   };
-  
-  console.log('🔍 getCurrentUser - constructed user:', user);
+
   return user;
 }
 

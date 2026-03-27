@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 const registerSchema = z.object({
   username: z.string().min(2, 'User name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
-  otp: z.string().optional().default(''),
+  otp: z.string().default(''),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -40,7 +40,7 @@ const registerSchema = z.object({
   path: ["confirmPassword"],
 });
 
-type RegisterFormData = z.infer<typeof registerSchema>;
+type RegisterFormData = z.input<typeof registerSchema>;
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -140,7 +140,7 @@ export default function RegisterPage() {
       
       if (result.success) {
         // brand new users go to config
-        router.push('/config');
+        router.push('/config/');
       } else {
         setError(result.error || 'Registration failed. Please try again.');
       }

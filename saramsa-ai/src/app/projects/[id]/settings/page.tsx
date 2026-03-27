@@ -116,14 +116,14 @@ export default function ProjectSettingsPage() {
 
   const backToDashboard = () => {
     if (!projectId) {
-      router.push("/projects");
+      router.push("/projects/");
       return;
     }
     try {
       const encrypted = encryptProjectId(projectId);
-      router.push(`/projects/${encrypted}/dashboard`);
+      router.push(`/projects/${encrypted}/dashboard/`);
     } catch (err) {
-      router.push(`/projects/${projectId}/dashboard`);
+      router.push(`/projects/${projectId}/dashboard/`);
     }
   };
 

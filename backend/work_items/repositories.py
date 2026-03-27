@@ -1,19 +1,33 @@
 """
-Work item repository for DevOps-related data operations.
+Work item repository — ORM-backed.
+
+WorkItemCandidate rows replace the old embedded-JSON approach.
+UserStory-level CRUD is preserved for backward compatibility.
 """
 
 from datetime import datetime
 import logging
 from typing import Any, Dict, List, Optional
 
+from django.db import transaction
 from django.forms.models import model_to_dict
 from django.utils import timezone
 
 from authentication.models import UserAccount
 from integrations.models import Project
-from .models import UserStory, WorkItemQualityRule
+from .models import UserStory, WorkItemCandidate, WorkItemQualityRule
 
 logger = logging.getLogger(__name__)
+
+KNOWN_CANDIDATE_FIELDS = {
+    "title", "description", "type", "priority", "feature_area",
+    "acceptance_criteria", "business_value", "effort_estimate", "tags",
+    "evidence", "candidate_id", "aspect_key", "analysis_id",
+    "platform", "process_template", "status", "status_changed_at",
+    "status_changed_by", "dismiss_reason", "snooze_until", "merged_into",
+    "push_status", "external_id", "external_url", "external_platform",
+    "push_error", "pushed_at",
+}
 
 
 def _iso(value):
@@ -24,15 +38,79 @@ def _iso(value):
     return value.isoformat()
 
 
+def _parse_dt(value):
+    """Parse an ISO datetime string, returning None on failure."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
 def _story_to_dict(item: UserStory) -> Dict[str, Any]:
     data = model_to_dict(item)
     data["projectId"] = item.project_id
     data["userId"] = item.user_id
-    data["work_items"] = item.work_items or []
+    data["work_items"] = [c.to_dict() for c in item.candidates.all().order_by("-created_at")]
     data["generated_at"] = _iso(item.generated_at)
     data["createdAt"] = _iso(item.created_at)
     data["updatedAt"] = _iso(item.updated_at)
     return data
+
+
+def _dict_to_candidate_kwargs(d: Dict[str, Any], project_id: str,
+                               user_story: Optional[UserStory] = None) -> Dict[str, Any]:
+    """Extract known columns from a work-item dict; rest goes into `extra`."""
+    extra = {}
+    for k, v in d.items():
+        if k not in KNOWN_CANDIDATE_FIELDS and k not in {
+            "id", "work_item_id", "projectId", "project_id", "userId",
+            "user_id", "createdAt", "updatedAt", "created_at", "updated_at",
+            "_story_id", "review_status", "comment_count",
+        }:
+            extra[k] = v
+
+    # Preserve comment_count in extra if present
+    if "comment_count" in d:
+        extra["comment_count"] = d["comment_count"]
+
+    kwargs: Dict[str, Any] = {
+        "project_id": str(project_id),
+        "user_story": user_story,
+        "title": str(d.get("title") or "")[:500],
+        "description": str(d.get("description") or ""),
+        "type": str(d.get("type") or "task")[:64],
+        "priority": str(d.get("priority") or "medium")[:32],
+        "feature_area": str(d.get("feature_area") or d.get("featurearea") or "")[:256],
+        "acceptance_criteria": str(d.get("acceptance_criteria") or d.get("acceptancecriteria") or ""),
+        "business_value": str(d.get("business_value") or d.get("businessvalue") or ""),
+        "effort_estimate": str(d.get("effort_estimate") or d.get("effortestimate") or "")[:64],
+        "tags": d.get("tags") or d.get("labels") or [],
+        "evidence": d.get("evidence") or [],
+        "candidate_id": str(d.get("candidate_id") or "")[:256],
+        "aspect_key": str(d.get("aspect_key") or "")[:256],
+        "analysis_id": str(d.get("analysis_id") or "")[:256],
+        "platform": str(d.get("platform") or "")[:64],
+        "process_template": str(d.get("process_template") or "")[:128],
+        "status": str(d.get("status") or d.get("review_status") or "pending")[:32],
+        "push_status": str(d.get("push_status") or "not_pushed")[:32],
+        "external_id": str(d.get("external_id") or "")[:256],
+        "external_url": str(d.get("external_url") or "")[:1024],
+        "external_platform": str(d.get("external_platform") or "")[:64],
+        "push_error": str(d.get("push_error") or ""),
+        "dismiss_reason": str(d.get("dismiss_reason") or "")[:64],
+        "merged_into": str(d.get("merged_into") or "")[:128],
+        "status_changed_by": str(d.get("status_changed_by") or "")[:128],
+        "status_changed_at": _parse_dt(d.get("status_changed_at")),
+        "snooze_until": _parse_dt(d.get("snooze_until")),
+        "pushed_at": _parse_dt(d.get("pushed_at")),
+        "extra": extra,
+    }
+    return kwargs
 
 
 class WorkItemRepository:
@@ -41,94 +119,174 @@ class WorkItemRepository:
     def __init__(self):
         self.entity_type = "user_story"
 
+    # ------------------------------------------------------------------
+    # UserStory CRUD (unchanged interface, now includes candidates)
+    # ------------------------------------------------------------------
+
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        item = UserStory.objects.create(
-            id=data["id"],
-            project=Project.objects.filter(id=str(data.get("projectId"))).first(),
-            user=UserAccount.objects.filter(id=str(data.get("userId"))).first(),
-            type=data.get("type", self.entity_type),
-            status=data.get("status", ""),
-            title=data.get("title", ""),
-            description=data.get("description", ""),
-            generated_at=datetime.fromisoformat(data["generated_at"]) if data.get("generated_at") else None,
-            work_items=data.get("work_items", []),
-            payload={k: v for k, v in data.items() if k not in {
-                "id", "projectId", "userId", "type", "status", "title", "description",
-                "generated_at", "work_items", "createdAt", "updatedAt",
-            }},
-        )
-        return _story_to_dict(item)
+        project = Project.objects.filter(id=str(data.get("projectId"))).first()
+        user = UserAccount.objects.filter(id=str(data.get("userId"))).first()
+
+        with transaction.atomic():
+            story = UserStory.objects.create(
+                id=data["id"],
+                project=project,
+                user=user,
+                type=data.get("type", self.entity_type),
+                status=data.get("status", ""),
+                title=data.get("title", ""),
+                description=data.get("description", ""),
+                generated_at=(
+                    datetime.fromisoformat(data["generated_at"])
+                    if data.get("generated_at") else None
+                ),
+                work_items=[],
+                payload={k: v for k, v in data.items() if k not in {
+                    "id", "projectId", "userId", "type", "status", "title",
+                    "description", "generated_at", "work_items", "createdAt", "updatedAt",
+                }},
+            )
+
+            raw_items = data.get("work_items") or []
+            self._bulk_create_candidates(raw_items, story)
+
+        return _story_to_dict(story)
 
     def upsert_by_id(self, item_id: str, project_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        item = UserStory.objects.filter(id=item_id).first()
-        if not item:
+        story = UserStory.objects.filter(id=item_id).first()
+        if not story:
             data = {**data, "id": item_id, "projectId": project_id}
             return self.create(data)
         return self.update(item_id, data)
 
     def get_by_id(self, work_item_id: str) -> Optional[Dict[str, Any]]:
-        item = UserStory.objects.filter(id=work_item_id).first()
-        return _story_to_dict(item) if item else None
+        story = UserStory.objects.filter(id=work_item_id).first()
+        return _story_to_dict(story) if story else None
 
     def get_by_project(self, project_id: str) -> List[Dict[str, Any]]:
-        rows = UserStory.objects.filter(project_id=str(project_id), type=self.entity_type).order_by("-created_at")
+        rows = UserStory.objects.filter(
+            project_id=str(project_id), type=self.entity_type,
+        ).order_by("-created_at")
         return [_story_to_dict(r) for r in rows]
 
     def get_by_user(self, user_id: str) -> List[Dict[str, Any]]:
-        rows = UserStory.objects.filter(user_id=str(user_id), type=self.entity_type).order_by("-created_at")
+        rows = UserStory.objects.filter(
+            user_id=str(user_id), type=self.entity_type,
+        ).order_by("-created_at")
         return [_story_to_dict(r) for r in rows]
 
     def update(self, work_item_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        item = UserStory.objects.get(id=work_item_id)
-        item.status = data.get("status", item.status)
-        item.title = data.get("title", item.title)
-        item.description = data.get("description", item.description)
-        if "work_items" in data:
-            item.work_items = data.get("work_items") or []
+        story = UserStory.objects.get(id=work_item_id)
+        story.status = data.get("status", story.status)
+        story.title = data.get("title", story.title)
+        story.description = data.get("description", story.description)
         if data.get("generated_at"):
-            item.generated_at = datetime.fromisoformat(data["generated_at"])
-        item.payload = {**(item.payload or {}), **data.get("payload", {})}
-        item.updated_at = timezone.now()
-        item.save()
-        return _story_to_dict(item)
+            story.generated_at = datetime.fromisoformat(data["generated_at"])
+        story.payload = {**(story.payload or {}), **data.get("payload", {})}
+        story.updated_at = timezone.now()
+
+        with transaction.atomic():
+            story.save()
+
+            if "work_items" in data:
+                raw_items = data.get("work_items") or []
+                story.candidates.all().delete()
+                self._bulk_create_candidates(raw_items, story)
+
+        return _story_to_dict(story)
 
     def delete(self, work_item_id: str) -> bool:
         deleted, _ = UserStory.objects.filter(id=work_item_id).delete()
         return deleted > 0
 
-    def update_embedded_work_item(self, work_item_id: str, user_id: str, updated_data: Dict[str, Any], project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        rows = UserStory.objects.filter(user_id=str(user_id))
-        if project_id:
-            rows = rows.filter(project_id=str(project_id))
-        for story in rows:
-            updated = False
-            for idx, wi in enumerate(story.work_items or []):
-                if str(wi.get("id")) == str(work_item_id):
-                    story.work_items[idx] = {**wi, **updated_data}
-                    updated = True
-                    break
-            if updated:
-                story.updated_at = timezone.now()
-                story.save(update_fields=["work_items", "updated_at"])
-                return _story_to_dict(story)
-        return None
+    # ------------------------------------------------------------------
+    # Individual work-item (candidate) operations — now ORM queries
+    # ------------------------------------------------------------------
 
-    def remove_embedded_work_item(self, work_item_id: str, user_id: str, project_id: Optional[str] = None) -> bool:
-        rows = UserStory.objects.filter(user_id=str(user_id))
+    def update_embedded_work_item(self, work_item_id: str, user_id: str,
+                                  updated_data: Dict[str, Any],
+                                  project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        qs = WorkItemCandidate.objects.filter(id=str(work_item_id))
         if project_id:
-            rows = rows.filter(project_id=str(project_id))
-        for story in rows:
-            before = len(story.work_items or [])
-            story.work_items = [w for w in (story.work_items or []) if str(w.get("id")) != str(work_item_id)]
-            if len(story.work_items) != before:
-                story.updated_at = timezone.now()
-                story.save(update_fields=["work_items", "updated_at"])
-                return True
-        return False
+            qs = qs.filter(project_id=str(project_id))
+        candidate = qs.first()
+        if not candidate:
+            return None
+        self._apply_updates(candidate, updated_data)
+        candidate.save()
+        story = candidate.user_story
+        return _story_to_dict(story) if story else None
+
+    def remove_embedded_work_item(self, work_item_id: str, user_id: str,
+                                  project_id: Optional[str] = None) -> bool:
+        qs = WorkItemCandidate.objects.filter(id=str(work_item_id))
+        if project_id:
+            qs = qs.filter(project_id=str(project_id))
+        deleted, _ = qs.delete()
+        return deleted > 0
 
     def get_work_items_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
-        rows = UserStory.objects.filter(project_id=str(project_id)).order_by("-generated_at", "-created_at")
+        rows = UserStory.objects.filter(
+            project_id=str(project_id),
+        ).order_by("-generated_at", "-created_at")
         return [_story_to_dict(r) for r in rows]
+
+    def get_all_work_items_flat(self, project_id: str) -> List[Dict[str, Any]]:
+        """Return all candidates for a project as flat dicts."""
+        qs = WorkItemCandidate.objects.filter(
+            project_id=str(project_id),
+        ).select_related("user_story").order_by("-created_at")
+        items = []
+        for c in qs:
+            d = c.to_dict()
+            d["_story_id"] = str(c.user_story_id) if c.user_story_id else ""
+            items.append(d)
+        return items
+
+    # ------------------------------------------------------------------
+    # Review / candidate operations — pure ORM, no JSON iteration
+    # ------------------------------------------------------------------
+
+    def get_candidates_by_status(self, project_id: str, status: str) -> List[Dict[str, Any]]:
+        qs = WorkItemCandidate.objects.filter(
+            project_id=str(project_id),
+            status=status,
+        ).order_by("-created_at")
+        return [c.to_dict() for c in qs]
+
+    def update_candidate_status(self, candidate_id: str, project_id: str,
+                                updates: Dict[str, Any]) -> Dict[str, Any]:
+        candidate = WorkItemCandidate.objects.filter(
+            id=str(candidate_id),
+            project_id=str(project_id),
+        ).first()
+        if not candidate:
+            raise ValueError(f"Candidate {candidate_id} not found")
+
+        self._apply_updates(candidate, updates)
+        candidate.updated_at = timezone.now()
+        candidate.save()
+        return candidate.to_dict()
+
+    def get_candidate_by_id(self, candidate_id: str, project_id: str) -> Optional[Dict[str, Any]]:
+        candidate = WorkItemCandidate.objects.filter(
+            id=str(candidate_id),
+            project_id=str(project_id),
+        ).first()
+        return candidate.to_dict() if candidate else None
+
+    def get_expired_snoozed_candidates(self) -> List[Dict[str, Any]]:
+        now = timezone.now()
+        qs = WorkItemCandidate.objects.filter(
+            status="snoozed",
+            snooze_until__lte=now,
+            snooze_until__isnull=False,
+        )
+        return [c.to_dict() for c in qs]
+
+    # ------------------------------------------------------------------
+    # Quality rules (unchanged)
+    # ------------------------------------------------------------------
 
     def get_quality_rules_for_project(self, project_id: str) -> Optional[Dict[str, Any]]:
         row = WorkItemQualityRule.objects.filter(project_id=str(project_id)).first()
@@ -162,106 +320,73 @@ class WorkItemRepository:
             **(row.payload or {}),
         }
 
-    def get_all_work_items_flat(self, project_id: str) -> List[Dict[str, Any]]:
-        """Return all embedded work items across all UserStory rows for a project."""
-        items: List[Dict[str, Any]] = []
-        rows = UserStory.objects.filter(project_id=str(project_id)).order_by("-generated_at", "-created_at")
-        for story in rows:
-            for item in story.work_items or []:
-                entry = dict(item)
-                entry["_story_id"] = str(story.id)
-                entry.setdefault("id", item.get("id") or item.get("work_item_id"))
-                items.append(entry)
-        return items
-
-    def get_candidates_by_status(self, project_id: str, status: str) -> List[Dict[str, Any]]:
-        """Get embedded work item candidates filtered by review status."""
-        candidates: List[Dict[str, Any]] = []
-        rows = UserStory.objects.filter(project_id=str(project_id)).order_by("-generated_at", "-created_at")
-
-        for story in rows:
-            for item in story.work_items or []:
-                item_status = item.get("status") or item.get("review_status") or "pending"
-                if item_status != status:
-                    continue
-                candidate_id = item.get("id") or item.get("work_item_id")
-                if not candidate_id:
-                    continue
-                candidate = dict(item)
-                candidate["id"] = str(candidate_id)
-                candidate["projectId"] = str(project_id)
-                candidate.setdefault("createdAt", _iso(story.created_at))
-                candidate.setdefault("updatedAt", _iso(story.updated_at))
-                candidates.append(candidate)
-        return candidates
-
-    def update_candidate_status(self, candidate_id: str, project_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
-        """Update an embedded work item candidate by ID."""
-        rows = UserStory.objects.filter(project_id=str(project_id))
-        for story in rows:
-            items = story.work_items or []
-            for idx, item in enumerate(items):
-                current_id = str(item.get("id") or item.get("work_item_id") or "")
-                if current_id != str(candidate_id):
-                    continue
-                updated = {**item, **updates}
-                if "status" in updates:
-                    updated["review_status"] = updates["status"]
-                story.work_items[idx] = updated
-                story.updated_at = timezone.now()
-                story.save(update_fields=["work_items", "updated_at"])
-                result = dict(updated)
-                result["id"] = str(candidate_id)
-                result["projectId"] = str(project_id)
-                result.setdefault("updatedAt", _iso(story.updated_at))
-                result.setdefault("createdAt", _iso(story.created_at))
-                return result
-        raise ValueError(f"Candidate {candidate_id} not found")
-
-    def get_candidate_by_id(self, candidate_id: str, project_id: str) -> Optional[Dict[str, Any]]:
-        """Get a single embedded candidate by ID."""
-        rows = UserStory.objects.filter(project_id=str(project_id))
-        for story in rows:
-            for item in story.work_items or []:
-                current_id = str(item.get("id") or item.get("work_item_id") or "")
-                if current_id == str(candidate_id):
-                    result = dict(item)
-                    result["id"] = str(candidate_id)
-                    result["projectId"] = str(project_id)
-                    result.setdefault("createdAt", _iso(story.created_at))
-                    result.setdefault("updatedAt", _iso(story.updated_at))
-                    return result
-        return None
-
-    def get_expired_snoozed_candidates(self) -> List[Dict[str, Any]]:
-        """Return snoozed candidates where snooze_until has already passed."""
-        now = timezone.now()
-        expired: List[Dict[str, Any]] = []
-        rows = UserStory.objects.all().order_by("-generated_at", "-created_at")
-
-        for story in rows:
-            for item in story.work_items or []:
-                item_status = item.get("status") or item.get("review_status") or "pending"
-                if item_status != "snoozed":
-                    continue
-                raw_until = item.get("snooze_until")
-                if not raw_until:
-                    continue
-                try:
-                    parsed_until = datetime.fromisoformat(str(raw_until).replace("Z", "+00:00"))
-                    if timezone.is_naive(parsed_until):
-                        parsed_until = timezone.make_aware(parsed_until, timezone.utc)
-                except Exception:
-                    logger.warning("Invalid snooze_until value for candidate %s: %s", item.get("id"), raw_until)
-                    continue
-                if parsed_until <= now:
-                    candidate = dict(item)
-                    candidate["id"] = str(item.get("id") or item.get("work_item_id"))
-                    candidate["projectId"] = str(story.project_id) if story.project_id else ""
-                    expired.append(candidate)
-        return expired
+    # ------------------------------------------------------------------
+    # Deep analysis (unchanged)
+    # ------------------------------------------------------------------
 
     def get_deep_analysis_by_project(self, project_id: str) -> Optional[List[Dict[str, Any]]]:
-        rows = UserStory.objects.filter(project_id=str(project_id), type="deep_analysis").order_by("-generated_at")
+        rows = UserStory.objects.filter(
+            project_id=str(project_id), type="deep_analysis",
+        ).order_by("-generated_at")
         return [_story_to_dict(r) for r in rows]
 
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _bulk_create_candidates(self, raw_items: List[Dict[str, Any]],
+                                story: UserStory) -> List[WorkItemCandidate]:
+        """Create WorkItemCandidate rows from a list of work-item dicts."""
+        if not raw_items:
+            return []
+
+        project_id = str(story.project_id) if story.project_id else ""
+        candidates = []
+        for d in raw_items:
+            item_id = d.get("id") or d.get("work_item_id")
+            kwargs = _dict_to_candidate_kwargs(d, project_id, story)
+            c = WorkItemCandidate(**kwargs)
+            if item_id:
+                try:
+                    c.id = item_id
+                except (ValueError, AttributeError):
+                    pass
+            candidates.append(c)
+
+        return WorkItemCandidate.objects.bulk_create(candidates, ignore_conflicts=True)
+
+    @staticmethod
+    def _apply_updates(candidate: WorkItemCandidate, updates: Dict[str, Any]):
+        """Apply a dict of updates to a candidate instance."""
+        field_map = {
+            "title": "title",
+            "description": "description",
+            "type": "type",
+            "priority": "priority",
+            "feature_area": "feature_area",
+            "acceptance_criteria": "acceptance_criteria",
+            "business_value": "business_value",
+            "effort_estimate": "effort_estimate",
+            "tags": "tags",
+            "evidence": "evidence",
+            "status": "status",
+            "push_status": "push_status",
+            "external_id": "external_id",
+            "external_url": "external_url",
+            "external_platform": "external_platform",
+            "push_error": "push_error",
+            "dismiss_reason": "dismiss_reason",
+            "merged_into": "merged_into",
+            "status_changed_by": "status_changed_by",
+        }
+        for key, attr in field_map.items():
+            if key in updates:
+                setattr(candidate, attr, updates[key])
+
+        for dt_field in ("status_changed_at", "snooze_until", "pushed_at"):
+            if dt_field in updates:
+                val = updates[dt_field]
+                setattr(candidate, dt_field, _parse_dt(val) if isinstance(val, str) else val)
+
+        if "updated_at" in updates:
+            candidate.updated_at = _parse_dt(updates["updated_at"]) or timezone.now()

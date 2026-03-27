@@ -14,18 +14,18 @@ export default function HomePage() {
   useEffect(() => {
     // Only redirect to login if auth check is complete and user is not authenticated
     if (!loading && !isAuthenticated) {
-      router.replace('/login');
+      router.replace('/login/');
     }
   }, [isAuthenticated, loading, router]);
 
   const handleGoToProject = useCallback((project: Project) => {
     try {
       const encryptedId = encryptProjectId(project.id);
-      router.push(`/projects/${encryptedId}/dashboard`);
+      router.push(`/projects/${encryptedId}/dashboard/`);
     } catch (error) {
       console.error('Failed to navigate to project:', error);
       // Fallback to unencrypted ID if encryption fails
-      router.push(`/projects/${project.id}/dashboard`);
+      router.push(`/projects/${project.id}/dashboard/`);
     }
   }, [router]);
 

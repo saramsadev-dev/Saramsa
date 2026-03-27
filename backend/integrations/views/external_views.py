@@ -19,17 +19,13 @@ from ..services import get_external_api_service, get_project_service, get_integr
 logger = logging.getLogger(__name__)
 
 
-@api_view(['GET', 'POST'])
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @handle_service_errors
 def get_azure_projects(request):
     """Get Azure DevOps projects directly from Azure API (for config page)."""
-    # This endpoint fetches projects directly from Azure DevOps API
-    # Used during initial setup/configuration, not from database
-    
-    # Get credentials from request body or query params
-    organization = request.GET.get('organization') or request.data.get('organization')
-    pat_token = request.GET.get('pat_token') or request.data.get('pat_token')
+    organization = request.data.get('organization')
+    pat_token = request.data.get('pat_token')
     
     if not organization or not pat_token:
         return StandardResponse.validation_error(
@@ -54,18 +50,14 @@ def get_azure_projects(request):
     )
 
 
-@api_view(['GET', 'POST'])
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @handle_service_errors
 def get_jira_projects(request):
     """Get Jira projects directly from Jira API (for config page)."""
-    # This endpoint fetches projects directly from Jira API
-    # Used during initial setup/configuration, not from database
-    
-    # Get credentials from request body or query params
-    domain = request.GET.get('domain') or request.data.get('domain')
-    email = request.GET.get('email') or request.data.get('email')
-    api_token = request.GET.get('api_token') or request.data.get('api_token')
+    domain = request.data.get('domain')
+    email = request.data.get('email')
+    api_token = request.data.get('api_token')
     
     if not domain or not email or not api_token:
         return StandardResponse.validation_error(
@@ -125,21 +117,23 @@ def get_dashboard_jira_projects(request):
     )
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 @handle_service_errors
 def get_external_projects(request):
     """Get external projects from various providers.
     
-    Can be called in two ways:
-    1. With accountId: Fetches credentials from stored integration account
-    2. With credentials directly: Uses provided credentials (for initial setup)
+    GET  with accountId: Fetches credentials from stored integration account.
+    POST with credentials: Uses provided credentials (for initial setup).
     """
-    provider = request.GET.get('provider')
-    account_id = request.GET.get('accountId')
+    if request.method == 'POST':
+        provider = request.data.get('provider')
+        account_id = request.data.get('accountId')
+    else:
+        provider = request.GET.get('provider')
+        account_id = request.GET.get('accountId')
+
     user_id = request.user.id
-    
-    logger.info(f"get_external_projects called - provider: {provider}, accountId: {account_id}, user_id: {user_id} (type: {type(user_id)})")
     
     if not provider:
         return StandardResponse.validation_error(
@@ -151,28 +145,32 @@ def get_external_projects(request):
     try:
         integration_service = get_integration_service()
         
-        # If accountId is provided, fetch projects using stored credentials
         if account_id:
             projects = integration_service.get_external_projects(
                 user_id, provider, accountId=account_id
             )
-        # Otherwise, use provided credentials directly (for initial setup)
-        elif provider == 'azure':
-            organization = request.GET.get('organization')
-            pat_token = request.GET.get('pat_token')
-            projects = integration_service.get_external_projects(
-                user_id, provider, organization=organization, pat_token=pat_token
-            )
-        elif provider == 'jira':
-            domain = request.GET.get('domain')
-            email = request.GET.get('email')
-            api_token = request.GET.get('api_token')
-            projects = integration_service.get_external_projects(
-                user_id, provider, domain=domain, email=email, api_token=api_token
-            )
+        elif request.method == 'POST':
+            if provider == 'azure':
+                organization = request.data.get('organization')
+                pat_token = request.data.get('pat_token')
+                projects = integration_service.get_external_projects(
+                    user_id, provider, organization=organization, pat_token=pat_token
+                )
+            elif provider == 'jira':
+                domain = request.data.get('domain')
+                email = request.data.get('email')
+                api_token = request.data.get('api_token')
+                projects = integration_service.get_external_projects(
+                    user_id, provider, domain=domain, email=email, api_token=api_token
+                )
+            else:
+                return StandardResponse.validation_error(
+                    detail=f'Unsupported provider: {provider}',
+                    instance=request.path
+                )
         else:
             return StandardResponse.validation_error(
-                detail=f'Unsupported provider: {provider}',
+                detail='accountId is required for GET requests. Use POST for direct credentials.',
                 instance=request.path
             )
         
