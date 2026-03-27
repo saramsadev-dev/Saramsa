@@ -162,6 +162,18 @@ class WorkItemRepository:
             **(row.payload or {}),
         }
 
+    def get_all_work_items_flat(self, project_id: str) -> List[Dict[str, Any]]:
+        """Return all embedded work items across all UserStory rows for a project."""
+        items: List[Dict[str, Any]] = []
+        rows = UserStory.objects.filter(project_id=str(project_id)).order_by("-generated_at", "-created_at")
+        for story in rows:
+            for item in story.work_items or []:
+                entry = dict(item)
+                entry["_story_id"] = str(story.id)
+                entry.setdefault("id", item.get("id") or item.get("work_item_id"))
+                items.append(entry)
+        return items
+
     def get_candidates_by_status(self, project_id: str, status: str) -> List[Dict[str, Any]]:
         """Get embedded work item candidates filtered by review status."""
         candidates: List[Dict[str, Any]] = []

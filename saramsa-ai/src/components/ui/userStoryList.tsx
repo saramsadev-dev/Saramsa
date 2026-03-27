@@ -258,6 +258,9 @@ export const UserStoryList = ({
           tags: item.tags || item.labels || [],
           acceptance: item.acceptance_criteria || item.acceptancecriteria || item.acceptance || '',
           featureArea: item.feature_area || item.featurearea || '',
+          review_status: item.status || 'pending',
+          push_status: item.push_status || (item.submitted ? 'pushed' : 'not_pushed'),
+          submitted: item.submitted || item.push_status === 'pushed',
         };
         dispatch(addActionItem(actionItem));
       });
@@ -267,10 +270,21 @@ export const UserStoryList = ({
   }, [userStories, currentProjectUserStories, dispatch, platform]);
 
   const handleActionSelect = (actionId: string) => {
-    // Check if this work item has already been submitted
+    // Check if this work item has already been submitted or is in a non-selectable state
     const workItem = currentProjectUserStoryWorkItems.find(item => item.id === actionId);
-    if (workItem?.submitted) {
-      alert('This work item has already been submitted and cannot be selected again.');
+    const reviewStatus = workItem?.status || 'pending';
+    const isPushed = workItem?.submitted || workItem?.push_status === 'pushed';
+
+    if (isPushed) {
+      alert('This work item has already been pushed and cannot be selected again.');
+      return;
+    }
+    if (reviewStatus === 'dismissed') {
+      alert('This work item has been dismissed. Restore it from the Review Queue first.');
+      return;
+    }
+    if (reviewStatus === 'snoozed') {
+      alert('This work item is snoozed. Unsnooze it from the Review Queue first.');
       return;
     }
     dispatch(toggleActionSelection(actionId));
@@ -722,9 +736,9 @@ export const UserStoryList = ({
 
   // Get submitted work items for the "Pushed to" section
   const getSubmittedWorkItems = () => {
-    
-    const submitted = currentProjectUserStoryWorkItems.filter(item => item.submitted === true);
-    return submitted;
+    return currentProjectUserStoryWorkItems.filter(
+      item => item.submitted === true || item.push_status === 'pushed'
+    );
   };
 
   
@@ -763,8 +777,19 @@ export const UserStoryList = ({
   }
 
   const draftItems = actionItems.filter(actionItem => {
-    const submittedItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
-    return !submittedItem?.submitted;
+    const workItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
+    const isPushed = workItem?.submitted || workItem?.push_status === 'pushed';
+    const reviewStatus = workItem?.status || actionItem.review_status || 'pending';
+    // Show as draft if not pushed and not dismissed/snoozed
+    return !isPushed && reviewStatus !== 'dismissed' && reviewStatus !== 'snoozed';
+  });
+  const dismissedItems = actionItems.filter(actionItem => {
+    const workItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
+    return (workItem?.status || actionItem.review_status) === 'dismissed';
+  });
+  const snoozedItems = actionItems.filter(actionItem => {
+    const workItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
+    return (workItem?.status || actionItem.review_status) === 'snoozed';
   });
   const submittedItems = getSubmittedWorkItems();
 
@@ -922,9 +947,12 @@ export const UserStoryList = ({
           <h3 className="text-lg font-semibold text-foreground">
             Work Items
           </h3>
-          {draftItems.length > 0 && (
+          {(draftItems.length > 0 || submittedItems.length > 0 || dismissedItems.length > 0 || snoozedItems.length > 0) && (
             <span className="text-xs text-muted-foreground">
-              {draftItems.length} draft{submittedItems.length > 0 ? `, ${submittedItems.length} pushed` : ''}
+              {draftItems.length} draft
+              {submittedItems.length > 0 ? `, ${submittedItems.length} pushed` : ''}
+              {dismissedItems.length > 0 ? `, ${dismissedItems.length} dismissed` : ''}
+              {snoozedItems.length > 0 ? `, ${snoozedItems.length} snoozed` : ''}
             </span>
           )}
         </div>
@@ -1019,6 +1047,26 @@ export const UserStoryList = ({
             };
             return renderAccordionItem(pseudoAction, true, workItem);
           })}
+        </div>
+      )}
+
+      {/* Snoozed Items */}
+      {snoozedItems.length > 0 && (
+        <div className="space-y-1.5 pt-2 opacity-60">
+          <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
+            Snoozed ({snoozedItems.length})
+          </p>
+          {snoozedItems.map((item) => renderAccordionItem(item, true))}
+        </div>
+      )}
+
+      {/* Dismissed Items */}
+      {dismissedItems.length > 0 && (
+        <div className="space-y-1.5 pt-2 opacity-40">
+          <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">
+            Dismissed ({dismissedItems.length})
+          </p>
+          {dismissedItems.map((item) => renderAccordionItem(item, true))}
         </div>
       )}
 

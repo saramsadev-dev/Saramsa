@@ -7,6 +7,8 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
 import uuid
 import json
+import re
+from difflib import SequenceMatcher
 from ..repositories import WorkItemRepository
 from apis.prompts import WORK_ITEM_TYPES_BY_TEMPLATE
 from feedback_analysis.services.narration_service import get_narration_service
@@ -122,14 +124,24 @@ class DevOpsService:
             logger.error(f"Error generating work items from analysis: {e}")
             raise
     
-    def create_work_items(self, user_id: str, work_items: List[Dict[str, Any]], 
+    def create_work_items(self, user_id: str, work_items: List[Dict[str, Any]],
                          platform: str, project_id: str = None, analysis_id: str = None) -> Dict[str, Any]:
-        """Create work items collection."""
+        """Create work items collection with cross-analysis dedup."""
         try:
             # Never use None or the string "None" for IDs (avoids storing workitems_insight_None)
             safe_analysis_id = None
             if analysis_id is not None and str(analysis_id).strip().lower() not in ("", "none"):
                 safe_analysis_id = str(analysis_id).strip()
+
+            # --- Set default status on every new work item ---
+            for item in work_items:
+                item.setdefault("status", "pending")
+                item.setdefault("push_status", "not_pushed")
+
+            # --- Cross-analysis dedup ---
+            if project_id:
+                work_items = self._deduplicate_against_existing(work_items, project_id)
+
             doc_id = f"workitems_{safe_analysis_id}" if safe_analysis_id else str(uuid.uuid4())
             work_items_doc = {
                 "id": doc_id,
@@ -143,16 +155,79 @@ class DevOpsService:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "updatedAt": datetime.now(timezone.utc).isoformat()
             }
-            
+
             if project_id:
                 work_items_doc["projectId"] = project_id
             if safe_analysis_id and project_id:
                 return self.work_item_repo.upsert_by_id(work_items_doc["id"], project_id, work_items_doc)
             return self.work_item_repo.create(work_items_doc)
-            
+
         except Exception as e:
             logger.error(f"Error creating work items: {e}")
             raise
+
+    def _deduplicate_against_existing(self, new_items: List[Dict[str, Any]],
+                                       project_id: str) -> List[Dict[str, Any]]:
+        """Remove new work items that already exist in this project (by aspect_key or title)."""
+        existing = self.work_item_repo.get_all_work_items_flat(project_id)
+        if not existing:
+            return new_items
+
+        # Build lookup sets from existing items (skip dismissed — they're dead-ended)
+        existing_aspect_keys: set = set()
+        existing_titles: List[str] = []
+        for item in existing:
+            status = item.get("status") or "pending"
+            if status == "dismissed":
+                continue
+            ak = item.get("aspect_key")
+            if ak:
+                existing_aspect_keys.add(str(ak).lower().strip())
+            title = item.get("title")
+            if title:
+                existing_titles.append(self._normalize_title(title))
+
+        kept: List[Dict[str, Any]] = []
+        for item in new_items:
+            # Check aspect_key match
+            ak = item.get("aspect_key")
+            if ak and str(ak).lower().strip() in existing_aspect_keys:
+                logger.info("Dedup: skipping work item '%s' — aspect_key '%s' already exists in project %s",
+                            item.get("title", ""), ak, project_id)
+                continue
+
+            # Check title similarity
+            new_title = self._normalize_title(item.get("title", ""))
+            if new_title and any(self._titles_similar(new_title, et) for et in existing_titles):
+                logger.info("Dedup: skipping work item '%s' — similar title already exists in project %s",
+                            item.get("title", ""), project_id)
+                continue
+
+            kept.append(item)
+
+        skipped = len(new_items) - len(kept)
+        if skipped:
+            logger.info("Cross-analysis dedup: kept %d, skipped %d duplicates (project=%s)",
+                        len(kept), skipped, project_id)
+        return kept
+
+    @staticmethod
+    def _normalize_title(title: str) -> str:
+        """Lowercase, strip punctuation and extra whitespace."""
+        title = title.lower().strip()
+        title = re.sub(r'[^\w\s]', '', title)
+        return re.sub(r'\s+', ' ', title).strip()
+
+    @staticmethod
+    def _titles_similar(a: str, b: str) -> bool:
+        """Return True if two normalized titles are near-duplicates."""
+        if not a or not b:
+            return False
+        if a == b:
+            return True
+        if a.startswith(b) or b.startswith(a):
+            return True
+        return SequenceMatcher(None, a, b).ratio() > 0.85
     
     def get_work_items_by_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get work items for a project - consolidated method."""
@@ -454,6 +529,7 @@ class DevOpsService:
                 "effort_estimate": "3",
                 "feature_area": label,
                 "candidate_id": c.get("candidate_id"),
+                "aspect_key": aspect_key,
             })
         return work_items
 

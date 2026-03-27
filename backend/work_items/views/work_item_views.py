@@ -223,6 +223,31 @@ class WorkItemSubmissionView(APIView):
                 project_config=project_config
             )
             
+            # Persist push status on each successfully submitted work item
+            if submission_result.get("success") and project_id:
+                now_iso = __import__('datetime').datetime.now(
+                    __import__('datetime').timezone.utc
+                ).isoformat()
+                for i, wi in enumerate(work_items):
+                    wi_id = wi.get("id")
+                    if not wi_id:
+                        continue
+                    result_entry = (submission_result.get("results") or [{}])[i] if i < len(submission_result.get("results", [])) else {}
+                    if result_entry.get("success"):
+                        push_updates = {
+                            "status": "approved",
+                            "push_status": "pushed",
+                            "submitted": True,
+                            "pushed_at": now_iso,
+                            "external_work_item_id": result_entry.get("work_item_id") or result_entry.get("issue_key"),
+                        }
+                        try:
+                            devops_service.work_item_repo.update_candidate_status(
+                                wi_id, project_id, push_updates
+                            )
+                        except Exception as push_err:
+                            logger.warning("Failed to update push status for %s: %s", wi_id, push_err)
+
             if quality_report["items_with_issues"] > 0:
                 submission_result["quality_gate"] = quality_report
                 submission_result["quality_gate"]["allow_push_with_warnings"] = True

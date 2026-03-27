@@ -21,6 +21,8 @@ export interface ActionItem {
   submittedAt?: string;
   externalWorkItemId?: string | number;
   externalUrl?: string;
+  review_status?: 'pending' | 'approved' | 'dismissed' | 'snoozed' | 'merged';
+  push_status?: 'not_pushed' | 'pushed' | 'failed';
 }
 
 export interface Feature {
