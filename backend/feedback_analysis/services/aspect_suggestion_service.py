@@ -28,7 +28,8 @@ class AspectSuggestionService:
         self.sample_size_max = 100
         self.target_aspect_count = 8  # Target 6-12, aim for middle
     
-    async def suggest_aspects(self, comments: List[str], company_name: Optional[str] = None) -> Dict[str, Any]:
+    async def suggest_aspects(self, comments: List[str], company_name: Optional[str] = None,
+                             user_id: Optional[str] = None, project_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate aspect suggestions from a sample of comments.
         
@@ -59,7 +60,9 @@ class AspectSuggestionService:
         prompt = self._build_aspect_suggestion_prompt(sample_comments)
         
         # Step 3: Call LLM with constrained prompt
-        result = await generate_completions(prompt)
+        result, _usage = await generate_completions(
+            prompt, user_id=user_id, project_id=project_id, task_type="aspect_suggestion",
+        )
         parsed_result = self._parse_llm_response(result)
 
         # Step 4: Validate and normalize response

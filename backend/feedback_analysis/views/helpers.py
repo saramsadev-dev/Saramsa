@@ -38,7 +38,7 @@ async def getSentimentAnalysis(comments):
         feedback_data = "\n".join([str(c) for c in comments])
         prompt = getSentAnalysisPrompt(feedback_data=feedback_data)
         logger.debug("Starting sentiment analysis")
-        result = await generate_completions(prompt)
+        result, _usage = await generate_completions(prompt)
         
         # Save insight using analysis service
         try:

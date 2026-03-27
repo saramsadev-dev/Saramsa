@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from rest_framework import status
 from asgiref.sync import async_to_sync
 from datetime import datetime
+import json
 import uuid
 import logging
 import os
@@ -211,7 +212,12 @@ class UpdateKeywordsView(APIView):
         # Create prompt using structured system
         prompt = getSentAnalysisPrompt(company_name=company_name, feedback_data=feedback_data)
         
-        result = await generate_completions(prompt)
+        result, _usage = await generate_completions(
+            prompt,
+            user_id=user_id_str,
+            project_id=project_id,
+            task_type="keyword_update",
+        )
 
         # Parse and normalize the result (same as AnalyzeCommentsView)
         try:

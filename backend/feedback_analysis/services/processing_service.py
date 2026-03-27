@@ -36,7 +36,7 @@ class ProcessingService:
     
     async def process_chunks(self, text: str = None, prompt_template: str = None, analysis_type: int = 0,
                             company_name: str = None, suggested_aspects: list = None,
-                            comments: list = None):
+                            comments: list = None, user_id: str = None, project_id: str = None):
         """
         Process comment batches with AI analysis with automatic retry and batch integrity validation.
 
@@ -109,7 +109,10 @@ class ProcessingService:
                             f"📡 [Batch {batch_index + 1}] Calling LLM API with max_tokens={max_tokens} "
                             f"(for {expected_count} comments)..."
                         )
-                        result = await generate_completions(chunk_prompt, max_tokens=max_tokens)
+                        result, _usage = await generate_completions(
+                            chunk_prompt, max_tokens=max_tokens,
+                            user_id=user_id, project_id=project_id, task_type="analysis",
+                        )
                         logger.info(
                             f"📡 [Batch {batch_index + 1}] LLM API response received "
                             f"(type: {type(result).__name__})"
@@ -239,22 +242,27 @@ class ProcessingService:
         )
         return batches
     
-    async def process_feedback(self, text, company_name: str = None, suggested_aspects: list = None):
+    async def process_feedback(self, text, company_name: str = None, suggested_aspects: list = None,
+                              user_id: str = None, project_id: str = None):
         """
         Process feedback text through complete analysis pipeline.
-        
+
         Args:
             text: Feedback text to analyze
             company_name: Optional company name for prompt customization
             suggested_aspects: Optional list of approved aspects (frozen aspect list)
-            
+            user_id: User who triggered the call
+            project_id: Project this analysis belongs to
+
         Returns:
             Normalized analysis results
         """
         # Run sentiment and deep analysis in parallel (both are independent)
         comments_analysis, deep_analysis = await asyncio.gather(
-            self.process_chunks(text, None, 0, company_name=company_name, suggested_aspects=suggested_aspects),
-            self.process_chunks(text, None, 1, company_name=company_name),
+            self.process_chunks(text, None, 0, company_name=company_name, suggested_aspects=suggested_aspects,
+                               user_id=user_id, project_id=project_id),
+            self.process_chunks(text, None, 1, company_name=company_name,
+                               user_id=user_id, project_id=project_id),
         )
         logger.debug("Comment analysis completed", extra={"result": comments_analysis})
         logger.debug("Deep analysis completed", extra={"result": deep_analysis})

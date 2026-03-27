@@ -32,7 +32,7 @@ class NarrationService:
     last_errors = None
     last_cost = None
 
-    def generate_narratives(self, narration_input: Dict[str, Any]) -> Dict[str, Any]:
+    def generate_narratives(self, narration_input: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
         """Generate narratives with strict schema validation and deterministic trimming.
 
         Raises on failure so callers see the real error instead of silent mock data.
@@ -56,7 +56,7 @@ class NarrationService:
 
         prompt = create_narration_prompt(trimmed)
 
-        raw = self._call_generate_completions(prompt)
+        raw, actual_usage = self._call_generate_completions(prompt, user_id=user_id, project_id=project_id)
         parsed, errors = validate_narration_output(
             raw,
             allowed_aspect_keys=[f.get("aspect_key") for f in trimmed.get("features", [])],
@@ -68,8 +68,8 @@ class NarrationService:
         self.last_status = "OK"
         self.last_errors = None
         parsed["_meta"] = {"status": "OK"}
-        self._record_usage(project_id, prompt, raw, cache_hit=False)
-        self._increment_usage_counters(project_id, prompt, raw)
+        self._record_usage(project_id, user_id, actual_usage, cache_hit=False)
+        self._increment_usage_counters(project_id, actual_usage)
         return parsed
 
     def _trim_input(self, narration_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -100,10 +100,13 @@ class NarrationService:
 
         return trimmed
 
-    def _call_generate_completions(self, prompt: str):
+    def _call_generate_completions(self, prompt: str, user_id: Optional[str] = None, project_id: Optional[str] = None):
         """Call async generate_completions from sync code. Safe when already inside an async event loop."""
         def _run():
-            return async_to_sync(generate_completions)(prompt, max_tokens=self.MAX_OUTPUT_TOKENS)
+            return async_to_sync(generate_completions)(
+                prompt, max_tokens=self.MAX_OUTPUT_TOKENS,
+                user_id=user_id, project_id=project_id, task_type="narration",
+            )
 
         try:
             asyncio.get_running_loop()
@@ -114,37 +117,37 @@ class NarrationService:
             future = executor.submit(_run)
             return future.result()
 
-    def _record_usage(self, project_id: Optional[str], prompt: str, output: Any, cache_hit: bool) -> None:
+    def _record_usage(self, project_id: Optional[str], user_id: Optional[str],
+                      actual_usage: Optional[Dict[str, Any]], cache_hit: bool) -> None:
         if not project_id:
             return
-        input_tokens = self._estimate_tokens(prompt)
-        output_tokens = self._estimate_tokens(output if isinstance(output, str) else "")
+        input_tokens = (actual_usage or {}).get("input_tokens") or 0
+        output_tokens = (actual_usage or {}).get("output_tokens") or 0
         period_day = datetime.now().strftime("%Y-%m-%d")
         period_month = datetime.now().strftime("%Y-%m")
         usage_service = get_usage_service()
-        usage_service.record_narration_usage(project_id, period_day, input_tokens, output_tokens, cache_hit=cache_hit)
-        usage_service.record_narration_usage(project_id, period_month, input_tokens, output_tokens, cache_hit=cache_hit)
+        usage_service.record_narration_usage(
+            project_id, period_day, input_tokens, output_tokens,
+            cache_hit=cache_hit, user_id=user_id,
+        )
+        usage_service.record_narration_usage(
+            project_id, period_month, input_tokens, output_tokens,
+            cache_hit=cache_hit, user_id=user_id,
+        )
         self.last_cost = {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
-    def _increment_usage_counters(self, project_id: Optional[str], prompt: str, output: Any) -> None:
+    def _increment_usage_counters(self, project_id: Optional[str], actual_usage: Optional[Dict[str, Any]]) -> None:
         if not project_id:
             return
         cache = get_cache_service()
         now = datetime.now()
         day = now.strftime("%Y-%m-%d")
         month = now.strftime("%Y-%m")
-        input_tokens = self._estimate_tokens(prompt)
-        output_tokens = self._estimate_tokens(output if isinstance(output, str) else "")
+        input_tokens = (actual_usage or {}).get("input_tokens") or 0
+        output_tokens = (actual_usage or {}).get("output_tokens") or 0
         cache.incr(f"usage_calls:{project_id}:{day}", 1, ttl=86400)
         cache.incr(f"usage_calls:{project_id}:{month}", 1, ttl=2592000)
         cache.incr(f"usage_tokens:{project_id}:{month}", input_tokens + output_tokens, ttl=2592000)
-
-    @staticmethod
-    def _estimate_tokens(text: Any) -> int:
-        if not text:
-            return 0
-        s = str(text)
-        return int(len(s.split()) * 1.3)
 
     @staticmethod
     def _budget_exceeded(project_id: str) -> bool:
