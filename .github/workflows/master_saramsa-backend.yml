@@ -126,7 +126,7 @@ jobs:
         working-directory: .
         run: |
           for i in $(seq 1 6); do
-            STATUS=$(az webapp show --name saramsa-backend --slot Production \
+            STATUS=$(az webapp show --name saramsa-api-2026 --slot Production \
               --query "siteConfig.publishingState" -o tsv 2>/dev/null || echo "unknown")
             echo "Publishing state: $STATUS"
             if [ "$STATUS" != "Publishing" ]; then
@@ -140,7 +140,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'saramsa-backend'
+          app-name: 'saramsa-api-2026'
           slot-name: 'Production'
           package: artifact/backend.zip
 

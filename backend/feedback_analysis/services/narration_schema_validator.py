@@ -50,31 +50,43 @@ def validate_narration_output(
     allowed_candidates = {str(c).strip() for c in allowed_candidate_ids if c}
 
     normalized_features = []
+    unknown_aspects = []
     for f in features:
         if not isinstance(f, dict):
             continue
         aspect_key = str(f.get("aspect_key") or "").strip().lower()
-        if aspect_key and aspect_key in allowed_aspects:
-            normalized_features.append({
-                "aspect_key": aspect_key,
-                "description": str(f.get("description") or "").strip(),
-            })
-        # Ignore unexpected aspect keys instead of failing the whole narration
+        if aspect_key:
+            if aspect_key in allowed_aspects:
+                normalized_features.append({
+                    "aspect_key": aspect_key,
+                    "description": str(f.get("description") or "").strip(),
+                })
+            else:
+                unknown_aspects.append(aspect_key)
 
     normalized_work_items = []
+    unknown_candidates = []
     for wi in work_items:
         if not isinstance(wi, dict):
             continue
         candidate_id = str(wi.get("candidate_id") or "").strip()
-        if candidate_id and candidate_id in allowed_candidates:
-            normalized_work_items.append({
-                "candidate_id": candidate_id,
-                "title": str(wi.get("title") or "").strip(),
-                "description": str(wi.get("description") or "").strip(),
-                "acceptance_criteria": str(wi.get("acceptance_criteria") or "").strip(),
-                "business_value": str(wi.get("business_value") or "").strip(),
-            })
-        # Ignore unexpected candidate ids instead of failing the whole narration
+        if candidate_id:
+            if candidate_id in allowed_candidates:
+                normalized_work_items.append({
+                    "candidate_id": candidate_id,
+                    "title": str(wi.get("title") or "").strip(),
+                    "description": str(wi.get("description") or "").strip(),
+                    "acceptance_criteria": str(wi.get("acceptance_criteria") or "").strip(),
+                    "business_value": str(wi.get("business_value") or "").strip(),
+                })
+            else:
+                unknown_candidates.append(candidate_id)
+
+    # Reject if there are unknown aspects/candidates with no valid ones
+    if unknown_aspects and not normalized_features:
+        errors.append(f"Unknown aspect keys with no valid features: {unknown_aspects}")
+    if unknown_candidates and not normalized_work_items:
+        errors.append(f"Unknown candidate IDs with no valid work items: {unknown_candidates}")
 
     if errors:
         logger.warning("Narration schema validation errors: %s", errors)
