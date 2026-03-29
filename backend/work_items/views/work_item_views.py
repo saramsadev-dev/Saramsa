@@ -46,7 +46,7 @@ class WorkItemGenerationView(APIView):
 
         from billing.quota import check_quota, record_usage, QuotaExceeded
         try:
-            check_quota(request.user.id, "work_item_gen")
+            await sync_to_async(check_quota, thread_sensitive=True)(request.user.id, "work_item_gen")
         except QuotaExceeded as exc:
             return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)
 
@@ -149,7 +149,7 @@ class WorkItemGenerationView(APIView):
             devops_service.group_work_items_by_feature, thread_sensitive=True
         )(work_items)
 
-        record_usage(user_id_str, "work_item_gen")
+        await sync_to_async(record_usage, thread_sensitive=True)(user_id_str, "work_item_gen")
 
         return StandardResponse.success(data=result, message="Work items generated successfully")
 
