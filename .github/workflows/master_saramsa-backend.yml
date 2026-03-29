@@ -115,33 +115,13 @@ jobs:
           zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
           mv requirements.txt.bak requirements.txt
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_CEB11A72062649FC91488E1157CCC66B }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C697C79FBC764F689A085128FFFE94ED }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8F9192667DEA4388B79BA8566B01E14E }}
-
-      - name: Wait for any in-progress deployment
-        working-directory: .
-        run: |
-          for i in $(seq 1 6); do
-            STATUS=$(az webapp show --name saramsa-api-2026 --slot Production \
-              --query "siteConfig.publishingState" -o tsv 2>/dev/null || echo "unknown")
-            echo "Publishing state: $STATUS"
-            if [ "$STATUS" != "Publishing" ]; then
-              break
-            fi
-            echo "Deployment in progress, waiting 30s..."
-            sleep 30
-          done
-
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'saramsa-api-2026'
-          slot-name: 'Production'
+          slot-name: 'production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_692C31C194754F4D99E950165FD78B43 }}
           package: artifact/backend.zip
 
       - name: Verify backend health
