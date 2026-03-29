@@ -124,7 +124,7 @@ jobs:
           app-name: 'saramsa-api-2026'
           slot-name: 'Production'
           package: artifact/backend.zip
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_692C31C194754F4D99E950165FD78B43 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_6F22115B07E945D3A2883F8E1E1561EC }}
 
       - name: Verify backend health
         run: |
