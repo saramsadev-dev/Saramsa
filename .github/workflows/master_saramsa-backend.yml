@@ -110,10 +110,12 @@ jobs:
         run: |
           cp requirements.txt requirements.txt.bak
           cp requirements.ci.txt requirements.txt
+          cp -r ../celery_ops . || echo "celery_ops not found, skipping"
           mkdir -p ../artifact
           rm -f ../artifact/backend.zip
           zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
           mv requirements.txt.bak requirements.txt
+          rm -rf celery_ops
 
       - name: Extract publish profile credentials
         id: publish-creds
