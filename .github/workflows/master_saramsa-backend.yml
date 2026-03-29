@@ -127,6 +127,14 @@ jobs:
           echo "username=$USERNAME" >> $GITHUB_OUTPUT
           echo "password=$PASSWORD" >> $GITHUB_OUTPUT
 
+      - name: Enable Oryx build
+        run: |
+          curl -X POST \
+            -u "${{ steps.publish-creds.outputs.username }}:${{ steps.publish-creds.outputs.password }}" \
+            -H "Content-Type: application/json" \
+            -d '{"name": "SCM_DO_BUILD_DURING_DEPLOYMENT", "value": "true", "slotSetting": false}' \
+            https://saramsa-api-2026.scm.azurewebsites.net/api/settings || echo "Setting may already exist"
+
       - name: Deploy to Azure Web App
         working-directory: .
         run: |
