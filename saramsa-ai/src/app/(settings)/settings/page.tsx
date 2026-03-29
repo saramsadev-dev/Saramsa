@@ -176,13 +176,13 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">
                     {billingLoading
                       ? "Loading billing status..."
-                      : billing?.is_active
-                      ? `Active (${billing.status})`
-                      : `Not active (${billing?.status || "inactive"})`}
+                      : billing?.is_subscribed
+                      ? `Active (${billing.subscription_status ?? "subscribed"})`
+                      : `Not active (${billing?.subscription_status || "inactive"})`}
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  {!billing?.is_active && (
+                  {!billing?.is_subscribed && (
                     <Button
                       variant="saramsa"
                       size="sm"
