@@ -1,0 +1,132 @@
+name: Configure Azure App Settings
+
+on:
+  workflow_dispatch:
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract publish profile credentials
+        id: publish-creds
+        run: |
+          PUBLISH_PROFILE='${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_692C31C194754F4D99E950165FD78B43 }}'
+          USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP 'userName="[^"]*"' | head -1 | cut -d'"' -f2)
+          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)
+          echo "::add-mask::$PASSWORD"
+          echo "username=$USERNAME" >> $GITHUB_OUTPUT
+          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+
+      - name: Configure critical app settings
+        run: |
+          # Function to set app setting
+          set_setting() {
+            local name="$1"
+            local value="$2"
+            if [ -z "$value" ] || [ "$value" = "null" ]; then
+              echo "⚠️  Skipping $name (empty value)"
+              return
+            fi
+            echo "Setting $name..."
+            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST \
+              -u "${{ steps.publish-creds.outputs.username }}:${{ steps.publish-creds.outputs.password }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"name\": \"$name\", \"value\": \"$value\", \"slotSetting\": false}" \
+              https://saramsa-api-2026.scm.azurewebsites.net/api/settings 2>&1)
+
+            http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2 || echo "000")
+            if [[ "$http_code" =~ ^(200|201|204)$ ]]; then
+              echo "✅ $name set successfully"
+            else
+              echo "❌ Failed to set $name (HTTP $http_code)"
+              echo "$response" | grep -v "HTTP_CODE:"
+            fi
+          }
+
+          echo "🔧 Configuring Azure App Service settings..."
+          echo ""
+
+          # CRITICAL: Oryx build settings
+          echo "📦 Setting build configuration..."
+          set_setting "SCM_DO_BUILD_DURING_DEPLOYMENT" "true"
+          set_setting "ENABLE_ORYX_BUILD" "true"
+          set_setting "BUILD_FLAGS" "UseExpressBuild"
+          set_setting "WEBSITE_HTTPLOGGING_RETENTION_DAYS" "7"
+
+          # Django settings
+          echo ""
+          echo "🐍 Setting Django configuration..."
+          set_setting "DEBUG" "False"
+          set_setting "SECRET_KEY" "${{ secrets.SECRET_KEY }}"
+          set_setting "ALLOWED_HOSTS" "${{ vars.ALLOWED_HOSTS }}"
+          set_setting "BACKEND_BASE_URL" "https://saramsa-api-2026.azurewebsites.net"
+
+          # Database
+          echo ""
+          echo "🗄️  Setting database configuration..."
+          set_setting "DATABASE_URL" "${{ secrets.DATABASE_URL }}"
+
+          # Redis & Celery
+          echo ""
+          echo "🔴 Setting Redis & Celery configuration..."
+          set_setting "REDIS_URL" "${{ secrets.REDIS_URL }}"
+          set_setting "CELERY_BROKER_URL" "${{ secrets.CELERY_BROKER_URL }}"
+          set_setting "CELERY_RESULT_BACKEND" "${{ secrets.CELERY_RESULT_BACKEND }}"
+          set_setting "REDIS_SSL_CERT_REQS" "none"
+
+          # Azure OpenAI
+          echo ""
+          echo "🤖 Setting Azure OpenAI configuration..."
+          set_setting "AZURE_ENDPOINT_URL" "${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}"
+          set_setting "AZURE_DEPLOYMENT_NAME" "${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}"
+          set_setting "AZURE_API_KEY" "${{ secrets.AZURE_OPENAI_API_KEY }}"
+          set_setting "AZURE_API_VERSION" "${{ secrets.AZURE_OPENAI_API_VERSION }}"
+
+          # Azure DevOps
+          echo ""
+          echo "🔧 Setting Azure DevOps configuration..."
+          set_setting "AZURE_DEVOPS_ORGANIZATION" "${{ secrets.AZURE_DEVOPS_ORGANIZATION }}"
+          set_setting "AZURE_DEVOPS_PROJECT" "${{ secrets.AZURE_DEVOPS_PROJECT }}"
+          set_setting "AZURE_DEVOPS_PAT" "${{ secrets.AZURE_DEVOPS_PAT }}"
+
+          # Application Insights
+          echo ""
+          echo "📊 Setting Application Insights..."
+          set_setting "APPLICATIONINSIGHTS_CONNECTION_STRING" "${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}"
+
+          # ML Pipeline
+          echo ""
+          echo "🧠 Setting ML Pipeline configuration..."
+          set_setting "USE_LOCAL_PIPELINE" "true"
+          set_setting "LLM_MAX_CONCURRENT_REQUESTS" "8"
+
+          # Optional integrations
+          echo ""
+          echo "🔌 Setting optional integrations..."
+          set_setting "JIRA_EMAIL" "${{ secrets.JIRA_EMAIL }}"
+          set_setting "JIRA_API_TOKEN" "${{ secrets.JIRA_API_TOKEN }}"
+          set_setting "JIRA_DOMAIN" "${{ secrets.JIRA_DOMAIN }}"
+          set_setting "JIRA_PROJECT_KEY" "${{ secrets.JIRA_PROJECT_KEY }}"
+
+          set_setting "SLACK_CLIENT_ID" "${{ secrets.SLACK_CLIENT_ID }}"
+          set_setting "SLACK_CLIENT_SECRET" "${{ secrets.SLACK_CLIENT_SECRET }}"
+          set_setting "SLACK_SIGNING_SECRET" "${{ secrets.SLACK_SIGNING_SECRET }}"
+          set_setting "SLACK_REDIRECT_URI" "${{ secrets.SLACK_REDIRECT_URI }}"
+
+          set_setting "EMAIL_BACKEND" "authentication.email_backend.AzureEmailBackend"
+          set_setting "AZURE_EMAIL_CONNECTION_STRING" "${{ secrets.AZURE_EMAIL_CONNECTION_STRING }}"
+          set_setting "DEFAULT_FROM_EMAIL" "${{ secrets.DEFAULT_FROM_EMAIL }}"
+
+          set_setting "LINEAR_API_KEY" "${{ secrets.LINEAR_API_KEY }}"
+
+          echo ""
+          echo "✅ Configuration complete!"
+
+      - name: Set startup command
+        run: |
+          echo "To set the startup command, run this in Azure Portal CLI:"
+          echo "az webapp config set --resource-group <resource-group-name> --name saramsa-api-2026 --startup-file startup.sh"
+          echo ""
+          echo "Or set it manually in Azure Portal:"
+          echo "Configuration -> General settings -> Startup Command: startup.sh"
