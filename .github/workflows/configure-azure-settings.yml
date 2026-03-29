@@ -11,7 +11,7 @@ jobs:
       - name: Extract publish profile credentials
         id: publish-creds
         run: |
-          PUBLISH_PROFILE='${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_692C31C194754F4D99E950165FD78B43 }}'
+          PUBLISH_PROFILE='${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_6F22115B07E945D3A2883F8E1E1561EC }}'
           USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP 'userName="[^"]*"' | head -1 | cut -d'"' -f2)
           PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)
           echo "::add-mask::$PASSWORD"
@@ -53,6 +53,12 @@ jobs:
           set_setting "ENABLE_ORYX_BUILD" "true"
           set_setting "BUILD_FLAGS" "UseExpressBuild"
           set_setting "WEBSITE_HTTPLOGGING_RETENTION_DAYS" "7"
+          set_setting "WEBSITES_PORT" "8000"
+
+          # Gunicorn settings
+          echo ""
+          echo "🦄 Setting Gunicorn configuration..."
+          set_setting "GUNICORN_CMD_ARGS" "--timeout 600 --workers 4"
 
           # Django settings
           echo ""
