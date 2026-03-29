@@ -12,8 +12,7 @@ class AiCoreConfig(AppConfig):
             # Test Azure OpenAI connection on startup
             from .services.openai_client import get_azure_client
             client = get_azure_client()
-            # Don't test connection on startup to avoid blocking Django startup
-            # Connection will be tested on first use
+
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
