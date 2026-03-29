@@ -115,25 +115,12 @@ jobs:
           zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
           mv requirements.txt.bak requirements.txt
 
-      - name: Extract publish profile credentials
-        id: publish-creds
-        run: |
-          PUBLISH_PROFILE='${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_692C31C194754F4D99E950165FD78B43 }}'
-          USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP 'userName="[^"]*"' | head -1 | cut -d'"' -f2)
-          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP 'userPWD="[^"]*"' | head -1 | cut -d'"' -f2)
-          echo "::add-mask::$PASSWORD"
-          echo "username=$USERNAME" >> $GITHUB_OUTPUT
-          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
-
       - name: Deploy to Azure Web App
-        working-directory: .
-        run: |
-          ls -la artifact/
-          curl -X POST \
-            -u "${{ steps.publish-creds.outputs.username }}:${{ steps.publish-creds.outputs.password }}" \
-            --data-binary @artifact/backend.zip \
-            -H "Content-Type: application/zip" \
-            https://saramsa-api-2026.scm.azurewebsites.net/api/zipdeploy
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'saramsa-api-2026'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_692C31C194754F4D99E950165FD78B43 }}
+          package: artifact/backend.zip
 
       - name: Verify backend health
         env:
