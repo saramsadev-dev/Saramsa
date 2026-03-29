@@ -120,7 +120,6 @@ jobs:
         id: deploy-to-webapp
         with:
           app-name: 'saramsa-api-2026'
-          slot-name: 'production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_692C31C194754F4D99E950165FD78B43 }}
           package: artifact/backend.zip
 
