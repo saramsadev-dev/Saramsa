@@ -41,17 +41,7 @@ jobs:
             }
           }' requirements.txt > requirements.ci.txt
 
-      - name: Cache virtualenv
-        id: cache-venv
-        uses: actions/cache@v4
-        with:
-          path: backend/.venv
-          key: venv-backend-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/requirements.txt') }}
-          restore-keys: |
-            venv-backend-py${{ steps.setup-python.outputs.python-version }}-
-
       - name: Install dependencies
-        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           python -m venv .venv
           source .venv/bin/activate
