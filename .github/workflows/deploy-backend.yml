@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -49,13 +50,19 @@ jobs:
           zip -r ../backend-deploy.zip . \
             -x '*.pyc' '*__pycache__*' '.venv/*' 'venv/*' '*/venv/*' '.env'
 
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_5AA83B24C1FA484CB4FE8149B2A0FA57 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_77B632439F9B4DB5825C585887305C0F }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_3CC842748D5F4E618A70FC57A7E846D1 }}
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'saramsa-backend-api'
           slot-name: 'Production'
           package: backend-deploy.zip
-          publish-profile: ${{ secrets.SARAMSA_BACKEND_API_PUBLISH_PROFILE }}
 
       - name: Wait for Oryx build and startup
         run: |
