@@ -1,21 +1,24 @@
 #!/bin/bash
 set -e
 
-echo "Starting Django application..."
+echo "Starting Saramsa API..."
+echo "Current directory: $(pwd)"
+echo "Contents: $(ls -la | head -10)"
+
+# Change to the application directory
 cd /home/site/wwwroot
 
-echo "Current directory: $(pwd)"
-echo "Directory contents:"
-ls -la
+echo "Changed to: $(pwd)"
+echo "Files here: $(ls -la | head -20)"
 
-# Run migrations
-echo "Running database migrations..."
-python manage.py migrate --noinput
-
-# Collect static files
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
+# Verify apis module exists
+if [ -d "apis" ]; then
+    echo "✓ apis directory found"
+else
+    echo "✗ ERROR: apis directory not found!"
+    exit 1
+fi
 
 # Start Gunicorn
 echo "Starting Gunicorn..."
-exec gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers 4 apis.wsgi:application
+exec gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers 2 --access-logfile - --error-logfile - --log-level info --chdir /home/site/wwwroot apis.wsgi:application
