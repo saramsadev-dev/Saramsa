@@ -11,8 +11,8 @@ class ApisConfig(AppConfig):
     verbose_name = 'Core API Services'
 
     def ready(self):
-        """Log infrastructure connectivity on startup."""
-        self._log_redis_status()
+        """App startup — heavy probes are deferred to first request."""
+        pass  # Redis connectivity is verified on first cache access
 
     # ------------------------------------------------------------------
     @staticmethod

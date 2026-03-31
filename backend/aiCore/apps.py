@@ -7,13 +7,5 @@ class AiCoreConfig(AppConfig):
     verbose_name = 'AI Core Services'
     
     def ready(self):
-        """Initialize AI services when Django starts."""
-        try:
-            from .services.openai_client import get_azure_client
-            client = get_azure_client()
-
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"AI Core initialization warning: {e}")
-            # Don't raise exception to allow Django to start even if AI is not configured
+        """AI Core app startup — client is initialized lazily on first use."""
+        pass  # Azure OpenAI client is created on first call to get_azure_client()
