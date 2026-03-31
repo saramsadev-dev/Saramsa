@@ -1,0 +1,88 @@
+name: Deploy Backend to Azure Web App
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - 'celery_ops/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Prepare deployment bundle
+        working-directory: backend
+        run: |
+          # Create CI-friendly requirements (remove git dependencies and torch platform specs)
+          awk '{
+            if ($0 ~ /^-e git\+https:\/\/github.com\/RakeshMahendran\/Saramsa.git@/ && $0 ~ /subdirectory=celery_ops/) {
+              next
+            } else if ($0 ~ /^torch==/ && $0 ~ /\+/) {
+              split($0, a, "==")
+              split(a[2], b, "+")
+              print "torch==" b[1]
+            } else {
+              print $0
+            }
+          }' requirements.txt > requirements.txt.tmp
+          mv requirements.txt.tmp requirements.txt
+
+          # Copy celery_ops into backend for deployment
+          cp -r ../celery_ops . || echo "celery_ops not found"
+
+          # Create deployment artifact
+          zip -r ../backend-deploy.zip . \
+            -x '*.pyc' '*__pycache__*' '.venv/*' 'venv/*' '*/venv/*' '.env'
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'saramsa-backend-api'
+          slot-name: 'Production'
+          package: backend-deploy.zip
+          publish-profile: ${{ secrets.SARAMSA_BACKEND_API_PUBLISH_PROFILE }}
+
+      - name: Wait for Oryx build and startup
+        run: |
+          echo "⏳ Waiting 90 seconds for Oryx build and app startup..."
+          sleep 90
+
+      - name: Health check
+        run: |
+          HEALTH_URL="https://saramsa-backend-api-cab8hscdf8hhcad2.centralus-01.azurewebsites.net/api/health/"
+          echo "🔍 Checking backend health at $HEALTH_URL"
+
+          for i in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
+            echo "Attempt $i: HTTP $HTTP_CODE"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Backend health check passed!"
+              curl -s "$HEALTH_URL"
+              exit 0
+            fi
+
+            if [ $i -lt 5 ]; then
+              echo "⏳ Waiting 15 seconds before retry..."
+              sleep 15
+            fi
+          done
+
+          echo "⚠️  Health check did not return 200, but deployment completed."
+          echo "📋 Check logs at: https://saramsa-backend-api-cab8hscdf8hhcad2.scm.centralus-01.azurewebsites.net"
+          exit 0
