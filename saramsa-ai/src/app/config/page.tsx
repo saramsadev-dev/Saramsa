@@ -18,7 +18,7 @@ export default function ConfigPage() {
   const dispatch = useDispatch<AppDispatch>();
   const [selectedPlatform, setSelectedPlatform] = useState<'azure' | 'jira' | null>(null);
 
-  // Fetch integration accounts once at the parent level
+  // checkk Fetch integration accounts once at the parent level
   useEffect(() => {
     forceUnlockBodyScroll();
     dispatch(fetchIntegrationAccounts());
