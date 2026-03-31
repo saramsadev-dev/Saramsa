@@ -13,9 +13,6 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
 
     defaults:
       run:
@@ -118,13 +115,6 @@ jobs:
           mv requirements.txt.bak requirements.txt
           rm -rf celery_ops
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_SARAMSA_BACKEND_PROD }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_SARAMSA_BACKEND_PROD }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_SARAMSA_BACKEND_PROD }}
-
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
@@ -132,6 +122,7 @@ jobs:
           app-name: 'saramsa-backend-prod'
           slot-name: 'Production'
           package: artifact/backend.zip
+          publish-profile: ${{ secrets.SARAMSA_BACKEND_PROD_PUBLISH_PROFILE }}
 
       - name: Verify backend health
         env:
