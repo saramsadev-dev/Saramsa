@@ -104,10 +104,14 @@
 
 ## 🚀 **Current Deployment Status**
 
-**Run ID:** 23780380792
+**Run ID:** 23780522788
 **Status:** 🟡 IN PROGRESS
-**Started:** 2026-03-31 04:24:39 UTC
-**Monitor:** https://github.com/saramsadev-dev/Saramsa/actions/runs/23780380792
+**Started:** 2026-03-31 04:30:17 UTC
+**Monitor:** https://github.com/saramsadev-dev/Saramsa/actions/runs/23780522788
+
+**Previous Attempt:** Run 23780380792 FAILED
+**Reason:** Wrong workflow with incorrect OIDC credentials
+**Fix Applied:** Disabled old workflow, activated correct one
 
 **Expected Timeline:**
 - Tests: ~2-3 minutes
@@ -126,10 +130,13 @@
 ❌ Cached dependencies in CI (0 seconds install = nothing installed)
 ❌ Wrong startup commands
 ❌ Missing environment variables
+❌ Multiple conflicting workflows with wrong OIDC credentials
 
 ### **Now Fixed:**
 ✅ Fresh Azure Web App with complete configuration
-✅ OIDC authentication (no publish profile issues)
+✅ OIDC authentication with proper federated credentials
+✅ Correct workflow file (`deploy-saramsa-backend-prod.yml`)
+✅ Old conflicting workflows disabled
 ✅ Proper dependency installation via Oryx
 ✅ Tests run before deployment
 ✅ Health checks verify deployment success
