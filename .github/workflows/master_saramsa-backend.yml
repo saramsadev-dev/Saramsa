@@ -110,42 +110,58 @@ jobs:
         run: |
           cp requirements.txt requirements.txt.bak
           cp requirements.ci.txt requirements.txt
-          cp -r ../celery_ops . || echo "celery_ops not found, skipping"
           mkdir -p ../artifact
           rm -f ../artifact/backend.zip
           zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
           mv requirements.txt.bak requirements.txt
-          rm -rf celery_ops
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_CEB11A72062649FC91488E1157CCC66B }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C697C79FBC764F689A085128FFFE94ED }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8F9192667DEA4388B79BA8566B01E14E }}
+
+      - name: Wait for any in-progress deployment
+        working-directory: .
+        run: |
+          for i in $(seq 1 6); do
+            STATUS=$(az webapp show --name saramsa-backend --slot Production \
+              --query "siteConfig.publishingState" -o tsv 2>/dev/null || echo "unknown")
+            echo "Publishing state: $STATUS"
+            if [ "$STATUS" != "Publishing" ]; then
+              break
+            fi
+            echo "Deployment in progress, waiting 30s..."
+            sleep 30
+          done
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'saramsa-api-2026'
+          app-name: 'saramsa-backend'
           slot-name: 'Production'
           package: artifact/backend.zip
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_6F22115B07E945D3A2883F8E1E1561EC }}
 
       - name: Verify backend health
+        env:
+          HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
-          echo "Waiting 120 seconds for Oryx build and app startup..."
-          sleep 120
+          if [ -z "$HEALTH_URL" ]; then
+            echo "BACKEND_HEALTH_URL is not set; failing workflow."
+            exit 1
+          fi
 
-          HEALTH_URL="https://saramsa-api-2026.azurewebsites.net/api/health/"
           echo "Checking backend health at $HEALTH_URL"
-
-          for i in 1 2 3 4 5; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
-            echo "Attempt $i: HTTP $HTTP_CODE"
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Backend health check succeeded!"
-              curl -s "$HEALTH_URL"
+          for i in 1 2 3; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo "Backend health check succeeded."
               exit 0
             fi
-            echo "Waiting 20 seconds before retry..."
-            sleep 20
+            echo "Health check attempt $i failed, retrying in 10s..."
+            sleep 10
           done
 
-          echo "❌ Backend health check failed after 5 attempts."
-          echo "Check deployment logs at: https://saramsa-api-2026.scm.azurewebsites.net"
+          echo "Backend health check failed after 3 attempts."
           exit 1
