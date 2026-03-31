@@ -121,3 +121,4 @@ dmypy.json
 
 # Specific files to ignore
 pyvenv.cfg 
+saramsa-api-settings.json
