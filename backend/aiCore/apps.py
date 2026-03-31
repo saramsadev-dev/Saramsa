@@ -9,7 +9,6 @@ class AiCoreConfig(AppConfig):
     def ready(self):
         """Initialize AI services when Django starts."""
         try:
-            # Test Azure OpenAI connection on startup
             from .services.openai_client import get_azure_client
             client = get_azure_client()
 
