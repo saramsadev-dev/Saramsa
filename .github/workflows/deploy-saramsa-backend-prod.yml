@@ -1,0 +1,167 @@
+name: Deploy Backend (saramsa-backend-prod)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - 'celery_ops/**'
+      - '.github/workflows/deploy-saramsa-backend-prod.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Prepare CI requirements
+        run: |
+          awk '{
+            if ($0 ~ /^-e git\+https:\/\/github.com\/RakeshMahendran\/Saramsa.git@/ && $0 ~ /subdirectory=celery_ops/) {
+              next
+            } else if ($0 ~ /^torch==/ && $0 ~ /\+/) {
+              split($0, a, "==")
+              split(a[2], b, "+")
+              print "torch==" b[1]
+            } else {
+              print $0
+            }
+          }' requirements.txt > requirements.ci.txt
+
+      - name: Cache virtualenv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-backend-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            venv-backend-py${{ steps.setup-python.outputs.python-version }}-
+
+      - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.ci.txt
+
+      - name: Run Django tests
+        env:
+          DJANGO_SETTINGS_MODULE: apis.settings
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALLOWED_HOSTS: ${{ vars.ALLOWED_HOSTS }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
+          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
+          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          source .venv/bin/activate
+          export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
+          export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret is required for backend tests."
+            exit 1
+          fi
+          python manage.py test --keepdb
+
+      - name: Run Django collectstatic
+        env:
+          DJANGO_SETTINGS_MODULE: apis.settings
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ALLOWED_HOSTS: ${{ vars.ALLOWED_HOSTS }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AZURE_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_ENDPOINT_URL: ${{ secrets.AZURE_OPENAI_ENDPOINT_URL }}
+          AZURE_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+          AZURE_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          AZURE_DEVOPS_ORGANIZATION: ${{ secrets.AZURE_DEVOPS_ORGANIZATION }}
+          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          source .venv/bin/activate
+          export SECRET_KEY="${SECRET_KEY:-ci-build-secret-key-not-for-prod}"
+          export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret is required for collectstatic."
+            exit 1
+          fi
+          python manage.py collectstatic --noinput
+
+      - name: Create deployment bundle
+        run: |
+          cp requirements.txt requirements.txt.bak
+          cp requirements.ci.txt requirements.txt
+          cp -r ../celery_ops . || echo "celery_ops already in backend/"
+          mkdir -p ../artifact
+          rm -f ../artifact/backend.zip
+          zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
+          mv requirements.txt.bak requirements.txt
+          rm -rf celery_ops
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_SARAMSA_BACKEND_PROD }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_SARAMSA_BACKEND_PROD }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_SARAMSA_BACKEND_PROD }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        id: deploy-to-webapp
+        with:
+          app-name: 'saramsa-backend-prod'
+          slot-name: 'Production'
+          package: artifact/backend.zip
+
+      - name: Verify backend health
+        env:
+          HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL_PROD }}
+        run: |
+          if [ -z "$HEALTH_URL" ]; then
+            echo "BACKEND_HEALTH_URL_PROD is not set; skipping health check."
+            exit 0
+          fi
+
+          echo "⏳ Waiting 90 seconds for Oryx build and app startup..."
+          sleep 90
+
+          echo "🔍 Checking backend health at $HEALTH_URL"
+          for i in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
+            echo "Attempt $i/5: HTTP $HTTP_CODE"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Backend health check succeeded!"
+              curl -s "$HEALTH_URL"
+              exit 0
+            fi
+
+            if [ $i -lt 5 ]; then
+              echo "⏳ Waiting 20 seconds before retry..."
+              sleep 20
+            fi
+          done
+
+          echo "⚠️ Health check did not return 200 after 5 attempts."
+          echo "📋 Check logs at: https://saramsa-backend-prod.scm.azurewebsites.net"
+          exit 0
