@@ -13,6 +13,9 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
 
     defaults:
       run:
@@ -41,7 +44,17 @@ jobs:
             }
           }' requirements.txt > requirements.ci.txt
 
+      - name: Cache virtualenv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-backend-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            venv-backend-py${{ steps.setup-python.outputs.python-version }}-
+
       - name: Install dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           python -m venv .venv
           source .venv/bin/activate
@@ -98,7 +111,7 @@ jobs:
         run: |
           cp requirements.txt requirements.txt.bak
           cp requirements.ci.txt requirements.txt
-          cp -r ../celery_ops . || echo "celery_ops already in backend/"
+          cp -r ../celery_ops . || echo "celery_ops not found, skipping"
           mkdir -p ../artifact
           rm -f ../artifact/backend.zip
           zip -1 -r ../artifact/backend.zip . -x '.venv/*' 'venv/*' '*/venv/*' '*__pycache__*' '*.pyc'
@@ -115,34 +128,25 @@ jobs:
           publish-profile: ${{ secrets.SARAMSA_BACKEND_PROD_PUBLISH_PROFILE }}
 
       - name: Verify backend health
-        env:
-          HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL_PROD }}
         run: |
-          if [ -z "$HEALTH_URL" ]; then
-            echo "BACKEND_HEALTH_URL_PROD is not set; skipping health check."
-            exit 0
-          fi
+          echo "Waiting 120 seconds for Oryx build and app startup..."
+          sleep 120
 
-          echo "⏳ Waiting 90 seconds for Oryx build and app startup..."
-          sleep 90
+          HEALTH_URL="https://saramsa-backend-prod.azurewebsites.net/api/health/"
+          echo "Checking backend health at $HEALTH_URL"
 
-          echo "🔍 Checking backend health at $HEALTH_URL"
           for i in 1 2 3 4 5; do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
-            echo "Attempt $i/5: HTTP $HTTP_CODE"
-
+            echo "Attempt $i: HTTP $HTTP_CODE"
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Backend health check succeeded!"
               curl -s "$HEALTH_URL"
               exit 0
             fi
-
-            if [ $i -lt 5 ]; then
-              echo "⏳ Waiting 20 seconds before retry..."
-              sleep 20
-            fi
+            echo "Waiting 20 seconds before retry..."
+            sleep 20
           done
 
-          echo "⚠️ Health check did not return 200 after 5 attempts."
-          echo "📋 Check logs at: https://saramsa-backend-prod.scm.azurewebsites.net"
-          exit 0
+          echo "❌ Backend health check failed after 5 attempts."
+          echo "Check deployment logs at: https://saramsa-backend-prod.scm.azurewebsites.net"
+          exit 1
