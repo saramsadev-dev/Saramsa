@@ -29,7 +29,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
-
+// #checkkkk
       return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8">
           <h2 className="text-xl font-semibold text-red-600">Something went wrong</h2>
