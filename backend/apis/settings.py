@@ -19,6 +19,8 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
 
 
 DEBUG = _as_bool(os.getenv('DEBUG', 'False'))
+# Expose GET /api/schema/ when True (needed for CI registry sync against production). Swagger UI stays DEBUG-only.
+ENABLE_OPENAPI_SCHEMA = _as_bool(os.getenv('ENABLE_OPENAPI_SCHEMA', 'False'))
 SECRET_KEY = os.getenv('SECRET_KEY', '')
 if not SECRET_KEY:
     if DEBUG:

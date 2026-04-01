@@ -55,14 +55,17 @@ urlpatterns = [
 
 ]
 
-if settings.DEBUG:
-    from drf_spectacular.views import (
-        SpectacularAPIView,
-        SpectacularSwaggerView,
-        SpectacularRedocView,
-    )
+if settings.DEBUG or settings.ENABLE_OPENAPI_SCHEMA:
+    from drf_spectacular.views import SpectacularAPIView
+
     urlpatterns += [
         path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    ]
+
+if settings.DEBUG:
+    from drf_spectacular.views import SpectacularSwaggerView, SpectacularRedocView
+
+    urlpatterns += [
         path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
         path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     ]
