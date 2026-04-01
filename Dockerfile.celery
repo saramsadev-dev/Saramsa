@@ -12,7 +12,8 @@ WORKDIR /app
 COPY backend/ ./
 
 # Collect Django static files (dummy env vars — only needed to load settings module)
-RUN AZURE_API_KEY=x AZURE_ENDPOINT_URL=x AZURE_DEPLOYMENT_NAME=x \
+RUN SECRET_KEY=build-dummy DEBUG=True \
+    AZURE_API_KEY=x AZURE_ENDPOINT_URL=x AZURE_DEPLOYMENT_NAME=x \
     AZURE_API_VERSION=x AZURE_DEVOPS_ORGANIZATION=x AZURE_DEVOPS_PROJECT=x \
     AZURE_DEVOPS_PAT=x DJANGO_SETTINGS_MODULE=apis.settings \
     python manage.py collectstatic --noinput
