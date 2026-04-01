@@ -347,10 +347,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-    'https://saramsa-fe.azurewebsites.net',
-    'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
-    'https://saramsa-chi.vercel.app',
-    'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
+    'https://saramsa-ai.vercel.app',
 ]
 if DEBUG:
     CORS_ALLOWED_ORIGINS += [
@@ -385,10 +382,7 @@ CORS_ALLOW_HEADERS = [
 
 # Trust requests coming from the static frontend domain (needed for some POSTs)
 CSRF_TRUSTED_ORIGINS = [
-    'https://saramsa-fe.azurewebsites.net',
-    'https://mango-pebble-0a60bb60f.3.azurestaticapps.net',
-    'https://saramsa-chi.vercel.app',
-    'https://saramsa-r4pmpubsw-rakeshmahendrans-projects.vercel.app',
+    'https://saramsa-ai.vercel.app',
 ]
 if DEBUG:
     CSRF_TRUSTED_ORIGINS += [
