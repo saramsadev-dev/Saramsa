@@ -2,30 +2,14 @@
 # Uses the pre-built base image (Dockerfile.celery-base) for fast builds.
 # Only rebuilds when application code changes (~2-3 min).
 
-# Global ARG — must be before the first FROM to be available in FROM directives
-ARG BASE_IMAGE
+ARG BASE_IMAGE=saramsa/saramsa-celery-base:latest
 
-# ── Stage 1: Build Celery Ops React UI ──────────────────────────────
-FROM node:20-alpine AS ui-builder
-WORKDIR /app
-COPY celery_ops/celery_ops/ui/react/package.json celery_ops/celery_ops/ui/react/package-lock.json ./
-RUN npm install
-COPY celery_ops/celery_ops/ui/react/ ./
-RUN npm run build
-
-# ── Stage 2: Application ────────────────────────────────────────────
 FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
-# Copy backend code
+# Copy backend code (includes celery_ops/ inside backend/)
 COPY backend/ ./
-
-# Copy celery_ops package (start_celery.py expects it at ./celery_ops/)
-COPY celery_ops/ ./celery_ops/
-
-# Copy built React UI into the celery_ops package
-COPY --from=ui-builder /app/build ./celery_ops/celery_ops/ui/react/build/
 
 # Collect Django static files (dummy env vars — only needed to load settings module)
 RUN AZURE_API_KEY=x AZURE_ENDPOINT_URL=x AZURE_DEPLOYMENT_NAME=x \

@@ -1,0 +1,102 @@
+name: Deploy Celery Worker (master)
+
+# Triggers when backend code or celery_ops changes on master
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - 'celery_ops/**'
+      - 'Dockerfile.celery'
+      - 'Dockerfile.celery-base'
+      - '.github/workflows/deploy-celery-prod.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Only rebuild base image if requirements changed
+      - name: Check if base image needs rebuild
+        id: check-base
+        run: |
+          BASE_HASH=$(cat backend/requirements.txt backend/requirements-ml.txt | sha256sum | cut -d' ' -f1)
+          echo "base_hash=${BASE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "Base image hash: ${BASE_HASH}"
+          # Try to pull existing base image — if it exists, skip rebuild
+          if docker pull saramsa/saramsa-celery-base:${BASE_HASH} 2>/dev/null; then
+            echo "needs_rebuild=false" >> "$GITHUB_OUTPUT"
+            docker tag saramsa/saramsa-celery-base:${BASE_HASH} saramsa/saramsa-celery-base:latest
+          else
+            echo "needs_rebuild=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build base image (only if requirements changed)
+        if: steps.check-base.outputs.needs_rebuild == 'true'
+        run: |
+          docker build \
+            -t saramsa/saramsa-celery-base:latest \
+            -t saramsa/saramsa-celery-base:${{ steps.check-base.outputs.base_hash }} \
+            -f Dockerfile.celery-base .
+
+      - name: Push base image (only if rebuilt)
+        if: steps.check-base.outputs.needs_rebuild == 'true'
+        run: |
+          docker push saramsa/saramsa-celery-base:latest
+          docker push saramsa/saramsa-celery-base:${{ steps.check-base.outputs.base_hash }}
+
+      # Always rebuild app image (code changes)
+      - name: Build app image
+        run: |
+          docker build \
+            -t saramsa/saramsa-celery:latest \
+            -t saramsa/saramsa-celery:${{ github.sha }} \
+            --build-arg BASE_IMAGE=saramsa/saramsa-celery-base:latest \
+            -f Dockerfile.celery .
+
+      - name: Push app image
+        run: |
+          docker push saramsa/saramsa-celery:latest
+          docker push saramsa/saramsa-celery:${{ github.sha }}
+
+      # Tell Azure to pull the new image
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_7ADE099664754A3C99E76F74337232B6 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_8CDDA0EE23EE4F6186145892542CA1A2 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_6E7B017B418A430AB1197545CF11F07F }}
+
+      - name: Restart Celery app to pull new image
+        run: |
+          az webapp restart --name saramsa-celery-prod --resource-group saramsa
+          echo "Restarted saramsa-celery-prod — pulling new image..."
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for container to start..."
+          sleep 30
+          for i in $(seq 1 5); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://saramsa-celery-prod.azurewebsites.net/)
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Celery app is healthy!"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "WARNING: App not responding after 5 attempts"
+          exit 1
