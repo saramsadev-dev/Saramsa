@@ -37,12 +37,12 @@ jobs:
           API_BASE_URL_VAR: ${{ vars.API_BASE_URL }}
           BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
-          # Derive API_BASE_URL from available secrets/vars
-          if [ -n "$BACKEND_HEALTH_URL" ]; then
+          # Prefer explicit API base URL; only derive from BACKEND_HEALTH_URL if unset.
+          # (Stale BACKEND_HEALTH_URL must not override a correct API_BASE_URL secret.)
+          API_BASE_URL="${API_BASE_URL_SECRET:-$API_BASE_URL_VAR}"
+          if [ -z "$API_BASE_URL" ] && [ -n "$BACKEND_HEALTH_URL" ]; then
             API_BASE_URL="${BACKEND_HEALTH_URL%/api/health/}"
             API_BASE_URL="${API_BASE_URL%/api/health}"
-          else
-            API_BASE_URL="${API_BASE_URL_SECRET:-$API_BASE_URL_VAR}"
           fi
 
           # Ensure https scheme
@@ -67,7 +67,15 @@ jobs:
       - name: Verify backend is reachable
         run: |
           echo "Checking backend health at: $API_BASE_URL/api/health/"
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$API_BASE_URL/api/health/" || echo "000")
+          # Do not use `curl ... || echo 000`: on DNS/connection failure curl still prints
+          # %{http_code} (000) to stdout, then `echo 000` runs → "000000" and the check never fails.
+          set +e
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$API_BASE_URL/api/health/")
+          curl_exit=$?
+          set -e
+          if [ "$curl_exit" -ne 0 ]; then
+            HTTP_CODE="000"
+          fi
           if [ "$HTTP_CODE" = "000" ]; then
             echo "::error::Backend is unreachable at $API_BASE_URL/api/health/ — check that the server is running and the URL is correct."
             exit 1
