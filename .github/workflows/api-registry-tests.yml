@@ -1,12 +1,11 @@
 name: API Registry Tests
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'backend/**'
-      - '.github/workflows/api-registry-tests.yml'
+  # Run after deployment completes (avoids race condition where tests run before deploy finishes)
+  workflow_run:
+    workflows: ["Saramsa-api (master)"]
+    types:
+      - completed
   pull_request:
     paths:
       - 'backend/**'
@@ -16,6 +15,8 @@ on:
 jobs:
   api-registry-tests:
     runs-on: ubuntu-latest
+    # Only run if deployment succeeded (or if manually triggered / PR)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
 
@@ -67,20 +68,40 @@ jobs:
       - name: Verify backend is reachable
         run: |
           echo "Checking backend health at: $API_BASE_URL/api/health/"
-          # Do not use `curl ... || echo 000`: on DNS/connection failure curl still prints
-          # %{http_code} (000) to stdout, then `echo 000` runs → "000000" and the check never fails.
-          set +e
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$API_BASE_URL/api/health/")
-          curl_exit=$?
-          set -e
-          if [ "$curl_exit" -ne 0 ]; then
-            HTTP_CODE="000"
-          fi
+          echo "Note: Azure App Service may need time to warm up from cold start..."
+
+          # Retry up to 3 times with 30-second timeout each (handles cold starts)
+          MAX_RETRIES=3
+          RETRY_DELAY=10
+          TIMEOUT=30
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES..."
+            set +e
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time $TIMEOUT "$API_BASE_URL/api/health/")
+            curl_exit=$?
+            set -e
+
+            if [ "$curl_exit" -ne 0 ]; then
+              HTTP_CODE="000"
+            fi
+
+            if [ "$HTTP_CODE" = "000" ]; then
+              echo "⚠️  Backend unreachable (attempt $i/$MAX_RETRIES)"
+              if [ "$i" -lt "$MAX_RETRIES" ]; then
+                echo "Waiting ${RETRY_DELAY}s before retry..."
+                sleep $RETRY_DELAY
+              fi
+            else
+              echo "✅ Backend responded with HTTP $HTTP_CODE"
+              break
+            fi
+          done
+
           if [ "$HTTP_CODE" = "000" ]; then
-            echo "::error::Backend is unreachable at $API_BASE_URL/api/health/ — check that the server is running and the URL is correct."
+            echo "::error::Backend is unreachable at $API_BASE_URL/api/health/ after $MAX_RETRIES attempts — check that the server is running and the URL is correct."
             exit 1
           fi
-          echo "Backend responded with HTTP $HTTP_CODE"
 
       - name: Sync registry from Swagger
         env:
