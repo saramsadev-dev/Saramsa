@@ -35,7 +35,7 @@ import {
 
 import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
-import { Check, Sparkles } from 'lucide-react';
+import { Check, Loader2, Sparkles } from 'lucide-react';
 import { UploadPanel } from './UploadPanel';
 import { SlackChannelPanel } from './SlackChannelPanel';
 import { MetricsCards } from './MetricsCards';
@@ -109,8 +109,9 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
   const { projects, loading: projectsLoading } = useSelector((state: RootState) => state.projects);
   const { accounts: integrationAccounts, loading: integrationsLoading } = useSelector((state: RootState) => state.integrations);
   const { user } = useSelector((state: RootState) => state.auth);
-  const { 
-    currentProjectUserStories, 
+  const {
+    currentProjectUserStories,
+    loading: userStoriesLoading,
   } = useSelector((state: RootState) => state.userStories);
   
   const [activeView, setActiveView] = useState<'dashboard' | 'user-stories'>('dashboard');
@@ -155,6 +156,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     initialSelectionAppliedRef.current = initialSelectedAnalysisId;
   }, [dispatch, initialSelectedAnalysisId]);
   const [wordCloudView, setWordCloudView] = useState<'split' | 'advanced'>('split');
+  const [resultsTab, setResultsTab] = useState<'insights' | 'workitems'>('insights');
 
   const projectId = typeof window !== 'undefined' ? localStorage.getItem('project_id') : null;
   const selectedProjectName = projects?.find((p: any) => p.id === (currentProjectId || projectId))?.name;
@@ -182,6 +184,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       isAnalyzing ||
       !!selectedAnalysisId?.startsWith('analyzing_'),
     [fetchingAnalysisById, isAnalyzing, selectedAnalysisId]
+  );
+
+  const workItemsPanelLoading = useMemo(
+    () =>
+      isTaskViewLoading ||
+      userStoriesLoading ||
+      isGeneratingUserStories,
+    [isTaskViewLoading, userStoriesLoading, isGeneratingUserStories]
   );
   const selectedPlatform = useMemo((): 'azure' | 'jira' | null => {
     if (!projects || !projects.length) return null;
@@ -904,6 +914,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
         // The result is already in the correct format, just use it directly
         dispatch(setAnalysisData(payload));
 
+        // Trigger usage badge refresh after successful analysis
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('usage-updated'));
+        }
+
         // Replace the temporary "analyzing" entry with the real one
         if (payload.id) {
           const counts = payload.analysisData?.counts ?? {};
@@ -1014,8 +1029,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
             projectId: effectiveProjectId || undefined,
             projectMetadata: jiraProjectMetadata
           })).unwrap();
-          
-          
+
+          // Trigger usage badge refresh after work items generation
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('usage-updated'));
+          }
+
           // Fetch the persisted user stories from the backend after successful generation
           if (effectiveProjectId && user?.id) {
             const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
@@ -1024,7 +1043,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
             setTimeout(() => {
               dispatch(fetchUserStoriesByProject({ 
                 projectId: formattedProjectId,
-                userId: user.id || user.user_id || user.username
+                userId: user.id || user.user_id
               }));
             }, 1000);
           }
@@ -1085,7 +1104,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
             processTemplate,
             projectId: effectiveProjectId || undefined
           })).unwrap();
-          
+
+          // Trigger usage badge refresh after work items generation
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('usage-updated'));
+          }
+
           if (workItemsResult?.work_items && workItemsResult.work_items.length > 0) {
             // Structure the data properly for the UserStories component
             const structuredData = {
@@ -1105,7 +1129,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
               setTimeout(() => {
                 dispatch(fetchUserStoriesByProject({ 
                   projectId: formattedProjectId,
-                  userId: user.id || user.user_id || user.username
+                  userId: user.id || user.user_id
                 }));
               }, 1000);
             }
@@ -1122,8 +1146,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
             processTemplate,
             projectId: effectiveProjectId || undefined
           })).unwrap();
-          
-          
+
+          // Trigger usage badge refresh after work items generation
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('usage-updated'));
+          }
+
           // Set the generated work items in the store
           if (workItemsResult.work_items) {
             // Structure the data properly for the UserStories component
@@ -1143,7 +1171,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
               setTimeout(() => {
                 dispatch(fetchUserStoriesByProject({ 
                   projectId: formattedProjectId,
-                  userId: user.id || user.user_id || user.username
+                  userId: user.id || user.user_id
                 }));
               }, 1000);
             }
@@ -1172,7 +1200,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
         setTimeout(() => {
           dispatch(fetchUserStoriesByProject({ 
             projectId: formattedProjectId,
-            userId: user.id || user.user_id || user.username
+            userId: user.id || user.user_id
           }));
         }, 1000);
       }
@@ -1353,7 +1381,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
   }));
 
 
-  // Enhanced colorful metrics
   const metrics = [
     {
       title: "Total Comments",
@@ -1368,7 +1395,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       description: "Comments with positive sentiment"
     },
     {
-      title: "Negative Comments", 
+      title: "Negative Comments",
       value: String(activeAnalysisData?.analysisData?.counts?.negative ?? 0),
       color: "red" as const,
       description: "Comments with negative sentiment"
@@ -1605,6 +1632,52 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                 </div>
               )}
 
+              <div className="flex w-full min-w-0 justify-end py-1">
+                <div
+                  role="tablist"
+                  aria-label="Analysis results"
+                  className="flex w-fit shrink-0 rounded-xl bg-secondary/60 p-1"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={resultsTab === 'insights'}
+                    id="tab-insights"
+                    aria-controls="panel-insights"
+                    onClick={() => setResultsTab('insights')}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                      resultsTab === 'insights'
+                        ? 'bg-background/90 text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Insights
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={resultsTab === 'workitems'}
+                    id="tab-workitems"
+                    aria-controls="panel-workitems"
+                    onClick={() => setResultsTab('workitems')}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                      resultsTab === 'workitems'
+                        ? 'bg-background/90 text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Work items
+                  </button>
+                </div>
+              </div>
+
+              {resultsTab === 'insights' && (
+              <div
+                id="panel-insights"
+                role="tabpanel"
+                aria-labelledby="tab-insights"
+                className="space-y-6"
+              >
               {isTaskViewLoading ? (
                 <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
                   <div className="flex items-center justify-between">
@@ -1618,7 +1691,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                       {analysisProgressUi?.label || 'Loading'}
                     </span>
                   </div>
-                  <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
                     <div className="h-20 rounded-xl border border-border/60 bg-secondary/40 animate-pulse" />
                     <div className="h-20 rounded-xl border border-border/60 bg-secondary/40 animate-pulse" />
                     <div className="h-20 rounded-xl border border-border/60 bg-secondary/40 animate-pulse" />
@@ -1654,20 +1727,108 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                   )}
                 </>
               )}
-              </div>
-            </>
 
-            {/* User Stories Section */}
-            {!isTaskViewLoading && (
-            <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
-              {isGeneratingUserStories ? (
-                <div className="py-8 text-center">
-                  <p className="text-sm font-semibold text-foreground">Generating user stories</p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Track progress in the Analysis Progress bar above.
-                  </p>
+              {hasAnalysisResults && !isTaskViewLoading && (
+              <SentimentCharts
+                featureSentimentData={featureSentimentData}
+                sentimentData={sentimentData}
+                selectedFeatures={selectedFeatures}
+              />
+              )}
+
+              {hasAnalysisResults && !isTaskViewLoading && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    Word Cloud Analysis
+                  </h3>
                 </div>
-              ) : selectedPlatform === 'jira' ? (
+
+                {wordCloudView === 'split' ? (
+                  <KeywordCloud
+                    positiveKeywords={
+                      activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                    negativeKeywords={
+                      activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                  />
+                ) : (
+                  <AdvancedWordCloud
+                    positiveKeywords={
+                      activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                    negativeKeywords={
+                      activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) =>
+                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
+                      ) || []
+                    }
+                  />
+                )}
+              </div>
+              )}
+
+              {hasAnalysisResults && !isTaskViewLoading && (
+              <div className="text-xs text-muted-foreground/70 text-right">
+                Analysis from {(() => {
+                  const analysisDate = activeAnalysisData?.createdAt;
+                  const deepAnalysisDate = activeAnalysisData?.deepAnalysis?.generated_at;
+                  const timestamp = deepAnalysisDate || analysisDate;
+                  if (timestamp) {
+                    return new Date(timestamp).toLocaleDateString('en-US', {
+                      year: 'numeric', month: 'long', day: 'numeric',
+                      hour: '2-digit', minute: '2-digit'
+                    });
+                  }
+                  return new Date().toLocaleDateString();
+                })()}
+              </div>
+              )}
+              </div>
+              )}
+
+              {resultsTab === 'workitems' && (
+              <div
+                id="panel-workitems"
+                role="tabpanel"
+                aria-labelledby="tab-workitems"
+                className="space-y-6"
+              >
+            {workItemsPanelLoading ? (
+            <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin text-saramsa-brand" aria-hidden />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Loading work items</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {isGeneratingUserStories
+                        ? 'Generating stories from your analysis…'
+                        : userStoriesLoading
+                          ? 'Fetching work items for this project…'
+                          : 'Refreshing analysis and backlog…'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="h-14 rounded-xl border border-border/60 bg-secondary/40 animate-pulse"
+                  />
+                ))}
+              </div>
+            </div>
+            ) : (
+            <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
+              {selectedPlatform === 'jira' ? (
                 /* Jira User Stories View */
                 (() => {
                   return loadedComments && loadedComments.length > 0;
@@ -1744,7 +1905,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                                     projectId: projectId || undefined,
                                     projectMetadata: jiraProjectMetadata
                                   })).unwrap();
-                                  
+
+                                  // Trigger usage badge refresh after work items generation
+                                  if (typeof window !== 'undefined') {
+                                    window.dispatchEvent(new Event('usage-updated'));
+                                  }
+
                                   // Structure the data properly for the UserStories component
                                   const structuredData = {
                                     ...workItemsResult,
@@ -1807,7 +1973,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                           const effectiveProjectId = currentProjectId || personalProjectId;
                           if (effectiveProjectId && user?.id) {
                             const formattedProjectId = effectiveProjectId.startsWith('project_') ? effectiveProjectId.replace('project_', '') : effectiveProjectId;
-                            const userId = user.id || user.user_id || user.username;
+                            const userId = user.id || user.user_id;
                             dispatch(fetchUserStoriesByProject({
                               projectId: formattedProjectId,
                               userId
@@ -1880,72 +2046,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                 </div>
               </div>
             )}
-
-            {/* Sentiment Charts */}
-            {hasAnalysisResults && !isTaskViewLoading && (
-              <SentimentCharts
-                featureSentimentData={featureSentimentData}
-                sentimentData={sentimentData}
-                selectedFeatures={selectedFeatures}
-              />
-            )}
-
-            {/* Keywords Analysis */}
-            {hasAnalysisResults && !isTaskViewLoading && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-foreground">
-                    Word Cloud Analysis
-                  </h3>
-                </div>
-
-                {wordCloudView === 'split' ? (
-                  <KeywordCloud
-                    positiveKeywords={
-                      activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) =>
-                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                      ) || []
-                    }
-                    negativeKeywords={
-                      activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) =>
-                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                      ) || []
-                    }
-                  />
-                ) : (
-                  <AdvancedWordCloud
-                    positiveKeywords={
-                      activeAnalysisData?.analysisData?.positive_keywords?.map((word: any) =>
-                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                      ) || []
-                    }
-                    negativeKeywords={
-                      activeAnalysisData?.analysisData?.negative_keywords?.map((word: any) =>
-                        typeof word === 'string' ? word : word.keyword || word.text || String(word)
-                      ) || []
-                    }
-                  />
-                )}
               </div>
-            )}
-
-            {/* Summary Info */}
-            {hasAnalysisResults && !isTaskViewLoading && (
-              <div className="text-xs text-muted-foreground/70 text-right">
-                Analysis from {(() => {
-                  const analysisDate = activeAnalysisData?.createdAt;
-                  const deepAnalysisDate = activeAnalysisData?.deepAnalysis?.generated_at;
-                  const timestamp = deepAnalysisDate || analysisDate;
-                  if (timestamp) {
-                    return new Date(timestamp).toLocaleDateString('en-US', {
-                      year: 'numeric', month: 'long', day: 'numeric',
-                      hour: '2-digit', minute: '2-digit'
-                    });
-                  }
-                  return new Date().toLocaleDateString();
-                })()}
+              )}
               </div>
-            )}
+            </>
 
           </main>
         </div>

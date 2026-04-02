@@ -96,6 +96,9 @@ def record_usage(user_id: str, resource: str, amount: int = 1) -> None:
     if not field:
         return
 
+    # Ensure record exists before updating
+    _get_or_create_record(user_id)
+
     from django.db.models import F
     UsageRecord.objects.filter(
         user_id=str(user_id), period=period,
