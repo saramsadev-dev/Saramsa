@@ -29,7 +29,6 @@ class GatherProjectStatsTest(TestCase):
     def setUp(self):
         self.user = UserAccount.objects.create(
             id=uuid.uuid4().hex[:16],
-            username="testuser",
             email="test@example.com",
             password="hashed",
         )
@@ -73,7 +72,6 @@ class GatherUserDigestTest(TestCase):
     def setUp(self):
         self.user = UserAccount.objects.create(
             id=uuid.uuid4().hex[:16],
-            username="digestuser",
             email="digest@example.com",
             password="hashed",
             first_name="Alice",
@@ -107,7 +105,6 @@ class RunWeeklyDigestTest(TestCase):
     def setUp(self):
         self.user = UserAccount.objects.create(
             id=uuid.uuid4().hex[:16],
-            username="weeklyuser",
             email="weekly@example.com",
             password="hashed",
         )

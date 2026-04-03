@@ -2,7 +2,6 @@
 
 export type User = {
   id?: string;
-  username: string;
   email?: string;
   role?: string;
   user_id?: string;
@@ -12,7 +11,6 @@ export type User = {
 
 type LoginParams = { email: string; password: string };
 type RegisterParams = {
-  username: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -175,7 +173,6 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
     success: boolean;
     data: {
       user_id?: string;
-      username: string;
       email?: string;
       role?: string;
       first_name?: string;
@@ -189,7 +186,6 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
   const user: User = {
     id: data.user_id,
     user_id: data.user_id,
-    username: data.username,
     email: data.email,
     role: data.role,
     first_name: data.first_name,
@@ -294,7 +290,6 @@ export async function register(
     data: {
       access: string;
       refresh: string;
-      username?: string;
       email?: string;
       user_id?: string;
     };
@@ -310,12 +305,11 @@ export async function register(
 
 export async function requestRegistrationOtp(
   email: string,
-  username?: string,
 ): Promise<{ expires_in_seconds: number; cooldown_seconds: number }> {
   const res = await fetch(`${AUTH_BASE}/register/request-otp/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, username }),
+    body: JSON.stringify({ email }),
   });
 
   if (!res.ok) {
@@ -332,22 +326,6 @@ export async function requestRegistrationOtp(
     message?: string;
   };
 
-  return response.data;
-}
-
-export async function checkUsername(
-  username: string,
-): Promise<{ available: boolean; message?: string }> {
-  const url = `${AUTH_BASE}/check-username?username=${encodeURIComponent(username)}`;
-  const res = await fetch(url, { method: 'GET' });
-  if (!res.ok) {
-    return { available: false, message: 'Unable to verify username' };
-  }
-  const response = (await res.json()) as { 
-    success: boolean; 
-    data: { available: boolean; message?: string };
-    message?: string;
-  };
   return response.data;
 }
 
@@ -381,5 +359,4 @@ async function safeJson(res: Response): Promise<any | null> {
     return null;
   }
 }
-
 

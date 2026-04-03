@@ -44,11 +44,21 @@ export default function RootLayout({
               <main className="flex-1 overflow-hidden">{children}</main>
               <PipelineWidgetGate />
             </ErrorBoundary>
-            <Toaster 
-              position="bottom-right" 
-              richColors 
+            <Toaster
+              position="bottom-right"
               duration={2000}
               closeButton
+              theme="system"
+              toastOptions={{
+                classNames: {
+                  toast: 'bg-background border-border',
+                  title: 'text-foreground',
+                  description: 'text-muted-foreground',
+                  actionButton: 'bg-saramsa-brand text-white hover:bg-saramsa-brand-hover',
+                  cancelButton: 'bg-muted text-muted-foreground',
+                  closeButton: 'bg-background border-border text-foreground',
+                },
+              }}
             />
           </StoreProvider>
         </Providers>

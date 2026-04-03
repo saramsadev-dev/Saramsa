@@ -83,7 +83,7 @@ def gather_user_digest(user: UserAccount, since: datetime, until: datetime) -> d
     return {
         "user_id": user.id,
         "email": user.email,
-        "first_name": user.first_name or user.username,
+        "first_name": user.first_name or (user.email.split("@", 1)[0] if user.email else ""),
         "period_start": since.isoformat(),
         "period_end": until.isoformat(),
         "totals": totals,

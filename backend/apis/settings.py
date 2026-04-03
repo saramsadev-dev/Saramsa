@@ -415,9 +415,9 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'user': os.getenv('THROTTLE_RATE_USER', '120/minute'),
         'anon': os.getenv('THROTTLE_RATE_ANON', '30/minute'),
-        'analysis': os.getenv('THROTTLE_RATE_ANALYSIS', '10/hour'),
-        'upload': os.getenv('THROTTLE_RATE_UPLOAD', '20/hour'),
-        'work_items': os.getenv('THROTTLE_RATE_WORK_ITEMS', '30/hour'),
+        'analysis': os.getenv('THROTTLE_RATE_ANALYSIS', '30/hour'),
+        'upload': os.getenv('THROTTLE_RATE_UPLOAD', '60/hour'),
+        'work_items': os.getenv('THROTTLE_RATE_WORK_ITEMS', '60/hour'),
     },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'EXCEPTION_HANDLER': 'apis.core.exceptions.custom_exception_handler',

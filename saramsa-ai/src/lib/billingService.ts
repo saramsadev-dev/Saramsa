@@ -104,6 +104,34 @@ export async function createStripeBillingPortalSession(): Promise<{ portal_url: 
   }
 }
 
+export interface UsageData {
+  period: string;
+  usage: {
+    analysis_count: number;
+    work_item_gen_count: number;
+    llm_tokens_used: number;
+  };
+  limits: {
+    analysis_limit: number;
+    work_item_gen_limit: number;
+    llm_token_limit: number;
+  };
+}
+
+/**
+ * Get the current user's monthly usage and limits
+ */
+export async function getUsage(): Promise<UsageData> {
+  try {
+    const response = await apiRequest('get', '/billing/usage/', undefined, true);
+    const data = (response.data?.data || response.data || {}) as UsageData;
+    return data;
+  } catch (error: any) {
+    console.error('Failed to fetch usage:', error);
+    throw new Error(error?.message || 'Failed to load usage data');
+  }
+}
+
 /**
  * Cancel subscription at the end of the current billing period
  */

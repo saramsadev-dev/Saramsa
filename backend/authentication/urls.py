@@ -3,7 +3,6 @@ from .views import (
     RegisterView, 
     RegisterOtpRequestView,
     ProfileMeView, 
-    CheckUsernameView, 
     AppTokenObtainPairView,
     AppTokenRefreshView,
     UserListView, 
@@ -18,7 +17,6 @@ urlpatterns = [
     path('register/request-otp/', RegisterOtpRequestView.as_view(), name='register_request_otp'),
     path('login/', LoginView.as_view(), name='login'), #verified
     path('me/', ProfileMeView.as_view(), name='profile'),
-    path('check-username', CheckUsernameView.as_view(), name='check-username'), #verified
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('token/', AppTokenObtainPairView.as_view(), name='token_obtain_pair'),

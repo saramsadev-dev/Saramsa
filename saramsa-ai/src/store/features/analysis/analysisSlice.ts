@@ -322,10 +322,11 @@ export const generateUserStories = createAsyncThunk<
       false,
       { timeout: 180000 } // 3 minutes timeout for LLM calls
     );
-    // Fix: Extract user stories from nested response structure
-    // Backend returns: { data: { data: { user_stories: [{ work_items: [...] }] } } }
-    const userStoriesData = response.data.data?.user_stories?.[0];
-    return userStoriesData || response.data;
+    // Extract work items from response
+    // Backend returns: { data: { work_items: [...], summary: {...}, ... } }
+    const innerData = response.data.data || response.data;
+    const userStoriesData = innerData?.user_stories?.[0] || innerData;
+    return userStoriesData;
   } catch (err: any) {
     console.error('❌ generateUserStories error:', err);
     const status = err.response?.status;

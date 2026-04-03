@@ -37,6 +37,13 @@ export function UploadPanel({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Reset file input when topFile becomes null (after analysis completes)
+  useEffect(() => {
+    if (!topFile && fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [topFile]);
+
   const handleFileSelect = (file: File | null) => {
     onFileSelect(file);
   };
@@ -124,7 +131,7 @@ export function UploadPanel({
               <Button
                 variant="outline"
                 size="sm"
-                className="border-saramsa-brand/20 hover:border-saramsa-brand/40 hover:bg-saramsa-brand/10"
+                className="border-border/70 hover:bg-accent/60 text-foreground"
                 onClick={(e) => {
                   e.stopPropagation();
                   onCloudConnect();

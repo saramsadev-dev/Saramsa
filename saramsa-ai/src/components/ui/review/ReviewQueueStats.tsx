@@ -9,10 +9,10 @@ interface ReviewQueueStatsProps {
 }
 
 const statCards = [
-  { key: 'pending' as const, label: 'Pending', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' },
-  { key: 'approved_this_week' as const, label: 'Approved this week', color: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
-  { key: 'dismissed_this_week' as const, label: 'Dismissed this week', color: 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400' },
-  { key: 'snoozed' as const, label: 'Snoozed', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
+  { key: 'pending' as const, label: 'Pending', color: 'text-saramsa-brand' },
+  { key: 'approved_this_week' as const, label: 'Approved this week', color: 'text-foreground' },
+  { key: 'dismissed_this_week' as const, label: 'Dismissed this week', color: 'text-muted-foreground' },
+  { key: 'snoozed' as const, label: 'Snoozed', color: 'text-foreground' },
 ];
 
 export function ReviewQueueStats({ projectId }: ReviewQueueStatsProps) {
@@ -28,16 +28,16 @@ export function ReviewQueueStats({ projectId }: ReviewQueueStatsProps) {
       {statCards.map(({ key, label, color }) => (
         <div
           key={key}
-          className="rounded-xl border border-border/60 bg-card/80 p-4 flex flex-col items-center justify-center gap-1"
+          className="rounded-2xl border border-border/60 bg-background/40 p-5 flex flex-col items-center justify-center gap-2"
         >
           {statsLoading ? (
-            <div className="h-8 w-12 bg-secondary/60 animate-pulse rounded" />
+            <div className="h-9 w-14 bg-secondary/60 animate-pulse rounded-lg" />
           ) : (
-            <span className={`text-2xl font-bold px-3 py-0.5 rounded-full ${color}`}>
+            <span className={`text-3xl font-bold ${color}`}>
               {stats?.[key] ?? 0}
             </span>
           )}
-          <span className="text-xs text-muted-foreground">{label}</span>
+          <span className="text-xs text-muted-foreground text-center">{label}</span>
         </div>
       ))}
     </div>

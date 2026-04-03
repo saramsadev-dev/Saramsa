@@ -104,7 +104,6 @@ class StorageService:
             d.setdefault("userId", obj.user_id)
         if container == "users":
             d.update({
-                "username": obj.username,
                 "email": obj.email,
                 "password": obj.password,
                 "first_name": obj.first_name,
@@ -141,7 +140,6 @@ class StorageService:
             obj, _ = UserAccount.objects.update_or_create(
                 id=str(item_id),
                 defaults={
-                    "username": data.get("username", str(item_id)),
                     "email": data.get("email", f"{item_id}@local.invalid"),
                     "password": data.get("password", ""),
                     "first_name": data.get("first_name", ""),

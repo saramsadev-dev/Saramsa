@@ -68,7 +68,6 @@ class RegisterView(generics.CreateAPIView):
             return StandardResponse.validation_error(detail=str(e), instance=request.path)
         
         user_data = auth_service.create_user(
-            username=serializer.validated_data['username'],
             email=serializer.validated_data['email'],
             password=serializer.validated_data['password'],
             first_name=serializer.validated_data.get('first_name', ''),
@@ -85,7 +84,6 @@ class RegisterView(generics.CreateAPIView):
 
         return StandardResponse.created(
             data={
-                "username": user_data['username'],
                 "email": user_data['email'],
                 "user_id": user_data['id'],
                 "access": token_data['access'],
@@ -107,10 +105,9 @@ class RegisterOtpRequestView(APIView):
 
         auth_service = get_authentication_service()
         email = serializer.validated_data['email']
-        username = serializer.validated_data.get('username') or None
 
         try:
-            result = auth_service.request_registration_otp(email=email, username=username)
+            result = auth_service.request_registration_otp(email=email)
         except ValueError as e:
             return StandardResponse.validation_error(detail=str(e), instance=request.path)
 
@@ -135,10 +132,8 @@ class ProfileMeView(APIView):
     authentication_classes = [AppJWTAuthentication]
     
     def get(self, request):
-        # Get user from service using username from JWT token
         auth_service = get_authentication_service()
-        username = request.user.username
-        user_data = auth_service.get_user_by_username(username)
+        user_data = auth_service.get_user_by_id(str(request.user.id))
         
         if not user_data:
             return StandardResponse.not_found(
@@ -150,7 +145,6 @@ class ProfileMeView(APIView):
         return StandardResponse.success(
             data={
                 "user_id": request.user.id,
-                "username": user_data.get('username'),
                 "email": user_data.get('email'),
                 "first_name": user_data.get('first_name'),
                 "last_name": user_data.get('last_name'),
@@ -167,8 +161,7 @@ class ProfileMeView(APIView):
     def patch(self, request):
         """Update basic profile fields using service layer."""
         auth_service = get_authentication_service()
-        username = request.user.username
-        user_doc = auth_service.get_user_by_username(username)
+        user_doc = auth_service.get_user_by_id(str(request.user.id))
         
         if not user_doc:
             return StandardResponse.not_found(
@@ -188,58 +181,11 @@ class ProfileMeView(APIView):
         
         return StandardResponse.success(
             data={
-                "username": user_doc.get('username'),
                 "email": user_doc.get('email'),
                 "first_name": user_doc.get('first_name'),
                 "last_name": user_doc.get('last_name'),
             },
             message="Profile updated successfully"
-        )
-
-
-class CheckUsernameView(APIView):
-    permission_classes = [NoAuthentication]
-    
-    def get(self, request):
-        username = request.query_params.get('username', '').strip()
-        if not username:
-            return StandardResponse.validation_error(
-                detail="Username parameter is required",
-                errors=[{"field": "username", "message": "This parameter is required."}],
-                instance=request.path
-            )
-        
-        # Check length
-        if len(username) < 3:
-            return StandardResponse.success(
-                data={
-                    "available": False,
-                    "message": "Username must be at least 3 characters"
-                },
-                message="Username validation completed"
-            )
-        
-        # Check character validity
-        import re
-        if not re.match(r'^[\w.@+-]+\Z', username):
-            return StandardResponse.success(
-                data={
-                    "available": False,
-                    "message": "Username can only contain letters, numbers, and @/./+/-/_ characters"
-                },
-                message="Username validation completed"
-            )
-        
-        # Check availability using service
-        auth_service = get_authentication_service()
-        username_exists = auth_service.get_user_by_username(username) is not None
-        
-        return StandardResponse.success(
-            data={
-                "available": not username_exists,
-                "message": "Username is already taken" if username_exists else "Username is available"
-            },
-            message="Username availability checked"
         )
 
 

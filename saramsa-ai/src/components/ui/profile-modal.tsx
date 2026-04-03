@@ -85,12 +85,12 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to rounded-full flex items-center justify-center">
                     <span className="text-white font-bold text-xl">
-                      {user?.username?.charAt(0).toUpperCase() || 'U'}
+                      {(user?.first_name?.charAt(0) || user?.email?.charAt(0) || 'U').toUpperCase()}
                     </span>
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-                      {user?.username || 'User'}
+                      {[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email || 'User'}
                     </h3>
                     <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                       {user?.role || 'User'}

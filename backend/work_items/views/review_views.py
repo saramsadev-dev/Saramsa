@@ -39,6 +39,15 @@ class ReviewQueueListView(APIView):
         else:
             candidates = service.repo.get_candidates_by_status(project_id, status_filter)
 
+        # DEBUG logging
+        logger.info(f"ReviewQueue: project_id={project_id}, status={status_filter}, filters={filters}, count={len(candidates)}")
+        if len(candidates) == 0:
+            # Check if any candidates exist at all for this project
+            all_candidates = service.repo.get_all_work_items_flat(project_id)
+            logger.warning(f"ReviewQueue returned 0 candidates, but {len(all_candidates)} total candidates exist for project {project_id}")
+            if all_candidates:
+                logger.warning(f"Sample candidate: {all_candidates[0]}")
+
         return StandardResponse.success(data={
             'candidates': candidates,
             'count': len(candidates),
@@ -56,6 +65,7 @@ class ReviewQueueStatsView(APIView):
             return StandardResponse.validation_error(detail="project_id is required.", instance=request.path)
 
         stats = get_review_service().get_stats(project_id)
+        logger.info(f"ReviewQueue Stats: project_id={project_id}, stats={stats}")
         return StandardResponse.success(data=stats)
 
 

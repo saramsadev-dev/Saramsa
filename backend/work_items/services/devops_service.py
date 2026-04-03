@@ -30,7 +30,8 @@ class DevOpsService:
                                               process_template: str = "Agile",
                                               company_name: str = None,
                                               project_metadata: Dict[str, Any] = None,
-                                              comments: List[str] = None) -> Dict[str, Any]:
+                                              comments: List[str] = None,
+                                              user_id: str = None) -> Dict[str, Any]:
         """Generate work items from analysis data using deterministic candidates + optional AI narration."""
         try:
             # Phase-2: deterministic candidates from analysis metrics (LLM does not decide existence/priority/type)
@@ -76,7 +77,7 @@ class DevOpsService:
             else:
                 try:
                     narration_service = get_narration_service()
-                    narratives = narration_service.generate_narratives(narration_input)
+                    narratives = narration_service.generate_narratives(narration_input, user_id=user_id)
                 except Exception as narration_err:
                     logger.warning(
                         "Narration failed, falling back to deterministic text: %s",
@@ -104,11 +105,15 @@ class DevOpsService:
                 logger.info("Successfully generated %s work items", len(work_items))
 
             # Add metadata to each work item
+            # CRITICAL: Set analysis_id on each item so they link to the source analysis
+            analysis_id_from_context = analysis_data.get("id") or analysis_data.get("analysis_id")
             for item in work_items:
                 item["id"] = str(uuid.uuid4())
                 item["created_at"] = datetime.now().isoformat()
                 item["process_template"] = process_template
                 item["platform"] = platform
+                if analysis_id_from_context:
+                    item["analysis_id"] = str(analysis_id_from_context)
 
             return {
                 'success': True,
@@ -137,12 +142,19 @@ class DevOpsService:
             for item in work_items:
                 item.setdefault("status", "pending")
                 item.setdefault("push_status", "not_pushed")
-
-            # --- Cross-analysis dedup ---
-            if project_id:
-                work_items = self._deduplicate_against_existing(work_items, project_id)
+                # CRITICAL: Ensure analysis_id is set on each work item for review queue linkage
+                if safe_analysis_id:
+                    item["analysis_id"] = safe_analysis_id
 
             doc_id = f"workitems_{safe_analysis_id}" if safe_analysis_id else str(uuid.uuid4())
+
+            # --- Cross-analysis dedup (create-only path) ---
+            # Skip dedup when safe_analysis_id is set: that path uses upsert_by_id which
+            # REPLACES all candidates for that story, so there is no accumulation across
+            # analyses and deduping against other stories would wrongly wipe every item
+            # (same aspect_keys appear in every analysis for the same product).
+            if project_id and not safe_analysis_id:
+                work_items = self._deduplicate_against_existing(work_items, project_id)
             work_items_doc = {
                 "id": doc_id,
                 "userId": user_id,
@@ -168,7 +180,11 @@ class DevOpsService:
 
     def _deduplicate_against_existing(self, new_items: List[Dict[str, Any]],
                                        project_id: str) -> List[Dict[str, Any]]:
-        """Remove new work items that already exist in this project (by aspect_key or title)."""
+        """Remove new work items that already exist in this project (by aspect_key or title).
+
+        Only called on the create (no analysis_id) path. The upsert path skips dedup
+        entirely because it replaces all candidates for the story anyway.
+        """
         existing = self.work_item_repo.get_all_work_items_flat(project_id)
         if not existing:
             return new_items
@@ -232,7 +248,11 @@ class DevOpsService:
     def get_work_items_by_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get work items for a project - consolidated method."""
         return self.work_item_repo.get_work_items_by_project(project_id) or []
-    
+
+    def get_work_items_by_analysis_id(self, analysis_id: str) -> Optional[List[Dict[str, Any]]]:
+        """Get work items that were generated for a specific analysis."""
+        return self.work_item_repo.get_work_items_by_analysis_id(analysis_id)
+
     def get_work_items_by_user(self, user_id: str) -> List[Dict[str, Any]]:
         """Get work items for a user."""
         return self.work_item_repo.get_by_user(user_id)
@@ -616,6 +636,8 @@ class DevOpsService:
             return "bug"
         if ct == "taxonomy_gap":
             return "task"
+        if ct == "strength":
+            return "feature"
         if ct in ("ux", "performance", "improvement"):
             return "feature"
         return "task"
@@ -718,6 +740,15 @@ class DevOpsService:
                 f"Address '{sub_label}' issues in {parent_label}",
                 f"'{sub_label}' is a recurring concern within {parent_label} ({pct_str} negative sentiment, "
                 f"{comment_count} comments). Investigate this specific theme and create targeted improvements.",
+            )
+        if ctype == "strength":
+            pos_pct = reason.get("pos_pct", 0)
+            comment_count = reason.get("comment_count", 0)
+            pct_str = f"{pos_pct:.0%}" if isinstance(pos_pct, float) else str(pos_pct)
+            return (
+                f"Protect and amplify {label} — a customer strength",
+                f"{label} has {pct_str} positive sentiment across {comment_count} comments. "
+                f"Document what makes this area successful, protect it from regressions, and explore how to amplify it.",
             )
         neg_pct = reason.get("neg_pct", 0)
         comment_count = reason.get("comment_count", 0)

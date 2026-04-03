@@ -14,8 +14,9 @@ import re
 import numpy as np
 from typing import List, Dict, Any, Tuple, Optional, Callable
 from dataclasses import dataclass, field
-from collections import defaultdict, Counter
+from collections import defaultdict
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from aiCore.services.aspect_service_factory import get_aspect_service
 from aiCore.services.embedding_service import EmbeddingService
@@ -28,8 +29,9 @@ logger = logging.getLogger(__name__)
 # but not on abbreviations like "Mr." or "e.g."
 _SENTENCE_RE = re.compile(r'(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])$')
 
-# Common English stopwords for keyword extraction
+# Common English stopwords for keyword extraction (expanded for feedback domain)
 _STOPWORDS = frozenset({
+    # --- pronouns, prepositions, auxiliaries, determiners ---
     'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your',
     'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her',
     'hers', 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs',
@@ -49,6 +51,21 @@ _STOPWORDS = frozenset({
     'even', 'still', 'well', 'back', 'like', 'one', 'two', 'go', 'going', 'went',
     'come', 'came', 'make', 'made', 'take', 'took', 'know', 'knew', 'think',
     'thought', 'want', 'said', 'say', 'way', 'thing', 'things', 'lot', 'every',
+    # --- generic feedback / filler verbs & nouns ---
+    'app', 'application', 'product', 'service', 'use', 'used', 'using', 'user',
+    'users', 'feature', 'features', 'please', 'need', 'needs', 'needed',
+    'work', 'works', 'working', 'worked', 'try', 'tried', 'trying',
+    'time', 'times', 'able', 'always', 'never', 'anything', 'something',
+    'everything', 'nothing', 'someone', 'anyone', 'everyone',
+    'see', 'seen', 'look', 'looking', 'find', 'found', 'give', 'given',
+    'help', 'helped', 'put', 'set', 'new', 'old', 'first', 'last',
+    'many', 'another', 'often', 'since', 'already', 'yet', 'let',
+    'keep', 'start', 'started', 'end', 'seems', 'seem', 'actually',
+    'maybe', 'though', 'however', 'instead', 'rather', 'quite',
+    'enough', 'sure', 'right', 'left', 'getting', 'using',
+    # --- generic UI / product noise ---
+    'button', 'page', 'screen', 'click', 'clicked', 'clicking',
+    'option', 'options', 'menu', 'tab', 'section', 'update', 'updated',
 })
 
 _WORD_RE = re.compile(r'[a-zA-Z]{3,}')
@@ -119,7 +136,8 @@ class LocalProcessingService:
 
     def process_comments(self, comments: List[str], aspects: List[str],
                          company_name: str = "Company", run_id: str = None,
-                         is_cancelled: Optional[Callable[[], bool]] = None) -> ProcessingResult:
+                         is_cancelled: Optional[Callable[[], bool]] = None,
+                         user_id: Optional[str] = None) -> ProcessingResult:
         """Run the full pipeline and return a ProcessingResult."""
         start_time = time.time()
 
@@ -159,7 +177,7 @@ class LocalProcessingService:
 
         # Step 4: Unified narration (single GPT entrypoint)
         insights, features, work_items = self._narrate_with_service(
-            combined_matches, aggregated_stats, aspects, company_name
+            combined_matches, aggregated_stats, aspects, company_name, user_id=user_id
         )
 
         processing_time = time.time() - start_time
@@ -338,11 +356,8 @@ class LocalProcessingService:
 
         overall_sentiment = {s.lower(): (c / total) * 100 for s, c in overall_counts.items()} if total else {}
 
-        # Extract real keywords per aspect
-        aspect_keywords = {}
-        for aspect in aspects:
-            texts = aspect_comments.get(aspect, [])
-            aspect_keywords[aspect] = self._extract_keywords(texts, top_n=10)
+        # Extract keywords per aspect using cross-aspect TF-IDF
+        aspect_keywords = self._extract_keywords_tfidf(aspect_comments, aspects, top_n=10)
 
         return AggregatedStats(
             aspect_sentiment_counts=dict(aspect_sentiment_counts),
@@ -355,20 +370,127 @@ class LocalProcessingService:
         )
 
     @staticmethod
-    def _extract_keywords(texts: List[str], top_n: int = 10) -> List[str]:
-        """Extract top keywords from a list of texts using word frequency."""
-        counter: Counter = Counter()
-        for text in texts:
-            words = _WORD_RE.findall(text.lower())
-            counter.update(w for w in words if w not in _STOPWORDS)
-        return [word for word, _ in counter.most_common(top_n)]
+    def _extract_keywords_tfidf(
+        aspect_comments: Dict[str, List[str]],
+        aspects: List[str],
+        top_n: int = 10,
+    ) -> Dict[str, List[str]]:
+        """Extract distinctive keywords per aspect using cross-aspect TF-IDF.
+
+        Each aspect's comments are joined into one "document". TF-IDF across
+        all aspect documents downranks words that appear everywhere and surfaces
+        terms that are distinctive to each aspect. Unigrams + bigrams are used
+        so phrases like "slow loading" or "poor navigation" can emerge.
+        """
+        ordered_aspects = [a for a in aspects if aspect_comments.get(a)]
+        if not ordered_aspects:
+            return {a: [] for a in aspects}
+
+        # Build one document per aspect (joined comment texts)
+        corpus = [" ".join(aspect_comments[a]) for a in ordered_aspects]
+
+        # Single-aspect edge case: TF-IDF needs ≥2 docs for IDF to matter.
+        # Add a background doc from ALL texts so single-aspect still works.
+        if len(corpus) == 1:
+            corpus.append(corpus[0])  # duplicate so vectorizer doesn't fail
+
+        try:
+            vectorizer = TfidfVectorizer(
+                stop_words=list(_STOPWORDS),
+                token_pattern=r'[a-zA-Z]{3,}',
+                ngram_range=(1, 2),
+                max_features=500,
+                min_df=1,
+                sublinear_tf=True,
+            )
+            tfidf_matrix = vectorizer.fit_transform(corpus)
+            feature_names = vectorizer.get_feature_names_out()
+        except ValueError:
+            # Empty vocabulary after stopword removal
+            return {a: [] for a in aspects}
+
+        # Build a lookup from term -> index for bigram quality checks
+        term_to_idx = {term: i for i, term in enumerate(feature_names)}
+
+        # Compute a per-aspect score threshold: median of non-zero scores.
+        # Bigrams whose best component is above this threshold are considered
+        # meaningful (at least one word is distinctive to this aspect).
+        result: Dict[str, List[str]] = {}
+        max_bigrams_per_aspect = max(2, top_n // 3)  # up to ~30% bigrams
+
+        for idx, aspect in enumerate(ordered_aspects):
+            row = tfidf_matrix[idx].toarray().flatten()
+            # Get indices sorted by TF-IDF score descending
+            top_indices = row.argsort()[::-1]
+
+            # Filter: skip terms that contain aspect name tokens (avoid "pricing" in pricing aspect)
+            aspect_tokens = set(aspect.lower().replace("_", " ").split())
+            keywords = []
+            bigram_count = 0
+            seen_unigrams = set()  # track unigrams already covered by accepted bigrams
+            for i in top_indices:
+                if row[i] <= 0:
+                    break
+                term = feature_names[i]
+                term_tokens = set(term.split())
+                # Skip if the term is just the aspect name or a token from it
+                if term_tokens <= aspect_tokens:
+                    continue
+
+                # Bigram quality gate: accept a bigram if at least one of its
+                # component words has a non-trivial score in this aspect AND
+                # neither component is a stopword. This filters genuine noise
+                # like "the quick" while keeping "slow loading", "poor quality".
+                if " " in term:
+                    if bigram_count >= max_bigrams_per_aspect:
+                        continue  # enough bigrams already
+                    parts = term.split()
+                    # Both parts must be non-stopwords (already handled by vectorizer,
+                    # but double-check for short generic words)
+                    if any(len(p) <= 3 for p in parts):
+                        continue
+                    # At least one part must score > 0 in this aspect
+                    best_part_score = max(
+                        (row[term_to_idx[p]] for p in parts if p in term_to_idx),
+                        default=0,
+                    )
+                    if best_part_score <= 0:
+                        continue
+                    bigram_count += 1
+
+                # Skip unigrams that are already part of an accepted bigram
+                if " " not in term and term in seen_unigrams:
+                    continue
+
+                keywords.append(term)
+                # Track component unigrams of accepted bigrams
+                if " " in term:
+                    for p in term.split():
+                        seen_unigrams.add(p)
+                if len(keywords) >= top_n:
+                    break
+            result[aspect] = keywords
+
+        # Fill aspects with no comments
+        for aspect in aspects:
+            if aspect not in result:
+                result[aspect] = []
+
+        return result
 
     # ------------------------------------------------------------------
     # Unified narration (single GPT entrypoint)
     # ------------------------------------------------------------------
 
-    def _narrate_with_service(self, matches, aggregated_stats, aspects, company_name):
-        """Call unified NarrationService with lean payload."""
+    def _narrate_with_service(self, matches, aggregated_stats, aspects, company_name, user_id: Optional[str] = None):
+        """Call unified NarrationService with lean payload.
+
+        Generates work item candidates deterministically BEFORE the GPT call
+        so that insights, feature descriptions, and work item narratives are
+        all produced in a single narration request.
+        """
+        from work_items.services.work_item_candidate_service import get_work_item_candidate_service
+
         narration_service = get_narration_service()
 
         features = []
@@ -379,14 +501,52 @@ class LocalProcessingService:
             total = sum(sentiment_counts.values())
             if total == 0:
                 continue
+            aspect_key = self._normalize_aspect_key(aspect)
+            neg_pct = sentiment_counts.get("NEGATIVE", 0) / total
+            pos_pct = sentiment_counts.get("POSITIVE", 0) / total
             features.append({
-                "aspect_key": self._normalize_aspect_key(aspect),
+                "aspect_key": aspect_key,
                 "metrics": {
                     "comment_count": total,
-                    "neg_pct": (sentiment_counts.get("NEGATIVE", 0) / total),
+                    "neg_pct": neg_pct,
+                    "pos_pct": pos_pct,
                 },
                 "keywords": aggregated_stats.aspect_keywords.get(aspect, [])[:5],
             })
+
+        # Build feature comment buckets and sample comments for narration
+        feature_comment_buckets = self._build_feature_comment_buckets(matches)
+        comment_samples = self._sample_comments_for_narration(feature_comment_buckets)
+
+        # Generate work item candidates deterministically so GPT can narrate them
+        # in the same call that produces insights and feature descriptions.
+        analysis_for_candidates = {
+            "features": [
+                {
+                    "name": aspect_key_map.get(f["aspect_key"], f["aspect_key"]),
+                    "feature": aspect_key_map.get(f["aspect_key"], f["aspect_key"]),
+                    "key": f["aspect_key"],
+                    "sentiment": {
+                        "negative": f["metrics"]["neg_pct"] * 100,
+                        "positive": f["metrics"].get("pos_pct", 0) * 100,
+                        "neutral": max(0, 100 - f["metrics"]["neg_pct"] * 100 - f["metrics"].get("pos_pct", 0) * 100),
+                    },
+                    "comment_count": f["metrics"]["comment_count"],
+                    "keywords": f.get("keywords", []),
+                }
+                for f in features
+            ],
+            "overall": aggregated_stats.overall_sentiment,
+            "counts": {"total": aggregated_stats.total_comments},
+            "pipeline_metadata": {
+                "unmapped_percentage": aggregated_stats.unmapped_percentage,
+            },
+        }
+        candidate_service = get_work_item_candidate_service()
+        candidates = candidate_service.generate_candidates(
+            analysis_for_candidates, previous_analysis=None
+        )
+        logger.info(f"Generated {len(candidates)} work item candidates for narration")
 
         narration_input = {
             "project_id": None,
@@ -396,15 +556,15 @@ class LocalProcessingService:
             "overall": aggregated_stats.overall_sentiment,
             "features": features,
             "evidence": self._build_evidence(matches),
-            "work_item_candidates": [],
+            "work_item_candidates": candidates,
+            "comment_samples": comment_samples,
         }
 
-        narratives = narration_service.generate_narratives(narration_input)
+        narratives = narration_service.generate_narratives(narration_input, user_id=user_id)
 
         narrative_map = {f.get("aspect_key"): f.get("description") for f in narratives.get("features", [])}
         sentiment_counts_map = aggregated_stats.aspect_sentiment_counts
         features_out = []
-        feature_comment_buckets = self._build_feature_comment_buckets(matches)
         for feature in features:
             aspect_key = feature.get("aspect_key")
             total_comments = feature["metrics"]["comment_count"]
@@ -433,6 +593,25 @@ class LocalProcessingService:
             })
 
         return narratives.get("insights", []), features_out, narratives.get("work_items", [])
+
+    @staticmethod
+    def _sample_comments_for_narration(
+        feature_comment_buckets: Dict[str, Dict[str, list]],
+        max_per_candidate: int = 5,
+    ) -> Dict[str, list]:
+        """Build comment_samples dict keyed by aspect_key for the narration prompt."""
+        samples = {}
+        for aspect_key, buckets in feature_comment_buckets.items():
+            aspect_samples = []
+            # Prioritize negative, then positive, then neutral
+            for sentiment in ("negative", "positive", "neutral"):
+                for comment in buckets.get(sentiment, []):
+                    if len(aspect_samples) >= max_per_candidate:
+                        break
+                    aspect_samples.append(comment)
+            if aspect_samples:
+                samples[aspect_key] = aspect_samples
+        return samples
 
     # ------------------------------------------------------------------
     # Evidence sampling (per-aspect, capped)

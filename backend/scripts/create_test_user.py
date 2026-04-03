@@ -61,7 +61,6 @@ def main():
     parser = argparse.ArgumentParser(description="Create or ensure a test user exists.")
     parser.add_argument("--email", help="Email for the test user.")
     parser.add_argument("--password", help="Password for the test user.")
-    parser.add_argument("--username", help="Username for the test user.")
     parser.add_argument("--first-name", default="Test", help="First name.")
     parser.add_argument("--last-name", default="User", help="Last name.")
     parser.add_argument("--role", default="user", help="Role for the user.")
@@ -71,8 +70,6 @@ def main():
 
     email = args.email or env.get("TEST_USER_EMAIL") or "test.user@saramsa.local"
     password = args.password or env.get("TEST_USER_PASSWORD") or _generate_password()
-    username = args.username or env.get("TEST_USER_USERNAME") or email.split("@")[0]
-
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "apis.settings")
     if PROJECT_ROOT not in sys.path:
         sys.path.insert(0, PROJECT_ROOT)
@@ -90,7 +87,6 @@ def main():
         print(f"User already exists: {email}")
     else:
         auth_service.create_user(
-            username=username,
             email=email,
             password=password,
             first_name=args.first_name,
@@ -102,7 +98,6 @@ def main():
     _write_dotenv(DOTENV_PATH, {
         "TEST_USER_EMAIL": email,
         "TEST_USER_PASSWORD": password,
-        "TEST_USER_USERNAME": username,
         "LOGIN_EMAIL": email,
         "LOGIN_PASSWORD": password,
     })

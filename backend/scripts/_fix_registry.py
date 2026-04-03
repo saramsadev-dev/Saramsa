@@ -42,7 +42,6 @@ EXPECT_403 = {
 }
 
 EXPECT_400 = {
-    "GET /api/auth/check-username",
     "POST /api/auth/token/",
     "POST /api/integrations/azure/",
     "GET /api/integrations/azure/projects/",
@@ -118,8 +117,9 @@ def main():
             ep["expect_json_keys"] = ["detail"]
             ep["body"] = {
                 "email": "test_register@example.com",
-                "username": "test_reg_user",
-                "password": "TestPass123!"
+                "password": "TestPass123!",
+                "confirmPassword": "TestPass123!",
+                "otp": "000000",
             }
             fixed += 1
         elif key in DISABLE_NO_PROJECT_ID:

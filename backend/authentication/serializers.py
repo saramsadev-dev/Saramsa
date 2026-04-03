@@ -9,21 +9,12 @@ import bcrypt
 
 class AppUserSerializer(serializers.Serializer):
     """Serializer for PostgreSQL user data"""
-    username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=6)
     confirmPassword = serializers.CharField(write_only=True, min_length=6)
     first_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
     last_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
     role = serializers.CharField(max_length=50, required=False, default='user')
-    
-    def validate_username(self, value):
-        """Check that username is unique using service layer"""
-        user_service = get_user_service()
-        existing_user = user_service.get_user_by_username(value)
-        if existing_user:
-            raise serializers.ValidationError("Username already exists")
-        return value
     
     def validate_email(self, value):
         """Check that email is unique using service layer"""
@@ -84,10 +75,9 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not user_data.get('is_active', True):
             raise serializers.ValidationError("User account is disabled")
         
-        # Create custom token payload
+        # Create custom token payload (user_id is the stable subject for API auth)
         payload = {
             'user_id': user_data.get('id'),
-            'username': user_data.get('username'),
             'email': user_data.get('email'),
             'is_staff': user_data.get('is_staff', False),
             'profile_role': user_data.get('profile', {}).get('role', 'user'),
@@ -101,7 +91,6 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Create refresh token payload
         refresh_payload = {
             'user_id': user_data.get('id'),
-            'username': user_data.get('username'),
             'exp': datetime.utcnow() + timedelta(days=7),  # 7 days expiry
             'iat': datetime.utcnow()
         }
@@ -112,7 +101,6 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
             'refresh': refresh_token,
             'user': {
                 'id': user_data.get('id'),
-                'username': user_data.get('username'),
                 'email': user_data.get('email'),
                 'first_name': user_data.get('first_name'),
                 'last_name': user_data.get('last_name'),
@@ -134,13 +122,12 @@ class AppTokenRefreshSerializer(serializers.Serializer):
             
             # Get user from PostgreSQL
             user_id = payload.get('user_id')
-            username = payload.get('username')
             
-            if not user_id or not username:
+            if not user_id:
                 raise serializers.ValidationError("Invalid refresh token")
             
             user_service = get_user_service()
-            user_data = user_service.get_user_by_username(username)
+            user_data = user_service.get_user_by_id(user_id)
             if not user_data:
                 raise serializers.ValidationError("User not found")
             
@@ -151,7 +138,6 @@ class AppTokenRefreshSerializer(serializers.Serializer):
             # Create new access token
             new_payload = {
                 'user_id': user_data.get('id'),
-                'username': user_data.get('username'),
                 'email': user_data.get('email'),
                 'is_staff': user_data.get('is_staff', False),
                 'profile_role': user_data.get('profile', {}).get('role', 'user'),
@@ -165,7 +151,6 @@ class AppTokenRefreshSerializer(serializers.Serializer):
                 'access': new_access_token,
                 'user': {
                     'id': user_data.get('id'),
-                    'username': user_data.get('username'),
                     'email': user_data.get('email'),
                     'first_name': user_data.get('first_name'),
                     'last_name': user_data.get('last_name'),
@@ -262,5 +247,4 @@ class AppUserRegisterWithOtpSerializer(AppUserSerializer):
 
 class RegistrationOtpRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
 

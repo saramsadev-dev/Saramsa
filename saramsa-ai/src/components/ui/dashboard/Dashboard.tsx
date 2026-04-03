@@ -35,7 +35,8 @@ import {
 
 import type { AnalysisData } from '@/types/analysis';
 import { apiRequest } from '@/lib/apiRequest';
-import { Check, Loader2, Sparkles } from 'lucide-react';
+import { Check, Loader2, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { UploadPanel } from './UploadPanel';
 import { SlackChannelPanel } from './SlackChannelPanel';
 import { MetricsCards } from './MetricsCards';
@@ -123,7 +124,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
   const [currentProjectId, setCurrentProjectId] = useState<string>("");
   const [personalProjectId, setPersonalProjectId] = useState<string>('');
   const [isGeneratingUserStories, setIsGeneratingUserStories] = useState<boolean>(false);
-  
+  const [isSwitchingAnalysis, setIsSwitchingAnalysis] = useState<boolean>(false);
+
   // Declare all refs at the top to prevent recreation on every render
   const didInitRef = useRef(false);
   const hasConsolidatedFetchRef = useRef(false);
@@ -181,9 +183,11 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
   const isTaskViewLoading = useMemo(
     () =>
       fetchingAnalysisById ||
-      isAnalyzing ||
+      isSwitchingAnalysis ||
+      // Only show loading if we're viewing the "analyzing" entry itself
+      // Don't block viewing old analyses just because a new one is running in background
       !!selectedAnalysisId?.startsWith('analyzing_'),
-    [fetchingAnalysisById, isAnalyzing, selectedAnalysisId]
+    [fetchingAnalysisById, isSwitchingAnalysis, selectedAnalysisId]
   );
 
   const workItemsPanelLoading = useMemo(
@@ -208,7 +212,35 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     [deepAnalysis, currentProjectUserStories]
   );
 
+  // Use analysis data directly (no cumulative view)
+  const activeAnalysisData = analysisData;
+
+  const hasAnalysisResults = useMemo(() => {
+    if (!activeAnalysisData?.analysisData) return false;
+    const counts = activeAnalysisData.analysisData.counts;
+    const features = activeAnalysisData.analysisData.features;
+    const positiveKeywords = activeAnalysisData.analysisData.positive_keywords;
+    const negativeKeywords = activeAnalysisData.analysisData.negative_keywords;
+
+    const totalComments = counts?.total ?? 0;
+    const hasFeatureData = Array.isArray(features) && features.length > 0;
+    const hasKeywordData =
+      (Array.isArray(positiveKeywords) && positiveKeywords.length > 0) ||
+      (Array.isArray(negativeKeywords) && negativeKeywords.length > 0);
+
+    return totalComments > 0 || hasFeatureData || hasKeywordData;
+  }, [activeAnalysisData?.analysisData]);
+
   const analysisProgressUi = useMemo(() => {
+    // Only show progress bar when actively analyzing or generating work items
+    const isCurrentlyAnalyzing = isAnalyzing || analysisStatus === 'pending' || analysisStatus === 'processing';
+    const isGeneratingItems = isGeneratingUserStories;
+
+    // Don't show progress bar for old completed analyses that are just being viewed
+    if (!isCurrentlyAnalyzing && !isGeneratingItems) {
+      return null;
+    }
+
     switch (analysisStatus) {
       case 'pending':
         return { label: 'Queued', width: 'w-1/4', tone: 'bg-orange-400/80', text: 'text-orange-600 dark:text-orange-400' };
@@ -218,16 +250,17 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
         if (isGeneratingUserStories) {
           return { label: 'Generating Work Items', width: 'w-3/4', tone: 'bg-orange-600/80', text: 'text-orange-600 dark:text-orange-400' };
         }
-        if (!hasGeneratedWorkItems) {
-          return { label: 'Insights Ready', width: 'w-3/4', tone: 'bg-orange-500/80', text: 'text-orange-600 dark:text-orange-400' };
+        // Only show completion status briefly after analysis finishes, not for historical views
+        if (isCurrentlyAnalyzing) {
+          return { label: 'Completed', width: 'w-full', tone: 'bg-saramsa-brand/80', text: 'text-saramsa-brand' };
         }
-        return { label: 'Completed', width: 'w-full', tone: 'bg-orange-600/80', text: 'text-orange-600 dark:text-orange-400' };
+        return null;
       case 'failure':
-        return { label: 'Failed', width: 'w-full', tone: 'bg-orange-700/80', text: 'text-orange-700 dark:text-orange-400' };
+        return { label: 'Failed', width: 'w-full', tone: 'bg-red-700/80', text: 'text-red-700 dark:text-red-400' };
       default:
         return null;
     }
-  }, [analysisStatus, isGeneratingUserStories, hasGeneratedWorkItems]);
+  }, [analysisStatus, isGeneratingUserStories, isAnalyzing]);
 
   const analysisProgressSteps = useMemo(() => {
     const base = [
@@ -264,7 +297,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     }
 
     return base;
-  }, [analysisStatus, hasGeneratedWorkItems, isGeneratingUserStories]);
+  }, [analysisStatus, hasGeneratedWorkItems, isGeneratingUserStories, isAnalyzing]);
 
 
   // Handle regeneration of analysis
@@ -336,13 +369,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     }
   };
 
-  // Use analysis data directly (no cumulative view)
-  const activeAnalysisData = analysisData;
-
   // Transform features to include edited status
   const transformedFeatures = useMemo(() => {
     if (!activeAnalysisData?.analysisData?.features) return [];
-    
+
     return activeAnalysisData.analysisData.features.map((feature: any) => ({
       name: feature.name || feature.feature,  // Backend uses "feature" field, fallback to "name"
       description: feature.description || '',
@@ -357,22 +387,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       sample_comments: feature.sample_comments
     })) as LocalFeatureSentiment[];
   }, [activeAnalysisData?.analysisData?.features, editedKeywords]);
-
-  const hasAnalysisResults = useMemo(() => {
-    if (!activeAnalysisData?.analysisData) return false;
-    const counts = activeAnalysisData.analysisData.counts;
-    const features = activeAnalysisData.analysisData.features;
-    const positiveKeywords = activeAnalysisData.analysisData.positive_keywords;
-    const negativeKeywords = activeAnalysisData.analysisData.negative_keywords;
-
-    const totalComments = counts?.total ?? 0;
-    const hasFeatureData = Array.isArray(features) && features.length > 0;
-    const hasKeywordData =
-      (Array.isArray(positiveKeywords) && positiveKeywords.length > 0) ||
-      (Array.isArray(negativeKeywords) && negativeKeywords.length > 0);
-
-    return totalComments > 0 || hasFeatureData || hasKeywordData;
-  }, [activeAnalysisData?.analysisData]);
   const userStoryFromDeepAnalysis = useMemo(() => {
     if (!deepAnalysis?.work_items || deepAnalysis.work_items.length === 0) {
       return null;
@@ -416,9 +430,47 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     if (!latestAnalysis) {
       return;
     }
-    
+
     const analysisId = latestAnalysis.analysis?.id;
-    
+
+    // CRITICAL: If user is viewing a historical analysis and a new analysis completes,
+    // show notification but don't overwrite their current view
+    if (selectedAnalysisId && !selectedAnalysisId.startsWith('analyzing_')) {
+      // Check if this is a newly completed analysis we haven't notified about
+      if (analysisId && lastProcessedAnalysisIdRef.current !== analysisId && latestAnalysis.exists) {
+        // Update the sidebar with the new completed analysis
+        const a = latestAnalysis.analysis;
+        const counts = a.analysisData?.counts ?? a.result?.counts ?? a.counts ?? {};
+        const total = Number(counts.total ?? 0);
+        const positive = Number(counts.positive ?? 0);
+
+        dispatch(prependToHistory({
+          id: analysisId,
+          analysis_date: a.createdAt || a.analysis_date || new Date().toISOString(),
+          comments_count: total,
+          positive_pct: total > 0 ? Math.round((positive / total) * 100) : 0,
+          status: 'completed',
+          name: a.name,
+        }));
+
+        // Show notification with brand color
+        toast('Analysis Complete!', {
+          description: `New analysis with ${total} comments is ready to view.`,
+          icon: <CheckCircle className="w-5 h-5 text-saramsa-brand" />,
+          action: {
+            label: 'View Now',
+            onClick: () => {
+              dispatch(setSelectedAnalysisId(analysisId));
+            }
+          },
+          duration: 10000, // Show for 10 seconds
+        });
+
+        lastProcessedAnalysisIdRef.current = analysisId;
+      }
+      return; // Don't overwrite the current view
+    }
+
     // Skip if we've already processed this analysis
     if (analysisId && lastProcessedAnalysisIdRef.current === analysisId) {
       return;
@@ -492,11 +544,16 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       dispatch(setDeepAnalysis(null));
       lastProcessedAnalysisIdRef.current = null;
     }
-  }, [latestAnalysis, dispatch]);
+  }, [latestAnalysis, dispatch, selectedAnalysisId]);
 
   // Extract user stories from consolidated data and set in Redux store
   useEffect(() => {
-    
+    // CRITICAL: Don't process latestAnalysis work items if user has selected a specific historical analysis
+    // This prevents overwriting the selected analysis's work items with the latest analysis
+    if (selectedAnalysisId && !selectedAnalysisId.startsWith('analyzing_')) {
+      return;
+    }
+
     if (latestAnalysis?.analysis?.userStories?.work_items) {
       const workItems = latestAnalysis.analysis.userStories.work_items;
       
@@ -537,7 +594,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       dispatch(clearCurrentProjectUserStories());
       dispatch(setDeepAnalysis(null));
     }
-  }, [latestAnalysis, currentProjectId, user, dispatch]);
+  }, [latestAnalysis, currentProjectId, user, dispatch, selectedAnalysisId]);
 
   // Fetch projects and integration accounts on mount (guard against double-invoke in dev)
   useEffect(() => {
@@ -558,11 +615,27 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
 
   // Load full analysis when a historical run is selected
   useEffect(() => {
-    if (!selectedAnalysisId) return;
+    if (!selectedAnalysisId) {
+      setIsSwitchingAnalysis(false);
+      return;
+    }
     // Skip fetch for temporary "analyzing" entries
-    if (selectedAnalysisId.startsWith('analyzing_')) return;
+    if (selectedAnalysisId.startsWith('analyzing_')) {
+      setIsSwitchingAnalysis(false);
+      return;
+    }
     // If the currently loaded analysis already matches, skip fetch
-    if (analysisData && (analysisData as any).id === selectedAnalysisId) return;
+    if (analysisData && (analysisData as any).id === selectedAnalysisId) {
+      setIsSwitchingAnalysis(false);
+      return;
+    }
+
+    // Set switching state to show loading UI
+    setIsSwitchingAnalysis(true);
+
+    // Clear previous analysis data to prevent showing stale work items
+    dispatch(clearCurrentProjectUserStories());
+    dispatch(setDeepAnalysis(null));
 
     (async () => {
       try {
@@ -581,8 +654,13 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
           dispatch(setAnalysisData(result.analysisData ? result : normalizeAnalysis(result)));
           dispatch(setDeepAnalysis(result.userStories ?? null));
         }
-      } catch {
-        // Error is handled by the slice
+      } catch (error) {
+        console.error('Failed to load analysis:', error);
+        // Clear data on error
+        dispatch(setAnalysisData(null));
+        dispatch(setDeepAnalysis(null));
+      } finally {
+        setIsSwitchingAnalysis(false);
       }
     })();
   }, [selectedAnalysisId, dispatch]);
@@ -796,6 +874,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       setTopError(null);
       dispatch(clearError());
 
+      // CRITICAL FIX: Clear any selected historical analysis before starting new one
+      // This prevents the new analysis from replacing the old one you were viewing
+      if (selectedAnalysisId && !selectedAnalysisId.startsWith('analyzing_')) {
+        // User was viewing a historical analysis, clear it before starting new one
+        dispatch(clearAnalysisData());
+        dispatch(setDeepAnalysis(null));
+      }
+
       // Load file data first
       const text = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -935,7 +1021,25 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
               name: payload.name,
             },
           }));
-          dispatch(setSelectedAnalysisId(payload.id));
+
+          // Only auto-switch if user is still viewing the "analyzing" entry
+          // If they switched to view another analysis, show notification instead
+          if (selectedAnalysisId === tempId) {
+            dispatch(setSelectedAnalysisId(payload.id));
+          } else {
+            // User switched away - show notification with brand color
+            toast('Analysis Complete!', {
+              description: `Analysis with ${total} comments completed successfully.`,
+              icon: <CheckCircle className="w-5 h-5 text-saramsa-brand" />,
+              action: {
+                label: 'View Results',
+                onClick: () => {
+                  dispatch(setSelectedAnalysisId(payload.id));
+                }
+              },
+              duration: 10000,
+            });
+          }
         } else {
           // No id returned, remove the temp entry
           dispatch(removeFromHistory(tempId));
@@ -1403,8 +1507,13 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
   ];
 
   const handleRunSelect = (id: string) => {
+    // Clear current data to prevent stale data showing
+    if (selectedAnalysisId !== id) {
+      setIsSwitchingAnalysis(true);
+      // Reset processing ref to allow fresh load
+      lastProcessedAnalysisIdRef.current = null;
+    }
     dispatch(setSelectedAnalysisId(id));
-    lastProcessedAnalysisIdRef.current = null; // allow re-processing
   };
 
   const handleRunRename = async (id: string, name: string) => {
@@ -1585,42 +1694,47 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
               <div id="analysis-results-section" className="space-y-6">
               {/* Analysis Results Section — only show loader when the selected run is the one being analyzed */}
               {analysisProgressUi && (
-                <div className="rounded-xl border border-border/60 bg-card/80 p-3">
+                <div className="rounded-xl border border-border/60 bg-card/80 p-3 transition-all duration-300">
                   <div className="mb-2 flex items-center justify-between text-xs">
                     <span className="font-medium text-foreground">Analysis Progress</span>
-                    <span className={analysisProgressUi.text}>{analysisProgressUi.label}</span>
+                    <span className={`${analysisProgressUi.text} transition-colors duration-300`}>
+                      {analysisProgressUi.label}
+                    </span>
                   </div>
                   <div className="mt-3 grid grid-cols-4 items-start gap-2">
                     {analysisProgressSteps.map((step, idx) => (
                       <div key={step.label} className="relative flex flex-col items-center text-center">
                         {idx < analysisProgressSteps.length - 1 && (
                           <div
-                            className={`absolute left-[calc(50%+12px)] top-[10px] h-[2px] w-[calc(100%-24px)] ${
-                              step.status === 'success' ? 'bg-orange-500/60' : 'bg-border/70'
+                            className={`absolute left-[calc(50%+12px)] top-[10px] h-[2px] w-[calc(100%-24px)] transition-colors duration-300 ${
+                              step.status === 'success'
+                                ? 'bg-orange-500/60'
+                                : 'bg-border/70'
                             }`}
                           />
                         )}
                         <div
-                          className={`z-10 h-5 w-5 rounded-full border ${
+                          className={`z-10 h-5 w-5 rounded-full border transition-all duration-300 ${
                             step.status === 'success'
                               ? 'border-orange-500/60 bg-orange-500/80'
                               : step.status === 'running'
                               ? 'border-orange-400/60 bg-orange-400/80'
                               : step.status === 'error'
-                              ? 'border-orange-700/60 bg-orange-700/80'
+                              ? 'border-red-700/60 bg-red-700/80'
                               : 'border-border/70 bg-background'
                           } flex items-center justify-center`}
                         >
                           {step.status === 'success' && <Check className="h-3 w-3 text-white" />}
+                          {step.status === 'running' && <Loader2 className="h-3 w-3 animate-spin text-white" />}
                         </div>
                         <span
-                          className={`mt-1 text-[10px] font-medium ${
+                          className={`mt-1 text-[10px] font-medium transition-colors duration-300 ${
                             step.status === 'success'
                               ? 'text-orange-600 dark:text-orange-400'
                               : step.status === 'running'
                               ? 'text-orange-500 dark:text-orange-400'
                               : step.status === 'error'
-                              ? 'text-orange-700 dark:text-orange-400'
+                              ? 'text-red-700 dark:text-red-400'
                               : 'text-muted-foreground'
                           }`}
                         >
@@ -1676,19 +1790,23 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                 id="panel-insights"
                 role="tabpanel"
                 aria-labelledby="tab-insights"
-                className="space-y-6"
+                className={`space-y-6 transition-opacity duration-300 ${isSwitchingAnalysis ? 'opacity-50' : 'opacity-100'}`}
               >
               {isTaskViewLoading ? (
                 <div className="bg-card/80 rounded-2xl border border-border/60 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Preparing fresh analysis</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {isSwitchingAnalysis ? 'Loading analysis...' : 'Preparing fresh analysis'}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Fetching latest run data and rebuilding charts.
+                        {isSwitchingAnalysis
+                          ? 'Fetching selected analysis data and rebuilding visualizations.'
+                          : 'Fetching latest run data and rebuilding charts.'}
                       </p>
                     </div>
                     <span className="inline-flex items-center rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-600 dark:text-orange-400">
-                      {analysisProgressUi?.label || 'Loading'}
+                      {analysisProgressUi?.label || (isSwitchingAnalysis ? 'Loading' : 'Processing')}
                     </span>
                   </div>
                   <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -1700,6 +1818,20 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                     <div className="h-4 w-40 rounded bg-secondary/50 animate-pulse" />
                     <div className="h-36 rounded-xl border border-border/60 bg-secondary/30 animate-pulse" />
                   </div>
+                </div>
+              ) : !hasAnalysisResults && !isAnalyzing && selectedAnalysisId ? (
+                /* Empty state when no analysis data is available for the selected analysis */
+                <div className="bg-card/80 rounded-2xl border border-border/60 p-8 text-center">
+                  <AlertCircle className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    No Analysis Data Available
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    The selected analysis could not be loaded or contains no data.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Try selecting a different analysis or upload new feedback data.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -1798,7 +1930,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                 id="panel-workitems"
                 role="tabpanel"
                 aria-labelledby="tab-workitems"
-                className="space-y-6"
+                className={`space-y-6 transition-opacity duration-300 ${workItemsPanelLoading ? 'opacity-50' : 'opacity-100'}`}
               >
             {workItemsPanelLoading ? (
             <div className="bg-card/80 rounded-2xl border border-border/60 p-6">

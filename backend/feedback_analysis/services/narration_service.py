@@ -27,7 +27,8 @@ class NarrationService:
 
     MAX_EVIDENCE = 30
     MAX_KEYWORDS_PER_ASPECT = 5
-    MAX_OUTPUT_TOKENS = 2500
+    MAX_COMMENT_SAMPLES_PER_CANDIDATE = 3
+    MAX_OUTPUT_TOKENS = 8000  # GPT-5-mini uses reasoning tokens; need extra headroom
     last_status = None
     last_errors = None
     last_cost = None
@@ -42,10 +43,16 @@ class NarrationService:
         analysis_id = trimmed.get("analysis_id")
         cache = get_cache_service()
 
+        # Allow up to 2 narration calls per analysis: one for insights/features
+        # (during pipeline) and one for work item phrasing (on-demand).
         if analysis_id:
-            if cache.get(f"narration_called:{analysis_id}"):
+            call_count = cache.get(f"narration_called:{analysis_id}", 0)
+            max_calls = 2
+            if isinstance(call_count, bool):
+                call_count = 1  # legacy: True means 1 call already made
+            if int(call_count) >= max_calls:
                 raise RuntimeError("max_narration_calls_per_analysis exceeded")
-            cache.set(f"narration_called:{analysis_id}", True, ttl=86400)
+            cache.set(f"narration_called:{analysis_id}", int(call_count) + 1, ttl=86400)
 
         if project_id and self._budget_exceeded(project_id):
             raise RuntimeError("Narration budget exceeded for this project")
@@ -56,18 +63,44 @@ class NarrationService:
 
         prompt = create_narration_prompt(trimmed)
 
+        candidates = trimmed.get("work_item_candidates", [])
+        candidate_count = len(candidates)
+        expected_ids = [c.get("candidate_id") for c in candidates]
+        logger.info(f"Narration: calling GPT with {candidate_count} work item candidates")
+        logger.info(f"Narration: expected candidate_ids: {expected_ids}")
+        logger.info(f"Narration: prompt length = {len(prompt)} chars, ~{len(prompt)//4} tokens (approx)")
+
         raw, actual_usage = self._call_generate_completions(prompt, user_id=user_id, project_id=project_id)
+        logger.info(f"Narration: GPT returned {len(raw)} chars. Checking for work_items in response...")
+
+        # Debug: check if GPT returned work_items
+        try:
+            import json
+            raw_parsed = json.loads(raw)
+            raw_work_items = raw_parsed.get("work_items", [])
+            raw_work_items_count = len(raw_work_items)
+            returned_ids = [wi.get("candidate_id") for wi in raw_work_items if isinstance(wi, dict)]
+            logger.info(f"Narration: GPT response contains {raw_work_items_count} work_items before validation")
+            logger.info(f"Narration: GPT returned candidate_ids: {returned_ids}")
+        except Exception as e:
+            logger.warning(f"Narration: could not parse raw GPT response for debug: {e}")
+
         parsed, errors = validate_narration_output(
             raw,
             allowed_aspect_keys=[f.get("aspect_key") for f in trimmed.get("features", [])],
-            allowed_candidate_ids=[c.get("candidate_id") for c in trimmed.get("work_item_candidates", [])],
+            allowed_candidate_ids=expected_ids,
         )
         if parsed is None:
             raise RuntimeError(f"Narration validation failed: {errors}")
 
+        validated_work_items_count = len(parsed.get("work_items", []))
+        logger.info(f"Narration: After validation, {validated_work_items_count} work_items remain")
+
         self.last_status = "OK"
         self.last_errors = None
         parsed["_meta"] = {"status": "OK"}
+        if actual_usage:
+            parsed["_token_usage"] = actual_usage
         self._record_usage(project_id, user_id, actual_usage, cache_hit=False)
         self._increment_usage_counters(project_id, actual_usage)
         return parsed
@@ -97,6 +130,38 @@ class NarrationService:
             reverse=True,
         )
         trimmed["evidence"] = evidence_sorted[: self.MAX_EVIDENCE]
+
+        # Trim comment_samples: cap per candidate to avoid prompt bloat
+        comment_samples = narration_input.get("comment_samples") or {}
+        if isinstance(comment_samples, dict):
+            trimmed_samples = {}
+            for key, samples in comment_samples.items():
+                if isinstance(samples, list):
+                    # Truncate each comment to 200 chars and cap count
+                    trimmed_samples[key] = [
+                        s[:200] if isinstance(s, str) else s
+                        for s in samples[:self.MAX_COMMENT_SAMPLES_PER_CANDIDATE]
+                    ]
+                else:
+                    trimmed_samples[key] = samples
+            trimmed["comment_samples"] = trimmed_samples
+
+        # Trim work_item_candidates: strip evidence (already in main evidence list)
+        candidates = narration_input.get("work_item_candidates") or []
+        if isinstance(candidates, list):
+            trimmed_candidates = []
+            for c in candidates:
+                if not isinstance(c, dict):
+                    continue
+                tc = {
+                    "candidate_id": c.get("candidate_id"),
+                    "aspect_key": c.get("aspect_key"),
+                    "type": c.get("type"),
+                    "priority": c.get("priority"),
+                    "reason": c.get("reason"),
+                }
+                trimmed_candidates.append(tc)
+            trimmed["work_item_candidates"] = trimmed_candidates
 
         return trimmed
 

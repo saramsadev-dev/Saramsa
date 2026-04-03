@@ -34,8 +34,15 @@ export function MetricsCards({ metrics }: MetricsCardsProps) {
 
 
 
+  const gridClass =
+    metrics.length <= 1
+      ? 'md:grid-cols-1'
+      : metrics.length === 2
+        ? 'md:grid-cols-2'
+        : 'md:grid-cols-3';
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className={`grid grid-cols-1 gap-6 ${gridClass}`}>
       {metrics.map((metric, index) => (
         <motion.div
           key={metric.title}

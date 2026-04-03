@@ -19,7 +19,6 @@ NO_AUTH_PATHS = {
     "/api/auth/refresh/",
     "/api/auth/forgot-password/",
     "/api/auth/reset-password/",
-    "/api/auth/check-username",
     "/api/health/",
     "/api/performance/",
 }
@@ -28,7 +27,12 @@ HAS_PATH_PARAM = re.compile(r"\{([^}]+)\}")
 
 BODY_TEMPLATES = {
     "POST /api/auth/login/": {"email": "{{LOGIN_EMAIL}}", "password": "{{LOGIN_PASSWORD}}"},
-    "POST /api/auth/register/": {"email": "test_register@example.com", "username": "test_reg_user", "password": "TestPass123!"},
+    "POST /api/auth/register/": {
+        "email": "test_register@example.com",
+        "password": "TestPass123!",
+        "confirmPassword": "TestPass123!",
+        "otp": "000000",
+    },
     "POST /api/auth/register/request-otp/": {"email": "test_register@example.com"},
     "POST /api/auth/token/": {"email": "{{LOGIN_EMAIL}}", "password": "{{LOGIN_PASSWORD}}"},
     "POST /api/auth/token/refresh/": None,

@@ -20,8 +20,7 @@ class AppUser:
         self.user_data = user_data
         self.id = user_data.get('id')
         self.pk = self.id
-        self.username = user_data.get('username')
-        self.email = user_data.get('email')
+        self.email = user_data.get('email') or ''
         self.first_name = user_data.get('first_name', '')
         self.last_name = user_data.get('last_name', '')
         self.is_active = user_data.get('is_active', True)
@@ -32,7 +31,12 @@ class AppUser:
         self.profile = user_data.get('profile', {})
     
     def get_username(self):
-        return self.username
+        """Django expects a username; we use email as the human identifier."""
+        return self.email
+
+    @property
+    def username(self):
+        return self.email
     
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
@@ -133,14 +137,12 @@ class AppJWTAuthentication(BaseAuthentication):
             # Decode JWT token
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             
-            # Extract user information from token
-            username = payload.get('username')
-            if not username:
+            user_id = payload.get('user_id')
+            if not user_id:
                 raise AuthenticationFailed('Invalid token')
             
-            # Get user from service
             user_service = get_user_service()
-            user_data = user_service.get_user_by_username(username)
+            user_data = user_service.get_user_by_id(user_id)
             if not user_data:
                 raise AuthenticationFailed('User not found')
             
@@ -175,13 +177,12 @@ class AppTokenAuthentication(BaseAuthentication):
             token_data = base64.b64decode(token).decode('utf-8')
             token_payload = json.loads(token_data)
             
-            username = token_payload.get('username')
-            if not username:
+            user_id = token_payload.get('user_id')
+            if not user_id:
                 raise AuthenticationFailed('Invalid token')
             
-            # Get user from service
             user_service = get_user_service()
-            user_data = user_service.get_user_by_username(username)
+            user_data = user_service.get_user_by_id(user_id)
             if not user_data:
                 raise AuthenticationFailed('User not found')
             

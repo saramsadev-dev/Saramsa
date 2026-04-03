@@ -231,6 +231,46 @@ class WorkItemRepository:
         ).order_by("-generated_at", "-created_at")
         return [_story_to_dict(r) for r in rows]
 
+    def get_work_items_by_analysis_id(self, analysis_id: str) -> Optional[List[Dict[str, Any]]]:
+        """Get work items that were generated for a specific analysis."""
+        # First try to find UserStory records with matching analysis_id in their payload
+        user_stories = UserStory.objects.filter(
+            payload__has_key='analysis_id'
+        ).order_by("-generated_at", "-created_at")
+
+        matching_stories = []
+        for story in user_stories:
+            if story.payload.get('analysis_id') == analysis_id:
+                matching_stories.append(_story_to_dict(story))
+
+        if matching_stories:
+            return matching_stories
+
+        # Fallback: Check WorkItemCandidates
+        candidates = WorkItemCandidate.objects.filter(
+            analysis_id=str(analysis_id)
+        ).select_related("user_story").order_by("-created_at")
+
+        if not candidates.exists():
+            return None
+
+        # Group candidates by their parent user_story if they have one
+        work_items = []
+        for candidate in candidates:
+            work_items.append(candidate.to_dict())
+
+        # If we have candidates, construct a UserStory-like response
+        if work_items:
+            # Group by feature_area to mimic work_items_by_feature structure
+            return [{
+                'id': f"analysis_{analysis_id}",
+                'work_items': work_items,
+                'generated_at': candidates.first().created_at.isoformat() if candidates else None,
+                'analysis_id': analysis_id
+            }]
+
+        return None
+
     def get_all_work_items_flat(self, project_id: str) -> List[Dict[str, Any]]:
         """Return all candidates for a project as flat dicts."""
         qs = WorkItemCandidate.objects.filter(
@@ -248,11 +288,17 @@ class WorkItemRepository:
     # ------------------------------------------------------------------
 
     def get_candidates_by_status(self, project_id: str, status: str) -> List[Dict[str, Any]]:
+        import logging
+        logger = logging.getLogger(__name__)
+
         qs = WorkItemCandidate.objects.filter(
             project_id=str(project_id),
             status=status,
         ).order_by("-created_at")
-        return [c.to_dict() for c in qs]
+
+        result = [c.to_dict() for c in qs]
+        logger.info(f"get_candidates_by_status: project_id={project_id}, status={status}, count={len(result)}")
+        return result
 
     def update_candidate_status(self, candidate_id: str, project_id: str,
                                 updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -340,9 +386,23 @@ class WorkItemRepository:
         if not raw_items:
             return []
 
-        project_id = str(story.project_id) if story.project_id else ""
+        if not story.project_id:
+            logger.error(
+                "Cannot create candidates for story %s — UserStory has no project_id",
+                story.id,
+            )
+            return []
+        project_id = str(story.project_id)
+
+        # CRITICAL: Get analysis_id from UserStory as fallback for older work items
+        story_analysis_id = story.payload.get("analysis_id") if story.payload else None
+
         candidates = []
         for d in raw_items:
+            # If work item doesn't have analysis_id but story does, inherit it
+            if not d.get("analysis_id") and story_analysis_id:
+                d = {**d, "analysis_id": story_analysis_id}
+
             item_id = d.get("id") or d.get("work_item_id")
             kwargs = _dict_to_candidate_kwargs(d, project_id, story)
             c = WorkItemCandidate(**kwargs)

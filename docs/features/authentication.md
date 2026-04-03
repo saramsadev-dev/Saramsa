@@ -10,7 +10,6 @@ JWT-based authentication using `rest_framework_simplejwt` with users stored in A
 | POST | `/api/auth/register/request-otp/` | None | Request OTP for registration |
 | POST | `/api/auth/login/` | None | Login, returns JWT access + refresh tokens |
 | GET | `/api/auth/me/` | Bearer | Get current user profile |
-| GET | `/api/auth/check-username` | None | Check username availability |
 | POST | `/api/auth/forgot-password/` | None | Request password reset email |
 | POST | `/api/auth/reset-password/` | None | Reset password with token |
 | POST | `/api/auth/token/` | None | Obtain token pair |
@@ -21,7 +20,7 @@ JWT-based authentication using `rest_framework_simplejwt` with users stored in A
 ## Token Structure
 - Access token: short-lived JWT
 - Refresh token: long-lived, used to obtain new access tokens
-- Tokens carry `user_id`, `role`, `email`
+- Tokens carry `user_id` (subject for API auth), `email`, `profile_role`, `is_staff`
 
 ## Roles & Permissions
 | Role | Scope | Permission Classes |

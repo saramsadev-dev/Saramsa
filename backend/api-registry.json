@@ -2,18 +2,6 @@
   "version": 1,
   "endpoints": [
     {
-      "name": "auth_check_username_retrieve",
-      "method": "GET",
-      "path": "/api/auth/check-username",
-      "auth": "none",
-      "enabled": true,
-      "expected_status": 400,
-      "expect_json_keys": [
-        "detail"
-      ],
-      "schema_hash": "0bf71857b5a3ce63"
-    },
-    {
       "name": "auth_forgot_password_create",
       "method": "POST",
       "path": "/api/auth/forgot-password/",
@@ -91,8 +79,9 @@
       ],
       "body": {
         "email": "test_register@example.com",
-        "username": "test_reg_user",
-        "password": "TestPass123!"
+        "password": "TestPass123!",
+        "confirmPassword": "TestPass123!",
+        "otp": "000000"
       }
     },
     {

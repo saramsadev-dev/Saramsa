@@ -98,88 +98,95 @@ export default function ReviewQueuePage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Review Queue</h1>
-        <div className="flex items-center gap-2">
-          <select
-            value={filters.status}
-            onChange={(e) => dispatch(setFilters({ status: e.target.value }))}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
-          >
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="dismissed">Dismissed</option>
-            <option value="snoozed">Snoozed</option>
-          </select>
-          <select
-            value={filters.priority}
-            onChange={(e) => dispatch(setFilters({ priority: e.target.value }))}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm"
-          >
-            <option value="">All priorities</option>
-            <option value="critical">P0 - Critical</option>
-            <option value="high">P1 - High</option>
-            <option value="medium">P2 - Medium</option>
-            <option value="low">P3 - Low</option>
-          </select>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 px-6 py-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Review Queue</h1>
+            <p className="text-sm text-muted-foreground mt-1">Review and approve AI-generated work items</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={filters.status}
+              onChange={(e) => dispatch(setFilters({ status: e.target.value }))}
+              className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-saramsa-brand/20"
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="dismissed">Dismissed</option>
+              <option value="snoozed">Snoozed</option>
+            </select>
+            <select
+              value={filters.priority}
+              onChange={(e) => dispatch(setFilters({ priority: e.target.value }))}
+              className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-saramsa-brand/20"
+            >
+              <option value="">All priorities</option>
+              <option value="critical">P0 - Critical</option>
+              <option value="high">P1 - High</option>
+              <option value="medium">P2 - Medium</option>
+              <option value="low">P3 - Low</option>
+            </select>
+          </div>
         </div>
+
+        {/* Stats */}
+        <ReviewQueueStats projectId={projectId} />
+
+        {/* Batch actions */}
+        {selectedIds.length > 0 && (
+          <div className="flex items-center gap-3 p-3 rounded-xl border border-saramsa-brand/20 bg-saramsa-brand/5">
+            <span className="text-sm font-medium text-foreground">{selectedIds.length} selected</span>
+            <Button size="sm" onClick={handleBatchApprove} className="bg-saramsa-brand hover:bg-saramsa-brand/90 text-white">
+              <Check className="w-3.5 h-3.5 mr-1" />
+              Approve All
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => dispatch(clearSelected())} className="hover:bg-accent">
+              Clear
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => dispatch(selectAll())} className="hover:bg-accent">
+              Select All
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Stats */}
-      <ReviewQueueStats projectId={projectId} />
-
-      {/* Batch actions */}
-      {selectedIds.length > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
-          <span className="text-sm font-medium">{selectedIds.length} selected</span>
-          <Button size="sm" onClick={handleBatchApprove} className="bg-green-600 hover:bg-green-700 text-white">
-            <Check className="w-3.5 h-3.5 mr-1" />
-            Approve All Selected
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => dispatch(clearSelected())}>
-            Clear
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => dispatch(selectAll())}>
-            Select All
-          </Button>
-        </div>
-      )}
-
-      {/* Candidate list */}
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 rounded-xl bg-secondary/70 animate-pulse dark:bg-secondary/40" />
-          ))}
-        </div>
-      ) : candidates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Inbox className="w-16 h-16 text-muted-foreground/40 mb-4" />
-          <h3 className="text-lg font-semibold text-foreground">Your review queue is clear!</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            No candidates to review right now. Check back later.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <AnimatePresence mode="popLayout">
-            {candidates.map((c) => (
-              <ReviewQueueItem
-                key={c.id}
-                candidate={c}
-                isSelected={selectedIds.includes(c.id)}
-                onToggleSelect={(id) => dispatch(toggleSelected(id))}
-                onApprove={handleApprove}
-                onEdit={setEditCandidate}
-                onDismiss={handleDismiss}
-                onSnooze={handleSnooze}
-              />
+      {/* Scrollable candidate list */}
+      <div className="flex-1 overflow-y-auto px-6 pb-6">
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-28 rounded-2xl bg-secondary/70 animate-pulse dark:bg-secondary/40" />
             ))}
-          </AnimatePresence>
-        </div>
-      )}
+          </div>
+        ) : candidates.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Inbox className="w-16 h-16 text-muted-foreground/40 mb-4" />
+            <h3 className="text-lg font-semibold text-foreground">Your review queue is clear!</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              No candidates to review right now. Check back later.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence mode="popLayout">
+              {candidates.map((c) => (
+                <ReviewQueueItem
+                  key={c.id}
+                  candidate={c}
+                  isSelected={selectedIds.includes(c.id)}
+                  onToggleSelect={(id) => dispatch(toggleSelected(id))}
+                  onApprove={handleApprove}
+                  onEdit={setEditCandidate}
+                  onDismiss={handleDismiss}
+                  onSnooze={handleSnooze}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
 
       {/* Edit drawer */}
       <EditCandidateDrawer

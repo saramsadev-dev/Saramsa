@@ -20,10 +20,10 @@ interface ReviewQueueItemProps {
 }
 
 const priorityConfig: Record<string, { color: string; label: string }> = {
-  critical: { color: 'bg-red-500 text-white', label: 'P0' },
-  high: { color: 'bg-orange-500 text-white', label: 'P1' },
-  medium: { color: 'bg-yellow-500 text-white', label: 'P2' },
-  low: { color: 'bg-gray-400 text-white', label: 'P3' },
+  critical: { color: 'bg-red-500/90 text-white dark:bg-red-500/80', label: 'P0' },
+  high: { color: 'bg-saramsa-brand text-white', label: 'P1' },
+  medium: { color: 'bg-muted text-foreground dark:bg-muted/80', label: 'P2' },
+  low: { color: 'bg-secondary text-muted-foreground', label: 'P3' },
 };
 
 const dismissReasons = [
@@ -59,16 +59,16 @@ export function ReviewQueueItem({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -100, height: 0 }}
       transition={{ duration: 0.25 }}
-      className="group rounded-xl border border-border/60 bg-card/80 hover:bg-card p-4 transition-colors"
+      className="group rounded-2xl border border-border/60 bg-background/40 hover:border-border/80 p-4 transition-all"
     >
       <div className="flex items-start gap-3">
         <Checkbox
           checked={isSelected}
           onCheckedChange={() => onToggleSelect(candidate.id)}
-          className="mt-1"
+          className="mt-1 data-[state=checked]:bg-saramsa-brand data-[state=checked]:border-saramsa-brand"
         />
 
-        <span className={`px-2 py-0.5 rounded text-xs font-bold ${prio.color} shrink-0 mt-0.5`}>
+        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${prio.color} shrink-0`}>
           {prio.label}
         </span>
 
@@ -76,20 +76,20 @@ export function ReviewQueueItem({
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground truncate">{candidate.title}</h3>
             {candidate.feature_area && (
-              <Badge variant="secondary" className="text-xs shrink-0">
+              <Badge variant="secondary" className="text-xs shrink-0 bg-secondary/80">
                 {candidate.feature_area}
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
             {candidate.description}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           {candidate.comment_count != null && candidate.comment_count > 0 && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <MessageSquare className="w-3 h-3" />
+              <MessageSquare className="w-3.5 h-3.5" />
               {candidate.comment_count}
             </span>
           )}
@@ -100,14 +100,13 @@ export function ReviewQueueItem({
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2 mt-3 ml-10">
+      <div className="flex items-center gap-2 mt-4 ml-10">
         <Button
           size="sm"
-          variant="outline"
           onClick={() => onApprove(candidate.id)}
-          className="text-green-600 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/20"
+          className="bg-saramsa-brand hover:bg-saramsa-brand/90 text-white"
         >
-          <Check className="w-3.5 h-3.5 mr-1" />
+          <Check className="w-3.5 h-3.5 mr-1.5" />
           Approve
         </Button>
 
@@ -115,9 +114,9 @@ export function ReviewQueueItem({
           size="sm"
           variant="outline"
           onClick={() => onEdit(candidate)}
-          className="text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/20"
+          className="border-border/70 hover:bg-accent/60"
         >
-          <Edit2 className="w-3.5 h-3.5 mr-1" />
+          <Edit2 className="w-3.5 h-3.5 mr-1.5" />
           Edit
         </Button>
 
@@ -126,18 +125,18 @@ export function ReviewQueueItem({
             size="sm"
             variant="outline"
             onClick={() => { setShowDismiss(!showDismiss); setShowSnooze(false); }}
-            className="text-gray-600 dark:text-gray-400"
+            className="border-border/70 hover:bg-accent/60"
           >
-            <X className="w-3.5 h-3.5 mr-1" />
+            <X className="w-3.5 h-3.5 mr-1.5" />
             Dismiss
           </Button>
           {showDismiss && (
-            <div className="absolute top-full left-0 mt-1 z-20 w-44 rounded-lg border border-border/60 bg-popover shadow-md py-1">
+            <div className="absolute top-full left-0 mt-2 z-20 w-44 rounded-xl border border-border/60 bg-popover shadow-lg py-1">
               {dismissReasons.map((r) => (
                 <button
                   key={r.value}
                   onClick={() => { onDismiss(candidate.id, r.value); setShowDismiss(false); }}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                  className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
                 >
                   {r.label}
                 </button>
@@ -151,18 +150,18 @@ export function ReviewQueueItem({
             size="sm"
             variant="outline"
             onClick={() => { setShowSnooze(!showSnooze); setShowDismiss(false); }}
-            className="text-yellow-600 dark:text-yellow-400"
+            className="border-border/70 hover:bg-accent/60"
           >
-            <Clock className="w-3.5 h-3.5 mr-1" />
+            <Clock className="w-3.5 h-3.5 mr-1.5" />
             Snooze
           </Button>
           {showSnooze && (
-            <div className="absolute top-full left-0 mt-1 z-20 w-36 rounded-lg border border-border/60 bg-popover shadow-md py-1">
+            <div className="absolute top-full left-0 mt-2 z-20 w-36 rounded-xl border border-border/60 bg-popover shadow-lg py-1">
               {snoozeOptions.map((o) => (
                 <button
                   key={o.days}
                   onClick={() => { onSnooze(candidate.id, o.days); setShowSnooze(false); }}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                  className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
                 >
                   {o.label}
                 </button>

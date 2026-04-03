@@ -95,27 +95,27 @@ export function EditCandidateDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleCancel}
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[900]"
           />
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-full max-w-2xl bg-card/95 dark:bg-background shadow-2xl z-50 overflow-hidden"
+            className="fixed right-0 top-0 h-full w-full max-w-2xl bg-background border-l border-border/60 shadow-2xl z-[1000] overflow-hidden"
           >
             <div className="flex flex-col h-full">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-border/60 bg-secondary/40 dark:bg-card/95">
+              <div className="flex items-center justify-between p-6 border-b border-border/60 bg-background/60">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-semibold">Edit Candidate</h2>
+                  <h2 className="text-xl font-semibold text-foreground">Edit Work Item</h2>
                   {hasChanges && (
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400">
-                      Unsaved
+                    <Badge className="bg-saramsa-brand/10 text-saramsa-brand border border-saramsa-brand/20">
+                      Unsaved Changes
                     </Badge>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" onClick={handleCancel}>
+                <Button variant="ghost" size="sm" onClick={handleCancel} className="hover:bg-accent">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -139,7 +139,7 @@ export function EditCandidateDrawer({
                       id="ed-priority"
                       value={form.priority}
                       onChange={(e) => update('priority', e.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      className="w-full rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-saramsa-brand/20"
                     >
                       {priorityOptions.map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>
@@ -152,7 +152,7 @@ export function EditCandidateDrawer({
                       id="ed-type"
                       value={form.type}
                       onChange={(e) => update('type', e.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      className="w-full rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-saramsa-brand/20"
                     >
                       {typeOptions.map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>
@@ -180,7 +180,7 @@ export function EditCandidateDrawer({
                 {candidate.evidence && candidate.evidence.length > 0 && (
                   <div className="space-y-1.5">
                     <Label>Supporting Evidence</Label>
-                    <div className="space-y-2 rounded-lg border border-border/60 bg-secondary/30 p-3">
+                    <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-4">
                       {candidate.evidence.map((ev, i) => (
                         <div key={i} className="text-sm">
                           <p className="text-muted-foreground italic">&ldquo;{ev.text}&rdquo;</p>
@@ -193,21 +193,24 @@ export function EditCandidateDrawer({
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-end gap-3 p-6 border-t border-border/60 bg-secondary/40 dark:bg-card/95">
-                <Button variant="outline" onClick={handleCancel}>Cancel</Button>
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-border/60 bg-background/60">
+                <Button variant="outline" onClick={handleCancel} className="border-border/70 hover:bg-accent/60">
+                  Cancel
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => { onSaveDraft(candidate.id, getEdits()); onClose(); }}
                   disabled={!hasChanges}
+                  className="border-border/70 hover:bg-accent/60 disabled:opacity-50"
                 >
-                  <Save className="w-4 h-4 mr-1" />
-                  Save Draft
+                  <Save className="w-4 h-4 mr-1.5" />
+                  Apply Changes
                 </Button>
                 <Button
                   onClick={() => { onSaveApprove(candidate, getEdits()); onClose(); }}
-                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                  className="bg-saramsa-brand hover:bg-saramsa-brand/90 text-white"
                 >
-                  <Check className="w-4 h-4 mr-1" />
+                  <Check className="w-4 h-4 mr-1.5" />
                   Save &amp; Approve
                 </Button>
               </div>

@@ -30,8 +30,6 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
-  Bug,
-  RefreshCw,
   CheckCircle,
 } from 'lucide-react';
 import { Badge } from "./badge";
@@ -41,6 +39,7 @@ import { EditActionDrawer } from "./edit-action-drawer";
 import apiRequest from "@/lib/apiRequest";
 import { getRelatedInsightsForWorkItem } from "@/lib/insightTraceability";
 import { DEFAULT_QUALITY_RULES, evaluateWorkItems, type QualityReport, type QualityRules } from "@/lib/workItemQuality";
+import { sortWorkItemsByPriority } from "@/lib/workItemPrioritySort";
 
 interface WorkItem {
   id: string;
@@ -113,6 +112,8 @@ export const UserStoryList = ({
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
   const [qualityRules, setQualityRules] = useState<QualityRules>(DEFAULT_QUALITY_RULES);
   const [qualityLoading, setQualityLoading] = useState(false);
+  /** Items staged for the review/push flow (header multi-select or per-row push). */
+  const [pushQueueItems, setPushQueueItems] = useState<ActionItem[]>([]);
 
   const insightsList = useMemo(() => {
     const data = analysisData as Record<string, unknown> | null;
@@ -338,7 +339,8 @@ export const UserStoryList = ({
   };
 
   const handlePushActionItems = async () => {
-    if (selectedActions.length === 0) {
+    const itemsToSubmit = pushQueueItems.length > 0 ? pushQueueItems : getSelectedItems();
+    if (itemsToSubmit.length === 0) {
       alert("Please select user stories to push");
       return;
     }
@@ -376,13 +378,13 @@ export const UserStoryList = ({
       return;
     }
 
-    if (!user.user_id && !user.username) {
+    if (!user.user_id && !user.id) {
       alert("User ID not found. Please logout and login again.");
       return;
     }
 
     // Use the id field (which contains the proper user_xxxxx format) instead of user_id
-    const userId = user.id || user.user_id || user.username || '';
+    const userId = user.id || user.user_id || '';
     
     // Check if user_id is in the correct format
     if (userId && !userId.startsWith('user_')) {
@@ -397,15 +399,8 @@ export const UserStoryList = ({
     }
 
 
-    const selectedItems = getSelectedItems();
-
-    if (selectedItems.length === 0) {
-      alert("No selected items found");
-      return;
-    }
-
     // Transform action items to user story format
-    const userStoriesToSubmit = selectedItems.map((item: ActionItem) => ({
+    const userStoriesToSubmit = itemsToSubmit.map((item: ActionItem) => ({
       id: item.id,
       title: item.title,
       description: item.description,
@@ -434,6 +429,7 @@ export const UserStoryList = ({
       if (result.success) {
         // Clear selection after successful submission
         dispatch(clearSelectedActions());
+        setPushQueueItems([]);
         
         // Update Redux state with the updated user stories from the response
         if (result.updated_user_stories && Array.isArray(result.updated_user_stories)) {
@@ -452,7 +448,7 @@ export const UserStoryList = ({
           if (projectId && user) {
             dispatch(fetchUserStoriesByProject({ 
               projectId: projectId.startsWith('project_') ? projectId.replace('project_', '') : projectId,
-              userId: user.id || user.user_id || user.username
+              userId: user.id || user.user_id
             }));
           }
         }
@@ -570,16 +566,10 @@ export const UserStoryList = ({
     return DEFAULT_QUALITY_RULES;
   };
 
-  const handleReviewClick = async () => {
-    if (selectedActions.length === 0) {
-      alert("Please select user stories to push");
-      return;
-    }
-
+  const runPushPreflightForItems = async (items: ActionItem[]) => {
     setQualityLoading(true);
     const rules = await fetchQualityRules();
-    const selectedItems = getSelectedItems();
-    const report = evaluateWorkItems(selectedItems, rules);
+    const report = evaluateWorkItems(items, rules);
     report.allow_push_with_warnings = rules.allow_push_with_warnings;
 
     setQualityReport(report);
@@ -593,6 +583,44 @@ export const UserStoryList = ({
     }
 
     setShowReviewModal(true);
+  };
+
+  const handleReviewClick = async () => {
+    if (selectedActions.length === 0) {
+      alert("Please select user stories to push");
+      return;
+    }
+
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length === 0) {
+      alert("No selected items found");
+      return;
+    }
+
+    setPushQueueItems(selectedItems);
+    await runPushPreflightForItems(selectedItems);
+  };
+
+  const handleRowPushClick = async (item: ActionItem) => {
+    const workItem = currentProjectUserStoryWorkItems.find((wi) => wi.id === item.id);
+    const reviewStatus = workItem?.status || item.review_status || "pending";
+    const isPushed = workItem?.submitted || workItem?.push_status === "pushed";
+
+    if (isPushed) {
+      alert("This work item has already been pushed.");
+      return;
+    }
+    if (reviewStatus === "dismissed") {
+      alert("This work item has been dismissed. Restore it from the Review Queue first.");
+      return;
+    }
+    if (reviewStatus === "snoozed") {
+      alert("This work item is snoozed. Unsnooze it from the Review Queue first.");
+      return;
+    }
+
+    setPushQueueItems([item]);
+    await runPushPreflightForItems([item]);
   };
 
   const getSelectedItems = () => {
@@ -713,25 +741,6 @@ export const UserStoryList = ({
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "feature":
-      case "user story":
-      case "product backlog item":
-      case "requirement":
-      case "story":
-      case "epic":
-        return <Sparkles className="w-4 h-4" />;
-      case "bug":
-        return <Bug className="w-4 h-4" />;
-      case "task":
-      case "issue":
-        return <RefreshCw className="w-4 h-4" />;
-      default:
-        return <Sparkles className="w-4 h-4" />;
-    }
-  };
-
   const getPlatformDisplayName = () => {
     return platform === 'azure' ? 'Azure DevOps' : 'Jira';
   };
@@ -778,22 +787,27 @@ export const UserStoryList = ({
     );
   }
 
-  const draftItems = actionItems.filter(actionItem => {
-    const workItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
-    const isPushed = workItem?.submitted || workItem?.push_status === 'pushed';
-    const reviewStatus = workItem?.status || actionItem.review_status || 'pending';
-    // Show as draft if not pushed and not dismissed/snoozed
-    return !isPushed && reviewStatus !== 'dismissed' && reviewStatus !== 'snoozed';
-  });
-  const dismissedItems = actionItems.filter(actionItem => {
-    const workItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
-    return (workItem?.status || actionItem.review_status) === 'dismissed';
-  });
-  const snoozedItems = actionItems.filter(actionItem => {
-    const workItem = currentProjectUserStoryWorkItems.find(item => item.id === actionItem.id);
-    return (workItem?.status || actionItem.review_status) === 'snoozed';
-  });
-  const submittedItems = getSubmittedWorkItems();
+  const draftItems = sortWorkItemsByPriority(
+    actionItems.filter((actionItem) => {
+      const workItem = currentProjectUserStoryWorkItems.find((item) => item.id === actionItem.id);
+      const isPushed = workItem?.submitted || workItem?.push_status === 'pushed';
+      const reviewStatus = workItem?.status || actionItem.review_status || 'pending';
+      return !isPushed && reviewStatus !== 'dismissed' && reviewStatus !== 'snoozed';
+    })
+  );
+  const dismissedItems = sortWorkItemsByPriority(
+    actionItems.filter((actionItem) => {
+      const workItem = currentProjectUserStoryWorkItems.find((item) => item.id === actionItem.id);
+      return (workItem?.status || actionItem.review_status) === 'dismissed';
+    })
+  );
+  const snoozedItems = sortWorkItemsByPriority(
+    actionItems.filter((actionItem) => {
+      const workItem = currentProjectUserStoryWorkItems.find((item) => item.id === actionItem.id);
+      return (workItem?.status || actionItem.review_status) === 'snoozed';
+    })
+  );
+  const submittedItems = sortWorkItemsByPriority(getSubmittedWorkItems());
 
   const renderAccordionItem = (item: ActionItem, isSubmitted: boolean, submittedData?: any) => {
     const isExpanded = expandedDescriptionIds[item.id] === true;
@@ -836,9 +850,6 @@ export const UserStoryList = ({
             }`}
           />
 
-          {/* Type Icon */}
-          <span className="shrink-0">{getTypeIcon(item.type || 'feature')}</span>
-
           {/* Title */}
           <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
             {item.title}
@@ -857,19 +868,38 @@ export const UserStoryList = ({
             </Badge>
           )}
 
-          {/* Edit button */}
+          {/* Push + Edit (row-level push avoids scrolling to header) */}
           {!isSubmitted && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEditAction(item);
-              }}
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+            <div
+              className="flex items-center gap-0.5 shrink-0"
+              onClick={(e) => e.stopPropagation()}
             >
-              <Edit className="w-3.5 h-3.5" />
-            </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleRowPushClick(item);
+                }}
+                disabled={isPushing || qualityLoading}
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-saramsa-brand shrink-0"
+                title="Push this work item"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditAction(item);
+                }}
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                title="Edit"
+              >
+                <Edit className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           )}
         </div>
 
@@ -1019,7 +1049,9 @@ export const UserStoryList = ({
           </div>
           {!collapsedFeatures.has(feature.name) && (
             <div className="space-y-1.5 ml-4">
-              {feature.actions.map((action: ActionItem) => renderAccordionItem(action, false))}
+              {sortWorkItemsByPriority(feature.actions).map((action: ActionItem) =>
+                renderAccordionItem(action, false)
+              )}
             </div>
           )}
         </div>
@@ -1102,19 +1134,25 @@ export const UserStoryList = ({
 
       <WorkItemReviewModal
         isOpen={showReviewModal}
-        onClose={() => setShowReviewModal(false)}
+        onClose={() => {
+          setShowReviewModal(false);
+          setPushQueueItems([]);
+        }}
         onConfirm={() => {
           setShowReviewModal(false);
           handlePushActionItems();
         }}
-        items={getSelectedItems()}
+        items={pushQueueItems}
         platformLabel={getPlatformDisplayName()}
         isSubmitting={isPushing}
       />
 
       <WorkItemQualityGateModal
         isOpen={showQualityModal}
-        onClose={() => setShowQualityModal(false)}
+        onClose={() => {
+          setShowQualityModal(false);
+          setPushQueueItems([]);
+        }}
         onProceed={() => {
           setShowQualityModal(false);
           setShowReviewModal(true);

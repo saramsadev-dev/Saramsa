@@ -143,6 +143,7 @@ class TaskService:
             company_name=company_name or "Company",
             run_id=run_id,
             is_cancelled=is_cancelled,
+            user_id=user_id_str,
         )
         
         logger.info(f"✅ Local ML pipeline completed in {pipeline_result.processing_time:.2f}s")

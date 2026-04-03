@@ -49,7 +49,6 @@ class UserRepository:
     def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         user = UserAccount.objects.create(
             id=data["id"],
-            username=data["username"],
             email=data["email"],
             password=data["password"],
             first_name=data.get("first_name", ""),
@@ -62,7 +61,7 @@ class UserRepository:
             company_url=data.get("company_url", ""),
             avatar_url=data.get("avatar_url", ""),
             extra={k: v for k, v in data.items() if k not in {
-                "id", "username", "email", "password", "first_name", "last_name",
+                "id", "email", "password", "first_name", "last_name",
                 "is_active", "is_staff", "date_joined", "profile", "company_name",
                 "company_url", "avatar_url", "createdAt", "updatedAt", "type",
             }},
@@ -73,10 +72,6 @@ class UserRepository:
         user = UserAccount.objects.filter(id=user_id).first()
         return _user_to_dict(user) if user else None
 
-    def get_by_username(self, username: str) -> Optional[Dict[str, Any]]:
-        user = UserAccount.objects.filter(username=username).first()
-        return _user_to_dict(user) if user else None
-
     def get_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         user = UserAccount.objects.filter(email=email).first()
         return _user_to_dict(user) if user else None
@@ -84,7 +79,7 @@ class UserRepository:
     def update(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         user = UserAccount.objects.get(id=user_id)
         fields = [
-            "username", "email", "password", "first_name", "last_name",
+            "email", "password", "first_name", "last_name",
             "is_active", "is_staff", "profile", "company_name", "company_url", "avatar_url",
         ]
         for field in fields:
@@ -98,8 +93,6 @@ class UserRepository:
         return [_user_to_dict(user) for user in UserAccount.objects.all().order_by("-created_at")]
 
     def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        if self.get_by_username(user_data["username"]):
-            raise ValueError(f"User with username '{user_data['username']}' already exists")
         if self.get_by_email(user_data["email"]):
             raise ValueError(f"User with email '{user_data['email']}' already exists")
         return self.create(user_data)

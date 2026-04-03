@@ -202,14 +202,14 @@ export const FeatureSentimentsTable = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                       {hasPositive && (
                         <div className="space-y-1.5">
-                          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          <p className="text-xs font-semibold text-saramsa-brand">
                             Positive ({feature.sample_comments!.positive!.length})
                           </p>
                           <div className="space-y-1 max-h-[160px] overflow-y-auto pr-1">
                             {feature.sample_comments!.positive!.slice(0, 10).map((c, i) => (
                               <p
                                 key={`pos-${i}`}
-                                className="text-xs text-foreground/80 pl-2 border-l-2 border-emerald-500/30 leading-relaxed"
+                                className="text-xs text-foreground/80 pl-2 border-l-2 border-saramsa-brand/40 leading-relaxed"
                               >
                                 {c}
                               </p>
@@ -219,14 +219,14 @@ export const FeatureSentimentsTable = ({
                       )}
                       {hasNegative && (
                         <div className="space-y-1.5">
-                          <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                          <p className="text-xs font-semibold text-saramsa-gradient-to">
                             Negative ({feature.sample_comments!.negative!.length})
                           </p>
                           <div className="space-y-1 max-h-[160px] overflow-y-auto pr-1">
                             {feature.sample_comments!.negative!.slice(0, 10).map((c, i) => (
                               <p
                                 key={`neg-${i}`}
-                                className="text-xs text-foreground/80 pl-2 border-l-2 border-rose-500/30 leading-relaxed"
+                                className="text-xs text-foreground/80 pl-2 border-l-2 border-saramsa-gradient-to/40 leading-relaxed"
                               >
                                 {c}
                               </p>

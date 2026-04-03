@@ -9,7 +9,6 @@ import { authService } from './authService';
 
 type LoginArgs = { email: string; password: string };
 type RegisterArgs = {
-  username: string;
   email: string;
   password: string;
   confirmPassword: string;

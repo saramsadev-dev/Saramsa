@@ -10,6 +10,7 @@ Contains views for analysis operations:
 
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework.negotiation import BaseContentNegotiation
 from asgiref.sync import async_to_sync
 from datetime import datetime
 import json
@@ -31,6 +32,15 @@ from ..services.task_service import process_feedback_task
 from ..services import get_analysis_service
 
 logger = logging.getLogger(__name__)
+
+
+class _AllowAnyContentNegotiation(BaseContentNegotiation):
+    """Allow any Accept header so SSE (text/event-stream) isn't rejected by DRF."""
+    def select_parser(self, request, parsers):
+        return parsers[0]
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        return (renderers[0], renderers[0].media_type)
 
 
 class AnalyzeCommentsView(APIView):
@@ -87,7 +97,7 @@ class AnalyzeCommentsView(APIView):
         company_name = None
         if hasattr(request, 'user') and request.user.is_authenticated:
             try:
-                user_data = analysis_service.get_user_by_username(request.user.username)
+                user_data = analysis_service.get_user_by_id(str(request.user.id))
                 if user_data:
                     company_name = user_data.get('company_name')
             except Exception as e:
@@ -208,7 +218,7 @@ class UpdateKeywordsView(APIView):
         company_name = None
         if hasattr(request, 'user') and request.user.is_authenticated:
             try:
-                user_data = analysis_service.get_user_by_username(request.user.username)
+                user_data = analysis_service.get_user_by_id(str(request.user.id))
                 if user_data:
                     company_name = user_data.get('company_name')
             except Exception as e:
@@ -549,6 +559,7 @@ class GetUserCommentsView(APIView):
 class TaskStatusView(APIView):
     """View to check the status of a Celery task (JSON or SSE)."""
     permission_classes = [IsAdminOrUser]
+    content_negotiation_class = _AllowAnyContentNegotiation
 
     def _build_status(self, task_id):
         res = AsyncResult(task_id)
@@ -760,21 +771,28 @@ class AnalysisByIdView(APIView):
         }
 
         if project_id:
-            latest_user_stories = devops_service.get_work_items_by_project(project_id)
-            if latest_user_stories:
-                latest_stories = latest_user_stories[0] if isinstance(latest_user_stories, list) else latest_user_stories
+            # CRITICAL FIX: Get work items for THIS specific analysis, not the latest for the project
+            analysis_user_stories = devops_service.get_work_items_by_analysis_id(analysis_id)
+
+            # Fallback to project-level if no analysis-specific work items found
+            if not analysis_user_stories:
+                analysis_user_stories = devops_service.get_work_items_by_project(project_id)
+
+            if analysis_user_stories:
+                specific_stories = analysis_user_stories[0] if isinstance(analysis_user_stories, list) else analysis_user_stories
                 work_items_with_submission_status = self._enrich_work_items_with_submission_status(
-                    latest_stories.get('work_items', []),
+                    specific_stories.get('work_items', []),
                     user_id,
                     project_id
                 )
                 response_data['analysis']['userStories'] = {
                     'work_items': work_items_with_submission_status,
                     'work_items_by_feature': self._group_work_items_by_feature(work_items_with_submission_status),
-                    'summary': latest_stories.get('summary', {}),
-                    'process_template': latest_stories.get('process_template', 'Agile'),
-                    'generated_at': latest_stories.get('generated_at'),
-                    'comments_count': latest_stories.get('comments_count', 0)
+                    'summary': specific_stories.get('summary', {}),
+                    'process_template': specific_stories.get('process_template', 'Agile'),
+                    'generated_at': specific_stories.get('generated_at'),
+                    'comments_count': specific_stories.get('comments_count', 0),
+                    'analysis_id': analysis_id  # Link work items back to this analysis
                 }
             else:
                 response_data['analysis']['userStories'] = None

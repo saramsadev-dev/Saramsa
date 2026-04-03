@@ -39,10 +39,10 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
           >
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-xl font-semibold text-foreground dark:text-white">
+                <h2 className="text-xl font-semibold text-foreground">
                   Why link Jira?
                 </h2>
-                <p className="text-sm text-muted-foreground dark:text-white/80">
+                <p className="text-sm text-muted-foreground">
                   Create issues directly from feedback, synchronize updates, and keep teams aligned without switching tools.
                 </p>
               </div>
@@ -62,18 +62,18 @@ export function JiraConfigScreen({ onContinue, onBack }: JiraConfigScreenProps) 
                   }
                 ].map((item) => (
                   <div key={item.title} className="rounded-2xl border border-border/60 bg-card/70 p-4">
-                    <p className="text-sm font-medium text-foreground dark:text-white/90">{item.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground dark:text-white/70">
+                    <p className="text-sm font-medium text-foreground">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {item.description}
                     </p>
                   </div>
                 ))}
               </div>
-              <div className="rounded-2xl border border-border/60 bg-secondary/50 p-4 dark:bg-black/20">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground dark:text-white/70">
+              <div className="rounded-2xl border border-border/60 bg-secondary/50 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   Need help?
                 </p>
-                <p className="mt-2 text-sm text-foreground dark:text-white/85">
+                <p className="mt-2 text-sm text-foreground">
                   Reach out to your Saramsa.ai admin to enable Jira integrations for your workspace.
                 </p>
               </div>

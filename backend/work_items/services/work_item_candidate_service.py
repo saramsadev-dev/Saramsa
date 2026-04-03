@@ -47,8 +47,22 @@ class WorkItemCandidateService:
     PRIORITY_ORDER = ["P3", "P2", "P1", "P0"]
 
     def generate_candidates(self, analysis: Dict[str, Any], previous_analysis: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Generate deterministic candidates from analysis metrics only."""
+        """Generate deterministic candidates from analysis metrics only.
+
+        Thresholds are adaptive: for small datasets (<100 total comments),
+        the minimum comment requirement per feature is relaxed so that
+        meaningful signals are not silently dropped.
+        """
         features = self._extract_features(analysis)
+
+        # Adaptive thresholds based on dataset size
+        total_comments = self._total_comment_count(analysis)
+        if total_comments < 50:
+            effective_min_comments = 1
+        elif total_comments < 100:
+            effective_min_comments = 2
+        else:
+            effective_min_comments = self.NEGATIVE_MIN_COMMENTS
 
         project_id = self._get_analysis_field(analysis, "project_id") or self._get_analysis_field(analysis, "projectId")
         analysis_id = self._get_analysis_field(analysis, "analysis_id") or self._get_analysis_field(analysis, "id")
@@ -69,19 +83,19 @@ class WorkItemCandidateService:
             comment_count = metrics.get("comment_count", 0)
             confidence_p95 = metrics.get("confidence_p95")
 
-            if neg_pct < self.NEGATIVE_CREATE_THRESHOLD or comment_count < self.NEGATIVE_MIN_COMMENTS:
+            if neg_pct < self.NEGATIVE_CREATE_THRESHOLD or comment_count < effective_min_comments:
                 reason_parts = []
                 if neg_pct < self.NEGATIVE_CREATE_THRESHOLD:
                     reason_parts.append(f"neg_pct {neg_pct:.1%} < threshold {self.NEGATIVE_CREATE_THRESHOLD:.0%}")
-                if comment_count < self.NEGATIVE_MIN_COMMENTS:
-                    reason_parts.append(f"comment_count {comment_count} < min {self.NEGATIVE_MIN_COMMENTS}")
+                if comment_count < effective_min_comments:
+                    reason_parts.append(f"comment_count {comment_count} < min {effective_min_comments}")
                 logger.debug(
                     "Candidate REJECTED for '%s': %s",
                     aspect_key, "; ".join(reason_parts),
                 )
                 continue
 
-            if neg_pct >= self.NEGATIVE_CREATE_THRESHOLD and comment_count >= self.NEGATIVE_MIN_COMMENTS:
+            if neg_pct >= self.NEGATIVE_CREATE_THRESHOLD and comment_count >= effective_min_comments:
                 priority = self._priority_from_negative(neg_pct)
                 candidate_type = "bug" if aspect_key in self.KNOWN_BUG_ASPECT_KEYS else "improvement"
                 candidates.append(self._build_candidate(
@@ -111,7 +125,7 @@ class WorkItemCandidateService:
             neg_pct = metrics.get("neg_pct", 0.0)
             comment_count = metrics.get("comment_count", 0)
             # Only split features that already qualify as candidates
-            if neg_pct < self.NEGATIVE_CREATE_THRESHOLD or comment_count < self.VOLUME_SPLIT_MIN_COMMENTS:
+            if neg_pct < self.NEGATIVE_CREATE_THRESHOLD or comment_count < max(self.VOLUME_SPLIT_MIN_COMMENTS, effective_min_comments):
                 continue
             # Check if this feature already has a candidate
             if not any(c.get("aspect_key") == aspect_key for c in candidates):
@@ -211,6 +225,40 @@ class WorkItemCandidateService:
                 },
                 evidence=[],
             ))
+
+        # Rule Group F — Positive/strength features
+        # Surfaces features with strong positive sentiment so PMs know what to
+        # protect, double-down on, or market.
+        for feature in features:
+            aspect_key, metrics = self._feature_metrics(feature)
+            if not aspect_key:
+                continue
+            comment_count = metrics.get("comment_count", 0)
+            if comment_count < effective_min_comments:
+                continue
+            # Compute positive ratio from the feature's sentiment
+            sentiment = feature.get("sentiment") or {}
+            pos_pct = self._to_ratio(sentiment.get("positive"))
+            if pos_pct >= 0.60:
+                # Don't duplicate if already a negative candidate
+                if any(c.get("aspect_key") == aspect_key for c in candidates):
+                    continue
+                candidates.append(self._build_candidate(
+                    project_id=project_id,
+                    analysis_id=analysis_id,
+                    taxonomy_id=taxonomy_id,
+                    taxonomy_version=taxonomy_version,
+                    aspect_key=aspect_key,
+                    candidate_type="strength",
+                    priority="P3",
+                    reason={
+                        "pos_pct": pos_pct,
+                        "comment_count": comment_count,
+                        "trend": "flat",
+                        "confidence_p95": None,
+                    },
+                    evidence=self._extract_evidence(feature),
+                ))
 
         # Rule Group C — Trend escalation
         candidates = [self._apply_trend_escalation(c, previous_map) for c in candidates]

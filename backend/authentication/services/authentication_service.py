@@ -25,8 +25,8 @@ class AuthenticationService:
     def __init__(self):
         self.user_repo = UserRepository()
     
-    def create_user(self, username: str, email: str, password: str, 
-                   first_name: str = "", last_name: str = "", 
+    def create_user(self, email: str, password: str,
+                   first_name: str = "", last_name: str = "",
                    role: str = "user") -> Dict[str, Any]:
         """Create a new user with hashed password."""
         try:
@@ -36,7 +36,6 @@ class AuthenticationService:
             # Create user data
             user_data = {
                 "id": f"user_{uuid.uuid4().hex[:12]}",
-                "username": username,
                 "email": email,
                 "password": hashed_password,
                 "first_name": first_name,
@@ -57,10 +56,10 @@ class AuthenticationService:
             logger.error(f"Error creating user: {e}")
             raise
     
-    def authenticate_user(self, username: str, password: str) -> Optional[Dict[str, Any]]:
-        """Authenticate user with username and password."""
+    def authenticate_user(self, email: str, password: str) -> Optional[Dict[str, Any]]:
+        """Authenticate user with email and password (Django passes this as `username`)."""
         try:
-            user = self.user_repo.get_by_username(username)
+            user = self.user_repo.get_by_email(email)
             if not user:
                 return None
             
@@ -80,10 +79,6 @@ class AuthenticationService:
     def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user by ID."""
         return self.user_repo.get_by_id(user_id)
-    
-    def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
-        """Get user by username."""
-        return self.user_repo.get_by_username(username)
     
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Get user by email."""
@@ -150,12 +145,10 @@ class AuthenticationService:
             return False
 
     # Registration OTP methods
-    def request_registration_otp(self, email: str, username: Optional[str] = None) -> Dict[str, Any]:
+    def request_registration_otp(self, email: str) -> Dict[str, Any]:
         """Generate and send registration OTP to email."""
         if self.user_repo.get_by_email(email):
             raise ValueError("Email already exists")
-        if username and self.user_repo.get_by_username(username):
-            raise ValueError("Username already exists")
 
         now = datetime.now(timezone.utc)
         ttl_minutes = getattr(settings, "REGISTRATION_OTP_TTL_MINUTES", 10)

@@ -332,6 +332,18 @@ class AnalysisRepository:
     def save_analysis_data(self, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         try:
             item_id = str(analysis_data.get("id") or f"insight_{timezone.now().timestamp()}")
+
+            # Build result dict from top-level keys if not already nested
+            result_dict = analysis_data.get("result") or analysis_data.get("analysisData")
+            if not result_dict:
+                # Extract analysis results from top-level keys
+                result_dict = {}
+                for key in ["overall", "features", "counts", "insights", "pipeline_work_items",
+                           "work_items", "negative_keywords", "positive_keywords",
+                           "pipeline_metadata", "processing_time", "model_info"]:
+                    if key in analysis_data:
+                        result_dict[key] = analysis_data[key]
+
             obj, _ = Analysis.objects.update_or_create(
                 id=item_id,
                 defaults={
@@ -340,7 +352,7 @@ class AnalysisRepository:
                     "type": analysis_data.get("type", "analysis"),
                     "analysis_type": analysis_data.get("analysis_type") or analysis_data.get("analysisType", ""),
                     "quarter": analysis_data.get("quarter", ""),
-                    "result": analysis_data.get("result") or analysis_data.get("analysisData") or {},
+                    "result": result_dict,
                     "comments": analysis_data.get("comments") or analysis_data.get("original_comments") or analysis_data.get("feedback") or [],
                     "payload": analysis_data,
                     "updated_at": timezone.now(),

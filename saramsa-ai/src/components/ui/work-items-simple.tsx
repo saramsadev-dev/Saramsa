@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { deleteWorkItems } from '@/store/features/userStories/userStoriesSlice';
 import { Button } from './button';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Badge } from './badge';
-import { Trash2, RefreshCw } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Checkbox } from './checkbox';
+import { sortWorkItemsByPriority } from '@/lib/workItemPrioritySort';
 
 interface WorkItemsSimpleProps {
   projectId?: string;
@@ -64,13 +65,16 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
     }
   };
 
-  const allWorkItems = currentProjectUserStories.flatMap(story => 
-    (story.work_items || []).map(item => ({
-      ...item,
-      userStoryId: story.id,
-      userStoryType: story.type
-    }))
-  );
+  const allWorkItems = useMemo(() => {
+    const flat = currentProjectUserStories.flatMap((story) =>
+      (story.work_items || []).map((item) => ({
+        ...item,
+        userStoryId: story.id,
+        userStoryType: story.type,
+      }))
+    );
+    return sortWorkItemsByPriority(flat);
+  }, [currentProjectUserStories]);
 
   return (
     <Card className="w-full">
@@ -100,7 +104,6 @@ export function WorkItemsSimple({ projectId }: WorkItemsSimpleProps) {
       <CardContent className="space-y-3">
         {loading && (
           <div className="text-center py-4">
-            <RefreshCw className="w-6 h-6 animate-spin mx-auto" />
             <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">Loading work items...</p>
           </div>
         )}

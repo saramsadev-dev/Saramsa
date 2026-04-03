@@ -99,6 +99,7 @@ class WorkItemGenerationView(APIView):
                 company_name=company_name,
                 project_metadata=project_metadata,
                 comments=comments if isinstance(comments, list) else [],
+                user_id=user_id_str,
             )
         except ConnectionError:
             raise

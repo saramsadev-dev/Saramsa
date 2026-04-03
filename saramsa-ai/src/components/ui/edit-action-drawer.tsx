@@ -115,11 +115,11 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[900] bg-[rgba(0,0,0,0.55)]"
+        className="fixed inset-0 z-[900] bg-black/50 backdrop-blur-sm"
         onClick={handleCancel}
       />
 
-      {/* Drawer */}
+      {/* Drawer — theme tokens so light/dark match the rest of the app (was hardcoded #0f0f0f) */}
       <motion.aside
         key="work-item-edit-drawer"
         role="dialog"
@@ -129,15 +129,11 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-        className="fixed top-0 right-0 z-[1000] h-[100vh] w-screen sm:w-[420px] flex flex-col"
-        style={{
-          background: '#0f0f0f',
-          boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
-        }}
+        className="fixed top-0 right-0 z-[1000] flex h-[100vh] w-screen flex-col border-l border-border bg-card text-card-foreground shadow-[0_30px_90px_-40px_rgba(15,23,42,0.25)] backdrop-blur-sm sm:w-[420px] dark:border-border/60 dark:bg-card/95 dark:shadow-[0_30px_90px_-40px_rgba(15,23,42,0.7)]"
         onClick={(event) => event.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/60 px-4 py-4 sm:px-6">
+        <div className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-6 dark:border-border/60">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-foreground">Edit Action</h2>
             {hasChanges && (
@@ -202,7 +198,7 @@ export const EditActionDrawer = ({ action, isOpen, onClose, onSave }: EditAction
         </div>
 
         {/* Footer */}
-        <div className="mt-auto border-t border-border/60 px-4 py-4 sm:px-6">
+        <div className="mt-auto border-t border-border px-4 py-4 sm:px-6 dark:border-border/60">
           <div className="flex items-center justify-end gap-2 sm:gap-3">
             <Button type="button" variant="outline" onClick={handleCancel}>
               Cancel

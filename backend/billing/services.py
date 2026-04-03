@@ -57,7 +57,7 @@ class StripeBillingService:
         stripe = self._stripe()
         customer = stripe.Customer.create(
             email=user.email,
-            name=f"{user.first_name} {user.last_name}".strip() or user.username or user.email,
+            name=f"{user.first_name} {user.last_name}".strip() or user.email,
             metadata={"user_id": str(user.id)},
         )
         profile.stripe_customer_id = customer.id

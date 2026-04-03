@@ -200,12 +200,12 @@ class AnalysisService:
             }
     
     # User and Project Context Methods
-    def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
-        """Get user by username."""
+    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by primary key."""
         try:
-            return self.auth_service.get_user_by_username(username)
+            return self.auth_service.get_user_by_id(user_id)
         except Exception as e:
-            logger.error(f"Error getting user by username: {e}")
+            logger.error(f"Error getting user by id: {e}")
             return None
     
     def ensure_project_context(self, project_id: str, user_id: str) -> tuple:

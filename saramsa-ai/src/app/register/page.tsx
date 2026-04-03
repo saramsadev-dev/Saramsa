@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Check, X } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -30,7 +30,6 @@ import { Button } from '@/components/ui/button';
 
 // Form validation schema
 const registerSchema = z.object({
-  username: z.string().min(2, 'User name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
   otp: z.string().default(''),
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -51,7 +50,6 @@ export default function RegisterPage() {
   const [otpSending, setOtpSending] = useState(false);
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
   const [otpCooldown, setOtpCooldown] = useState(0);
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
   const otpInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { register: registerUser } = useAuth();
@@ -65,28 +63,7 @@ export default function RegisterPage() {
     resolver: zodResolver(registerSchema),
   });
 
-  const watchedUsername = watch('username');
   const watchedEmail = watch('email');
-
-  // Check username availability when username changes
-  useEffect(() => {
-    const checkUsername = async () => {
-      if (watchedUsername && watchedUsername.length >= 2) {
-        setUsernameStatus('checking');
-        try {
-          const response = await authApi.checkUsername(watchedUsername);
-          setUsernameStatus(response.available ? 'available' : 'unavailable');
-        } catch {
-          setUsernameStatus('unavailable');
-        }
-      } else {
-        setUsernameStatus('idle');
-      }
-    };
-
-    const timeoutId = setTimeout(checkUsername, 500);
-    return () => clearTimeout(timeoutId);
-  }, [watchedUsername]);
 
   useEffect(() => {
     if (otpCooldown <= 0) return;
@@ -105,7 +82,7 @@ export default function RegisterPage() {
     setError(null);
     setOtpMessage(null);
     try {
-      const result = await authApi.requestRegistrationOtp(watchedEmail, watchedUsername);
+      const result = await authApi.requestRegistrationOtp(watchedEmail);
       setOtpSent(true);
       setOtpCooldown(result.cooldown_seconds || 60);
       setOtpMessage('Code sent. Check your email.');
@@ -131,7 +108,6 @@ export default function RegisterPage() {
 
     try {
       const result = await registerUser({
-        username: data.username,
         email: data.email,
         otp: data.otp,
         password: data.password,
@@ -290,48 +266,6 @@ export default function RegisterPage() {
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-2 sm:space-y-2.5">
             <div className="space-y-1.5 sm:space-y-2">
-              {/* Username */}
-              <div>
-                <label htmlFor="username" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">
-                  Username
-                </label>
-                <div className="relative">
-                  <Input
-                    {...register('username')}
-                    id="username"
-                    type="text"
-                    placeholder="Choose a username"
-                    className={`w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-1.5 sm:py-2 text-sm sm:text-sm md:text-sm lg:text-sm xl:text-sm 2xl:text-sm bg-background border border-border rounded-2xl focus:border-saramsa-brand/50 focus:ring-2 focus:ring-saramsa-brand/20 focus:outline-none transition-all duration-300 text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)] dark:bg-background/80 dark:border-border/60 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] ${
-                      usernameStatus === 'available' ? 'border-green-500' : 
-                      usernameStatus === 'unavailable' ? 'border-destructive' : ''
-                    }`}
-                  />
-                  <User className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
-                  
-                  {/* Username status indicator */}
-                  {usernameStatus === 'checking' && (
-                    <div className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2">
-                      <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-muted border-t-saramsa-brand rounded-full animate-spin" />
-                    </div>
-                  )}
-                  {usernameStatus === 'available' && (
-                    <Check className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
-                  )}
-                  {usernameStatus === 'unavailable' && (
-                    <X className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500" />
-                  )}
-                </div>
-                {errors.username && (
-                  <p className="mt-1 text-xs sm:text-sm text-destructive">{errors.username.message}</p>
-                )}
-                {usernameStatus === 'available' && (
-                  <p className="mt-1 text-xs sm:text-sm text-green-600">Username is available</p>
-                )}
-                {usernameStatus === 'unavailable' && watchedUsername && watchedUsername.length >= 2 && (
-                  <p className="mt-1 text-xs sm:text-sm text-destructive">Username is already taken</p>
-                )}
-              </div>
-
               {/* Email + Send Code inline */}
               <div>
                 <label htmlFor="email" className="block text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm font-medium text-foreground mb-1 sm:mb-2">

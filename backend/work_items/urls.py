@@ -23,18 +23,7 @@ from .views.review_views import (
 )
 
 urlpatterns = [
-    # CORE WORK ITEMS ENDPOINTS (Primary functionality)
-    path('generate/', WorkItemGenerationView.as_view(), name='work_items_generate'),
-    path('submit/', WorkItemSubmissionView.as_view(), name='work_items_submit'),
-    path('', WorkItemsListView.as_view(), name='work_items_list'),
-    path('<str:work_item_id>/', WorkItemDetailView.as_view(), name='work_item_detail'),
-    path('<str:work_item_id>/update/', WorkItemUpdateView.as_view(), name='work_item_update'),
-    path('platform/<str:platform>/', WorkItemsByPlatformView.as_view(), name='work_items_by_platform'),
-    path('remove/', WorkItemRemovalView.as_view(), name='work_items_remove'),
-    path('quality-rules/', WorkItemQualityRulesView.as_view(), name='work_item_quality_rules'),
-    path('quality-check/', WorkItemQualityCheckView.as_view(), name='work_item_quality_check'),
-
-    # REVIEW QUEUE ENDPOINTS
+    # REVIEW QUEUE ENDPOINTS (Must come BEFORE generic <work_item_id> pattern!)
     path('review/', ReviewQueueListView.as_view(), name='review_queue_list'),
     path('review/stats/', ReviewQueueStatsView.as_view(), name='review_queue_stats'),
     path('review/approve/', CandidateApproveView.as_view(), name='review_approve'),
@@ -44,6 +33,19 @@ urlpatterns = [
     path('review/batch-approve/', CandidateBatchApproveView.as_view(), name='review_batch_approve'),
     path('review/update/', CandidateUpdateView.as_view(), name='review_update'),
     path('review/retry-push/', CandidateRetryPushView.as_view(), name='review_retry_push'),
+
+    # CORE WORK ITEMS ENDPOINTS (Primary functionality)
+    path('generate/', WorkItemGenerationView.as_view(), name='work_items_generate'),
+    path('submit/', WorkItemSubmissionView.as_view(), name='work_items_submit'),
+    path('', WorkItemsListView.as_view(), name='work_items_list'),
+    path('platform/<str:platform>/', WorkItemsByPlatformView.as_view(), name='work_items_by_platform'),
+    path('remove/', WorkItemRemovalView.as_view(), name='work_items_remove'),
+    path('quality-rules/', WorkItemQualityRulesView.as_view(), name='work_item_quality_rules'),
+    path('quality-check/', WorkItemQualityCheckView.as_view(), name='work_item_quality_check'),
+
+    # Generic patterns MUST come last (catch-all)
+    path('<str:work_item_id>/', WorkItemDetailView.as_view(), name='work_item_detail'),
+    path('<str:work_item_id>/update/', WorkItemUpdateView.as_view(), name='work_item_update'),
 ]
 
 # NOTE: Platform-specific configuration endpoints (Azure DevOps, Jira) have been moved to the integrations app

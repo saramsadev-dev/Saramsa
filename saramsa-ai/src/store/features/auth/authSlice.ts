@@ -48,12 +48,11 @@ export const loginUser = createAsyncThunk<
 // Async thunk for register
 export const registerUser = createAsyncThunk<
   User,
-  { username: string; email: string; password: string; confirmPassword: string; otp: string; role?: 'admin' | 'user' | 'restricted user' },
+  { email: string; password: string; confirmPassword: string; otp: string; role?: 'admin' | 'user' | 'restricted user' },
   { rejectValue: string }
 >('auth/registerUser', async (data, { rejectWithValue }) => {
   try {
     const { user } = await authApi.register({
-      username: data.username,
       email: data.email,
       password: data.password,
       confirmPassword: data.confirmPassword,
@@ -69,9 +68,7 @@ export const registerUser = createAsyncThunk<
       errorMessage = 'Unable to connect to the server. Please check if the backend is running.';
     } else if (err.response?.status === 400) {
       const errors = err.response?.data;
-      if (errors?.username) {
-        errorMessage = `Username: ${errors.username[0]}`;
-      } else if (errors?.email) {
+      if (errors?.email) {
         errorMessage = `Email: ${errors.email[0]}`;
       } else if (errors?.password) {
         errorMessage = `Password: ${errors.password[0]}`;

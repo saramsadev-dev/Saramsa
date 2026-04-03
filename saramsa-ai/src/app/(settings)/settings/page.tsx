@@ -12,7 +12,7 @@ import {
   type SubscriptionStatus,
 } from "@/lib/billingService";
 
-type Profile = { email?: string; username?: string };
+type Profile = { email?: string };
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"profile" | "integrations">("profile");
@@ -38,7 +38,6 @@ export default function SettingsPage() {
         const payload = me.data?.data || me.data || {};
         setProfile({
           email: payload.email || "",
-          username: payload.username || "",
         });
       } catch {
         setProfile({});
@@ -158,10 +157,6 @@ export default function SettingsPage() {
 
             <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60 p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground mb-1">Username</p>
-                  <p className="font-medium text-foreground">{profile.username || "-"}</p>
-                </div>
                 <div>
                   <p className="text-muted-foreground mb-1">Email</p>
                   <p className="font-medium text-foreground">{profile.email || "-"}</p>

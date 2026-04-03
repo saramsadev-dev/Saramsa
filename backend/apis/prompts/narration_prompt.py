@@ -50,15 +50,17 @@ The JSON below contains:
 }}
 
 ## STRICT RULES
-1. Output one work_item for EACH candidate_id in the input. Do NOT add or remove candidates.
-2. Do NOT change type, priority, or any metric values — you only write narrative text.
-3. Do NOT include priority, type, or metric numbers in the title.
-4. For "title": Be specific. BAD: "Improve Pricing based on feedback". GOOD: "Restructure pricing tiers to address cost concerns".
-5. For "description": Reference actual customer language from comment_samples. Group feedback into 2-3 themes. End with a concrete recommendation.
-6. For "acceptance_criteria": Write measurable outcomes, not vague goals. BAD: "Fix the issue". GOOD: "Billing page shows itemized breakdown before charge".
-7. For "business_value": Always reference the actual numbers (e.g. "350 comments, 55% negative, largest feedback category").
-8. insights: max 5 items.
-9. features: only for aspect_key values present in the input.
-10. If comment_samples is empty for a candidate, still generate rich text based on the aspect_key, keywords, and metrics available.
-11. Return ONLY valid JSON. No explanation or commentary outside the JSON.
+1. **CRITICAL**: Output one work_item for EACH candidate_id in the input. Do NOT add or remove candidates.
+2. **CRITICAL**: Use the EXACT candidate_id value from each work_item_candidate (e.g., "a1b2c3d4-e5f6-7890-abcd-ef1234567890"). Copy it character-for-character. Do NOT generate new IDs or modify existing ones.
+3. Do NOT change type, priority, or any metric values — you only write narrative text (title, description, acceptance_criteria, business_value).
+4. Do NOT include priority, type, or metric numbers in the title.
+5. For "title": Be specific. BAD: "Improve Pricing based on feedback". GOOD: "Restructure pricing tiers to address cost concerns".
+6. For "description": Reference actual customer language from comment_samples. Group feedback into 2-3 themes. End with a concrete recommendation.
+7. For "acceptance_criteria": Write measurable outcomes, not vague goals. BAD: "Fix the issue". GOOD: "Billing page shows itemized breakdown before charge".
+8. For "business_value": Always reference the actual numbers (e.g. "350 comments, 55% negative, largest feedback category").
+9. insights: max 5 items.
+10. features: only for aspect_key values present in the input.
+11. If comment_samples is empty for a candidate, still generate rich text based on the aspect_key, keywords, and metrics available.
+12. For candidates with type "strength": write a title highlighting what customers love (e.g. "Preserve fast one-click checkout experience"), a description of what makes it successful with customer quotes, acceptance criteria focused on maintaining/amplifying the strength, and business value emphasizing retention/differentiation.
+13. Return ONLY valid JSON. No explanation or commentary outside the JSON.
 """

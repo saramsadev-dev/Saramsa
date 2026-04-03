@@ -59,7 +59,7 @@ export function IntegrationConfigDrawer({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[900] bg-[rgba(0,0,0,0.55)]"
+        className="fixed inset-0 z-[900] bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -72,11 +72,7 @@ export function IntegrationConfigDrawer({
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 260 }}
-        className="fixed top-0 right-0 z-[1000] h-[100vh] w-screen lg:w-[720px] flex flex-col"
-        style={{
-          background: "#0f0f0f",
-          boxShadow: "-10px 0 30px rgba(0,0,0,0.5)",
-        }}
+        className="fixed top-0 right-0 z-[1000] h-[100vh] w-screen lg:w-[720px] flex flex-col bg-background border-l border-border/60 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-4 sm:px-6">

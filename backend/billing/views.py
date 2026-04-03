@@ -12,6 +12,7 @@ from apis.core.response import StandardResponse
 from authentication.authentication import AppJWTAuthentication
 
 from .models import BillingWebhookEvent
+from .quota import _get_or_create_record, _get_limits
 from .services import StripeBillingService
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,29 @@ class StripeSubscriptionStatusView(APIView):
         service = StripeBillingService()
         data = service.get_subscription_status(user_id=str(request.user.id))
         return StandardResponse.success(data=data, message="Subscription status fetched.")
+
+
+class UsageView(APIView):
+    """Return current user's monthly usage and limits."""
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def get(self, request):
+        user_id = str(request.user.id)
+        record = _get_or_create_record(user_id)
+        limits = _get_limits(user_id)
+
+        data = {
+            "period": record.period,
+            "usage": {
+                "analysis_count": record.analysis_count,
+                "work_item_gen_count": record.work_item_gen_count,
+                "llm_tokens_used": record.llm_tokens_used,
+            },
+            "limits": limits,
+        }
+        return StandardResponse.success(data=data, message="Usage fetched.")
 
 
 @csrf_exempt

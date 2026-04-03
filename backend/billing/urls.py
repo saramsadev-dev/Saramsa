@@ -4,10 +4,12 @@ from .views import (
     StripeBillingPortalSessionView,
     StripeCheckoutSessionView,
     StripeSubscriptionStatusView,
+    UsageView,
     stripe_webhook,
 )
 
 urlpatterns = [
+    path("usage/", UsageView.as_view(), name="billing_usage"),
     path("stripe/checkout-session/", StripeCheckoutSessionView.as_view(), name="stripe_checkout_session"),
     path("stripe/portal-session/", StripeBillingPortalSessionView.as_view(), name="stripe_portal_session"),
     path("stripe/subscription/", StripeSubscriptionStatusView.as_view(), name="stripe_subscription_status"),

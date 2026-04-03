@@ -98,18 +98,45 @@ async def generate_completions(prompt_instruction, max_tokens=None, user_id=None
         latency_ms = (time.perf_counter() - t0) * 1_000
 
         logger.info("Analysis Complete (%.0fms)", latency_ms)
-        result = fix_json_string(completion.choices[0].message.content)
+
+        # Check for empty response (GPT-5-mini may use all tokens for reasoning)
+        raw_content = completion.choices[0].message.content
+        if not raw_content or len(raw_content.strip()) == 0:
+            finish_reason = completion.choices[0].finish_reason
+            logger.error(f"Empty response from Azure OpenAI. Finish reason: {finish_reason}, Max tokens: {effective_max_tokens}")
+            raise ValueError("Azure OpenAI returned empty content. Increase max_completion_tokens.")
+
+        result = fix_json_string(raw_content)
 
         # Log token usage if usage object available
         actual_usage = None
         try:
-            usage = getattr(completion, 'usage', None)
+            usage = getattr(completion, "usage", None)
             if usage:
+                input_tokens = getattr(usage, "prompt_tokens", None) or getattr(usage, "input_tokens", None)
+                output_tokens = getattr(usage, "completion_tokens", None) or getattr(usage, "output_tokens", None)
+                total_tokens = getattr(usage, "total_tokens", None)
+
+                # Fallback: if total_tokens is missing but input/output are present, derive it
+                if total_tokens is None and (input_tokens is not None or output_tokens is not None):
+                    total_tokens = (input_tokens or 0) + (output_tokens or 0)
+
                 actual_usage = {
-                    "input_tokens": getattr(usage, 'prompt_tokens', None) or getattr(usage, 'input_tokens', None),
-                    "output_tokens": getattr(usage, 'completion_tokens', None) or getattr(usage, 'output_tokens', None),
-                    "total_tokens": getattr(usage, 'total_tokens', None),
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
                 }
+
+                # Log reasoning tokens if present (GPT-5-mini feature)
+                completion_details = getattr(usage, "completion_tokens_details", None)
+                if completion_details:
+                    reasoning_tokens = getattr(completion_details, "reasoning_tokens", 0)
+                    if reasoning_tokens > 0:
+                        logger.info(
+                            f"GPT-5-mini used {reasoning_tokens} reasoning tokens (included in completion_tokens)"
+                        )
+                        actual_usage["reasoning_tokens"] = reasoning_tokens
+
                 log_token_usage(
                     user_id=user_id,
                     project_id=project_id,
@@ -122,6 +149,26 @@ async def generate_completions(prompt_instruction, max_tokens=None, user_id=None
                     latency_ms=latency_ms,
                     metadata={"component": "completion_service.generate_completions"},
                 )
+
+                # Record tokens in billing quota system
+                if user_id and actual_usage.get("total_tokens"):
+                    try:
+                        from billing.quota import record_usage
+                        from asgiref.sync import sync_to_async
+
+                        # Use sync_to_async because record_usage touches the ORM
+                        await sync_to_async(record_usage)(
+                            user_id,
+                            "llm_tokens",
+                            actual_usage["total_tokens"],
+                        )
+                    except Exception as billing_err:
+                        # Don't fail the request if billing tracking fails, but log the root cause
+                        logger.warning(
+                            "Failed to record billing token usage for user %s: %s",
+                            user_id,
+                            billing_err,
+                        )
         except Exception as e:
             logger.warning(f"Failed to log token usage: {e}")
 

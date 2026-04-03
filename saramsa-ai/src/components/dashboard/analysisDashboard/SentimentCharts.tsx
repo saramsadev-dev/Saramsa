@@ -142,7 +142,7 @@ export function SentimentCharts({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-        {/* Feature Sentiment Horizontal Bar Chart */}
+        {/* Feature Sentiment vertical grouped bar chart */}
         <div className="bg-card/80 rounded-2xl border border-border/60 overflow-hidden">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -167,56 +167,59 @@ export function SentimentCharts({
                 ))}
               </div>
             </div>
-            <div style={{ height: `${Math.max(300, featureSentimentData.length * 52)}px` }}>
+            <div className="h-[380px] min-h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={featureSentimentData}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                  margin={{ top: 12, right: 16, left: 8, bottom: featureSentimentData.length > 4 ? 56 : 28 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="var(--border)"
                     opacity={0.2}
-                    horizontal={false}
+                    vertical={false}
                   />
                   <XAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                    stroke="var(--border)"
+                    interval={0}
+                    angle={featureSentimentData.length > 4 ? -32 : 0}
+                    textAnchor={featureSentimentData.length > 4 ? 'end' : 'middle'}
+                    height={featureSentimentData.length > 4 ? 72 : undefined}
+                  />
+                  <YAxis
                     type="number"
                     tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                     stroke="var(--border)"
                     tickFormatter={(v) => (Number.isInteger(v) ? `${v}%` : `${v.toFixed(1)}%`)}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={140}
-                    tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                    stroke="none"
+                    width={48}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar
                     dataKey="positive"
                     fill={COLORS.positive}
                     name="Positive"
-                    radius={[0, 4, 4, 0]}
+                    radius={[4, 4, 0, 0]}
                     animationDuration={800}
-                    barSize={14}
+                    maxBarSize={28}
                   />
                   <Bar
                     dataKey="negative"
                     fill={COLORS.negative}
                     name="Negative"
-                    radius={[0, 4, 4, 0]}
+                    radius={[4, 4, 0, 0]}
                     animationDuration={800}
-                    barSize={14}
+                    maxBarSize={28}
                   />
                   <Bar
                     dataKey="neutral"
                     fill={COLORS.neutral}
                     name="Neutral"
-                    radius={[0, 4, 4, 0]}
+                    radius={[4, 4, 0, 0]}
                     animationDuration={800}
-                    barSize={14}
+                    maxBarSize={28}
                   />
                 </BarChart>
               </ResponsiveContainer>
