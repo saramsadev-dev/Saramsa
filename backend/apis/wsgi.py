@@ -15,7 +15,6 @@ from .infrastructure.otel import setup_otel
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'apis.settings')
 
 # Initialize OpenTelemetry
-# Temporarily disabled to debug startup issues
-# setup_otel()
+setup_otel()
 
 application = get_wsgi_application()
