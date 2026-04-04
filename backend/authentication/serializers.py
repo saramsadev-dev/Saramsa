@@ -81,8 +81,8 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
             'email': user_data.get('email'),
             'is_staff': user_data.get('is_staff', False),
             'profile_role': user_data.get('profile', {}).get('role', 'user'),
-            'exp': datetime.utcnow() + timedelta(hours=1),  # 1 hour expiry
-            'iat': datetime.utcnow()
+            'exp': int((datetime.utcnow() + timedelta(hours=1)).timestamp()),  # 1 hour expiry
+            'iat': int(datetime.utcnow().timestamp())
         }
         
         # Generate JWT tokens
@@ -91,8 +91,8 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Create refresh token payload
         refresh_payload = {
             'user_id': user_data.get('id'),
-            'exp': datetime.utcnow() + timedelta(days=7),  # 7 days expiry
-            'iat': datetime.utcnow()
+            'exp': int((datetime.utcnow() + timedelta(days=7)).timestamp()),  # 7 days expiry
+            'iat': int(datetime.utcnow().timestamp())
         }
         refresh_token = jwt.encode(refresh_payload, settings.SECRET_KEY, algorithm='HS256')
         
@@ -141,8 +141,8 @@ class AppTokenRefreshSerializer(serializers.Serializer):
                 'email': user_data.get('email'),
                 'is_staff': user_data.get('is_staff', False),
                 'profile_role': user_data.get('profile', {}).get('role', 'user'),
-                'exp': datetime.utcnow() + timedelta(hours=1),
-                'iat': datetime.utcnow()
+                'exp': int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
+                'iat': int(datetime.utcnow().timestamp())
             }
             
             new_access_token = jwt.encode(new_payload, settings.SECRET_KEY, algorithm='HS256')
