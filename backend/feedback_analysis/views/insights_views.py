@@ -561,6 +561,34 @@ class UserStoriesView(APIView):
         }, message="User stories retrieved successfully")
 
 
+class UserStoryUpdateView(APIView):
+    """Update a single user story (owner only)."""
+    permission_classes = [IsProjectEditor]
+
+    @handle_service_errors
+    def put(self, request, user_story_id: str):
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        if not user_id:
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
+
+        from apis.infrastructure.storage_service import storage_service
+        story = storage_service.get_user_story(user_story_id, str(user_id))
+        if not story:
+            return StandardResponse.not_found(detail="User story not found or not owned by you.", instance=request.path)
+
+        allowed_fields = {"title", "description", "status", "work_items", "payload"}
+        updates = {k: v for k, v in request.data.items() if k in allowed_fields}
+        if not updates:
+            return StandardResponse.validation_error(detail="No updatable fields provided.", instance=request.path)
+
+        story.update(updates)
+        updated = storage_service.save_user_story(story)
+        return StandardResponse.success(
+            data={"user_story": updated},
+            message="User story updated successfully"
+        )
+
+
 class UserStoryDeleteView(APIView):
     """Delete a single user story (owner only)."""
     permission_classes = [IsProjectEditor]

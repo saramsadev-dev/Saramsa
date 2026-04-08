@@ -59,6 +59,28 @@ class StripeSubscriptionStatusView(APIView):
         return StandardResponse.success(data=data, message="Subscription status fetched.")
 
 
+class StripeCancelSubscriptionView(APIView):
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def post(self, request):
+        service = StripeBillingService()
+        data = service.cancel_subscription(user_id=str(request.user.id))
+        return StandardResponse.success(data=data, message="Subscription will cancel at the end of the billing period.")
+
+
+class StripeResumeSubscriptionView(APIView):
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def post(self, request):
+        service = StripeBillingService()
+        data = service.resume_subscription(user_id=str(request.user.id))
+        return StandardResponse.success(data=data, message="Subscription resumed successfully.")
+
+
 class UsageView(APIView):
     """Return current user's monthly usage and limits."""
     authentication_classes = [AppJWTAuthentication]

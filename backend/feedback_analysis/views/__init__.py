@@ -24,6 +24,7 @@ from .insights_views import (
     CumulativeAnalysisView,
     AnalysisComparisonView,
     UserStoriesView,
+    UserStoryUpdateView,
     UserStoryDeleteView,
     UserStoryBulkDeleteView,
     InsightReviewListView,
@@ -59,6 +60,7 @@ __all__ = [
     'CumulativeAnalysisView',
     'AnalysisComparisonView',
     'UserStoriesView',
+    'UserStoryUpdateView',
     'UserStoryDeleteView',
     'UserStoryBulkDeleteView',
     # Digest views
