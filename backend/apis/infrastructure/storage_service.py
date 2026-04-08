@@ -315,6 +315,17 @@ class StorageService:
     def get_user_story_by_id(self, user_story_id: str):
         return self.get_document("user_stories", user_story_id, user_story_id)
 
+    def delete_user_story(self, user_story_id: str, user_id: str) -> bool:
+        deleted, _ = UserStory.objects.filter(id=str(user_story_id), user_id=str(user_id)).delete()
+        return deleted > 0
+
+    def bulk_delete_user_stories(self, ids: List[str], user_id: str) -> Dict[str, Any]:
+        qs = UserStory.objects.filter(id__in=[str(i) for i in ids], user_id=str(user_id))
+        found_ids = list(qs.values_list("id", flat=True))
+        deleted, _ = qs.delete()
+        missing = [i for i in ids if i not in found_ids]
+        return {"deleted": deleted, "not_found": missing}
+
     def patch_user_story(self, user_story_id: str, partition_key: str, patch_operations: List[Dict[str, Any]]):
         obj = UserStory.objects.filter(id=str(user_story_id)).first()
         if not obj:
