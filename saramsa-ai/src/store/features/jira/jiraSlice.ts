@@ -29,8 +29,6 @@ interface JiraState {
   projectMetadata: any | null;
   loading: boolean;
   error: string | null;
-  isAnalyzing: boolean;
-  analysis: any | null;
   createdProject: any | null;
 }
 
@@ -41,8 +39,6 @@ const initialState: JiraState = {
   projectMetadata: null,
   loading: false,
   error: null,
-  isAnalyzing: false,
-  analysis: null,
   createdProject: null,
 };
 
@@ -218,10 +214,6 @@ const jiraSlice = createSlice({
       state.selectedProject = null;
       state.error = null;
     },
-    clearAnalysis: (state) => {
-      state.analysis = null;
-      state.error = null;
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -316,7 +308,6 @@ export const {
   clearError,
   setSelectedProject,
   clearProjects,
-  clearAnalysis,
 } = jiraSlice.actions;
 
 export default jiraSlice.reducer;

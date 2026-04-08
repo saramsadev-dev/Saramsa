@@ -106,7 +106,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     fetchingAnalysisById,
   } = useSelector((state: RootState) => state.analysis);
   
-  const { analysis: jiraAnalysis, isAnalyzing: isJiraAnalyzing } = useSelector((state: RootState) => state.jira);
   const { projects, loading: projectsLoading } = useSelector((state: RootState) => state.projects);
   const { accounts: integrationAccounts, loading: integrationsLoading } = useSelector((state: RootState) => state.integrations);
   const { user } = useSelector((state: RootState) => state.auth);

@@ -161,8 +161,9 @@ const reviewSlice = createSlice({
         state.statsLoading = false;
         state.stats = action.payload;
       })
-      .addCase(fetchReviewStats.rejected, (state) => {
+      .addCase(fetchReviewStats.rejected, (state, action) => {
         state.statsLoading = false;
+        state.error = action.error.message || 'Failed to fetch review stats';
       })
       .addCase(approveCandidate.fulfilled, (state, action) => {
         state.candidates = state.candidates.filter((c) => c.id !== action.payload.candidateId);

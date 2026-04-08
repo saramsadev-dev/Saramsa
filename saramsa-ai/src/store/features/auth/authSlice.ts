@@ -57,8 +57,7 @@ export const registerUser = createAsyncThunk<
       password: data.password,
       confirmPassword: data.confirmPassword,
       otp: data.otp,
-      // Default role to admin if omitted
-      role: (data.role || 'admin') as any,
+      role: (data.role || 'user') as any,
     });
     authApi.setStoredUser(user);
     return user;

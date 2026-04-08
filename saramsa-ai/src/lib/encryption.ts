@@ -1,8 +1,11 @@
 ﻿import CryptoJS from 'crypto-js';
 
-// Use a consistent secret key for encryption/decryption
-// In production, this should be stored in environment variables
-const SECRET_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || 'saramsa-ai-project-encryption-key-2024';
+// Note: NEXT_PUBLIC_ vars are embedded in the client bundle — this is URL obfuscation, not security.
+// The env var must be set; do not commit a fallback key.
+const SECRET_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY;
+if (!SECRET_KEY) {
+  throw new Error('NEXT_PUBLIC_ENCRYPTION_KEY is not set');
+}
 
 /**
  * Encrypts a project ID for use in URLs

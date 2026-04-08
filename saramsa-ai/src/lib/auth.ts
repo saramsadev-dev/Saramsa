@@ -273,7 +273,7 @@ export async function register(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
       ...params, 
-      role: params.role || 'admin'
+      role: params.role || 'user'
     }),
   });
 

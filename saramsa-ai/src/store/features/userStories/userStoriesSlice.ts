@@ -92,6 +92,7 @@ export const fetchUserStoriesByProject = createAsyncThunk<
     } else if (err.response?.status === 404) {
       errorMessage = 'User stories not found.';
     } else if (err.response?.status >= 500) {
+      errorMessage = 'Server error. Please try again later.';
     } else if (err.message) {
       errorMessage = err.response?.data?.error || err.message;
     }

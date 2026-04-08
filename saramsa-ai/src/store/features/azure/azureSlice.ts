@@ -37,8 +37,6 @@ interface AzureState {
   loading: boolean;
   error: string | null;
   isPushing: boolean;
-  isAnalyzing: boolean;
-  analysis: any | null;
   createdProject: any | null;
   workItems: any[];
 }
@@ -53,8 +51,6 @@ const initialState: AzureState = {
   loading: false,
   error: null,
   isPushing: false,
-  isAnalyzing: false,
-  analysis: null,
   createdProject: null,
   workItems: [],
 };
@@ -305,10 +301,6 @@ const azureSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    clearAnalysis: (state) => {
-      state.analysis = null;
-      state.error = null;
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -418,7 +410,6 @@ export const {
   setPatToken,
   clearProjects,
   clearError,
-  clearAnalysis,
 } = azureSlice.actions;
 
 // Export all async thunks
