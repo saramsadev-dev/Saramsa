@@ -10,6 +10,8 @@ Contains views for insights and reporting:
 - CumulativeAnalysisView: Get cumulative analysis
 - AnalysisComparisonView: Compare analyses
 - UserStoriesView: Get user stories by project and user
+- UserStoryDeleteView: Delete a single user story (owner only)
+- UserStoryBulkDeleteView: Bulk delete user stories (owner only)
 """
 
 from rest_framework.views import APIView
@@ -557,4 +559,52 @@ class UserStoriesView(APIView):
             "user_id": user_id,
             "count": len(user_stories)
         }, message="User stories retrieved successfully")
+
+
+class UserStoryDeleteView(APIView):
+    """Delete a single user story (owner only)."""
+    permission_classes = [IsProjectEditor]
+
+    @handle_service_errors
+    def delete(self, request, user_story_id: str):
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        if not user_id:
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
+
+        from apis.infrastructure.storage_service import storage_service
+        deleted = storage_service.delete_user_story(user_story_id, str(user_id))
+        if not deleted:
+            return StandardResponse.not_found(detail="User story not found or not owned by you.", instance=request.path)
+
+        return StandardResponse.success(
+            data={"deleted": True, "id": user_story_id},
+            message="User story deleted successfully"
+        )
+
+
+class UserStoryBulkDeleteView(APIView):
+    """Bulk delete user stories (owner only)."""
+    permission_classes = [IsProjectEditor]
+
+    @handle_service_errors
+    def delete(self, request):
+        user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+        if not user_id:
+            return StandardResponse.unauthorized(detail="Authentication required.", instance=request.path)
+
+        ids = request.data.get("ids", [])
+        if not ids or not isinstance(ids, list):
+            return StandardResponse.validation_error(detail="'ids' must be a non-empty list.", instance=request.path)
+
+        from apis.infrastructure.storage_service import storage_service
+        result = storage_service.bulk_delete_user_stories(ids, str(user_id))
+
+        return StandardResponse.success(
+            data={
+                "deleted": result["deleted"],
+                "not_found": result["not_found"],
+                "failed": [],
+            },
+            message=f"Deleted {result['deleted']} user story/stories"
+        )
 
