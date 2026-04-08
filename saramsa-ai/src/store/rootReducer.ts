@@ -1,7 +1,6 @@
 import { combineReducers } from '@reduxjs/toolkit';
 import authReducer from './features/auth/authSlice';
 import analysisReducer from './features/analysis/analysisSlice';
-import uploadReducer from './features/upload/uploadSlice';
 import workItemsReducer from './features/workItems/workItemsSlice';
 import azureReducer from './features/azure/azureSlice';
 import jiraReducer from './features/jira/jiraSlice';
@@ -13,7 +12,6 @@ import reviewReducer from './features/review/reviewSlice';
 const rootReducer = combineReducers({
   auth: authReducer,
   analysis: analysisReducer,
-  upload: uploadReducer,
   workItems: workItemsReducer,
   azure: azureReducer,
   jira: jiraReducer,

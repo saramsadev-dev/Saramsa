@@ -3,8 +3,7 @@ Views package for feedback analysis.
 
 Organized into logical modules:
 - analysis_views: Core analysis operations
-- insights_views: Insights and reporting views  
-- file_upload_views: File upload and processing views
+- insights_views: Insights and reporting views
 - helpers: Shared helper functions
 """
 
@@ -35,9 +34,6 @@ from .ingestion_schedule_views import (
     IngestionScheduleView,
     IngestionRunNowView,
 )
-from .file_upload_views import (
-    FeedbackFileUploadView,
-)
 from .digest_views import (
     DigestPreferenceView,
     DigestPreviewView,
@@ -62,8 +58,6 @@ __all__ = [
     'CumulativeAnalysisView',
     'AnalysisComparisonView',
     'UserStoriesView',
-    # File upload views
-    'FeedbackFileUploadView',
     # Digest views
     'DigestPreferenceView',
     'DigestPreviewView',
