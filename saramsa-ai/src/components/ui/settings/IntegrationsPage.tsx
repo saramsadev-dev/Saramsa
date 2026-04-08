@@ -179,13 +179,6 @@ export function IntegrationsPage() {
       localStorage.setItem("project_id", createdProject.id);
       localStorage.setItem("selected_project_name", project.name);
 
-      // Handle both new project creation and existing project navigation
-      if (payload.already_exists || res.data.already_exists) {
-        console.log("Project already exists, navigating to existing project");
-      } else {
-        console.log("Project created successfully, navigating to dashboard");
-      }
-
       // Navigate to project dashboard
       const encryptedProjectId = encryptProjectId(createdProject.id);
       router.push(`/projects/${encryptedProjectId}/dashboard/`);
