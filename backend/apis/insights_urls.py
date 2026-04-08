@@ -1,0 +1,39 @@
+from django.urls import path
+from feedback_analysis.views import (
+    AnalyzeCommentsView,
+    TaskStatusView,
+    TaskListView,
+    GetUserCommentsView,
+    UserStoriesView,
+    InsightReviewListView,
+    InsightReviewUpdateView,
+    InsightRulesView,
+    InsightRulesApplyView,
+    IngestionScheduleView,
+    IngestionRunNowView,
+)
+from work_items.views import (
+    WorkItemGenerationView,
+    WorkItemSubmissionView,
+    WorkItemUpdateView,
+    WorkItemRemovalView,
+)
+
+urlpatterns = [
+    path('analyze/', AnalyzeCommentsView.as_view(), name='insights_analyze'),
+    path('task-status/<str:task_id>/', TaskStatusView.as_view(), name='insights_task_status'),
+    path('tasks/', TaskListView.as_view(), name='insights_tasks'),
+    path('comments/', GetUserCommentsView.as_view(), name='insights_comments'),
+    path('user-story-creation/', WorkItemGenerationView.as_view(), name='insights_user_story_creation'),
+    path('user-story-submission/', WorkItemSubmissionView.as_view(), name='insights_user_story_submission'),
+    path('user-stories/remove-work-items/', WorkItemRemovalView.as_view(), name='insights_remove_work_items'),
+    path('user-stories/all/', UserStoriesView.as_view(), name='insights_user_stories_all'),
+    path('user-stories/', UserStoriesView.as_view(), name='insights_user_stories'),
+    path('work-items/<str:work_item_id>/update/', WorkItemUpdateView.as_view(), name='insights_work_item_update'),
+    path('review/update/', InsightReviewUpdateView.as_view(), name='insights_review_update'),
+    path('review/', InsightReviewListView.as_view(), name='insights_review'),
+    path('rules/apply/', InsightRulesApplyView.as_view(), name='insights_rules_apply'),
+    path('rules/', InsightRulesView.as_view(), name='insights_rules'),
+    path('ingestion/schedule/', IngestionScheduleView.as_view(), name='insights_ingestion_schedule'),
+    path('ingestion/run-now/', IngestionRunNowView.as_view(), name='insights_ingestion_run_now'),
+]
