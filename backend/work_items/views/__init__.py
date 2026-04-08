@@ -37,6 +37,8 @@ __all__ = [
     'WorkItemUpdateView',
     'WorkItemsByPlatformView',
     'WorkItemRemovalView',
+    'WorkItemQualityRulesView',
+    'WorkItemQualityCheckView',
     'ReviewQueueListView',
     'ReviewQueueStatsView',
     'CandidateApproveView',

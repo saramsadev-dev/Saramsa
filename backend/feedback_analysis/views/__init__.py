@@ -63,6 +63,14 @@ __all__ = [
     'UserStoryUpdateView',
     'UserStoryDeleteView',
     'UserStoryBulkDeleteView',
+    # Review views
+    'InsightReviewListView',
+    'InsightReviewUpdateView',
+    'InsightRulesView',
+    'InsightRulesApplyView',
+    # Ingestion schedule views
+    'IngestionScheduleView',
+    'IngestionRunNowView',
     # Digest views
     'DigestPreferenceView',
     'DigestPreviewView',

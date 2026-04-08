@@ -1,8 +1,6 @@
 from .analysis_service import AnalysisService, get_analysis_service
 from .task_service import TaskService, get_task_service
 from .aspect_suggestion_service import AspectSuggestionService, get_aspect_suggestion_service
-from .aspect_taxonomy_service import AspectTaxonomyService, get_aspect_taxonomy_service
-from .production_processing_service import ProductionProcessingService, get_production_processing_service
 from .taxonomy_service import TaxonomyService, get_taxonomy_service
 from .narration_service import NarrationService, get_narration_service
 from .pipeline_health import PipelineHealth
@@ -16,10 +14,6 @@ __all__ = [
     'get_task_service',
     'AspectSuggestionService',
     'get_aspect_suggestion_service',
-    'AspectTaxonomyService',
-    'get_aspect_taxonomy_service',
-    'ProductionProcessingService',
-    'get_production_processing_service',
     'TaxonomyService',
     'get_taxonomy_service',
     'NarrationService',
