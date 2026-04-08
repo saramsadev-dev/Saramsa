@@ -10,7 +10,6 @@ azure-core==1.35.0
 azure-communication-email==1.0.0
 azure-identity==1.25.0
 azure-monitor-opentelemetry-exporter==1.0.0b41
-bcrypt==4.1.2
 billiard==4.2.4
 cachetools==5.5.2
 celery==5.3.4
