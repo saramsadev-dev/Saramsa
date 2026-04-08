@@ -110,6 +110,16 @@ class AuthenticationService:
         """Save/update user data."""
         return self.user_repo.save_user(user_data)
 
+    def change_password(self, email: str, new_password: str) -> bool:
+        """Set a new hashed password for the user identified by email."""
+        from authentication.models import UserAccount
+        user = UserAccount.objects.filter(email=email).first()
+        if not user:
+            return False
+        user.set_password(new_password)
+        user.save(update_fields=["password", "updated_at"])
+        return True
+
     def send_password_reset_email(self, email: str, reset_link: str) -> bool:
         """Send password reset email with a secure link."""
         subject = getattr(settings, "PASSWORD_RESET_EMAIL_SUBJECT", "Reset your Saramsa password")
