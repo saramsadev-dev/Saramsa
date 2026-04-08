@@ -33,7 +33,7 @@ def _iso(dt: Optional[datetime]) -> Optional[str]:
 
 
 def _user_to_dict(user: UserAccount) -> Dict[str, Any]:
-    data = model_to_dict(user)
+    data = model_to_dict(user, exclude=["password"])
     data["createdAt"] = _iso(user.created_at)
     data["updatedAt"] = _iso(user.updated_at)
     data["date_joined"] = _iso(user.date_joined)

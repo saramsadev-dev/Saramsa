@@ -292,7 +292,3 @@ def get_authentication_service() -> AuthenticationService:
     return _authentication_service
 
 
-# Legacy alias for backward compatibility
-def get_user_service() -> AuthenticationService:
-    """Legacy alias - use get_authentication_service() instead."""
-    return get_authentication_service()

@@ -1,7 +1,6 @@
 from rest_framework import permissions
 from apis.infrastructure.storage_service import storage_service
 
-#check
 def _get_role_from_user(user):
     if not user:
         return None

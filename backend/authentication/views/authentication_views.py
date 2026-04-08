@@ -17,7 +17,7 @@ from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from ..services import get_authentication_service
 
-from ..permissions import NoAuthentication
+from ..permissions import NoAuthentication, IsAdmin
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 import logging
@@ -189,33 +189,16 @@ class ProfileMeView(APIView):
 
 
 class UserListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdmin]
     authentication_classes = [AppJWTAuthentication]
-    
+
     @handle_service_errors
     def get(self, request):
         """Get all users - admin only."""
-        from authentication.permissions import _get_role_from_user
-        if _get_role_from_user(request.user) != "admin":
-            return StandardResponse.error(
-                title="Forbidden",
-                detail="Only admins can list all users.",
-                status_code=403,
-                error_type="forbidden",
-                instance=request.path,
-            )
-
         auth_service = get_authentication_service()
         users = auth_service.get_all_users()
-        
-        for user in users:
-            user.pop('password', None)
-        
         return StandardResponse.success(
-            data={
-                "users": users,
-                "count": len(users)
-            },
+            data={"users": users, "count": len(users)},
             message="Users retrieved successfully"
         )
 
@@ -223,11 +206,13 @@ class UserListView(APIView):
 class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [AppJWTAuthentication]
-    
+
     @handle_service_errors
     def get(self, request, user_id):
-        """Get specific user by ID - restricted to own profile or admin."""
-        if str(user_id) != str(request.user.id):
+        """Get specific user by ID - own profile or admin."""
+        from authentication.permissions import _get_role_from_user
+        is_admin = _get_role_from_user(request.user) == "admin"
+        if not is_admin and str(user_id) != str(request.user.id):
             return StandardResponse.error(
                 title="Forbidden",
                 detail="You can only view your own profile.",
@@ -238,20 +223,14 @@ class UserDetailView(APIView):
 
         auth_service = get_authentication_service()
         user_data = auth_service.get_user_by_id(user_id)
-        
+
         if not user_data:
             return StandardResponse.not_found(
                 detail=f"User with ID '{user_id}' was not found",
                 instance=request.path
             )
-        
-        if 'password' in user_data:
-            del user_data['password']
-        
-        return StandardResponse.success(
-            data=user_data,
-            message="User retrieved successfully"
-        )
+
+        return StandardResponse.success(data=user_data, message="User retrieved successfully")
 
 
 class LoginView(APIView):

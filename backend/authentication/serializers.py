@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
-from .services import get_user_service
+from .services import get_authentication_service
 
 
 class AppUserSerializer(serializers.Serializer):
@@ -14,7 +14,7 @@ class AppUserSerializer(serializers.Serializer):
     role = serializers.CharField(max_length=50, required=False, default='user')
 
     def validate_email(self, value):
-        if get_user_service().get_user_by_email(value):
+        if get_authentication_service().get_user_by_email(value):
             raise serializers.ValidationError("Email already exists")
         return value
 
@@ -29,10 +29,10 @@ class AppTokenObtainPairSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        user_service = get_user_service()
-        user_data = user_service.get_user_by_email(attrs['email'])
+        auth_service = get_authentication_service()
+        user_data = auth_service.get_user_by_email(attrs['email'])
 
-        if not user_data or not user_service._verify_password(attrs['password'], user_data.get('password', '')):
+        if not user_data or not auth_service._verify_password(attrs['password'], user_data.get('password', '')):
             raise serializers.ValidationError("Invalid credentials")
 
         if not user_data.get('is_active', True):
@@ -67,8 +67,8 @@ class AppTokenRefreshSerializer(serializers.Serializer):
             raise serializers.ValidationError(str(e))
 
         user_id = refresh.get(api_settings.USER_ID_CLAIM)
-        user_service = get_user_service()
-        user_data = user_service.get_user_by_id(user_id)
+        auth_service = get_authentication_service()
+        user_data = auth_service.get_user_by_id(user_id)
 
         if not user_data:
             raise serializers.ValidationError("User not found")
