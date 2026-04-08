@@ -9,11 +9,9 @@ attrs==25.3.0
 azure-core==1.35.0
 azure-identity==1.25.0
 azure-monitor-opentelemetry-exporter==1.0.0b41
-bcrypt==4.1.2
 billiard==4.2.4
 cachetools==5.5.2
 celery==5.3.4
--e git+https://github.com/RakeshMahendran/Saramsa.git@a20af6b2a6cb0143e04ff4f5acb0f300317a3bce#egg=celery_ops&subdirectory=celery_ops
 certifi==2025.1.31
 cffi==2.0.0
 charset-normalizer==3.4.1
