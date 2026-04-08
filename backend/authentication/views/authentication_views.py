@@ -9,7 +9,6 @@ Contains views for authentication operations:
 - User listing and details
 """
 
-from http import HTTPStatus
 from rest_framework import generics, permissions, serializers
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -34,8 +33,7 @@ from ..serializers import (
     ResetPasswordSerializer,
     RegistrationOtpRequestSerializer
 )
-from ..authentication import AppJWTAuthentication, AppUser
-import bcrypt
+from ..authentication import AppJWTAuthentication
 
 
 class RegisterView(generics.CreateAPIView):
@@ -426,8 +424,7 @@ class ResetPasswordView(APIView):
             hashed_password = ResetPasswordSerializer().hash_password(new_password)
             
             # Update user password using service layer
-            user_data['password'] = hashed_password
-            auth_service.save_user(user_data)
+            auth_service.change_password(email, new_password)
             
             # Mark token as used using service layer
             auth_service.mark_reset_token_used(token)
