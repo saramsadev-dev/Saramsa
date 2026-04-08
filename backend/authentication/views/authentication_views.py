@@ -35,7 +35,6 @@ from ..serializers import (
     RegistrationOtpRequestSerializer
 )
 from ..authentication import AppJWTAuthentication, AppUser
-import bcrypt
 
 
 class RegisterView(generics.CreateAPIView):
@@ -422,11 +421,8 @@ class ResetPasswordView(APIView):
                     instance=request.path
                 )
             
-            # Hash new password
-            hashed_password = ResetPasswordSerializer().hash_password(new_password)
-            
             # Update user password using service layer
-            user_data['password'] = hashed_password
+            user_data['password'] = auth_service._hash_password(new_password)
             auth_service.save_user(user_data)
             
             # Mark token as used using service layer

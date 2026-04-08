@@ -7,10 +7,10 @@ password management, and user profile operations.
 
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone, timedelta
-import uuid
-import bcrypt
 import hashlib
 import secrets
+import uuid
+from django.contrib.auth.hashers import make_password, check_password
 from ..repositories import UserRepository
 import logging
 from django.conf import settings
@@ -256,24 +256,11 @@ class AuthenticationService:
             return False
     
     def _hash_password(self, password: str) -> str:
-        """Hash password using bcrypt."""
-        try:
-            password_bytes = password.encode('utf-8')
-            salt = bcrypt.gensalt()
-            hashed = bcrypt.hashpw(password_bytes, salt)
-            return hashed.decode('utf-8')
-        except Exception as e:
-            logger.error(f"Error hashing password: {e}")
-            raise ValueError("Failed to hash password")
-    
+        return make_password(password)
+
     def _verify_password(self, password: str, stored_password: str) -> bool:
-        """Verify password against stored bcrypt hash."""
         try:
-            if isinstance(stored_password, str):
-                stored_password = stored_password.encode('utf-8')
-            
-            password_bytes = password.encode('utf-8')
-            return bcrypt.checkpw(password_bytes, stored_password)
+            return check_password(password, stored_password)
         except Exception as e:
             logger.error(f"Error verifying password: {e}")
             return False

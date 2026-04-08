@@ -1,3 +1,4 @@
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils import timezone
 
@@ -14,6 +15,12 @@ class UserAccount(TimestampedModel):
     id = models.CharField(max_length=64, primary_key=True)
     email = models.EmailField(unique=True, db_index=True)
     password = models.TextField()
+
+    def check_password(self, raw_password: str) -> bool:
+        return check_password(raw_password, self.password)
+
+    def set_password(self, raw_password: str) -> None:
+        self.password = make_password(raw_password)
     first_name = models.CharField(max_length=150, blank=True, default="")
     last_name = models.CharField(max_length=150, blank=True, default="")
     is_active = models.BooleanField(default=True, db_index=True)
