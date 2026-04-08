@@ -57,21 +57,13 @@ class AuthenticationService:
             raise
     
     def authenticate_user(self, email: str, password: str) -> Optional[Dict[str, Any]]:
-        """Authenticate user with email and password (Django passes this as `username`)."""
+        """Authenticate user with email and password."""
         try:
-            user = self.user_repo.get_by_email(email)
-            if not user:
-                return None
-            
-            if not user.get('is_active', False):
-                return None
-            
-            # Verify password
-            if self._verify_password(password, user.get('password', '')):
-                return user
-            
+            from authentication.models import UserAccount
+            user = UserAccount.objects.filter(email=email, is_active=True).first()
+            if user and user.check_password(password):
+                return self.user_repo.get_by_id(str(user.id))
             return None
-            
         except Exception as e:
             logger.error(f"Error authenticating user: {e}")
             return None

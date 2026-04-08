@@ -30,13 +30,10 @@ class AppTokenObtainPairSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         auth_service = get_authentication_service()
-        user_data = auth_service.get_user_by_email(attrs['email'])
+        user_data = auth_service.authenticate_user(attrs['email'], attrs['password'])
 
-        if not user_data or not auth_service._verify_password(attrs['password'], user_data.get('password', '')):
+        if not user_data:
             raise serializers.ValidationError("Invalid credentials")
-
-        if not user_data.get('is_active', True):
-            raise serializers.ValidationError("User account is disabled")
 
         refresh = RefreshToken()
         refresh[api_settings.USER_ID_CLAIM] = user_data['id']

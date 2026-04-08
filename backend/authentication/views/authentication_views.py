@@ -252,30 +252,13 @@ class LoginView(APIView):
                 instance=request.path
             )
         
-        # Use service for authentication
-        auth_service = get_authentication_service()
-        user_data = auth_service.get_user_by_email(email)
-        
-        if not user_data or not auth_service._verify_password(password, user_data.get('password', '')):
-            return StandardResponse.unauthorized(
-                detail="Invalid credentials",
-                instance=request.path
-            )
-        
-        # Check if user is active
-        if not user_data.get('is_active', True):
-            return StandardResponse.unauthorized(
-                detail="User account is disabled",
-                instance=request.path
-            )
-        
-        # Generate JWT token
         from ..serializers import AppTokenObtainPairSerializer
-        serializer = AppTokenObtainPairSerializer()
-        token_data = serializer.validate({
-            'email': email,
-            'password': password
-        })
+        from rest_framework.exceptions import ValidationError
+        try:
+            serializer = AppTokenObtainPairSerializer()
+            token_data = serializer.validate({'email': email, 'password': password})
+        except ValidationError:
+            return StandardResponse.unauthorized(detail="Invalid credentials", instance=request.path)
         
         return StandardResponse.success(
             data=token_data,
