@@ -2,6 +2,10 @@
 .DS_Store
 Thumbs.db
 
+# SQLite databases
+*.sqlite3
+*.db
+
 # Saramsa specific files
 .saramsa-pids.json
 .saramsa-*.log
