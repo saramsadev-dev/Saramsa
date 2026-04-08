@@ -4,7 +4,6 @@ Views package for feedback analysis.
 Organized into logical modules:
 - analysis_views: Core analysis operations
 - insights_views: Insights and reporting views
-- helpers: Shared helper functions
 """
 
 from .analysis_views import (

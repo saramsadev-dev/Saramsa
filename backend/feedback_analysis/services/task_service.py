@@ -1,7 +1,6 @@
 from celery import shared_task, current_task
 from typing import List
 from .analysis_service import get_analysis_service
-from .schema_validator import get_validation_service
 from .taxonomy_service import get_taxonomy_service
 from .pipeline_health import PipelineHealth
 from apis.infrastructure.cache_service import get_cache_service
@@ -20,7 +19,6 @@ class TaskService:
     """Service for managing background tasks."""
     
     def __init__(self):
-        self.validation_service = get_validation_service()
         self.local_processing_service = None
     
     def process_feedback_background(self, comments, company_name, user_id_str, project_id, analysis_id, task_id=None, suggested_aspects=None):

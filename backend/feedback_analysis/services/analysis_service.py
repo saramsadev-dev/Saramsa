@@ -6,8 +6,6 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 import uuid
 from ..repositories import AnalysisRepository
-from aiCore.services.openai_client import get_azure_deployment_name
-from .chunking_service import get_chunking_service
 from authentication.services import get_authentication_service
 from apis.core.error_handlers import handle_service_errors
 from apis.infrastructure.cache_service import cache_analysis_result, get_cache_service
@@ -21,7 +19,6 @@ class AnalysisService:
     
     def __init__(self, project_service=None):
         self.analysis_repo = AnalysisRepository()
-        self.chunking_service = get_chunking_service()
         self.auth_service = get_authentication_service()
         # Use dependency injection instead of local import
         self._project_service = project_service
@@ -96,108 +93,6 @@ class AnalysisService:
             logger.error(f"Error getting user analysis summary: {e}")
             raise
     
-    def create_sentiment_analysis(self, user_id: str, feedback_data: str, 
-                                 analysis_results: Dict[str, Any], 
-                                 project_id: str = None) -> Dict[str, Any]:
-        """Create a sentiment analysis record."""
-        try:
-            # Chunk feedback data for optimal processing
-            chunks = self.chunking_service.chunk_feedback_for_sentiment(feedback_data)
-            
-            analysis_data = {
-                "analysisSubType": "sentiment",
-                "feedbackData": feedback_data,
-                "results": analysis_results,
-                "chunks_info": {
-                    "total_chunks": len(chunks),
-                    "chunking_strategy": "sentiment_optimized"
-                },
-                "metadata": {
-                    "analysisEngine": "azure_openai",
-                    "modelUsed": get_azure_deployment_name(),
-                    "processingTime": analysis_results.get('processing_time'),
-                    "commentsProcessed": len(feedback_data.split('\n')) if feedback_data else 0,
-                    "chunksProcessed": len(chunks)
-                }
-            }
-            
-            return self.create_analysis(user_id, analysis_data, project_id)
-            
-        except Exception as e:
-            logger.error(f"Error creating sentiment analysis: {e}")
-            raise
-    
-    def create_deep_analysis(self, user_id: str, feedback_data: str, 
-                           work_items: List[Dict[str, Any]], platform: str,
-                           project_id: str = None) -> Dict[str, Any]:
-        """Create a deep analysis record with work items."""
-        try:
-            # Chunk feedback data for optimal deep analysis processing
-            chunks = self.chunking_service.chunk_feedback_for_deep_analysis(feedback_data)
-            
-            analysis_data = {
-                "analysisSubType": "deep_analysis",
-                "feedbackData": feedback_data,
-                "workItems": work_items,
-                "platform": platform,
-                "summary": self._generate_work_items_summary(work_items),
-                "chunks_info": {
-                    "total_chunks": len(chunks),
-                    "chunking_strategy": "deep_analysis_optimized"
-                },
-                "metadata": {
-                    "analysisEngine": "azure_openai",
-                    "modelUsed": get_azure_deployment_name(),
-                    "platform": platform,
-                    "workItemsGenerated": len(work_items),
-                    "commentsProcessed": len(feedback_data.split('\n')) if feedback_data else 0,
-                    "chunksProcessed": len(chunks)
-                }
-            }
-            
-            return self.create_analysis(user_id, analysis_data, project_id)
-            
-        except Exception as e:
-            logger.error(f"Error creating deep analysis: {e}")
-            raise
-    
-    def _generate_work_items_summary(self, work_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Generate summary statistics for work items."""
-        if not work_items:
-            return {
-                "total_items": 0,
-                "by_type": {},
-                "by_priority": {}
-            }
-        
-        # Count by type
-        type_counts = {}
-        priority_counts = {}
-        
-        for item in work_items:
-            item_type = item.get('type', 'unknown')
-            priority = item.get('priority', 'unknown')
-            
-            type_counts[item_type] = type_counts.get(item_type, 0) + 1
-            priority_counts[priority] = priority_counts.get(priority, 0) + 1
-        
-        return {
-            "total_items": len(work_items),
-            "by_type": type_counts,
-            "by_priority": priority_counts
-        }
-
-    def get_chunking_info(self, feedback_data: str) -> Dict[str, Any]:
-        """Get information about how feedback would be chunked for analysis."""
-        try:
-            return self.chunking_service.get_chunk_info(feedback_data)
-        except Exception as e:
-            logger.error(f"Error getting chunking info: {e}")
-            return {
-                "error": str(e),
-                "total_tokens": 0,
-                "total_characters": len(feedback_data) if feedback_data else 0
-            }
     
     # User and Project Context Methods
     def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
