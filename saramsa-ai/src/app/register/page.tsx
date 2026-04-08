@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { DataStream, AINodes, AIProcessing } from '@/components/ui/animations';
+import { AINodes, AIProcessing } from '@/components/ui/animations';
 
 // Lazy-load components to avoid SSR issues
 

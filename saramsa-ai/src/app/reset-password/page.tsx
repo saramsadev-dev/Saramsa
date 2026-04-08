@@ -10,7 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
 import { apiRequest } from '@/lib/apiRequest';
-import { DataStream, TaskCards, AIProcessing } from '@/components/ui/animations';
+import { TaskCards, AIProcessing } from '@/components/ui/animations';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 

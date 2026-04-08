@@ -38,14 +38,8 @@ export default function ForgotPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [resetLink, setResetLink] = useState<string | null>(null);
 
-  // Handle component mount
   useEffect(() => {
     setMounted(true);
-    
-    // Cleanup function
-    return () => {
-      // Any cleanup code if needed
-    };
   }, []);
 
   const {
@@ -75,8 +69,6 @@ export default function ForgotPasswordPage() {
         // In development, log the reset link if provided
         if (result.data?.reset_link) {
           setResetLink(result.data.reset_link);
-          if (typeof window !== 'undefined') {
-          }
         }
       } else {
         setError(result.data?.error || 'Failed to send reset email. Please try again.');
