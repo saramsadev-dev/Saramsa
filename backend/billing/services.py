@@ -133,6 +133,32 @@ class StripeBillingService:
         )
         return {"portal_url": portal.url}
 
+    def cancel_subscription(self, user_id: str) -> Dict[str, Any]:
+        self._ensure_configured()
+        profile = BillingProfile.objects.filter(user_id=str(user_id)).first()
+        if not profile or not profile.stripe_subscription_id:
+            raise ValueError("No active subscription found.")
+        stripe = self._stripe()
+        sub = stripe.Subscription.modify(
+            profile.stripe_subscription_id,
+            cancel_at_period_end=True,
+        )
+        self._upsert_subscription_from_obj(sub, fallback_user_id=user_id)
+        return {"cancel_at_period_end": True, "status": sub.get("status")}
+
+    def resume_subscription(self, user_id: str) -> Dict[str, Any]:
+        self._ensure_configured()
+        profile = BillingProfile.objects.filter(user_id=str(user_id)).first()
+        if not profile or not profile.stripe_subscription_id:
+            raise ValueError("No active subscription found.")
+        stripe = self._stripe()
+        sub = stripe.Subscription.modify(
+            profile.stripe_subscription_id,
+            cancel_at_period_end=False,
+        )
+        self._upsert_subscription_from_obj(sub, fallback_user_id=user_id)
+        return {"cancel_at_period_end": False, "status": sub.get("status")}
+
     def get_subscription_status(self, user_id: str) -> Dict[str, Any]:
         profile = BillingProfile.objects.filter(user_id=str(user_id)).first()
         if not profile:
