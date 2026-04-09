@@ -97,7 +97,10 @@ class EmbeddingService(metaclass=SingletonMeta):
             return False
 
     def _select_backend(self) -> str:
-        """Select best available backend: gpu > onnx > cpu."""
+        """Select best available backend: gpu > onnx > cpu.
+
+        Skips ONNX if available RAM is below 2GB to avoid OOM during export.
+        """
         forced = os.getenv("EMBEDDING_BACKEND", "").strip().lower()
         if forced in ("gpu", "onnx", "cpu"):
             logger.info(f"EMBEDDING_BACKEND override: {forced}")
@@ -105,6 +108,15 @@ class EmbeddingService(metaclass=SingletonMeta):
 
         if torch.cuda.is_available():
             return "gpu"
+
+        avail_gb = psutil.virtual_memory().available / (1024 ** 3)
+        if avail_gb < 2.0:
+            logger.info(
+                f"Skipping ONNX for embeddings — only {avail_gb:.1f}GB RAM available. "
+                f"Falling back to PyTorch CPU."
+            )
+            return "cpu"
+
         if self._onnx_available():
             return "onnx"
         return "cpu"

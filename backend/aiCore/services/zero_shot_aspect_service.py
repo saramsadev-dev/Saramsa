@@ -131,6 +131,7 @@ class ZeroShotAspectService:
 
         Priority: NLI_BACKEND env var override > auto-detect.
         Auto-detect: GPU if CUDA available, else ONNX FP32 if installed, else CPU.
+        Skips ONNX if available RAM < 2GB to avoid OOM during export.
 
         Note: INT8 quantization is NOT offered here — DeBERTa-v3 NLI accuracy
         collapses under INT8 dynamic quantization (scores drop from ~1.0 to <0.35).
@@ -142,6 +143,15 @@ class ZeroShotAspectService:
 
         if torch.cuda.is_available():
             return "gpu"
+
+        avail_gb = psutil.virtual_memory().available / (1024 ** 3)
+        if avail_gb < 2.0:
+            logger.info(
+                f"[DIAG] Skipping ONNX for NLI — only {avail_gb:.1f}GB RAM available. "
+                f"Falling back to PyTorch CPU."
+            )
+            return "cpu"
+
         if _onnx_available():
             return "onnx"
         return "cpu"

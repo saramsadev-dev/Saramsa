@@ -144,7 +144,11 @@ class LocalSentimentService(metaclass=SingletonMeta):
             return False
 
     def _select_backend(self) -> str:
-        """Select best available backend: gpu > onnx-int8 > onnx > cpu."""
+        """Select best available backend: gpu > onnx-int8 > onnx > cpu.
+
+        Skips ONNX if available RAM is below 2GB — ONNX export temporarily
+        doubles memory usage (holds both PyTorch + ONNX models).
+        """
         forced = os.getenv("SENTIMENT_BACKEND", "").strip().lower()
         if forced in ("gpu", "onnx-int8", "onnx", "cpu"):
             logger.info(f"SENTIMENT_BACKEND override: {forced}")
@@ -152,6 +156,15 @@ class LocalSentimentService(metaclass=SingletonMeta):
 
         if torch.cuda.is_available():
             return "gpu"
+
+        avail_gb = psutil.virtual_memory().available / (1024 ** 3)
+        if avail_gb < 2.0:
+            logger.info(
+                f"Skipping ONNX for sentiment — only {avail_gb:.1f}GB RAM available "
+                f"(need >=2GB for safe ONNX export). Falling back to PyTorch CPU."
+            )
+            return "cpu"
+
         if self._onnx_available() and self._onnx_quantization_available():
             return "onnx-int8"
         if self._onnx_available():
