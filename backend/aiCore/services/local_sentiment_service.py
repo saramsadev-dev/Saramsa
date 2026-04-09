@@ -24,6 +24,7 @@ from threading import Lock
 from dataclasses import dataclass
 import time
 import os
+import psutil
 
 logger = logging.getLogger(__name__)
 
