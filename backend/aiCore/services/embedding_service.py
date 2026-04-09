@@ -71,11 +71,12 @@ class EmbeddingService(metaclass=SingletonMeta):
     def __init__(self):
         """
         Initialize the embedding service with model loading and error handling.
-        
+
         Raises:
             RuntimeError: If model loading fails
         """
         self._model: Optional[SentenceTransformer] = None
+        self._backend = "not_loaded"
         self._aspect_cache: Dict[str, np.ndarray] = {}
         self._cache_run_id: Optional[str] = None
         self._cache_lock: Lock = Lock()  # Thread safety for cache operations
@@ -86,28 +87,56 @@ class EmbeddingService(metaclass=SingletonMeta):
             'last_access_time': None
         }
         self._initialize_model()
-    
+
+    @staticmethod
+    def _onnx_available() -> bool:
+        try:
+            import onnxruntime  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def _select_backend(self) -> str:
+        """Select best available backend: gpu > onnx > cpu."""
+        forced = os.getenv("EMBEDDING_BACKEND", "").strip().lower()
+        if forced in ("gpu", "onnx", "cpu"):
+            logger.info(f"EMBEDDING_BACKEND override: {forced}")
+            return forced
+
+        if torch.cuda.is_available():
+            return "gpu"
+        if self._onnx_available():
+            return "onnx"
+        return "cpu"
+
     def _initialize_model(self) -> None:
         """
-        Load the sentence transformer model with comprehensive error handling.
-        
-        Raises:
-            RuntimeError: If model loading fails after all retry attempts
+        Load the sentence transformer model with backend auto-detection.
+
+        Priority: GPU > ONNX > PyTorch CPU.
+        sentence-transformers supports ONNX natively via backend parameter.
         """
         try:
-            logger.info(f"Loading embedding model: {self.MODEL_NAME}")
-            
-            # Set device preference (CPU for compatibility, GPU if available)
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info(f"Using device: {device}")
-            
-            # Load model with error handling
-            self._model = SentenceTransformer(self.MODEL_NAME, device=device)
-            
+            backend = self._select_backend()
+            logger.info(f"Loading embedding model: {self.MODEL_NAME} (backend: {backend})")
+
+            device = "cuda" if backend == "gpu" else "cpu"
+
+            if backend == "onnx":
+                self._backend = "onnx-cpu"
+                self._model = SentenceTransformer(
+                    self.MODEL_NAME,
+                    device=device,
+                    backend="onnx",
+                )
+            else:
+                self._backend = f"pytorch-{device}"
+                self._model = SentenceTransformer(self.MODEL_NAME, device=device)
+
             # Verify model loaded correctly
             if self._model is None:
                 raise RuntimeError("Model loaded but returned None")
-            
+
             # Test model with a simple embedding
             test_embedding = self._model.encode("test", convert_to_numpy=True)
             if test_embedding.shape[0] != self.EMBEDDING_DIMENSION:
@@ -115,12 +144,12 @@ class EmbeddingService(metaclass=SingletonMeta):
                     f"Model output dimension {test_embedding.shape[0]} "
                     f"does not match expected {self.EMBEDDING_DIMENSION}"
                 )
-            
+
             logger.info(
                 f"Successfully loaded {self.MODEL_NAME} "
-                f"(dimension: {self.EMBEDDING_DIMENSION}, device: {device})"
+                f"(backend: {self._backend}, dimension: {self.EMBEDDING_DIMENSION})"
             )
-            
+
         except Exception as e:
             error_msg = f"Failed to load embedding model {self.MODEL_NAME}: {str(e)}"
             logger.error(error_msg)

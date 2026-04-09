@@ -9,8 +9,11 @@ Model: MoritzLaurer/deberta-v3-base-zeroshot-v2.0 (configurable via NLI_ASPECT_M
 
 Backend selection (NLI_BACKEND env var or auto-detect):
   - gpu:  PyTorch FP16 on CUDA (fastest with GPU)
-  - onnx: ONNX Runtime on CPU (2-4x faster than PyTorch CPU)
+  - onnx: ONNX Runtime FP32 on CPU (1.4x faster than PyTorch CPU)
   - cpu:  PyTorch FP32 on CPU (fallback)
+
+Note: INT8 quantization is NOT supported for DeBERTa-v3 NLI — it destroys
+classification accuracy (scores collapse to <0.35 with wrong rankings).
 """
 
 import logging
@@ -101,7 +104,7 @@ class ZeroShotAspectService:
             # ONNX Runtime models don't expose PyTorch parameters
             logger.info(
                 f"[DIAG] Model weight verification | "
-                f"backend=onnx-cpu (ONNX Runtime session, no PyTorch weights)"
+                f"backend={self._backend} (ONNX Runtime session, no PyTorch weights)"
             )
             return
 
@@ -127,7 +130,10 @@ class ZeroShotAspectService:
         """Decide which backend to use: gpu, onnx, or cpu.
 
         Priority: NLI_BACKEND env var override > auto-detect.
-        Auto-detect: GPU if CUDA available, else ONNX if installed, else CPU.
+        Auto-detect: GPU if CUDA available, else ONNX FP32 if installed, else CPU.
+
+        Note: INT8 quantization is NOT offered here — DeBERTa-v3 NLI accuracy
+        collapses under INT8 dynamic quantization (scores drop from ~1.0 to <0.35).
         """
         forced = os.getenv("NLI_BACKEND", "").strip().lower()
         if forced in ("gpu", "onnx", "cpu"):

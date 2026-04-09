@@ -109,13 +109,14 @@ class LocalSentimentService(metaclass=SingletonMeta):
     def __init__(self):
         """
         Initialize the sentiment service with model loading and error handling.
-        
+
         Raises:
             RuntimeError: If model loading fails
         """
         self._model = None
         self._tokenizer = None
         self._pipeline = None
+        self._backend = "not_loaded"
         self._stats = {
             'classifications': 0,
             'batch_classifications': 0,
@@ -124,34 +125,57 @@ class LocalSentimentService(metaclass=SingletonMeta):
         }
         self._stats_lock: Lock = Lock()
         self._initialize_model()
-    
+
+    @staticmethod
+    def _onnx_available() -> bool:
+        try:
+            from optimum.onnxruntime import ORTModelForSequenceClassification  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    @staticmethod
+    def _onnx_quantization_available() -> bool:
+        try:
+            from optimum.onnxruntime import ORTQuantizer  # noqa: F401
+            from optimum.onnxruntime.configuration import AutoQuantizationConfig  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def _select_backend(self) -> str:
+        """Select best available backend: gpu > onnx-int8 > onnx > cpu."""
+        forced = os.getenv("SENTIMENT_BACKEND", "").strip().lower()
+        if forced in ("gpu", "onnx-int8", "onnx", "cpu"):
+            logger.info(f"SENTIMENT_BACKEND override: {forced}")
+            return forced
+
+        if torch.cuda.is_available():
+            return "gpu"
+        if self._onnx_available() and self._onnx_quantization_available():
+            return "onnx-int8"
+        if self._onnx_available():
+            return "onnx"
+        return "cpu"
+
     def _initialize_model(self) -> None:
         """
-        Load the sentiment classification model with comprehensive error handling.
+        Load the sentiment classification model with backend auto-detection.
 
-        Raises:
-            RuntimeError: If model loading fails
+        Priority: GPU > ONNX+INT8 > ONNX > PyTorch CPU
         """
         try:
-            logger.info(f"Loading sentiment model: {self.MODEL_NAME}")
+            backend = self._select_backend()
+            logger.info(f"Loading sentiment model: {self.MODEL_NAME} (backend: {backend})")
 
-            # Set device preference (GPU if available)
-            device = 0 if torch.cuda.is_available() else -1
-            device_name = "cuda" if device == 0 else "cpu"
-            logger.info(f"Using device: {device_name}")
-
-            # Load tokenizer and model
-            self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
-            model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
-
-            # Create pipeline for efficient inference
-            self._pipeline = pipeline(
-                "sentiment-analysis",
-                model=model,
-                tokenizer=self._tokenizer,
-                device=device,
-                top_k=None,  # Return all 5 star scores
-            )
+            if backend == "gpu":
+                self._init_pytorch_gpu()
+            elif backend == "onnx-int8":
+                self._init_onnx_int8_cpu()
+            elif backend == "onnx":
+                self._init_onnx_cpu()
+            else:
+                self._init_pytorch_cpu()
 
             # Test model with a simple classification
             test_result = self._pipeline("test")
@@ -162,16 +186,89 @@ class LocalSentimentService(metaclass=SingletonMeta):
             if not isinstance(first_result, list) or len(first_result) < 5:
                 raise RuntimeError("Model test failed - expected list of 5 star classes")
 
-            logger.info(f"Model test passed. Sample result: {first_result[0]}")
             logger.info(
                 f"Successfully loaded {self.MODEL_NAME} "
-                f"(device: {device_name}, classes: {len(first_result)})"
+                f"(backend: {self._backend}, classes: {len(first_result)})"
             )
 
         except Exception as e:
             error_msg = f"Failed to load sentiment model {self.MODEL_NAME}: {str(e)}"
             logger.error(error_msg)
             raise RuntimeError(error_msg) from e
+
+    def _init_pytorch_gpu(self) -> None:
+        self._backend = "pytorch-gpu"
+        self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+        model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
+        self._pipeline = pipeline(
+            "sentiment-analysis", model=model, tokenizer=self._tokenizer,
+            device=0, top_k=None,
+        )
+
+    def _init_pytorch_cpu(self) -> None:
+        self._backend = "pytorch-cpu"
+        self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+        model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
+        self._pipeline = pipeline(
+            "sentiment-analysis", model=model, tokenizer=self._tokenizer,
+            device=-1, top_k=None,
+        )
+
+    def _init_onnx_cpu(self) -> None:
+        from optimum.onnxruntime import ORTModelForSequenceClassification
+
+        self._backend = "onnx-cpu"
+        logger.info("[DIAG] Loading sentiment model with ONNX Runtime on CPU")
+
+        load_start = time.time()
+        ort_model = ORTModelForSequenceClassification.from_pretrained(
+            self.MODEL_NAME, export=True,
+        )
+        self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+        self._pipeline = pipeline(
+            "sentiment-analysis", model=ort_model, tokenizer=self._tokenizer,
+            device=-1, top_k=None,
+        )
+        logger.info(f"[DIAG] ONNX sentiment pipeline created in {time.time() - load_start:.1f}s")
+
+    def _init_onnx_int8_cpu(self) -> None:
+        from optimum.onnxruntime import ORTModelForSequenceClassification, ORTQuantizer
+        from optimum.onnxruntime.configuration import AutoQuantizationConfig
+
+        self._backend = "onnx-int8-cpu"
+        logger.info("[DIAG] Loading sentiment model with ONNX Runtime + INT8 on CPU")
+
+        load_start = time.time()
+
+        save_dir = os.path.join(
+            os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface")),
+            "onnx_quantized",
+            self.MODEL_NAME.replace("/", "_") + "_int8",
+        )
+
+        if os.path.exists(save_dir) and os.path.exists(os.path.join(save_dir, "model_quantized.onnx")):
+            logger.info(f"[DIAG] Loading cached INT8 sentiment model from {save_dir}")
+            ort_model = ORTModelForSequenceClassification.from_pretrained(
+                save_dir, file_name="model_quantized.onnx",
+            )
+        else:
+            logger.info("[DIAG] Quantizing sentiment model to INT8 (first run, will be cached)")
+            ort_model = ORTModelForSequenceClassification.from_pretrained(
+                self.MODEL_NAME, export=True,
+            )
+            quantizer = ORTQuantizer.from_pretrained(ort_model)
+            qconfig = AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False)
+            quantizer.quantize(save_dir=save_dir, quantization_config=qconfig)
+            ort_model = ORTModelForSequenceClassification.from_pretrained(
+                save_dir, file_name="model_quantized.onnx",
+            )
+
+        self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+        self._pipeline = pipeline(
+            "sentiment-analysis", model=ort_model, tokenizer=self._tokenizer,
+            device=-1, top_k=None,
+        )
+        logger.info(f"[DIAG] ONNX+INT8 sentiment pipeline created in {time.time() - load_start:.1f}s")
     
     def _preprocess_text(self, text: str) -> str:
         """
