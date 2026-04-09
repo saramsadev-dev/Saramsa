@@ -17,7 +17,6 @@ import { DeleteWorkItemsModal } from './DeleteWorkItemsModal';
 import { DashboardIntegrationModal } from './dashboard/DashboardIntegrationModal';
 import { WorkItemReviewModal } from './WorkItemReviewModal';
 import { WorkItemQualityGateModal } from './WorkItemQualityGateModal';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import type {
   ActionItem,
@@ -33,7 +32,6 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { Badge } from "./badge";
-import { Card, CardContent } from "./card";
 import { Checkbox } from "./checkbox";
 import { EditActionDrawer } from "./edit-action-drawer";
 import apiRequest from "@/lib/apiRequest";
@@ -62,8 +60,6 @@ interface UserStoryListProps {
   platform?: 'azure' | 'jira';
   projectId?: string;
   projectKey?: string;
-  onRegenerateAnalysis?: () => void;
-  isAnalyzing?: boolean;
 }
 
 export const UserStoryList = ({ 
@@ -71,11 +67,8 @@ export const UserStoryList = ({
   platform = 'azure',
   projectId,
   projectKey,
-  onRegenerateAnalysis,
-  isAnalyzing 
 }: UserStoryListProps) => {
   const dispatch = useAppDispatch();
-  const router = useRouter();
   const { selectedActions, actionItems, features, loading, error } = useAppSelector((state) => state.workItems);
   const { loading: analysisLoading, projectContext, analysisData } = useAppSelector((state) => state.analysis);
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);

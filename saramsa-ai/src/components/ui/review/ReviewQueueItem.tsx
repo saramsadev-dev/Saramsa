@@ -16,7 +16,6 @@ interface ReviewQueueItemProps {
   onEdit: (candidate: ReviewCandidate) => void;
   onDismiss: (id: string, reason: string) => void;
   onSnooze: (id: string, days: number) => void;
-  onMerge?: (id: string) => void;
 }
 
 const priorityConfig: Record<string, { color: string; label: string }> = {

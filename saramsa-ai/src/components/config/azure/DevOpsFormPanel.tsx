@@ -446,7 +446,7 @@ export const DevOpsFormPanel = ({
                 <div className="flex items-center gap-3 justify-center">
                   <Zap className="w-5 h-5 group-hover:scale-110 transition-transform" />
                   <span>
-                    {isExistingIntegration ? "Fetch Projects" : "Fetch Projects"}
+                    {isExistingIntegration ? "Refresh Projects" : "Fetch Projects"}
                   </span>
                 </div>
               )}

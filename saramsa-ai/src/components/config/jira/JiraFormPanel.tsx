@@ -357,7 +357,7 @@ export const JiraFormPanel = ({
                                 ? "cursor-pointer border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 hover:border-orange-300 dark:hover:border-orange-700"
                                 : selectedProject === project.id
                                 ? "border-saramsa-brand/60 bg-saramsa-brand/10 dark:bg-saramsa-brand/20 cursor-pointer"
-                                : "border-border/60 dark:border-border/60 hover:border-saramsa-brand/60/50 cursor-pointer"
+                                : "border-border/60 dark:border-border/60 hover:border-saramsa-brand/40 cursor-pointer"
                             }`}
                             onClick={() => isAlreadyLinked ? handleLinkedProjectClick(linkedProject.id) : onProjectSelect(project.id)}
                           >
