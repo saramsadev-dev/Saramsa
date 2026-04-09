@@ -56,7 +56,7 @@ saramsa log all -f
 - `saramsa.bat` calls `saramsa.ps1`, which delegates to scripts in `saramsa-scripts/`.
 - `saramsa start` uses **honcho** to run all services defined in the `Procfile` in the foreground.
 - Press **Ctrl+C** to stop all services.
-- Logs are written to `.saramsa-*.log` files in the repo root.
+- Logs are written to `saramsa-logs/runtime/.saramsa-*.log`.
 
 ## Project Structure
 

@@ -89,6 +89,7 @@ saramsa kill
    ```
 
 3. Check the terminal output from honcho
+4. Runtime logs are written under `saramsa-logs/runtime/`
 
 ### Redis failed to start / "Redis failed to start. Start manually"
 

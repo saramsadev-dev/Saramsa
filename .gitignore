@@ -16,6 +16,7 @@ Thumbs.db
 *.err.log
 logs/
 backend/logs/
+saramsa-logs/runtime/
 
 # Redis dump
 dump.rdb

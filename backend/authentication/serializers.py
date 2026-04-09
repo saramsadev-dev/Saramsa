@@ -3,7 +3,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from .services import get_user_service
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from django.conf import settings
 import bcrypt
 
@@ -81,18 +81,18 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
             'email': user_data.get('email'),
             'is_staff': user_data.get('is_staff', False),
             'profile_role': user_data.get('profile', {}).get('role', 'user'),
-            'exp': int((datetime.utcnow() + timedelta(hours=1)).timestamp()),  # 1 hour expiry
-            'iat': int(datetime.utcnow().timestamp())
+            'exp': int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),  # 1 hour expiry
+            'iat': int(datetime.now(timezone.utc).timestamp())
         }
-        
+
         # Generate JWT tokens
         access_token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
-        
+
         # Create refresh token payload
         refresh_payload = {
             'user_id': user_data.get('id'),
-            'exp': int((datetime.utcnow() + timedelta(days=7)).timestamp()),  # 7 days expiry
-            'iat': int(datetime.utcnow().timestamp())
+            'exp': int((datetime.now(timezone.utc) + timedelta(days=7)).timestamp()),  # 7 days expiry
+            'iat': int(datetime.now(timezone.utc).timestamp())
         }
         refresh_token = jwt.encode(refresh_payload, settings.SECRET_KEY, algorithm='HS256')
         
@@ -141,8 +141,8 @@ class AppTokenRefreshSerializer(serializers.Serializer):
                 'email': user_data.get('email'),
                 'is_staff': user_data.get('is_staff', False),
                 'profile_role': user_data.get('profile', {}).get('role', 'user'),
-                'exp': int((datetime.utcnow() + timedelta(hours=1)).timestamp()),
-                'iat': int(datetime.utcnow().timestamp())
+                'exp': int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+                'iat': int(datetime.now(timezone.utc).timestamp())
             }
             
             new_access_token = jwt.encode(new_payload, settings.SECRET_KEY, algorithm='HS256')

@@ -4,8 +4,8 @@
 . "$PSScriptRoot\common.ps1"
 
 $Procfile = Join-Path $ScriptDir "Procfile"
-$HonchoRawOutLog = Join-Path $ScriptDir ".saramsa-honcho.raw.out.log"
-$HonchoRawErrLog = Join-Path $ScriptDir ".saramsa-honcho.raw.err.log"
+$HonchoRawOutLog = Join-Path $RuntimeLogDir ".saramsa-honcho.raw.out.log"
+$HonchoRawErrLog = Join-Path $RuntimeLogDir ".saramsa-honcho.raw.err.log"
 $script:FrontendReady = $false
 $script:BackendReady = $false
 $script:CeleryReady = $false
@@ -583,7 +583,7 @@ try {
 
     Write-Host ""
     Write-Host "Starting services in the foreground (Ctrl+C stops all)..." -ForegroundColor Cyan
-    Write-Host "Writing split logs to .saramsa-*.log files in repo root..." -ForegroundColor Cyan
+    Write-Host "Writing split logs to saramsa-logs/runtime..." -ForegroundColor Cyan
     Write-Host ""
     Set-Location $ScriptDir
 

@@ -3,12 +3,10 @@ from .views import (
     WorkItemGenerationView,
     WorkItemSubmissionView,
     WorkItemsListView,
-    WorkItemDetailView,
     WorkItemUpdateView,
-    WorkItemsByPlatformView,
     WorkItemRemovalView,
     WorkItemQualityRulesView,
-    WorkItemQualityCheckView
+    WorkItemQualityCheckView,
 )
 from .views.review_views import (
     ReviewQueueListView,
@@ -23,7 +21,7 @@ from .views.review_views import (
 )
 
 urlpatterns = [
-    # REVIEW QUEUE ENDPOINTS (Must come BEFORE generic <work_item_id> pattern!)
+    # Review queue endpoints (Must come BEFORE generic <work_item_id> pattern)
     path('review/', ReviewQueueListView.as_view(), name='review_queue_list'),
     path('review/stats/', ReviewQueueStatsView.as_view(), name='review_queue_stats'),
     path('review/approve/', CandidateApproveView.as_view(), name='review_approve'),
@@ -34,23 +32,14 @@ urlpatterns = [
     path('review/update/', CandidateUpdateView.as_view(), name='review_update'),
     path('review/retry-push/', CandidateRetryPushView.as_view(), name='review_retry_push'),
 
-    # CORE WORK ITEMS ENDPOINTS (Primary functionality)
+    # Core work items endpoints
     path('generate/', WorkItemGenerationView.as_view(), name='work_items_generate'),
     path('submit/', WorkItemSubmissionView.as_view(), name='work_items_submit'),
     path('', WorkItemsListView.as_view(), name='work_items_list'),
-    path('platform/<str:platform>/', WorkItemsByPlatformView.as_view(), name='work_items_by_platform'),
     path('remove/', WorkItemRemovalView.as_view(), name='work_items_remove'),
     path('quality-rules/', WorkItemQualityRulesView.as_view(), name='work_item_quality_rules'),
     path('quality-check/', WorkItemQualityCheckView.as_view(), name='work_item_quality_check'),
 
-    # Generic patterns MUST come last (catch-all)
-    path('<str:work_item_id>/', WorkItemDetailView.as_view(), name='work_item_detail'),
+    # Generic patterns MUST come last
     path('<str:work_item_id>/update/', WorkItemUpdateView.as_view(), name='work_item_update'),
 ]
-
-# NOTE: Platform-specific configuration endpoints (Azure DevOps, Jira) have been moved to the integrations app
-# to eliminate duplication. Use the integrations app endpoints for:
-# - /integrations/azure/projects/
-# - /integrations/jira/projects/
-# - /integrations/projects/create/
-# - etc.

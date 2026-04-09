@@ -1,11 +1,10 @@
 from django.urls import path
 from .views import (
-    RegisterView, 
+    RegisterView,
     RegisterOtpRequestView,
-    ProfileMeView, 
-    AppTokenObtainPairView,
+    ProfileMeView,
     AppTokenRefreshView,
-    UserListView, 
+    UserListView,
     UserDetailView,
     LoginView,
     ForgotPasswordView,
@@ -13,15 +12,13 @@ from .views import (
 )
 
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name='register'), #verified
+    path('register/', RegisterView.as_view(), name='register'),
     path('register/request-otp/', RegisterOtpRequestView.as_view(), name='register_request_otp'),
-    path('login/', LoginView.as_view(), name='login'), #verified
+    path('login/', LoginView.as_view(), name='login'),
     path('me/', ProfileMeView.as_view(), name='profile'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
-    path('token/', AppTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', AppTokenRefreshView.as_view(), name='token_refresh'),
-    path('refresh/', AppTokenRefreshView.as_view(), name='refresh'),  # Frontend expects this endpoint
+    path('refresh/', AppTokenRefreshView.as_view(), name='refresh'),
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
 ]

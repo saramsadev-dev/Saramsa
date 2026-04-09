@@ -73,95 +73,105 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
+        'api_file': {
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'api.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 3,
+            'formatter': 'verbose',
+        },
+        'celery_file': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'celery.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 3,
             'formatter': 'verbose',
         },
     },
     'loggers': {
+        # --- API / Django loggers → api.log ---
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'api_file'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'api_file'],
             'level': 'DEBUG' if DEBUG else 'WARNING',
             'propagate': False,
         },
         'apis.infrastructure.middleware': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'api_file'],
             'level': 'INFO',
             'propagate': False,
         },
-        # Logging for feedback analysis services (detailed debugging)
         'apis.app': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'feedback_analysis': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'feedback_analysis.services': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'feedback_analysis.services.ml': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'feedback_analysis.services.ml.embedding_service': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'feedback_analysis.services.ml.local_sentiment_service': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'feedback_analysis.services.ml.local_processing_service': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'api_file'],
             'level': 'INFO',
             'propagate': False,
         },
         'apis.prompts': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'api_file'],
             'level': 'INFO',
             'propagate': False,
         },
-        # Celery logging
+        # --- Celery / background task loggers → celery.log ---
         'celery': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'celery_file'],
             'level': 'INFO',
             'propagate': False,
         },
         'celery.task': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'celery_file'],
             'level': 'INFO',
             'propagate': False,
         },
-        # Suppress verbose Azure SDK logging
+        'feedback_analysis': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services.ml': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services.ml.embedding_service': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services.ml.local_sentiment_service': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'feedback_analysis.services.ml.local_processing_service': {
+            'handlers': ['console', 'celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # --- Suppress verbose Azure SDK logging ---
         'azure': {
-            'handlers': ['file'],
+            'handlers': ['api_file'],
             'level': 'ERROR',
             'propagate': False,
         },
         'azure.core.pipeline.policies.http_logging_policy': {
-            'handlers': ['file'],
+            'handlers': ['api_file'],
             'level': 'ERROR',
             'propagate': False,
         },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console', 'api_file'],
         'level': 'INFO',
     },
 }

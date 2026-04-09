@@ -8,19 +8,23 @@ $ScriptDir = Split-Path -Parent $PSScriptRoot
 $BackendDir = Join-Path $ScriptDir "backend"
 $FrontendDir = Join-Path $ScriptDir "saramsa-ai"
 $CeleryOpsUIDir = Join-Path $ScriptDir "celery_ops" | Join-Path -ChildPath "celery_ops" | Join-Path -ChildPath "ui" | Join-Path -ChildPath "react"
-# Canonical PID file path (legacy background mode). Kept to clear stale files.
-$PidFile = [System.IO.Path]::GetFullPath((Join-Path $ScriptDir ".saramsa-pids.json"))
-$FrontendLog = Join-Path $ScriptDir ".saramsa-frontend.log"
-$BackendLog = Join-Path $ScriptDir ".saramsa-backend.log"
-$SystemLog = Join-Path $ScriptDir ".saramsa-system.log"
-$AllLog = Join-Path $ScriptDir ".saramsa-all.log"
-$BackendErrLog = Join-Path $ScriptDir ".saramsa-backend.err.log"
-$CeleryLog = Join-Path $ScriptDir ".saramsa-celery.log"
-$CeleryErrLog = Join-Path $ScriptDir ".saramsa-celery.err.log"
-$CeleryOpsLog = Join-Path $ScriptDir ".saramsa-celery-ops.log"
-$CeleryOpsErrLog = Join-Path $ScriptDir ".saramsa-celery-ops.err.log"
-$CeleryOpsBuildLog = Join-Path $ScriptDir ".saramsa-celery-ops.build.log"
-$CeleryOpsBuildErrLog = Join-Path $ScriptDir ".saramsa-celery-ops.build.err.log"
+$SaramsaLogRoot = Join-Path $ScriptDir "saramsa-logs"
+$RuntimeLogDir = Join-Path $SaramsaLogRoot "runtime"
+New-Item -ItemType Directory -Path $RuntimeLogDir -Force | Out-Null
+
+# Canonical runtime metadata/log paths.
+$PidFile = [System.IO.Path]::GetFullPath((Join-Path $RuntimeLogDir ".saramsa-pids.json"))
+$FrontendLog = Join-Path $RuntimeLogDir ".saramsa-frontend.log"
+$BackendLog = Join-Path $RuntimeLogDir ".saramsa-backend.log"
+$SystemLog = Join-Path $RuntimeLogDir ".saramsa-system.log"
+$AllLog = Join-Path $RuntimeLogDir ".saramsa-all.log"
+$BackendErrLog = Join-Path $RuntimeLogDir ".saramsa-backend.err.log"
+$CeleryLog = Join-Path $RuntimeLogDir ".saramsa-celery.log"
+$CeleryErrLog = Join-Path $RuntimeLogDir ".saramsa-celery.err.log"
+$CeleryOpsLog = Join-Path $RuntimeLogDir ".saramsa-celery-ops.log"
+$CeleryOpsErrLog = Join-Path $RuntimeLogDir ".saramsa-celery-ops.err.log"
+$CeleryOpsBuildLog = Join-Path $RuntimeLogDir ".saramsa-celery-ops.build.log"
+$CeleryOpsBuildErrLog = Join-Path $RuntimeLogDir ".saramsa-celery-ops.build.err.log"
 
 $VenvPath = Join-Path $BackendDir "venv"
 $VenvActivate = Join-Path $VenvPath "Scripts\Activate.ps1"
