@@ -1,3 +1,4 @@
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils import timezone
 
@@ -14,6 +15,19 @@ class UserAccount(TimestampedModel):
     id = models.CharField(max_length=64, primary_key=True)
     email = models.EmailField(unique=True, db_index=True)
     password = models.TextField()
+
+    def check_password(self, raw_password: str) -> bool:
+        if check_password(raw_password, self.password):
+            return True
+        # Legacy: raw bcrypt hash without Django prefix
+        if self.password.startswith('$2b$') or self.password.startswith('$2a$'):
+            import bcrypt
+            return bcrypt.checkpw(raw_password.encode('utf-8'), self.password.encode('utf-8'))
+        return False
+
+    def set_password(self, raw_password: str) -> None:
+        self.password = make_password(raw_password)
+
     first_name = models.CharField(max_length=150, blank=True, default="")
     last_name = models.CharField(max_length=150, blank=True, default="")
     is_active = models.BooleanField(default=True, db_index=True)

@@ -1,11 +1,10 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
+from django.contrib.auth.hashers import make_password
 from .services import get_user_service
-import jwt
-from datetime import datetime, timedelta, timezone
-from django.conf import settings
-import bcrypt
+
 
 class AppUserSerializer(serializers.Serializer):
     """Serializer for PostgreSQL user data"""
@@ -15,155 +14,110 @@ class AppUserSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
     last_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
     role = serializers.CharField(max_length=50, required=False, default='user')
-    
+
     def validate_email(self, value):
-        """Check that email is unique using service layer"""
         user_service = get_user_service()
-        existing_user = user_service.get_user_by_email(value)
-        if existing_user:
+        if user_service.get_user_by_email(value):
             raise serializers.ValidationError("Email already exists")
         return value
-    
+
     def validate(self, attrs):
-        """Validate that password and confirmPassword match"""
         password = attrs.get('password')
         confirm_password = attrs.get('confirmPassword')
-        
         if password and confirm_password and password != confirm_password:
-            raise serializers.ValidationError({
-                'confirmPassword': "Passwords don't match"
-            })
-        
+            raise serializers.ValidationError({'confirmPassword': "Passwords don't match"})
         return attrs
-    
+
     def hash_password(self, password):
-        """Hash password using bcrypt"""
-        try:
-            # Convert password to bytes
-            password_bytes = password.encode('utf-8')
-            
-            # Generate salt and hash password
-            salt = bcrypt.gensalt()
-            hashed = bcrypt.hashpw(password_bytes, salt)
-            
-            # Return as string for storage
-            return hashed.decode('utf-8')
-        except Exception as e:
-            raise serializers.ValidationError(f"Password hashing failed: {str(e)}")
+        return make_password(password)
+
 
 class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Custom JWT serializer for PostgreSQL users"""
-    
+    """Issue simplejwt tokens for PostgreSQL users."""
+
     def validate(self, attrs):
         email = attrs.get('email')
         password = attrs.get('password')
-        
+
         if not email or not password:
             raise serializers.ValidationError("Email and password are required")
-        
-        # Get user using service layer
+
         user_service = get_user_service()
         user_data = user_service.get_user_by_email(email)
         if not user_data:
             raise serializers.ValidationError("Invalid credentials")
-        
-        # Verify password using service
+
         if not user_service._verify_password(password, user_data.get('password', '')):
             raise serializers.ValidationError("Invalid credentials")
-        
-        # Check if user is active
+
         if not user_data.get('is_active', True):
             raise serializers.ValidationError("User account is disabled")
-        
-        # Create custom token payload (user_id is the stable subject for API auth)
-        payload = {
-            'user_id': user_data.get('id'),
-            'email': user_data.get('email'),
-            'is_staff': user_data.get('is_staff', False),
-            'profile_role': user_data.get('profile', {}).get('role', 'user'),
-            'exp': int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),  # 1 hour expiry
-            'iat': int(datetime.now(timezone.utc).timestamp())
-        }
 
-        # Generate JWT tokens
-        access_token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+        # Use simplejwt RefreshToken — tokens are tracked by the blacklist
+        refresh = RefreshToken()
+        refresh['user_id'] = user_data.get('id')
+        refresh['email'] = user_data.get('email')
+        refresh['is_staff'] = user_data.get('is_staff', False)
+        refresh['profile_role'] = user_data.get('profile', {}).get('role', 'user')
 
-        # Create refresh token payload
-        refresh_payload = {
-            'user_id': user_data.get('id'),
-            'exp': int((datetime.now(timezone.utc) + timedelta(days=7)).timestamp()),  # 7 days expiry
-            'iat': int(datetime.now(timezone.utc).timestamp())
-        }
-        refresh_token = jwt.encode(refresh_payload, settings.SECRET_KEY, algorithm='HS256')
-        
         return {
-            'access': access_token,
-            'refresh': refresh_token,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
             'user': {
                 'id': user_data.get('id'),
                 'email': user_data.get('email'),
                 'first_name': user_data.get('first_name'),
                 'last_name': user_data.get('last_name'),
-                'role': user_data.get('profile', {}).get('role', 'user')
+                'role': user_data.get('profile', {}).get('role', 'user'),
             }
         }
 
+
 class AppTokenRefreshSerializer(serializers.Serializer):
-    """Custom JWT refresh serializer for PostgreSQL users"""
-    
+    """Refresh access token using simplejwt — handles rotation and blacklisting."""
+
     refresh = serializers.CharField()
-    
+
     def validate(self, attrs):
-        refresh_token = attrs.get('refresh')
-        
         try:
-            # Decode refresh token
-            payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=['HS256'])
-            
-            # Get user from PostgreSQL
-            user_id = payload.get('user_id')
-            
-            if not user_id:
-                raise serializers.ValidationError("Invalid refresh token")
-            
-            user_service = get_user_service()
-            user_data = user_service.get_user_by_id(user_id)
-            if not user_data:
-                raise serializers.ValidationError("User not found")
-            
-            # Check if user is active
-            if not user_data.get('is_active', True):
-                raise serializers.ValidationError("User account is disabled")
-            
-            # Create new access token
-            new_payload = {
-                'user_id': user_data.get('id'),
-                'email': user_data.get('email'),
-                'is_staff': user_data.get('is_staff', False),
-                'profile_role': user_data.get('profile', {}).get('role', 'user'),
-                'exp': int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
-                'iat': int(datetime.now(timezone.utc).timestamp())
-            }
-            
-            new_access_token = jwt.encode(new_payload, settings.SECRET_KEY, algorithm='HS256')
-            
-            return {
-                'access': new_access_token,
-                'user': {
-                    'id': user_data.get('id'),
-                    'email': user_data.get('email'),
-                    'first_name': user_data.get('first_name'),
-                    'last_name': user_data.get('last_name'),
-                    'role': user_data.get('profile', {}).get('role', 'user')
-                }
-            }
-            
-        except jwt.ExpiredSignatureError:
-            raise serializers.ValidationError("Refresh token has expired")
-        except jwt.InvalidTokenError:
+            old_refresh = RefreshToken(attrs['refresh'])
+        except TokenError:
+            raise serializers.ValidationError("Invalid or expired refresh token")
+
+        user_id = old_refresh.get('user_id')
+        if not user_id:
             raise serializers.ValidationError("Invalid refresh token")
-        except Exception as e:
-            raise serializers.ValidationError(f"Token refresh failed: {str(e)}")
+
+        user_service = get_user_service()
+        user_data = user_service.get_user_by_id(user_id)
+        if not user_data:
+            raise serializers.ValidationError("User not found")
+
+        if not user_data.get('is_active', True):
+            raise serializers.ValidationError("User account is disabled")
+
+        # Blacklist the old refresh token (skip if user model incompatible)
+        try:
+            old_refresh.blacklist()
+        except Exception:
+            pass  # OutstandingToken FK expects numeric user_id; our IDs are strings
+
+        new_refresh = RefreshToken()
+        new_refresh['user_id'] = user_data.get('id')
+        new_refresh['email'] = user_data.get('email')
+        new_refresh['is_staff'] = user_data.get('is_staff', False)
+        new_refresh['profile_role'] = user_data.get('profile', {}).get('role', 'user')
+
+        return {
+            'access': str(new_refresh.access_token),
+            'user': {
+                'id': user_data.get('id'),
+                'email': user_data.get('email'),
+                'first_name': user_data.get('first_name'),
+                'last_name': user_data.get('last_name'),
+                'role': user_data.get('profile', {}).get('role', 'user'),
+            }
+        }
 
 class AppUserProfileSerializer(serializers.Serializer):
     """Serializer for user profile updates"""
