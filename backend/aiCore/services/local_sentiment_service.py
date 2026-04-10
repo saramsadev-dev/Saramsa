@@ -135,23 +135,14 @@ class LocalSentimentService(metaclass=SingletonMeta):
         except ImportError:
             return False
 
-    @staticmethod
-    def _onnx_quantization_available() -> bool:
-        try:
-            from optimum.onnxruntime import ORTQuantizer  # noqa: F401
-            from optimum.onnxruntime.configuration import AutoQuantizationConfig  # noqa: F401
-            return True
-        except ImportError:
-            return False
-
     def _select_backend(self) -> str:
-        """Select best available backend: gpu > onnx-int8 > onnx > cpu.
+        """Select best available backend: gpu > onnx > cpu.
 
         Skips ONNX if available RAM is below 2GB — ONNX export temporarily
         doubles memory usage (holds both PyTorch + ONNX models).
         """
         forced = os.getenv("SENTIMENT_BACKEND", "").strip().lower()
-        if forced in ("gpu", "onnx-int8", "onnx", "cpu"):
+        if forced in ("gpu", "onnx", "cpu"):
             logger.info(f"SENTIMENT_BACKEND override: {forced}")
             return forced
 
@@ -159,15 +150,13 @@ class LocalSentimentService(metaclass=SingletonMeta):
             return "gpu"
 
         avail_gb = psutil.virtual_memory().available / (1024 ** 3)
-        if avail_gb < 4.0:
+        if avail_gb < 2.0:
             logger.info(
-                f"Skipping ONNX for sentiment — only {avail_gb:.1f}GB RAM available "
-                f"(need >=4GB for safe ONNX+INT8 quantization). Falling back to PyTorch CPU."
+                f"Skipping ONNX for sentiment — only {avail_gb:.1f}GB RAM available. "
+                f"Falling back to PyTorch CPU."
             )
             return "cpu"
 
-        if self._onnx_available() and self._onnx_quantization_available():
-            return "onnx-int8"
         if self._onnx_available():
             return "onnx"
         return "cpu"
@@ -176,7 +165,7 @@ class LocalSentimentService(metaclass=SingletonMeta):
         """
         Load the sentiment classification model with backend auto-detection.
 
-        Priority: GPU > ONNX+INT8 > ONNX > PyTorch CPU
+        Priority: GPU > ONNX FP32 > PyTorch CPU
         """
         try:
             backend = self._select_backend()
@@ -184,8 +173,6 @@ class LocalSentimentService(metaclass=SingletonMeta):
 
             if backend == "gpu":
                 self._init_pytorch_gpu()
-            elif backend == "onnx-int8":
-                self._init_onnx_int8_cpu()
             elif backend == "onnx":
                 self._init_onnx_cpu()
             else:
@@ -245,45 +232,6 @@ class LocalSentimentService(metaclass=SingletonMeta):
         )
         logger.info(f"[DIAG] ONNX sentiment pipeline created in {time.time() - load_start:.1f}s")
 
-    def _init_onnx_int8_cpu(self) -> None:
-        from optimum.onnxruntime import ORTModelForSequenceClassification, ORTQuantizer
-        from optimum.onnxruntime.configuration import AutoQuantizationConfig
-
-        self._backend = "onnx-int8-cpu"
-        logger.info("[DIAG] Loading sentiment model with ONNX Runtime + INT8 on CPU")
-
-        load_start = time.time()
-
-        save_dir = os.path.join(
-            os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface")),
-            "onnx_quantized",
-            self.MODEL_NAME.replace("/", "_") + "_int8",
-        )
-
-        if os.path.exists(save_dir) and os.path.exists(os.path.join(save_dir, "model_quantized.onnx")):
-            logger.info(f"[DIAG] Loading cached INT8 sentiment model from {save_dir}")
-            ort_model = ORTModelForSequenceClassification.from_pretrained(
-                save_dir, file_name="model_quantized.onnx",
-            )
-        else:
-            logger.info("[DIAG] Quantizing sentiment model to INT8 (first run, will be cached)")
-            ort_model = ORTModelForSequenceClassification.from_pretrained(
-                self.MODEL_NAME, export=True,
-            )
-            quantizer = ORTQuantizer.from_pretrained(ort_model)
-            qconfig = AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False)
-            quantizer.quantize(save_dir=save_dir, quantization_config=qconfig)
-            ort_model = ORTModelForSequenceClassification.from_pretrained(
-                save_dir, file_name="model_quantized.onnx",
-            )
-
-        self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
-        self._pipeline = pipeline(
-            "sentiment-analysis", model=ort_model, tokenizer=self._tokenizer,
-            device=-1, top_k=None,
-        )
-        logger.info(f"[DIAG] ONNX+INT8 sentiment pipeline created in {time.time() - load_start:.1f}s")
-    
     def _preprocess_text(self, text: str) -> str:
         """
         Preprocess text for sentiment analysis.
