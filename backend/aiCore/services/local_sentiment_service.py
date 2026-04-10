@@ -159,10 +159,10 @@ class LocalSentimentService(metaclass=SingletonMeta):
             return "gpu"
 
         avail_gb = psutil.virtual_memory().available / (1024 ** 3)
-        if avail_gb < 2.0:
+        if avail_gb < 4.0:
             logger.info(
                 f"Skipping ONNX for sentiment — only {avail_gb:.1f}GB RAM available "
-                f"(need >=2GB for safe ONNX export). Falling back to PyTorch CPU."
+                f"(need >=4GB for safe ONNX+INT8 quantization). Falling back to PyTorch CPU."
             )
             return "cpu"
 
