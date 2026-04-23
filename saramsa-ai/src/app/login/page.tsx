@@ -318,10 +318,10 @@ export default function LoginPage() {
               <p className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-muted-foreground">
                 New to Saramsa AI?{' '}
                 <Link
-                  href="/register"
+                  href="/signup"
                   className="text-saramsa-brand hover:text-saramsa-brand-hover font-medium transition-colors"
                 >
-                  Create an account
+                  Sign up
                 </Link>
               </p>
             </div>
