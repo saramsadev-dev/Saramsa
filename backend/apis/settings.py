@@ -359,7 +359,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-    'https://saramsa-ai.vercel.app',
+    'https://agent.saramsa.ai',
 ]
 if DEBUG:
     CORS_ALLOWED_ORIGINS += [
@@ -394,7 +394,7 @@ CORS_ALLOW_HEADERS = [
 
 # Trust requests coming from the static frontend domain (needed for some POSTs)
 CSRF_TRUSTED_ORIGINS = [
-    'https://saramsa-ai.vercel.app',
+    'https://agent.saramsa.ai',
 ]
 if DEBUG:
     CSRF_TRUSTED_ORIGINS += [
