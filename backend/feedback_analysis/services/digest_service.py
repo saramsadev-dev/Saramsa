@@ -114,7 +114,7 @@ def _build_html(digest: dict[str, Any]) -> str:
     if not projects:
         no_activity = '<p style="color:#888;font-style:italic;">No project activity this week.</p>'
 
-    frontend_url = getattr(settings, "FRONTEND_BASE_URL", "") or "https://saramsa-chi.vercel.app"
+    frontend_url = getattr(settings, "FRONTEND_BASE_URL", "") or "https://agent.saramsa.ai"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -223,7 +223,7 @@ def _build_plain_text(digest: dict[str, Any]) -> str:
             )
         lines.append("")
 
-    lines.append("Open Saramsa: " + (getattr(settings, "FRONTEND_BASE_URL", "") or "https://saramsa-chi.vercel.app"))
+    lines.append("Open Saramsa: " + (getattr(settings, "FRONTEND_BASE_URL", "") or "https://agent.saramsa.ai"))
     return "\n".join(lines)
 
 
