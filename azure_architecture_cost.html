@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saramsa — Azure Architecture & Cost Comparison</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e1e4e8; line-height: 1.6; }
+
+  .header { text-align: center; padding: 40px 20px 10px; }
+  .header h1 { font-size: 2rem; font-weight: 700; background: linear-gradient(135deg, #0078d4, #50e6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: #8b949e; margin-top: 6px; }
+
+  .container { max-width: 1300px; margin: 0 auto; padding: 0 24px 60px; }
+
+  /* ── Section titles ── */
+  .section-title { font-size: 1.3rem; color: #c9d1d9; margin: 36px 0 16px; padding-left: 12px; border-left: 3px solid #0078d4; }
+
+  /* ── Architecture diagram ── */
+  .arch { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 32px; position: relative; overflow-x: auto; }
+  .arch-grid { display: grid; grid-template-columns: 200px 1fr; gap: 0; min-width: 900px; }
+
+  /* Left labels */
+  .arch-layer { display: flex; align-items: center; padding: 12px 16px; font-weight: 700; font-size: .85rem; color: #8b949e; border-right: 2px solid #30363d; }
+
+  /* Right content */
+  .arch-row { display: flex; align-items: center; gap: 16px; padding: 14px 20px; flex-wrap: wrap; border-bottom: 1px solid #21262d; }
+  .arch-row:last-child { border-bottom: none; }
+
+  .node { background: #0d1117; border: 1px solid #30363d; border-radius: 10px; padding: 12px 16px; min-width: 180px; position: relative; }
+  .node .n-title { font-size: .85rem; font-weight: 700; color: #c9d1d9; display: flex; align-items: center; gap: 6px; }
+  .node .n-sub { font-size: .75rem; color: #8b949e; margin-top: 2px; }
+  .node .n-tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: .65rem; font-weight: 700; margin-top: 4px; }
+
+  .tag-azure { background: #0078d4; color: #fff; }
+  .tag-docker { background: #2496ed; color: #fff; }
+  .tag-redis { background: #dc382d; color: #fff; }
+  .tag-gpt { background: #10a37f; color: #fff; }
+  .tag-ml { background: #7c3aed; color: #fff; }
+  .tag-pg { background: #336791; color: #fff; }
+  .tag-gh { background: #6e40c9; color: #fff; }
+  .tag-green { background: #1b3a2a; color: #3fb950; }
+  .tag-yellow { background: #3b2e1a; color: #d29922; }
+  .tag-red { background: #3d1a1a; color: #f85149; }
+
+  .arrow-r { color: #30363d; font-size: 1.2rem; flex-shrink: 0; }
+
+  /* ── Info box ── */
+  .info-box { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px 24px; margin-top: 16px; }
+  .info-box h3 { font-size: 1rem; color: #58a6ff; margin-bottom: 10px; }
+  .info-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #21262d; font-size: .88rem; }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .label { color: #8b949e; }
+  .info-row .value { color: #c9d1d9; font-weight: 600; }
+
+  /* ── Cost comparison table ── */
+  table { width: 100%; border-collapse: collapse; background: #161b22; border: 1px solid #30363d; border-radius: 12px; overflow: hidden; margin-top: 16px; }
+  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #21262d; font-size: .85rem; }
+  th { background: #0d1117; color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: .72rem; letter-spacing: .04em; }
+  .cost-current { color: #3fb950; }
+  .cost-alt { color: #f0883e; }
+  .cost-gpu { color: #f85149; }
+  .row-total { background: #0d1117; font-weight: 700; }
+  .row-total td { border-top: 2px solid #30363d; }
+
+  /* ── Pipeline flow diagrams ── */
+  .flow-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px; }
+  @media (max-width: 900px) { .flow-columns { grid-template-columns: 1fr; } }
+
+  .flow-card { background: #161b22; border: 1px solid #30363d; border-radius: 14px; overflow: hidden; }
+  .flow-head { padding: 16px 20px; display: flex; align-items: center; gap: 10px; }
+  .flow-head h3 { font-size: 1.05rem; }
+  .flow-head .badge { padding: 3px 10px; border-radius: 16px; font-size: .7rem; font-weight: 700; }
+
+  .ml-flow .flow-head { background: linear-gradient(90deg, #0d3b1e, #161b22); }
+  .ml-flow .badge { background: #238636; color: #fff; }
+  .llm-flow .flow-head { background: linear-gradient(90deg, #3b1d0d, #161b22); }
+  .llm-flow .badge { background: #da3633; color: #fff; }
+
+  .flow-body { padding: 0 20px 20px; }
+
+  .fstep { display: flex; align-items: flex-start; gap: 12px; margin-top: 12px; }
+  .fstep-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; color: #fff; flex-shrink: 0; margin-top: 2px; }
+  .ml-flow .fstep-icon { background: #238636; }
+  .llm-flow .fstep-icon { background: #da3633; }
+  .fstep-content { flex: 1; }
+  .fstep-content h4 { font-size: .88rem; color: #c9d1d9; }
+  .fstep-content .fdetail { font-size: .78rem; color: #8b949e; margin-top: 2px; }
+  .fstep-content .ftime { font-size: .72rem; font-weight: 700; margin-top: 4px; }
+  .time-fast { color: #3fb950; }
+  .time-slow { color: #f85149; }
+  .time-med { color: #d29922; }
+
+  .flow-arrow { text-align: center; color: #30363d; font-size: 1rem; margin: 4px 0; padding-left: 48px; }
+  .flow-total { margin-top: 14px; padding: 10px 14px; background: #0d1117; border-radius: 8px; text-align: center; }
+  .flow-total .ft-label { font-size: .75rem; color: #8b949e; }
+  .flow-total .ft-value { font-size: 1.3rem; font-weight: 700; }
+
+  /* ── Dilemma box ── */
+  .dilemma { background: linear-gradient(135deg, #2d1a0d, #161b22); border: 1px solid #d29922; border-radius: 14px; padding: 28px; margin-top: 24px; }
+  .dilemma h2 { color: #d29922; font-size: 1.2rem; margin-bottom: 12px; }
+  .dilemma p { color: #8b949e; font-size: .92rem; }
+
+  .option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+  .option { background: #0d1117; border: 1px solid #21262d; border-radius: 10px; padding: 16px; position: relative; }
+  .option.recommended { border-color: #238636; }
+  .option.recommended::after { content: 'BEST BET'; position: absolute; top: -10px; right: 12px; background: #238636; color: #fff; font-size: .65rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .option h4 { font-size: .95rem; color: #c9d1d9; margin-bottom: 6px; }
+  .option .o-cost { font-size: .82rem; color: #58a6ff; font-weight: 600; }
+  .option .o-speed { font-size: .82rem; margin-top: 4px; }
+  .option .o-detail { font-size: .78rem; color: #8b949e; margin-top: 6px; }
+
+  /* ── Verdict ── */
+  .verdict { margin-top: 28px; background: linear-gradient(135deg, #0d3b1e, #161b22); border: 1px solid #238636; border-radius: 14px; padding: 28px; text-align: center; }
+  .verdict h2 { color: #3fb950; font-size: 1.2rem; margin-bottom: 8px; }
+  .verdict p { color: #8b949e; max-width: 800px; margin: 0 auto; font-size: .92rem; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Saramsa — Azure Architecture & Pipeline Cost Analysis</h1>
+  <p>Live data from Azure subscription &bull; saramsadev@gmail.com &bull; April 2026</p>
+</div>
+
+<div class="container">
+
+<!-- ════════════════════════════════════════════ -->
+<!-- CURRENT ARCHITECTURE                         -->
+<!-- ════════════════════════════════════════════ -->
+<h2 class="section-title">Current Azure Architecture (Live)</h2>
+
+<div class="arch">
+  <div class="arch-grid">
+
+    <!-- Row 1: Users -->
+    <div class="arch-layer">Users / Frontend</div>
+    <div class="arch-row">
+      <div class="node">
+        <div class="n-title">🌐 React Frontend</div>
+        <div class="n-sub">Vercel / Static hosting</div>
+      </div>
+      <div class="arrow-r">→</div>
+      <div class="node">
+        <div class="n-title">📱 API Requests</div>
+        <div class="n-sub">HTTPS → saramsa-api</div>
+      </div>
+    </div>
+
+    <!-- Row 2: App Service Plan -->
+    <div class="arch-layer">App Service Plan<br><span style="color:#58a6ff;">ASP-saramsa-87d6</span><br>B3 Basic · Linux<br>4 vCPU · 7GB RAM</div>
+    <div class="arch-row">
+      <div class="node">
+        <div class="n-title">🐍 saramsa-api</div>
+        <div class="n-sub">Python 3.11 · Gunicorn · Django REST</div>
+        <div class="n-sub">Code deploy · AlwaysOn</div>
+        <span class="n-tag tag-azure">App Service</span>
+        <span class="n-tag tag-green">USE_LOCAL_PIPELINE=true</span>
+      </div>
+      <div class="arrow-r">→ Celery task</div>
+      <div class="node">
+        <div class="n-title">🐳 saramsa-celery-prod</div>
+        <div class="n-sub">Docker: saramsa/saramsa-celery:latest</div>
+        <div class="n-sub">Worker + Beat + Celery Ops UI · AlwaysOn</div>
+        <span class="n-tag tag-docker">Container</span>
+        <span class="n-tag tag-ml">ML Models (~426MB)</span>
+      </div>
+    </div>
+
+    <!-- Row 3: Data Layer -->
+    <div class="arch-layer">Data &amp; Messaging</div>
+    <div class="arch-row">
+      <div class="node">
+        <div class="n-title">🗄️ PostgreSQL</div>
+        <div class="n-sub">Flexible Server (external)</div>
+        <div class="n-sub">Analysis results, work items, users</div>
+        <span class="n-tag tag-pg">PostgreSQL</span>
+      </div>
+      <div class="node">
+        <div class="n-title">⚡ Redis</div>
+        <div class="n-sub">saramsa-redis-2026</div>
+        <div class="n-sub">Basic C0 · Celery broker + result backend</div>
+        <span class="n-tag tag-redis">Redis</span>
+      </div>
+      <div class="node">
+        <div class="n-title">📊 Application Insights</div>
+        <div class="n-sub">Monitoring + logging</div>
+        <span class="n-tag tag-azure">Insights</span>
+      </div>
+    </div>
+
+    <!-- Row 4: AI / External -->
+    <div class="arch-layer">AI &amp; External</div>
+    <div class="arch-row">
+      <div class="node">
+        <div class="n-title">🤖 Azure OpenAI</div>
+        <div class="n-sub">Deployment: <strong>gpt-5-mini</strong></div>
+        <div class="n-sub">Used for narration only (1 call/analysis)</div>
+        <span class="n-tag tag-gpt">GPT</span>
+      </div>
+      <div class="node">
+        <div class="n-title">🧠 Local ML Models (in Celery)</div>
+        <div class="n-sub">DeBERTa-v3 (283MB) · BERT Sentiment (110MB) · MiniLM (33MB)</div>
+        <div class="n-sub">CPU-only on B3 · No GPU</div>
+        <span class="n-tag tag-ml">PyTorch CPU</span>
+        <span class="n-tag tag-yellow">SLOW: ~7 min / 50 comments</span>
+      </div>
+      <div class="node">
+        <div class="n-title">🔧 GitHub Actions CI/CD</div>
+        <div class="n-sub">OIDC → Docker Hub → Azure restart</div>
+        <span class="n-tag tag-gh">GitHub</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Resource details -->
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+  <div class="info-box">
+    <h3>Subscription Details</h3>
+    <div class="info-row"><span class="label">Subscription</span><span class="value">Azure subscription 1</span></div>
+    <div class="info-row"><span class="label">Tenant</span><span class="value">Default Directory</span></div>
+    <div class="info-row"><span class="label">Resource Group</span><span class="value">saramsa</span></div>
+    <div class="info-row"><span class="label">Region</span><span class="value">Central US</span></div>
+    <div class="info-row"><span class="label">Identity</span><span class="value">saramsa-api-id-aa70 (OIDC)</span></div>
+  </div>
+  <div class="info-box">
+    <h3>Current Monthly Cost Breakdown</h3>
+    <div class="info-row"><span class="label">App Service Plan B3 (both apps)</span><span class="value" style="color:#3fb950;">~$52/mo</span></div>
+    <div class="info-row"><span class="label">Redis Basic C0</span><span class="value" style="color:#3fb950;">~$16/mo</span></div>
+    <div class="info-row"><span class="label">PostgreSQL Flexible (Burstable B1ms)</span><span class="value" style="color:#3fb950;">~$13-25/mo</span></div>
+    <div class="info-row"><span class="label">Application Insights</span><span class="value" style="color:#3fb950;">~$2-5/mo</span></div>
+    <div class="info-row"><span class="label">Azure OpenAI (narration only)</span><span class="value" style="color:#3fb950;">~$5-10/mo</span></div>
+    <div class="info-row" style="border-top: 2px solid #30363d; font-size: 1rem;"><span class="label" style="color:#c9d1d9; font-weight:700;">TOTAL</span><span class="value" style="color:#3fb950; font-size:1.1rem;">~$88-108/mo</span></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- PIPELINE FLOW COMPARISON                     -->
+<!-- ════════════════════════════════════════════ -->
+<h2 class="section-title">Pipeline Flow — What Happens When You Analyze 500 Comments</h2>
+
+<div class="flow-columns">
+
+  <!-- LOCAL ML -->
+  <div class="flow-card ml-flow">
+    <div class="flow-head">
+      <span class="badge">CURRENT</span>
+      <h3>Local ML Pipeline</h3>
+    </div>
+    <div class="flow-body">
+
+      <div class="fstep">
+        <div class="fstep-icon">1</div>
+        <div class="fstep-content">
+          <h4>Aspect Classification</h4>
+          <div class="fdetail">DeBERTa-v3 NLI · 500 comments × 6 aspects = 3000 inferences</div>
+          <div class="ftime time-slow">⏱ ~3-4 min on CPU (B3) · No Azure OpenAI cost</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">2</div>
+        <div class="fstep-content">
+          <h4>BERT Sentiment</h4>
+          <div class="fdetail">nlptown/bert-multilingual · 500 comments, batch 32</div>
+          <div class="ftime time-slow">⏱ ~1-2 min on CPU · No Azure OpenAI cost</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">3</div>
+        <div class="fstep-content">
+          <h4>Aspect-Relative Sentiment</h4>
+          <div class="fdetail">Sentence splitting → MiniLM embeddings → cosine → per-sentence sentiment</div>
+          <div class="ftime time-slow">⏱ ~2-3 min on CPU · No Azure OpenAI cost</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">4</div>
+        <div class="fstep-content">
+          <h4>Aggregation + Keywords</h4>
+          <div class="fdetail">TF-IDF extraction, sentiment counts, work item candidates</div>
+          <div class="ftime time-fast">⏱ &lt;1 sec · No cost</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">5</div>
+        <div class="fstep-content">
+          <h4>GPT Narration (gpt-5-mini)</h4>
+          <div class="fdetail">1 call · ~2-3K tokens · Writes insights, features, work items</div>
+          <div class="ftime time-med">⏱ ~10-15 sec · ~$0.01</div>
+        </div>
+      </div>
+
+      <div class="flow-total">
+        <div class="ft-label">Total Time (500 comments, CPU on B3)</div>
+        <div class="ft-value" style="color:#d29922;">~7-10 minutes</div>
+        <div class="ft-label" style="margin-top:4px;">Azure OpenAI Cost</div>
+        <div class="ft-value" style="color:#3fb950; font-size:1rem;">~$0.01 per analysis</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LLM ONLY -->
+  <div class="flow-card llm-flow">
+    <div class="flow-head">
+      <span class="badge">ALTERNATIVE</span>
+      <h3>LLM-Only Pipeline (gpt-5-mini for everything)</h3>
+    </div>
+    <div class="flow-body">
+
+      <div class="fstep">
+        <div class="fstep-icon">1</div>
+        <div class="fstep-content">
+          <h4>Token Batching</h4>
+          <div class="fdetail">500 comments → ~17 batches of 30 each (tiktoken)</div>
+          <div class="ftime time-fast">⏱ &lt;1 sec · No cost</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">2</div>
+        <div class="fstep-content">
+          <h4>GPT Classification (×17 batches)</h4>
+          <div class="fdetail">Each batch → gpt-5-mini for aspect + sentiment (8 concurrent)</div>
+          <div class="ftime time-med">⏱ ~30-60 sec · ~$0.15-0.25</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">3</div>
+        <div class="fstep-content">
+          <h4>Schema Validation + Retries</h4>
+          <div class="fdetail">Validate JSON, count match, retry failures (3× max, backoff)</div>
+          <div class="ftime time-slow">⏱ +10-40 sec if retries · +$0.05-0.10</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">4</div>
+        <div class="fstep-content">
+          <h4>Batch Integrity Check</h4>
+          <div class="fdetail">498 of 500 returned? → ValueError → ENTIRE analysis fails</div>
+          <div class="ftime time-slow">⏱ Hard failure risk · Comments silently dropped</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+
+      <div class="fstep">
+        <div class="fstep-icon">5</div>
+        <div class="fstep-content">
+          <h4>GPT Narration (gpt-5-mini)</h4>
+          <div class="fdetail">Same narration call as ML pipeline · +1 more GPT call</div>
+          <div class="ftime time-med">⏱ ~10-15 sec · ~$0.01</div>
+        </div>
+      </div>
+
+      <div class="flow-total">
+        <div class="ft-label">Total Time (500 comments)</div>
+        <div class="ft-value" style="color:#f85149;">~1-2 minutes (if no failures)</div>
+        <div class="ft-label" style="margin-top:4px;">Azure OpenAI Cost</div>
+        <div class="ft-value" style="color:#f85149; font-size:1rem;">~$0.15-0.35 per analysis</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- MONTHLY COST COMPARISON                      -->
+<!-- ════════════════════════════════════════════ -->
+<h2 class="section-title">Monthly Cost Comparison — At Different Usage Levels</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Cost Component</th>
+      <th>Local ML on B3 (Current) ✅</th>
+      <th>LLM-Only on B3 (No ML models)</th>
+      <th>Local ML + GPU VM</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>App Service Plan</td>
+      <td class="cost-current">$52 (B3 — runs both apps)</td>
+      <td class="cost-alt">$52 (B3 — same, but ML models not loaded)</td>
+      <td class="cost-gpu">$330+ (NC4as T4 v3 for GPU) or keep B3 + separate GPU</td>
+    </tr>
+    <tr>
+      <td>Redis Basic C0</td>
+      <td class="cost-current">$16</td>
+      <td class="cost-alt">$16</td>
+      <td class="cost-gpu">$16</td>
+    </tr>
+    <tr>
+      <td>PostgreSQL</td>
+      <td class="cost-current">~$13-25</td>
+      <td class="cost-alt">~$13-25</td>
+      <td class="cost-gpu">~$13-25</td>
+    </tr>
+    <tr>
+      <td>Application Insights</td>
+      <td class="cost-current">~$3</td>
+      <td class="cost-alt">~$3</td>
+      <td class="cost-gpu">~$3</td>
+    </tr>
+    <tr>
+      <td>Azure OpenAI (10 analyses/mo)</td>
+      <td class="cost-current">~$0.10 (narration only)</td>
+      <td class="cost-alt">~$2-4 (17 calls × 10)</td>
+      <td class="cost-gpu">~$0.10 (narration only)</td>
+    </tr>
+    <tr>
+      <td>Azure OpenAI (100 analyses/mo)</td>
+      <td class="cost-current">~$1 (narration only)</td>
+      <td class="cost-alt">~$20-35 (1700 GPT calls)</td>
+      <td class="cost-gpu">~$1 (narration only)</td>
+    </tr>
+    <tr>
+      <td>Azure OpenAI (500 analyses/mo)</td>
+      <td class="cost-current">~$5</td>
+      <td class="cost-alt">~$100-175 (8500 GPT calls!)</td>
+      <td class="cost-gpu">~$5</td>
+    </tr>
+    <tr class="row-total">
+      <td>TOTAL (10 analyses/mo)</td>
+      <td class="cost-current" style="font-size:1.1rem;">~$85-96</td>
+      <td class="cost-alt" style="font-size:1.1rem;">~$87-100</td>
+      <td class="cost-gpu" style="font-size:1.1rem;">~$363-375</td>
+    </tr>
+    <tr class="row-total">
+      <td>TOTAL (100 analyses/mo)</td>
+      <td class="cost-current" style="font-size:1.1rem;">~$86-97</td>
+      <td class="cost-alt" style="font-size:1.1rem;">~$105-135</td>
+      <td class="cost-gpu" style="font-size:1.1rem;">~$364-376</td>
+    </tr>
+    <tr class="row-total">
+      <td>TOTAL (500 analyses/mo)</td>
+      <td class="cost-current" style="font-size:1.1rem;">~$90-101</td>
+      <td class="cost-alt" style="font-size:1.1rem;">~$185-260</td>
+      <td class="cost-gpu" style="font-size:1.1rem;">~$368-380</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- THE DILEMMA & OPTIONS                        -->
+<!-- ════════════════════════════════════════════ -->
+<div class="dilemma">
+  <h2>⚡ The Dilemma: CPU is Slow, GPU is Expensive</h2>
+  <p>
+    Your current setup runs ML models on <strong>CPU (B3 plan, 4 vCPU)</strong> which takes <strong>~7 min for 50 comments</strong>.
+    Adding a GPU VM (NVIDIA T4) would cost <strong>~$330/mo extra</strong> — a 4× increase in your total bill.
+    Going LLM-only avoids ML compute but costs <strong>15-25× more per analysis</strong> in API fees and <strong>drops comments</strong> at scale.
+  </p>
+  <p style="margin-top: 10px; color: #c9d1d9;"><strong>Here are your realistic options:</strong></p>
+
+  <div class="option-grid">
+
+    <div class="option recommended">
+      <h4>A. ONNX Runtime on CPU (No GPU needed)</h4>
+      <div class="o-cost">Cost: $0 extra — same B3 plan</div>
+      <div class="o-speed time-fast">Speed: ~7 min → ~2-3 min (2-4× faster)</div>
+      <div class="o-detail">
+        Convert PyTorch models to ONNX format. Add <code>optimum</code> + <code>onnxruntime</code> to requirements-ml.txt.
+        ONNX uses graph optimization + operator fusion on CPU — no GPU needed.
+        DeBERTa and BERT both have ONNX support out of the box.
+        <br><strong>Effort:</strong> ~1-2 days of code changes.
+      </div>
+    </div>
+
+    <div class="option">
+      <h4>B. Upgrade to B3 → P1v3 (Premium, faster CPU)</h4>
+      <div class="o-cost">Cost: $52 → ~$130/mo (+$78)</div>
+      <div class="o-speed time-med">Speed: ~7 min → ~3-4 min (faster CPU + more RAM)</div>
+      <div class="o-detail">
+        Premium v3 has faster Intel Xeon processors and 8GB RAM.
+        No code changes needed — just scale up the plan.
+        <br><strong>Effort:</strong> 1 CLI command.
+      </div>
+    </div>
+
+    <div class="option">
+      <h4>C. ONNX + Quantization (INT8)</h4>
+      <div class="o-cost">Cost: $0 extra — same B3 plan</div>
+      <div class="o-speed time-fast">Speed: ~7 min → ~1-2 min (4-7× faster)</div>
+      <div class="o-detail">
+        ONNX Runtime + INT8 quantization reduces model weights to 1/4 size and uses VNNI instructions on modern CPUs.
+        Slight accuracy trade-off (&lt;1% drop on sentiment, negligible on aspects).
+        <br><strong>Effort:</strong> ~2-3 days of code changes + testing.
+      </div>
+    </div>
+
+    <div class="option">
+      <h4>D. Accept 7 min — It's Async Anyway</h4>
+      <div class="o-cost">Cost: $0 extra</div>
+      <div class="o-speed time-med">Speed: 7 min (unchanged, but user doesn't wait)</div>
+      <div class="o-detail">
+        Celery processes in background. User submits analysis → gets notified when done.
+        7 minutes isn't a UX blocker if the user isn't staring at a loading spinner.
+        <br><strong>Effort:</strong> Zero — already works this way.
+      </div>
+    </div>
+
+    <div class="option">
+      <h4>E. Azure Container Apps + GPU (Spot)</h4>
+      <div class="o-cost">Cost: ~$50-80/mo (spot T4, pay-per-use)</div>
+      <div class="o-speed time-fast">Speed: ~7 min → ~30-60 sec</div>
+      <div class="o-detail">
+        Run Celery on Azure Container Apps with GPU spot instances.
+        Spin up only during analysis, shut down after. Pay per second, not 24/7.
+        <br><strong>Effort:</strong> ~3-5 days (new deployment target, Dockerfile changes).
+      </div>
+    </div>
+
+    <div class="option">
+      <h4>F. GPU VM (NC4as T4 v3, always-on)</h4>
+      <div class="o-cost" style="color:#f85149;">Cost: +$330/mo (total ~$418)</div>
+      <div class="o-speed time-fast">Speed: ~7 min → ~20-30 sec</div>
+      <div class="o-detail">
+        Dedicated NVIDIA T4 GPU (16GB VRAM). Fastest option but expensive for your usage level. Only makes sense at 500+ analyses/month.
+        <br><strong>Effort:</strong> ~2-3 days (GPU Docker image, new deployment).
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- VERDICT                                      -->
+<!-- ════════════════════════════════════════════ -->
+<div class="verdict">
+  <h2>Recommendation</h2>
+  <p>
+    <strong>Start with Option D</strong> — your Celery worker already runs async, so 7 minutes isn't a user-facing bottleneck today.
+    <br><br>
+    <strong>When speed matters, go with Option A (ONNX Runtime)</strong> — zero extra hosting cost, 2-4× speedup, just add <code>optimum</code> + <code>onnxruntime</code> and convert models.
+    Combine with <strong>Option C (INT8 quantization)</strong> for 4-7× speedup at near-zero accuracy loss.
+    <br><br>
+    <strong>Avoid GPU VMs</strong> at your current scale — $330/mo for a few analyses/day is overkill.
+    <strong>Avoid LLM-only</strong> — it costs 15-25× more per analysis, drops comments, and gets worse at scale.
+    <br><br>
+    <span style="color:#58a6ff;">Your current setup (Local ML + B3 + CPU) is already the most cost-effective architecture. Speed is the only trade-off, and ONNX fixes that without touching your bill.</span>
+  </p>
+</div>
+
+</div>
+</body>
+</html>
