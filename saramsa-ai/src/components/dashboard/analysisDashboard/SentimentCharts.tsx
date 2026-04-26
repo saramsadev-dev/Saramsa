@@ -58,10 +58,15 @@ interface CustomTooltipProps {
   active?: boolean;
   payload?: CustomTooltipPayload[];
   label?: string | number;
+  isPercentage?: boolean;
 }
 
-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, label, isPercentage = false }: CustomTooltipProps) => {
   if (!active || !payload || payload.length === 0) return null;
+
+  const total = isPercentage
+    ? payload.reduce((sum, entry) => sum + (typeof entry.value === 'number' ? entry.value : 0), 0)
+    : 0;
 
   return (
     <div className="bg-background/95 border border-border/70 rounded-xl p-4 shadow-md">
@@ -70,22 +75,24 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
           {label}
         </p>
       )}
-      {payload.map((entry, index) => (
-        <div key={index} className="flex items-center gap-2 text-sm">
-          <div
-            className="w-3 h-3 rounded-full"
-            style={{ backgroundColor: entry.color ?? 'var(--muted-foreground)' }}
-          />
-          <span className="text-muted-foreground">{entry.name}:</span>
-          <span className="text-foreground font-medium">
-            {typeof entry.value === 'number'
-              ? Number.isInteger(entry.value)
-                ? entry.value
-                : entry.value.toFixed(2)
-              : entry.value ?? 0}
-          </span>
-        </div>
-      ))}
+      {payload.map((entry, index) => {
+        const value = typeof entry.value === 'number' ? entry.value : 0;
+        const percentage = isPercentage && total > 0 ? ((value / total) * 100).toFixed(1) : null;
+
+        return (
+          <div key={index} className="flex items-center gap-2 text-sm">
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: entry.color ?? 'var(--muted-foreground)' }}
+            />
+            <span className="text-muted-foreground">{entry.name}:</span>
+            <span className="text-foreground font-medium">
+              {Number.isInteger(value) ? value : value.toFixed(2)}
+              {percentage && ` (${percentage}%)`}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -292,7 +299,7 @@ export function SentimentCharts({
                       }}
                     />
                   </Pie>
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={<CustomTooltip isPercentage={true} />} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
