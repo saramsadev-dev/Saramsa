@@ -126,7 +126,7 @@ jobs:
         working-directory: .
         run: |
           for i in $(seq 1 6); do
-            STATUS=$(az webapp show --name saramsa-api --slot Production \
+            STATUS=$(az webapp show --name saramsa-api-prod --slot Production \
               --query "siteConfig.publishingState" -o tsv 2>/dev/null || echo "unknown")
             echo "Publishing state: $STATUS"
             if [ "$STATUS" != "Publishing" ]; then
@@ -140,7 +140,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'saramsa-api'
+          app-name: 'saramsa-api-prod'
           slot-name: 'Production'
           package: artifact/api.zip
 
@@ -148,4 +148,4 @@ jobs:
         run: |
           echo "Deployment completed. Verifying container health..."
           sleep 10
-          az webapp show --name saramsa-api --resource-group saramsa --query "state" -o tsv
+          az webapp show --name saramsa-api-prod --resource-group saramsa --query "state" -o tsv

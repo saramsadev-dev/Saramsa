@@ -82,15 +82,15 @@ jobs:
 
       - name: Restart Celery app to pull new image
         run: |
-          az webapp restart --name saramsa-celery-prod --resource-group saramsa
-          echo "Restarted saramsa-celery-prod — pulling new image..."
+          az webapp restart --name saramsa-celery-prod-2 --resource-group saramsa
+          echo "Restarted saramsa-celery-prod-2 — pulling new image..."
 
       - name: Verify deployment
         run: |
           echo "Waiting for container to start..."
           sleep 30
           for i in $(seq 1 5); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://saramsa-celery-prod.azurewebsites.net/)
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://saramsa-celery-prod-2.azurewebsites.net/)
             echo "Attempt $i: HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "Celery app is healthy!"
