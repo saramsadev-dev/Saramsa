@@ -20,12 +20,14 @@ from rest_framework import status
 
 from authentication.permissions import IsProjectEditor
 from apis.core.response import StandardResponse
+from billing.quota import QuotaExceeded, check_quota, record_usage
 
 from ..file_extractors import (
     extract_comments_from_docx,
     extract_comments_from_pdf,
     extract_comments_from_text,
 )
+from ..language_check import UnsupportedLanguage, assert_english
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,16 @@ class FeedbackFileIngestView(APIView):
             )
         user_id_str = str(user.id)
 
+        try:
+            check_quota(user_id_str, "analysis")
+        except QuotaExceeded as exc:
+            return StandardResponse.error(
+                title="Quota exceeded",
+                detail=str(exc),
+                status_code=429,
+                instance=request.path,
+            )
+
         analysis_service = get_analysis_service()
         try:
             project_id, _project_doc, _is_draft = analysis_service.ensure_project_context(
@@ -135,9 +147,18 @@ class FeedbackFileIngestView(APIView):
                 instance=request.path,
             )
 
+        try:
+            assert_english(comments)
+        except UnsupportedLanguage as exc:
+            return StandardResponse.validation_error(
+                detail=str(exc),
+                errors=[{"field": "file", "message": str(exc)}],
+                instance=request.path,
+            )
+
         company_name = None
         try:
-            user_data = analysis_service.get_user_by_username(user.username)
+            user_data = analysis_service.get_user_by_id(user_id_str)
             if user_data:
                 company_name = user_data.get("company_name")
         except Exception as exc:
@@ -168,6 +189,11 @@ class FeedbackFileIngestView(APIView):
                     error_type="service-unavailable",
                 )
             raise
+
+        try:
+            record_usage(user_id_str, "analysis")
+        except Exception:
+            logger.exception("record_usage failed after successful ingest")
 
         cache = get_cache_service()
         started_at = datetime.now().isoformat()

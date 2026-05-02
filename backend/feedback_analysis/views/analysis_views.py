@@ -23,6 +23,7 @@ from authentication.permissions import IsAdminOrUser, IsProjectViewer, IsProject
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from billing.quota import check_quota, record_usage, QuotaExceeded
+from ..language_check import UnsupportedLanguage, assert_english
 from celery.result import AsyncResult
 from apis.infrastructure.cache_service import get_cache_service
 from apis.infrastructure.storage_service import storage_service
@@ -77,6 +78,15 @@ class AnalyzeCommentsView(APIView):
                 detail=f"Too many comments for one analysis (max {max_comments}).",
                 errors=[{"field": "comments", "message": "Max comments per analysis exceeded."}],
                 instance=request.path
+            )
+
+        try:
+            assert_english(comments)
+        except UnsupportedLanguage as exc:
+            return StandardResponse.validation_error(
+                detail=str(exc),
+                errors=[{"field": "comments", "message": str(exc)}],
+                instance=request.path,
             )
 
         # Get user info and project context

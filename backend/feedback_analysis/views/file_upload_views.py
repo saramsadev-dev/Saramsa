@@ -16,6 +16,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 import logging
 
 from ..services import get_analysis_service, get_processing_service
+from ..language_check import UnsupportedLanguage, assert_english
 from authentication.permissions import IsProjectEditor
 from apis.core.response import StandardResponse
 from billing.quota import check_quota, record_usage, QuotaExceeded
@@ -180,7 +181,16 @@ class FeedbackFileUploadView(APIView):
             # Extract original comments before processing
             original_comments = self.extract_comments_from_data(data, 'json')
             logger.info(f"📊 JSON Upload: Extracted {len(original_comments)} comments from file")
-            
+
+            try:
+                assert_english(original_comments)
+            except UnsupportedLanguage as exc:
+                return StandardResponse.validation_error(
+                    detail=str(exc),
+                    errors=[{"field": "file", "message": str(exc)}],
+                    instance=request.path,
+                )
+
             # Step 2: Resolve project-owned taxonomy (Phase-1)
             taxonomy, aspect_suggestions = await self._resolve_taxonomy_for_upload(
                 project_id, original_comments
@@ -258,7 +268,16 @@ class FeedbackFileUploadView(APIView):
             # Extract original comments before processing
             original_comments = self.extract_comments_from_data(csv_data, 'csv')
             logger.info(f"📊 CSV Upload: Extracted {len(original_comments)} comments from file")
-            
+
+            try:
+                assert_english(original_comments)
+            except UnsupportedLanguage as exc:
+                return StandardResponse.validation_error(
+                    detail=str(exc),
+                    errors=[{"field": "file", "message": str(exc)}],
+                    instance=request.path,
+                )
+
             # Step 2: Resolve project-owned taxonomy (Phase-1)
             taxonomy, aspect_suggestions = await self._resolve_taxonomy_for_upload(
                 project_id, original_comments
