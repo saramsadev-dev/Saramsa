@@ -137,30 +137,13 @@ class TestExtractCommentsFromDocx:
         ]
 
     def test_splits_paragraph_with_soft_line_breaks(self):
-        # Shift+Enter / <w:br/> renders as \n inside paragraph.text.
-        from docx import Document
-        buf = io.BytesIO()
-        doc = Document()
-        p = doc.add_paragraph("first line")
-        p.add_run().add_break()
-        p.add_run("second line")
-        doc.save(buf)
-        buf.seek(0)
-        assert extract_comments_from_docx(buf) == ["first line", "second line"]
+        # Static fixture — pins the on-disk wire format so this test is
+        # robust against future changes in python-docx's serializer.
+        comments = extract_comments_from_docx(_open(FIXTURES / "mock_feedback_softbreak.docx"))
+        assert comments == ["first line", "second line"]
 
     def test_extracts_text_from_nested_tables(self):
-        from docx import Document
-        buf = io.BytesIO()
-        doc = Document()
-        outer = doc.add_table(rows=1, cols=1)
-        outer_cell = outer.cell(0, 0)
-        outer_cell.paragraphs[0].text = "Outer cell text"
-        inner = outer_cell.add_table(rows=1, cols=2)
-        inner.cell(0, 0).text = "Inner left"
-        inner.cell(0, 1).text = "Inner right"
-        doc.save(buf)
-        buf.seek(0)
-        comments = extract_comments_from_docx(buf)
+        comments = extract_comments_from_docx(_open(FIXTURES / "mock_feedback_nested_table.docx"))
         assert "Outer cell text" in comments
         assert "Inner left" in comments
         assert "Inner right" in comments
