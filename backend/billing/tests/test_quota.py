@@ -92,9 +92,7 @@ class RecordUsageTest(TestCase):
         self.assertEqual(rec.analysis_count, 0)
 
     def test_creates_record_if_none_exists(self):
-        """Fix for latent bug: record_usage on a fresh user/period silently
-        no-ops because .update() on an empty queryset does nothing. This
-        test pins the new behavior: record_usage MUST upsert."""
+        """record_usage must upsert; .update() on an empty queryset silently no-ops."""
         record_usage("u3-fresh", "analysis")
         rec = UsageRecord.objects.get(
             user_id="u3-fresh", period=current_period()

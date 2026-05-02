@@ -83,9 +83,8 @@ def check_quota(user_id: str, resource: str) -> None:
 def record_usage(user_id: str, resource: str, amount: int = 1) -> None:
     """Increment usage counter after a successful operation.
 
-    Upserts the per-month UsageRecord row so that a record_usage call without
-    a prior check_quota still persists. Without the upsert, .update() on an
-    empty queryset is a silent no-op and usage is dropped.
+    Upserts the row first: .update() on an empty queryset silently no-ops,
+    so a record_usage call without a prior check_quota would drop usage.
     """
     from .models import UsageRecord
 

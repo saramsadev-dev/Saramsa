@@ -44,8 +44,7 @@ class FileUploadQuotaTest(TestCase):
         proc_factory.assert_not_called()
 
     def test_under_quota_increments_analysis_count(self):
-        # Patch out the heavy downstream work but let the gate's
-        # check_quota / record_usage run for real.
+        # Stub downstream LLM/processing; gate runs for real.
         with patch.object(
             FeedbackFileUploadView,
             "_resolve_taxonomy_for_upload",
