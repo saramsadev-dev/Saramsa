@@ -255,7 +255,9 @@ class UpdateKeywordsView(APIView):
         feedback_data = f"{keyword_context}\n\nFEEDBACK DATA:\n" + "\n".join([str(c) for c in comments])
         
         # Create prompt using structured system
-        prompt = getSentAnalysisPrompt(company_name=company_name, feedback_data=feedback_data)
+        prompt = getSentAnalysisPrompt(
+            company_name=company_name, feedback_data=feedback_data, project_id=project_id,
+        )
         
         result, _usage = await generate_completions(
             prompt,

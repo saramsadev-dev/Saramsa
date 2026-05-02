@@ -61,7 +61,7 @@ class NarrationService:
         if analysis_id and cache.get(f"analysis_failed:{analysis_id}"):
             raise RuntimeError("Cannot narrate a previously failed analysis")
 
-        prompt = create_narration_prompt(trimmed)
+        prompt = create_narration_prompt(trimmed, project_id=project_id)
 
         candidates = trimmed.get("work_item_candidates", [])
         candidate_count = len(candidates)

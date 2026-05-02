@@ -88,13 +88,15 @@ class PromptOverrideService:
         if scope == "organization" and not organization_id:
             raise ValueError("organization_id is required for organization scope.")
 
-        return self.repo.upsert_prompt_override(
+        result = self.repo.upsert_prompt_override(
             scope=scope,
             prompt_type=prompt_type,
             content=content.strip(),
             updated_by_user_id=updated_by_user_id,
             organization_id=organization_id,
         )
+        self._invalidate_resolver_cache()
+        return result
 
     def delete_prompt(self, *, scope: str, prompt_type: str, organization_id: Optional[str] = None) -> bool:
         if scope not in ("platform", "organization"):
@@ -103,7 +105,20 @@ class PromptOverrideService:
             raise ValueError(f"prompt_type must be one of: {', '.join(PROMPT_TYPES)}")
         if scope == "organization" and not organization_id:
             raise ValueError("organization_id is required for organization scope.")
-        return self.repo.delete_prompt_override(scope, prompt_type, organization_id=organization_id)
+        deleted = self.repo.delete_prompt_override(scope, prompt_type, organization_id=organization_id)
+        if deleted:
+            self._invalidate_resolver_cache()
+        return deleted
+
+    @staticmethod
+    def _invalidate_resolver_cache() -> None:
+        """Drop the apis.prompts.resolver in-process cache so admin edits
+        take effect on the next LLM call instead of after the TTL."""
+        try:
+            from apis.prompts.resolver import invalidate_cache
+            invalidate_cache()
+        except Exception:
+            pass
 
 
 _prompt_override_service = None
