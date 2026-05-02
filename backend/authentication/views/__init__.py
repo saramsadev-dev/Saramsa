@@ -21,6 +21,12 @@ from .authentication_views import (
     ForgotPasswordView,
     ResetPasswordView,
 )
+from .organization_views import (
+    OrganizationsView,
+    SwitchActiveOrganizationView,
+    OrganizationMembersView,
+    AdminPromptSettingsView,
+)
 
 __all__ = [
     'RegisterView',
@@ -33,5 +39,9 @@ __all__ = [
     'LoginView',
     'ForgotPasswordView',
     'ResetPasswordView',
+    'OrganizationsView',
+    'SwitchActiveOrganizationView',
+    'OrganizationMembersView',
+    'AdminPromptSettingsView',
 ]
 

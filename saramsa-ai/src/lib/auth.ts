@@ -1,5 +1,12 @@
 
 
+export type Organization = {
+  id: string;
+  name?: string;
+  slug?: string;
+  role?: string;
+};
+
 export type User = {
   id?: string;
   email?: string;
@@ -7,6 +14,9 @@ export type User = {
   user_id?: string;
   first_name?: string;
   last_name?: string;
+  active_organization_id?: string;
+  active_organization?: Organization | null;
+  organizations?: Organization[];
 };
 
 type LoginParams = { email: string; password: string };

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, UserRound, PlugZap } from 'lucide-react';
+import { Settings, UserRound, PlugZap, Building2, Bot } from 'lucide-react';
 import { apiRequest } from "@/lib/apiRequest";
 import { IntegrationsPage } from "@/components/ui/settings/IntegrationsPage";
+import { WorkspacePage } from "@/components/ui/settings/WorkspacePage";
+import { PromptSettingsPage } from "@/components/ui/settings/PromptSettingsPage";
 import { Button } from "@/components/ui/button";
 import {
   createStripeBillingPortalSession,
@@ -15,7 +17,7 @@ import {
 type Profile = { email?: string };
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"profile" | "integrations">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "workspace" | "integrations" | "prompts">("profile");
   const [profile, setProfile] = useState<Profile>({});
   const [billing, setBilling] = useState<SubscriptionStatus | null>(null);
   const [billingLoading, setBillingLoading] = useState<boolean>(true);
@@ -27,6 +29,10 @@ export default function SettingsPage() {
       const tab = new URLSearchParams(window.location.search).get("tab");
       if (tab === "integrations") {
         setActiveTab("integrations");
+      } else if (tab === "workspace") {
+        setActiveTab("workspace");
+      } else if (tab === "prompts") {
+        setActiveTab("prompts");
       }
     }
   }, []);
@@ -104,47 +110,35 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-card rounded-xl border border-border p-2">
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="ghost"
-              className={`h-10 text-sm font-medium transition-colors ${
-                activeTab === "profile"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-              }`}
-              onClick={() => setActiveTab("profile")}
-            >
-              <span className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white transition-opacity ${
-                    activeTab === "profile" ? "opacity-100" : "opacity-60"
-                  }`}
-                >
-                  <UserRound className="h-4 w-4" />
+          <div className="grid grid-cols-4 gap-2">
+            {([
+              { key: "profile", label: "Profile", Icon: UserRound },
+              { key: "workspace", label: "Workspace", Icon: Building2 },
+              { key: "integrations", label: "Integrations", Icon: PlugZap },
+              { key: "prompts", label: "Prompts", Icon: Bot },
+            ] as const).map(({ key, label, Icon }) => (
+              <Button
+                key={key}
+                variant="ghost"
+                className={`h-10 text-sm font-medium transition-colors ${
+                  activeTab === key
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+                onClick={() => setActiveTab(key)}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white transition-opacity ${
+                      activeTab === key ? "opacity-100" : "opacity-60"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  {label}
                 </span>
-                Profile
-              </span>
-            </Button>
-            <Button
-              variant="ghost"
-              className={`h-10 text-sm font-medium transition-colors ${
-                activeTab === "integrations"
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-              }`}
-              onClick={() => setActiveTab("integrations")}
-            >
-              <span className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white transition-opacity ${
-                    activeTab === "integrations" ? "opacity-100" : "opacity-60"
-                  }`}
-                >
-                  <PlugZap className="h-4 w-4" />
-                </span>
-                Integrations
-              </span>
-            </Button>
+              </Button>
+            ))}
           </div>
         </div>
 
@@ -204,7 +198,9 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {activeTab === "workspace" && <WorkspacePage />}
         {activeTab === "integrations" && <IntegrationsPage />}
+        {activeTab === "prompts" && <PromptSettingsPage />}
       </div>
     </div>
   );

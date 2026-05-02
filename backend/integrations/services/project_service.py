@@ -12,6 +12,7 @@ import logging
 
 from ..repositories import IntegrationsRepository
 from apis.infrastructure.storage_service import storage_service
+from .organization_service import get_organization_service
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class ProjectService:
     def __init__(self):
         self.integrations_repo = IntegrationsRepository()
         self.storage_service = storage_service
+        self.organization_service = get_organization_service()
 
     def _normalize_project(self, project: Dict[str, Any]) -> Dict[str, Any]:
         if not project:
@@ -40,8 +42,14 @@ class ProjectService:
             project['status'] = "active"
         return project
     
-    def _create_project_document(self, user_id: str, name: str, description: str = None, 
-                                external_links: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _create_project_document(
+        self,
+        user_id: str,
+        organization_id: str,
+        name: str,
+        description: str = None,
+        external_links: List[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Create a new project document for PostgreSQL."""
         project_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -50,6 +58,7 @@ class ProjectService:
             "id": project_id,
             "type": "project",
             "userId": user_id,  # This is the partition key for projects container
+            "organizationId": organization_id,
             "name": name,
             "description": description or "",
             "status": "active",
@@ -102,10 +111,13 @@ class ProjectService:
         try:
             # Validate required fields
             user_id = project_data.get('userId')
+            organization_id = project_data.get('organizationId')
             project_name = project_data.get('name')
             
-            if not user_id or not project_name:
-                raise ValueError("User ID and project name are required")
+            if not user_id or not organization_id or not project_name:
+                raise ValueError("User ID, organization ID, and project name are required")
+
+            self.organization_service.require_membership(str(organization_id), str(user_id))
             
             # Check if external project already imported
             external_links = project_data.get('externalLinks', [])
@@ -114,12 +126,19 @@ class ProjectService:
                 external_id = link.get('externalId')
                 if provider and external_id:
                     existing = self.integrations_repo.check_external_project_exists(provider, external_id, user_id)
+                    if not existing and organization_id:
+                        existing = self.integrations_repo.check_external_project_exists(
+                            provider,
+                            external_id,
+                            organization_id=str(organization_id),
+                        )
                     if existing:
                         raise ValueError(f'Project "{existing["name"]}" is already imported')
             
             # Create project document using helper
             document = self._create_project_document(
                 user_id=user_id,
+                organization_id=organization_id,
                 name=project_name.strip(),
                 description=project_data.get('description', ''),
                 external_links=external_links
@@ -149,15 +168,19 @@ class ProjectService:
             logger.error(f"Error creating project: {e}")
             raise
     
-    def get_projects_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_projects_by_user(self, user_id: str, organization_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get all projects for a user."""
         try:
-            owned = self.integrations_repo.get_projects_by_user(user_id)
+            if organization_id:
+                self.organization_service.require_membership(str(organization_id), str(user_id))
+            owned = self.integrations_repo.get_projects_by_user(user_id, organization_id=organization_id)
             owned_ids = {p.get('id') for p in owned if p.get('id')}
 
             shared_ids = self.storage_service.get_project_ids_for_user(user_id)
             shared_ids = [pid for pid in shared_ids if pid not in owned_ids]
             shared = self.storage_service.get_projects_by_ids(shared_ids) if shared_ids else []
+            if organization_id:
+                shared = [project for project in shared if str(project.get("organizationId") or "") == str(organization_id)]
 
             all_projects = []
             for project in owned + shared:
@@ -192,12 +215,18 @@ class ProjectService:
         try:
             project = self.integrations_repo.get_project(project_id, user_id)
             if project:
+                project_org_id = project.get("organizationId")
+                if project_org_id:
+                    self.organization_service.require_membership(str(project_org_id), str(user_id))
                 return self._normalize_project(project)
 
             # Check project roles for shared access
             role = self.storage_service.get_project_role_for_user(project_id, user_id)
             if role:
                 project = self.storage_service.get_project_by_id_any(project_id)
+                project_org_id = project.get("organizationId") if project else None
+                if project_org_id:
+                    self.organization_service.require_membership(str(project_org_id), str(user_id))
                 return self._normalize_project(project) if project else None
 
             return None
@@ -277,14 +306,17 @@ class ProjectService:
             owner_id = project.get("owner_user_id") or project.get("userId")
         if owner_id and str(owner_id) == str(user_id):
             return "owner"
-        return self.storage_service.get_project_role_for_user(project_id, str(user_id))
+        role_doc = self.storage_service.get_project_role_for_user(project_id, str(user_id))
+        if isinstance(role_doc, dict):
+            return role_doc.get("role")
+        return role_doc
 
     def _has_min_role(self, role: Optional[str], required: str) -> bool:
         if not role:
             return False
         return self._ROLE_ORDER.get(role, 0) >= self._ROLE_ORDER.get(required, 0)
     
-    def get_projects_by_provider(self, user_id: str, provider: str) -> List[Dict[str, Any]]:
+    def get_projects_by_provider(self, user_id: str, provider: str, organization_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get projects filtered by external provider.
         
@@ -296,7 +328,7 @@ class ProjectService:
             List of projects linked to the specified provider
         """
         try:
-            all_projects = self.integrations_repo.get_projects_by_user(user_id)
+            all_projects = self.get_projects_by_user(user_id, organization_id=organization_id)
             
             # Filter for projects with the specified provider
             filtered_projects = [

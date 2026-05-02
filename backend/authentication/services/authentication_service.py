@@ -93,6 +93,26 @@ class AuthenticationService:
             logger.error(f"Error updating user {user_id}: {e}")
             raise
 
+    def get_organization_context(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        from integrations.services import get_organization_service
+        profile = user_data.get("profile") or {}
+        active_organization_id = profile.get("active_organization_id")
+        return get_organization_service().get_organization_context_for_user(
+            user_data,
+            active_organization_id=active_organization_id,
+        )
+
+    def set_active_organization(self, user_id: str, organization_id: str) -> Dict[str, Any]:
+        from integrations.services import get_organization_service
+        user_data = self.get_user_by_id(user_id)
+        if not user_data:
+            raise ValueError("User not found")
+        get_organization_service().require_membership(organization_id, user_id)
+        profile = dict(user_data.get("profile") or {})
+        profile["active_organization_id"] = organization_id
+        user_data["profile"] = profile
+        return self.update_user(user_id, user_data)
+
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Get all users."""
         try:

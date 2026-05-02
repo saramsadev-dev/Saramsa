@@ -128,3 +128,13 @@ class NoAuthentication(permissions.BasePermission):
     def has_permission(self, request, view):
         return True
 
+
+class IsSuperAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = getattr(request, 'user', None)
+        if not getattr(user, 'is_authenticated', False):
+            return False
+        if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
+            return True
+        return _get_role_from_user(user) in ('superadmin', 'platform_admin')
+

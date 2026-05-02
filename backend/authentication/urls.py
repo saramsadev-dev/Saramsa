@@ -8,7 +8,11 @@ from .views import (
     UserDetailView,
     LoginView,
     ForgotPasswordView,
-    ResetPasswordView
+    ResetPasswordView,
+    OrganizationsView,
+    SwitchActiveOrganizationView,
+    OrganizationMembersView,
+    AdminPromptSettingsView,
 )
 
 urlpatterns = [
@@ -21,5 +25,9 @@ urlpatterns = [
     path('refresh/', AppTokenRefreshView.as_view(), name='refresh'),
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
+    path('organizations/', OrganizationsView.as_view(), name='organizations'),
+    path('organizations/active/', SwitchActiveOrganizationView.as_view(), name='organizations-active'),
+    path('organizations/members/', OrganizationMembersView.as_view(), name='organizations-members'),
+    path('admin/prompts/', AdminPromptSettingsView.as_view(), name='admin-prompts'),
 ]
 

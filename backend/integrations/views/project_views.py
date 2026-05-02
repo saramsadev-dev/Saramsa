@@ -24,6 +24,13 @@ from apis.infrastructure.storage_service import storage_service
 from ..services import get_project_service
 
 
+def _get_active_organization_id(request):
+    profile = getattr(request.user, "profile", {}) or {}
+    if isinstance(profile, dict):
+        return profile.get("active_organization_id")
+    return None
+
+
 class ProjectCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -31,15 +38,21 @@ class ProjectCreateView(APIView):
     def get(self, request):
         """Get all projects for the authenticated user."""
         user_id = getattr(request.user, 'id', None)
+        organization_id = _get_active_organization_id(request)
         if not user_id:
             return StandardResponse.unauthorized(
                 detail="Authentication required",
                 instance=request.path
             )
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization context is required.",
+                instance=request.path
+            )
         
         # Use project service to get projects
         project_service = get_project_service()
-        projects = project_service.get_projects_by_user(user_id)
+        projects = project_service.get_projects_by_user(user_id, organization_id=organization_id)
         
         return StandardResponse.success(
             data={'projects': projects, 'count': len(projects)},
@@ -49,17 +62,19 @@ class ProjectCreateView(APIView):
     @handle_service_errors
     def post(self, request):
         user_id = getattr(request.user, 'id', None)
+        organization_id = _get_active_organization_id(request)
         project_name = request.data.get('project_name')
         description = request.data.get('description', '')
         platform = request.data.get('platform', 'standalone')
         external_project_id = request.data.get('external_project_id')
         integration_account_id = request.data.get('integration_account_id')
 
-        if not user_id or not project_name:
+        if not user_id or not organization_id or not project_name:
             return StandardResponse.validation_error(
-                detail="user_id (auth) and project_name are required",
+                detail="Authenticated user, active organization, and project_name are required",
                 errors=[
                     {"field": "user_id", "message": "Authentication required."} if not user_id else None,
+                    {"field": "organization_id", "message": "Active organization is required."} if not organization_id else None,
                     {"field": "project_name", "message": "This field is required."} if not project_name else None
                 ],
                 instance=request.path
@@ -87,6 +102,7 @@ class ProjectCreateView(APIView):
         project_service = get_project_service()
         project_data = {
             'userId': user_id,
+            'organizationId': organization_id,
             'name': project_name.strip(),
             'description': description or "",
             'externalLinks': external_links
@@ -123,15 +139,21 @@ class ProjectListView(APIView):
     @handle_service_errors
     def get(self, request):
         user_id = getattr(request.user, 'id', None)
+        organization_id = _get_active_organization_id(request)
         if not user_id:
             return StandardResponse.unauthorized(
                 detail="Authentication required",
                 instance=request.path
             )
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization context is required.",
+                instance=request.path
+            )
         
         # Use project service to get projects
         project_service = get_project_service()
-        projects = project_service.get_projects_by_user(user_id)
+        projects = project_service.get_projects_by_user(user_id, organization_id=organization_id)
         
         return StandardResponse.success(
             data={'projects': projects, 'count': len(projects)},
