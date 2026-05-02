@@ -82,6 +82,17 @@ record_usage(str(request.user.id), "analysis")
 ```
 For async views, wrap `check_quota` and `record_usage` in `sync_to_async`.
 
+**Gate ordering:** put `check_quota` after auth/permission checks and after
+trivial input presence checks (e.g. file or user-id missing) but **before**
+any payload validation, project-context lookup, taxonomy resolution, or LLM
+call. The intent is to fail fast for over-quota users without consuming any
+billable downstream work, while still surfacing 401/400 responses for
+clearly-broken requests instead of misdirecting them as a quota error.
+
+`record_usage` should run only on a successful response and should be
+wrapped in a try/log so that a transient accounting failure does not turn
+a successful request into a 500.
+
 ## Known limits
 
 - **Race**: two concurrent requests at limit-1 can both pass `check_quota` and

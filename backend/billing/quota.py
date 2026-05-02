@@ -9,8 +9,6 @@ can be overridden per-user via BillingProfile.metadata["quota_overrides"].
 import logging
 from datetime import datetime, timezone
 
-from django.db import models as _  # noqa — ensure app registry is ready
-
 logger = logging.getLogger(__name__)
 
 
@@ -101,8 +99,10 @@ def record_usage(user_id: str, resource: str, amount: int = 1) -> None:
     if not field:
         return
 
+    from django.db import transaction
     from django.db.models import F
-    UsageRecord.objects.get_or_create(user_id=str(user_id), period=period)
-    UsageRecord.objects.filter(
-        user_id=str(user_id), period=period,
-    ).update(**{field: F(field) + amount})
+    with transaction.atomic():
+        UsageRecord.objects.get_or_create(user_id=str(user_id), period=period)
+        UsageRecord.objects.filter(
+            user_id=str(user_id), period=period,
+        ).update(**{field: F(field) + amount})
