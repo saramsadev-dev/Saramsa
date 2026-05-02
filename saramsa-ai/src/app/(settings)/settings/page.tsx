@@ -19,7 +19,12 @@ type Profile = { email?: string };
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const isSuperadmin = !!user?.is_staff;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  // Computed only after client mount so the Prompts tab can't appear on
+  // the SSR pass (when auth state hasn't hydrated) and disappear on the
+  // client — that swap was triggering a React hydration mismatch.
+  const isSuperadmin = mounted && !!user?.is_staff;
   const [activeTab, setActiveTab] = useState<"profile" | "workspace" | "integrations" | "prompts">("profile");
   const [profile, setProfile] = useState<Profile>({});
   const [billing, setBilling] = useState<SubscriptionStatus | null>(null);
