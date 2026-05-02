@@ -82,8 +82,6 @@ class IngestEndpointTests(TestCase):
         assert response.data["data"]["task_id"] == "celery-task-123"
         assert response.data["data"]["status"] == "processing"
         assert response.data["data"]["comment_count"] == 3
-        # Frontend uses this to populate `loadedComments` immediately
-        # without waiting for the analysis task to finish.
         assert response.data["data"]["comments"] == [
             "The new dashboard layout is wonderful and feels much faster on my laptop.",
             "However the export button keeps failing on Safari with a generic error message.",

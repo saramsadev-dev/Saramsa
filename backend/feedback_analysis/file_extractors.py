@@ -1,6 +1,7 @@
-"""Convert uploaded PDF and plain-text files into a list of feedback comments.
+"""Convert uploaded PDF, plain-text, and Word (.docx) files into a list of
+feedback comments.
 
-Both extractors return ``list[str]`` and raise ``ValueError`` with a
+Each extractor returns ``list[str]`` and raises ``ValueError`` with a
 user-friendly message when the file cannot be turned into comments. The
 caller (``FeedbackFileIngestView``) translates that into an HTTP 400.
 

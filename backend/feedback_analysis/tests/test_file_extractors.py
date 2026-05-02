@@ -49,7 +49,6 @@ class TestExtractCommentsFromText:
         assert extract_comments_from_text(payload) == ["one", "two"]
 
     def test_decodes_invalid_utf8_with_replacement(self):
-        # 0xFF is invalid utf-8; should not crash and should produce one comment.
         payload = io.BytesIO(b"valid line\nbroken \xff byte\n")
         result = extract_comments_from_text(payload)
         assert result[0] == "valid line"
@@ -89,7 +88,6 @@ class TestExtractCommentsFromPdf:
             extract_comments_from_pdf(_open(FIXTURES / "mock_feedback_encrypted.pdf"))
 
     def test_corrupt_bytes_raises_value_error(self):
-        # Valid PDFs start with "%PDF-"; bytes that don't are malformed.
         with pytest.raises(ValueError):
             extract_comments_from_pdf(io.BytesIO(b"this is not a pdf"))
 
@@ -104,7 +102,6 @@ class TestExtractCommentsFromDocx:
         ]
 
     def test_empty_docx_raises_value_error(self):
-        # A docx with only blank/whitespace paragraphs.
         from docx import Document
         buf = io.BytesIO()
         doc = Document()
@@ -116,14 +113,10 @@ class TestExtractCommentsFromDocx:
             extract_comments_from_docx(buf)
 
     def test_corrupt_bytes_raises_value_error(self):
-        # Valid DOCX files are zip archives; a plain string is malformed.
         with pytest.raises(ValueError):
             extract_comments_from_docx(io.BytesIO(b"this is not a docx"))
 
     def test_extracts_text_from_table_cells_in_order(self):
-        # If users export feedback as a table in Word, we should pick it up
-        # in document order: paragraphs first, then table rows in
-        # left-to-right, top-to-bottom order.
         from docx import Document
         buf = io.BytesIO()
         doc = Document()
@@ -131,7 +124,7 @@ class TestExtractCommentsFromDocx:
         table = doc.add_table(rows=2, cols=2)
         table.cell(0, 0).text = "Cell A1"
         table.cell(0, 1).text = "Cell A2"
-        table.cell(1, 0).text = ""  # filtered out
+        table.cell(1, 0).text = ""
         table.cell(1, 1).text = "Cell B2"
         doc.save(buf)
         buf.seek(0)
@@ -143,8 +136,7 @@ class TestExtractCommentsFromDocx:
         ]
 
     def test_splits_paragraph_with_soft_line_breaks(self):
-        # Shift+Enter inside Word inserts a <w:br/> which renders as \n in
-        # paragraph.text. Each line becomes its own comment.
+        # Shift+Enter / <w:br/> renders as \n inside paragraph.text.
         from docx import Document
         buf = io.BytesIO()
         doc = Document()
@@ -156,8 +148,6 @@ class TestExtractCommentsFromDocx:
         assert extract_comments_from_docx(buf) == ["first line", "second line"]
 
     def test_extracts_text_from_nested_tables(self):
-        # Outer table whose cell contains a nested table — both levels
-        # must be collected.
         from docx import Document
         buf = io.BytesIO()
         doc = Document()
