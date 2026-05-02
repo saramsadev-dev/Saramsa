@@ -206,6 +206,7 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
     role: data.role,
     first_name: data.first_name,
     last_name: data.last_name,
+    is_staff: data.is_staff ?? false,
     active_organization_id: data.active_organization_id ?? undefined,
     active_organization: data.active_organization ?? null,
     organizations: data.organizations ?? [],

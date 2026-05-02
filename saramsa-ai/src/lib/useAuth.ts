@@ -60,6 +60,20 @@ export function useAuth(): HookResult {
           if (!cancelled) {
             dispatch(setUser(storedUser));
           }
+          // Refresh from /me in the background so server-side changes
+          // (role/staff promotion, org switches done elsewhere, name edits)
+          // propagate without requiring a logout/login round-trip.
+          getCurrentUser(validToken)
+            .then((fresh) => {
+              if (!cancelled) {
+                setStoredUser(fresh);
+                dispatch(setUser(fresh));
+              }
+            })
+            .catch(() => {
+              // Stale stored user is fine; user keeps using cached state
+              // until next active call surfaces the auth error.
+            });
         } else {
           try {
             const user = await getCurrentUser(validToken);
