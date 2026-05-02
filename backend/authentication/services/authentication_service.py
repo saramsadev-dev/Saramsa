@@ -28,14 +28,23 @@ class AuthenticationService:
     def create_user(self, email: str, password: str,
                    first_name: str = "", last_name: str = "",
                    role: str = "user") -> Dict[str, Any]:
-        """Create a new user with hashed password."""
+        """Create a new user with hashed password.
+
+        Also bootstraps a personal organization for the user (the B2B
+        "one company per user" tenant model) so the new account has
+        somewhere to put projects, integrations, and credits the moment
+        it logs in. The user is set as the org owner and the org id is
+        written to profile.active_organization_id so the JWT issued on
+        first login carries it.
+        """
         try:
             # Hash password
             hashed_password = self._hash_password(password)
-            
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+
             # Create user data
             user_data = {
-                "id": f"user_{uuid.uuid4().hex[:12]}",
+                "id": user_id,
                 "email": email,
                 "password": hashed_password,
                 "first_name": first_name,
@@ -49,12 +58,51 @@ class AuthenticationService:
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "updatedAt": datetime.now(timezone.utc).isoformat()
             }
-            
-            return self.user_repo.create_user(user_data)
-            
+
+            created = self.user_repo.create_user(user_data)
+
+            try:
+                self._bootstrap_default_organization(created, first_name, last_name, email)
+            except Exception as exc:
+                # Don't fail signup if org bootstrap hits a snag — the user
+                # account is real and recoverable; the org can be created
+                # on demand from the workspace settings page.
+                logger.exception("Failed to bootstrap default org for new user %s: %s", user_id, exc)
+
+            return created
+
         except Exception as e:
             logger.error(f"Error creating user: {e}")
             raise
+
+    def _bootstrap_default_organization(
+        self,
+        user_data: Dict[str, Any],
+        first_name: str,
+        last_name: str,
+        email: str,
+    ) -> None:
+        """Create a fresh org for a brand-new user, install them as owner,
+        and persist the org id into their profile so login picks it up."""
+        from integrations.services import get_organization_service
+
+        display_name = (
+            (f"{first_name} {last_name}".strip())
+            or email.split("@")[0]
+            or "My Workspace"
+        )
+        org_name = f"{display_name}'s Workspace"
+
+        organization = get_organization_service().create_organization(
+            name=org_name,
+            description="Default workspace created at signup.",
+            created_by_user_id=str(user_data["id"]),
+        )
+
+        profile = dict(user_data.get("profile") or {})
+        profile["active_organization_id"] = organization["id"]
+        user_data["profile"] = profile
+        self.user_repo.update(str(user_data["id"]), {"profile": profile})
     
     def authenticate_user(self, email: str, password: str) -> Optional[Dict[str, Any]]:
         """Authenticate user with email and password (Django passes this as `username`)."""
