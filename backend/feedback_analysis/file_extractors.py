@@ -11,6 +11,7 @@ can be unit-tested without bootstrapping the wider feedback-analysis stack.
 
 from __future__ import annotations
 
+import logging
 import zipfile
 from typing import IO, List
 
@@ -19,10 +20,40 @@ from docx.opc.exceptions import PackageNotFoundError
 from pypdf import PdfReader
 from pypdf.errors import FileNotDecryptedError, PdfReadError
 
+logger = logging.getLogger(__name__)
+
 # Reject DOCX whose inner ZIP would decompress to more than this many bytes.
 # Defends against zip-bomb / decompression-DoS attacks where a small upload
 # explodes into gigabytes of XML once python-docx + lxml parse it.
 _DOCX_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024  # 50 MB
+_DOCX_STREAM_CHUNK_BYTES = 64 * 1024
+
+
+def _enforce_docx_size_cap(file_obj: IO[bytes]) -> None:
+    """Stream-decompress every zip member; raise if the cumulative
+    decompressed bytes exceed the cap. Leaves ``file_obj`` rewound for
+    the caller (python-docx) to re-parse."""
+    try:
+        with zipfile.ZipFile(file_obj) as zf:
+            total = 0
+            for zi in zf.infolist():
+                with zf.open(zi) as member:
+                    while True:
+                        chunk = member.read(_DOCX_STREAM_CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > _DOCX_MAX_UNCOMPRESSED_BYTES:
+                            raise ValueError(
+                                "DOCX is too large to process. "
+                                "Please split it into smaller files."
+                            )
+    except zipfile.BadZipFile as exc:
+        logger.warning("DOCX is not a valid zip archive: %s", exc)
+        raise ValueError(
+            "DOCX could not be read. The file may be corrupted or password-protected."
+        ) from exc
+    file_obj.seek(0)
 
 _BOM = "﻿"
 
@@ -80,12 +111,12 @@ def extract_comments_from_pdf(file_obj: IO[bytes]) -> List[str]:
 
 
 def _append_lines(comments: List[str], text: str) -> None:
-    """Split ``text`` on newlines (soft line breaks render as ``\\n`` inside
-    a single paragraph) and append each non-empty trimmed line to ``comments``."""
-    for line in (text or "").split("\n"):
-        line = line.strip()
-        if line:
-            comments.append(line)
+    """Append non-empty lines from ``text`` (soft line breaks render as
+    ``\\n`` inside a paragraph). Delegates to ``_split_lines_to_comments``
+    so DOCX ends up with the same BOM-strip / CR-normalize / trim
+    semantics as TXT and PDF — the format-parity claim in the docs
+    relies on it."""
+    comments.extend(_split_lines_to_comments(text))
 
 
 def _walk_tables(tables, comments: List[str]) -> None:
@@ -109,24 +140,16 @@ def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
     tables (including nested tables) is collected too, since users
     sometimes paste feedback as a single-column table.
     """
-    # Peek at the inner ZIP first to reject zip-bombs before lxml expands
-    # gigabytes of XML in memory.
-    try:
-        with zipfile.ZipFile(file_obj) as zf:
-            uncompressed = sum(zi.file_size for zi in zf.infolist())
-    except zipfile.BadZipFile as exc:
-        raise ValueError(
-            "DOCX could not be read. The file may be corrupted or password-protected."
-        ) from exc
-    if uncompressed > _DOCX_MAX_UNCOMPRESSED_BYTES:
-        raise ValueError(
-            "DOCX is too large to process. Please split it into smaller files."
-        )
-    file_obj.seek(0)
+    # Stream-decompress every member with a hard byte ceiling. Cannot trust
+    # ZipInfo.file_size — a zip-bomb crafts the central directory to claim
+    # a tiny size while the actual stream expands to gigabytes. The only
+    # safe defense is to bound the bytes we actually decompress.
+    _enforce_docx_size_cap(file_obj)
 
     try:
         doc = Document(file_obj)
     except (PackageNotFoundError, zipfile.BadZipFile) as exc:
+        logger.warning("DOCX failed to open via python-docx: %s", exc)
         raise ValueError(
             "DOCX could not be read. The file may be corrupted or password-protected."
         ) from exc

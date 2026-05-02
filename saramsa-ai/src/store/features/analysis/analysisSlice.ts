@@ -233,6 +233,7 @@ export const analyzeComments = createAsyncThunk<
   }
 });
 
+// Resolves to the same shape as analyzeComments — both feed waitForAnalysisTask.
 export const ingestFile = createAsyncThunk<
   any,
   { file: File; projectId?: string },

@@ -10,6 +10,7 @@ Run with:
 from __future__ import annotations
 
 import io
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -163,3 +164,14 @@ class TestExtractCommentsFromDocx:
         assert "Outer cell text" in comments
         assert "Inner left" in comments
         assert "Inner right" in comments
+
+    def test_zip_bomb_rejected_even_with_lying_central_directory(self):
+        # Hand-craft a DOCX-shaped zip whose single member decompresses to
+        # 200 MB of zeros (well above the 50 MB cap). The cap must catch
+        # this regardless of what the central directory header claims.
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("word/document.xml", b"\x00" * (200 * 1024 * 1024))
+        buf.seek(0)
+        with pytest.raises(ValueError, match="too large"):
+            extract_comments_from_docx(buf)
