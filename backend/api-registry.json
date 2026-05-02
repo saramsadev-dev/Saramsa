@@ -439,6 +439,18 @@
       "schema_hash": "0bf71857b5a3ce63"
     },
     {
+      "name": "insights_ingest_create",
+      "method": "POST",
+      "path": "/api/insights/ingest/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 400,
+      "expect_json_keys": [
+        "detail"
+      ],
+      "schema_hash": "0bf71857b5a3ce63"
+    },
+    {
       "name": "insights_user_stories_retrieve",
       "method": "GET",
       "path": "/api/insights/user-stories/",

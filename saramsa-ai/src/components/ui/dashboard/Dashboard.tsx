@@ -6,6 +6,7 @@ import type { AppDispatch, RootState } from '@/store/store';
 import { encryptProjectId } from '@/lib/encryption';
 import {
   analyzeComments,
+  ingestFile,
   getLatestAnalysis,
   getConsolidatedDashboardData,
   generateUserStories,
@@ -74,9 +75,12 @@ const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 function validateSelectedFile(file: File): { isValid: boolean; error?: string } {
   const name = file.name.toLowerCase();
-  const isSupported = name.endsWith('.csv') || name.endsWith('.json');
+  const isSupported = name.endsWith('.csv')
+    || name.endsWith('.json')
+    || name.endsWith('.pdf')
+    || name.endsWith('.txt');
   if (!isSupported) {
-    return { isValid: false, error: 'Please upload a CSV or JSON file.' };
+    return { isValid: false, error: 'Please upload a CSV, JSON, PDF, or TXT file.' };
   }
   if (file.size <= 0) {
     return { isValid: false, error: 'Selected file is empty.' };
@@ -782,6 +786,48 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       return;
     }
     const tempId = `analyzing_${Date.now()}`;
+    const fileToSubmit = topFile;
+    const fileName = fileToSubmit.name;
+    const lowerName = fileName.toLowerCase();
+    const effectiveProjectId = currentProjectId || personalProjectId || undefined;
+
+    // PDF: backend handles text extraction (the JS bundle stays light).
+    // The ingest endpoint enqueues the same Celery task as /insights/analyze/.
+    if (lowerName.endsWith('.pdf')) {
+      try {
+        setTopError(null);
+        dispatch(clearError());
+        setTopFile(null);
+        dispatch(prependToHistory({
+          id: tempId,
+          analysis_date: new Date().toISOString(),
+          comments_count: 0,
+          positive_pct: 0,
+          status: 'analyzing',
+        }));
+        dispatch(setSelectedAnalysisId(tempId));
+
+        const result = await dispatch(ingestFile({
+          file: fileToSubmit,
+          projectId: effectiveProjectId,
+        })).unwrap();
+
+        await applyAnalysisResult(result, tempId);
+      } catch (e: any) {
+        dispatch(removeFromHistory(tempId));
+        const data = e?.response?.data;
+        const message =
+          (typeof data?.message === 'string' && data.message) ||
+          (typeof data?.error === 'string' && data.error) ||
+          (typeof data?.detail === 'string' && data.detail) ||
+          (Array.isArray(data?.errors) && data.errors[0]) ||
+          e?.message ||
+          'PDF ingestion failed. Please try again.';
+        setTopError(message);
+      }
+      return;
+    }
+
     try {
       setTopError(null);
       dispatch(clearError());
@@ -791,11 +837,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
         reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsText(topFile);
+        reader.readAsText(fileToSubmit);
       });
-      
+
       let comments: string[] = [];
-      const lowerName = topFile.name.toLowerCase();
       if (lowerName.endsWith('.json')) {
         try {
           const parsed = JSON.parse(text);
@@ -807,6 +852,13 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
         } catch {
           // ignore, will error below if empty
         }
+      } else if (lowerName.endsWith('.txt')) {
+        // Strip UTF-8 BOM if present (matches backend extract_comments_from_text).
+        const stripped = text.startsWith('﻿') ? text.slice(1) : text;
+        comments = stripped
+          .split(/\r\n|\r|\n/)
+          .map(line => line.trim())
+          .filter(Boolean);
       } else if (lowerName.endsWith('.csv')) {
         // Parse CSV properly handling quoted fields (commas inside quotes)
         const parseCSVLine = (line: string): string[] => {
@@ -854,18 +906,12 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       }
       
       if (!comments.length) {
-        setTopError('No comments detected. Ensure JSON has a comments array or CSV has a comment column.');
+        setTopError('No comments detected. Ensure JSON has a comments array, CSV has a comment column, or TXT has one comment per line.');
         return;
       }
 
-      // Update loadedComments for display
       dispatch(setLoadedComments(comments));
-
-      // Clear the file from upload panel immediately so it resets
-      const fileName = topFile.name;
       setTopFile(null);
-
-      // Prepend a temporary "analyzing" entry to the sidebar for immediate feedback
       dispatch(prependToHistory({
         id: tempId,
         analysis_date: new Date().toISOString(),
@@ -875,72 +921,14 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
       }));
       dispatch(setSelectedAnalysisId(tempId));
 
-      // Use Redux action to analyze comments
-      const effectiveProjectId = currentProjectId || personalProjectId || undefined;
       const result = await dispatch(analyzeComments({
         comments,
         projectId: effectiveProjectId,
-        fileName
+        fileName,
       })).unwrap();
-      
 
-      // Extract analysis data from the result
-      const payload = (result && (result.analysisData || result.sentimentsummary || result.featureasba)) ? result : (result?.data || null);
-      
-      if (payload) {
-        const resolvedProjectId = payload?.context?.project_id || payload?.projectId;
-        const isDraft = payload?.context?.is_draft;
-        if (resolvedProjectId) {
-          if (isDraft) {
-            setPersonalProjectId(resolvedProjectId);
-          }
-          if (!currentProjectId) {
-            setCurrentProjectId(resolvedProjectId);
-          }
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('project_id', resolvedProjectId);
-          }
-        }
-        // The result is already in the correct format, just use it directly
-        dispatch(setAnalysisData(payload));
-
-        // Replace the temporary "analyzing" entry with the real one
-        if (payload.id) {
-          const counts = payload.analysisData?.counts ?? {};
-          const total = Number(counts.total ?? 0);
-          const positive = Number(counts.positive ?? 0);
-          dispatch(replaceInHistory({
-            oldId: tempId,
-            entry: {
-              id: payload.id,
-              analysis_date: payload.createdAt || new Date().toISOString(),
-              comments_count: total,
-              positive_pct: total > 0 ? Math.round((positive / total) * 100) : 0,
-              status: 'completed',
-              name: payload.name,
-            },
-          }));
-          dispatch(setSelectedAnalysisId(payload.id));
-        } else {
-          // No id returned, remove the temp entry
-          dispatch(removeFromHistory(tempId));
-        }
-
-        // Set deepAnalysis if available
-        if (payload.deepAnalysis) {
-          dispatch(setDeepAnalysis(payload.deepAnalysis));
-        }
-        
-        // Generate work items asynchronously in the background (don't await)
-        // This allows the dashboard to display analysis results immediately
-        generateWorkItemsFromAnalysis(payload).catch(e => {
-          console.error('Background work item generation failed:', e);
-        });
-        
-      }
-      
+      await applyAnalysisResult(result, tempId);
     } catch (e: any) {
-      // Remove the temporary "analyzing" entry on failure
       dispatch(removeFromHistory(tempId));
       const data = e?.response?.data;
       const message =
@@ -952,6 +940,63 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
         'Analysis failed. Please try again.';
       setTopError(message);
     }
+  }
+
+  // Wire a successful analysis result (from either /analyze/ or /ingest/) back
+  // into the dashboard state, replacing the optimistic "analyzing..." entry.
+  async function applyAnalysisResult(result: any, tempId: string) {
+    const payload = (result && (result.analysisData || result.sentimentsummary || result.featureasba))
+      ? result
+      : (result?.data || null);
+
+    if (!payload) {
+      dispatch(removeFromHistory(tempId));
+      return;
+    }
+
+    const resolvedProjectId = payload?.context?.project_id || payload?.projectId;
+    const isDraft = payload?.context?.is_draft;
+    if (resolvedProjectId) {
+      if (isDraft) {
+        setPersonalProjectId(resolvedProjectId);
+      }
+      if (!currentProjectId) {
+        setCurrentProjectId(resolvedProjectId);
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('project_id', resolvedProjectId);
+      }
+    }
+
+    dispatch(setAnalysisData(payload));
+
+    if (payload.id) {
+      const counts = payload.analysisData?.counts ?? {};
+      const total = Number(counts.total ?? 0);
+      const positive = Number(counts.positive ?? 0);
+      dispatch(replaceInHistory({
+        oldId: tempId,
+        entry: {
+          id: payload.id,
+          analysis_date: payload.createdAt || new Date().toISOString(),
+          comments_count: total,
+          positive_pct: total > 0 ? Math.round((positive / total) * 100) : 0,
+          status: 'completed',
+          name: payload.name,
+        },
+      }));
+      dispatch(setSelectedAnalysisId(payload.id));
+    } else {
+      dispatch(removeFromHistory(tempId));
+    }
+
+    if (payload.deepAnalysis) {
+      dispatch(setDeepAnalysis(payload.deepAnalysis));
+    }
+
+    generateWorkItemsFromAnalysis(payload).catch(e => {
+      console.error('Background work item generation failed:', e);
+    });
   }
 
   // Generate work items from analysis data

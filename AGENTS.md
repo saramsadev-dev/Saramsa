@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Saramsa is a feedback analysis platform. Users upload customer feedback (CSV/JSON), and the system runs sentiment analysis, extracts aspects/features, generates insights, and produces actionable work items (user stories). The stack is Django (backend) + Next.js (frontend) + Celery + Redis + Azure Cosmos DB.
+Saramsa is a feedback analysis platform. Users upload customer feedback (CSV, JSON, PDF, or plain text), and the system runs sentiment analysis, extracts aspects/features, generates insights, and produces actionable work items (user stories). The stack is Django (backend) + Next.js (frontend) + Celery + Redis + Azure Cosmos DB.
 
 ## Repository Layout
 
@@ -15,7 +15,7 @@ backend/                  Django API server
   aiCore/                 LLM completion service, local sentiment, aspect classification
   apis/                   Shared infra (Cosmos, cache, response format, prompts, URLs)
   scripts/                Automation scripts (API registry sync, test runner, user creation)
-  tests/fixtures/         Mock test data (JSON/CSV)
+  tests/fixtures/         Mock test data (JSON, CSV, PDF, TXT)
 saramsa-ai/               Next.js frontend
   src/app/                Pages (Next.js App Router)
   src/components/ui/      UI components (dashboard, cards, charts, navbar)
@@ -58,7 +58,9 @@ Error responses follow RFC 7807 Problem Details.
 ### Feedback Data Format
 - **JSON upload**: `{"comments": ["comment1", "comment2", ...]}` or root array of strings
 - **CSV upload**: Must have a `comment` column (fallback: first column)
-- Test data lives in `backend/tests/fixtures/mock_feedback.json` and `.csv`
+- **TXT upload**: One non-empty line per comment (parsed client-side; line endings normalized)
+- **PDF upload**: Backend extracts text via `feedback_analysis/file_extractors.py` (pypdf); one extracted line per comment. Encrypted/scanned PDFs are rejected. Goes through `POST /api/insights/ingest/` which is async and returns `{task_id}` like `/analyze/`.
+- Test data lives in `backend/tests/fixtures/mock_feedback.{json,csv,txt,pdf}` (rebuild PDFs via `python backend/scripts/build_pdf_test_fixtures.py`)
 
 ### Locked Extraction Schema
 LLM outputs must conform to the schema in `feedback_analysis/schemas/semantic_schema.py`:
