@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Settings, UserRound, PlugZap, Building2, Bot } from 'lucide-react';
 import { apiRequest } from "@/lib/apiRequest";
 import { IntegrationsPage } from "@/components/ui/settings/IntegrationsPage";
 import { WorkspacePage } from "@/components/ui/settings/WorkspacePage";
 import { PromptSettingsPage } from "@/components/ui/settings/PromptSettingsPage";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/useAuth";
 import {
   createStripeBillingPortalSession,
   createStripeCheckoutSession,
@@ -17,6 +18,8 @@ import {
 type Profile = { email?: string };
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const isSuperadmin = !!user?.is_staff;
   const [activeTab, setActiveTab] = useState<"profile" | "workspace" | "integrations" | "prompts">("profile");
   const [profile, setProfile] = useState<Profile>({});
   const [billing, setBilling] = useState<SubscriptionStatus | null>(null);
@@ -31,11 +34,26 @@ export default function SettingsPage() {
         setActiveTab("integrations");
       } else if (tab === "workspace") {
         setActiveTab("workspace");
-      } else if (tab === "prompts") {
+      } else if (tab === "prompts" && isSuperadmin) {
         setActiveTab("prompts");
       }
     }
-  }, []);
+  }, [isSuperadmin]);
+
+  const tabs = useMemo(
+    () => {
+      const list: Array<{ key: "profile" | "workspace" | "integrations" | "prompts"; label: string; Icon: typeof UserRound }> = [
+        { key: "profile", label: "Profile", Icon: UserRound },
+        { key: "workspace", label: "Workspace", Icon: Building2 },
+        { key: "integrations", label: "Integrations", Icon: PlugZap },
+      ];
+      if (isSuperadmin) {
+        list.push({ key: "prompts", label: "Prompts", Icon: Bot });
+      }
+      return list;
+    },
+    [isSuperadmin],
+  );
 
   useEffect(() => {
     (async () => {
@@ -110,13 +128,8 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-card rounded-xl border border-border p-2">
-          <div className="grid grid-cols-4 gap-2">
-            {([
-              { key: "profile", label: "Profile", Icon: UserRound },
-              { key: "workspace", label: "Workspace", Icon: Building2 },
-              { key: "integrations", label: "Integrations", Icon: PlugZap },
-              { key: "prompts", label: "Prompts", Icon: Bot },
-            ] as const).map(({ key, label, Icon }) => (
+          <div className={`grid gap-2 ${tabs.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+            {tabs.map(({ key, label, Icon }) => (
               <Button
                 key={key}
                 variant="ghost"
@@ -200,7 +213,7 @@ export default function SettingsPage() {
 
         {activeTab === "workspace" && <WorkspacePage />}
         {activeTab === "integrations" && <IntegrationsPage />}
-        {activeTab === "prompts" && <PromptSettingsPage />}
+        {activeTab === "prompts" && isSuperadmin && <PromptSettingsPage />}
       </div>
     </div>
   );
