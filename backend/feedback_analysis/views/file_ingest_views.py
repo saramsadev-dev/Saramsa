@@ -1,4 +1,4 @@
-"""Async ingestion endpoint for PDF and plain-text feedback files.
+"""Async ingestion endpoint for PDF, plain-text, and Word (.docx) feedback files.
 
 Mirrors :class:`AnalyzeCommentsView` but accepts a multipart file upload,
 extracts comments via :mod:`feedback_analysis.file_extractors`, then queues
@@ -21,12 +21,16 @@ from rest_framework import status
 from authentication.permissions import IsProjectEditor
 from apis.core.response import StandardResponse
 
-from ..file_extractors import extract_comments_from_pdf, extract_comments_from_text
+from ..file_extractors import (
+    extract_comments_from_docx,
+    extract_comments_from_pdf,
+    extract_comments_from_text,
+)
 
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_EXTENSIONS = {".pdf", ".txt"}
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx"}
 
 
 # --- Lazy seams (patched by tests) -------------------------------------------------
@@ -85,10 +89,10 @@ class FeedbackFileIngestView(APIView):
         ext = os.path.splitext(upload.name or "")[1].lower()
         if ext not in SUPPORTED_EXTENSIONS:
             return StandardResponse.validation_error(
-                detail="Unsupported file type. Please upload a .pdf or .txt file.",
+                detail="Unsupported file type. Please upload a .pdf, .txt, or .docx file.",
                 errors=[{
                     "field": "file",
-                    "message": "Only .pdf and .txt files are supported by this endpoint.",
+                    "message": "Only .pdf, .txt, and .docx files are supported by this endpoint.",
                 }],
                 instance=request.path,
             )
@@ -117,6 +121,8 @@ class FeedbackFileIngestView(APIView):
         try:
             if ext == ".pdf":
                 comments = extract_comments_from_pdf(upload)
+            elif ext == ".docx":
+                comments = extract_comments_from_docx(upload)
             else:
                 comments = extract_comments_from_text(upload)
         except ValueError as exc:

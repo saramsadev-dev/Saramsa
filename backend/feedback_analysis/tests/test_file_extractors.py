@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from feedback_analysis.file_extractors import (
+    extract_comments_from_docx,
     extract_comments_from_pdf,
     extract_comments_from_text,
 )
@@ -91,3 +92,51 @@ class TestExtractCommentsFromPdf:
         # Valid PDFs start with "%PDF-"; bytes that don't are malformed.
         with pytest.raises(ValueError):
             extract_comments_from_pdf(io.BytesIO(b"this is not a pdf"))
+
+
+class TestExtractCommentsFromDocx:
+    def test_extracts_one_comment_per_nonempty_paragraph(self):
+        comments = extract_comments_from_docx(_open(FIXTURES / "mock_feedback.docx"))
+        assert comments == [
+            "The new dashboard layout is wonderful and feels much faster on my laptop.",
+            "However the export button keeps failing on Safari with a generic error message.",
+            "I would love to see better keyboard shortcuts for the comment review queue.",
+        ]
+
+    def test_empty_docx_raises_value_error(self):
+        # A docx with only blank/whitespace paragraphs.
+        from docx import Document
+        buf = io.BytesIO()
+        doc = Document()
+        doc.add_paragraph("")
+        doc.add_paragraph("   ")
+        doc.save(buf)
+        buf.seek(0)
+        with pytest.raises(ValueError, match="no extractable text"):
+            extract_comments_from_docx(buf)
+
+    def test_corrupt_bytes_raises_value_error(self):
+        # Valid DOCX files are zip archives; a plain string is malformed.
+        with pytest.raises(ValueError):
+            extract_comments_from_docx(io.BytesIO(b"this is not a docx"))
+
+    def test_extracts_text_from_table_cells(self):
+        # If users export feedback as a table in Word, we should still pick it up.
+        from docx import Document
+        buf = io.BytesIO()
+        doc = Document()
+        doc.add_paragraph("Header paragraph")
+        table = doc.add_table(rows=2, cols=2)
+        table.cell(0, 0).text = "Cell A1"
+        table.cell(0, 1).text = "Cell A2"
+        table.cell(1, 0).text = ""
+        table.cell(1, 1).text = "Cell B2"
+        doc.save(buf)
+        buf.seek(0)
+        comments = extract_comments_from_docx(buf)
+        assert "Header paragraph" in comments
+        assert "Cell A1" in comments
+        assert "Cell A2" in comments
+        assert "Cell B2" in comments
+        # No empty entries.
+        assert all(c.strip() for c in comments)

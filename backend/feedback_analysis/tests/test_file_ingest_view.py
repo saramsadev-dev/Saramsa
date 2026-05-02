@@ -123,6 +123,30 @@ class IngestEndpointTests(TestCase):
     @patch("feedback_analysis.views.file_ingest_views.get_cache_service")
     @patch("feedback_analysis.views.file_ingest_views.get_process_feedback_task")
     @patch("feedback_analysis.views.file_ingest_views.get_analysis_service")
+    def test_docx_upload_enqueues_task_with_extracted_paragraphs(
+        self, mock_analysis_svc, mock_task_factory, mock_cache
+    ):
+        task = self._stub_seams(mock_analysis_svc, mock_task_factory, mock_cache)
+
+        response = self._post({
+            "file": _uploaded_file(
+                FIXTURES / "mock_feedback.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ),
+            "project_id": "proj-1",
+        })
+
+        assert response.status_code == 202, response.data
+        positional, _ = task.delay.call_args
+        assert positional[0] == [
+            "The new dashboard layout is wonderful and feels much faster on my laptop.",
+            "However the export button keeps failing on Safari with a generic error message.",
+            "I would love to see better keyboard shortcuts for the comment review queue.",
+        ]
+
+    @patch("feedback_analysis.views.file_ingest_views.get_cache_service")
+    @patch("feedback_analysis.views.file_ingest_views.get_process_feedback_task")
+    @patch("feedback_analysis.views.file_ingest_views.get_analysis_service")
     def test_encrypted_pdf_returns_validation_error(
         self, mock_analysis_svc, mock_task_factory, mock_cache
     ):
@@ -162,13 +186,17 @@ class IngestEndpointTests(TestCase):
     ):
         task = self._stub_seams(mock_analysis_svc, mock_task_factory, mock_cache)
 
-        bad = SimpleUploadedFile("feedback.docx", b"fake", content_type="application/vnd.openxmlformats")
+        bad = SimpleUploadedFile(
+            "feedback.xlsx",
+            b"fake",
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
         response = self._post({"file": bad, "project_id": "proj-1"})
 
         assert response.status_code == 400
         assert task.delay.call_count == 0
         body = str(response.data).lower()
-        assert ".pdf" in body and ".txt" in body
+        assert ".pdf" in body and ".txt" in body and ".docx" in body
 
     def test_missing_file_returns_400(self):
         response = self._post({"project_id": "proj-1"})
