@@ -11,10 +11,23 @@ def _get_role_from_user(user):
     return getattr(profile, 'role', None)
 
 
+def _has_role(user, *roles):
+    return _get_role_from_user(user) in set(roles)
+
+
 def _get_user_id(user):
     if not user:
         return None
     return getattr(user, 'id', None) or getattr(user, 'user_id', None)
+
+
+def _get_active_organization_id(user):
+    if not user:
+        return None
+    profile = getattr(user, 'profile', None)
+    if isinstance(profile, dict):
+        return profile.get('active_organization_id')
+    return getattr(profile, 'active_organization_id', None)
 
 
 def _get_project_id_from_request(request, view):
@@ -59,7 +72,7 @@ class ProjectRolePermission(permissions.BasePermission):
             return False
 
         # Global admins always pass
-        if _get_role_from_user(user) == 'admin':
+        if _has_role(user, 'admin', 'superadmin'):
             return True
 
         project_id = _get_project_id_from_request(request, view)
@@ -72,14 +85,23 @@ class ProjectRolePermission(permissions.BasePermission):
 
         project = storage_service.get_project_by_id_any(project_id)
         owner_id = None
+        organization_id = None
         if isinstance(project, dict):
             owner_id = project.get('owner_user_id') or project.get('userId')
+            organization_id = project.get('organizationId')
+
+        if organization_id:
+            membership = storage_service.get_organization_membership_for_user(str(organization_id), str(user_id))
+            if not membership:
+                return False
+
         if owner_id and str(owner_id) == str(user_id):
             return True
 
-        role = storage_service.get_project_role_for_user(project_id, str(user_id))
-        if not role:
+        role_doc = storage_service.get_project_role_for_user(project_id, str(user_id))
+        if not role_doc:
             return False
+        role = role_doc.get('role') if isinstance(role_doc, dict) else role_doc
 
         return _ROLE_ORDER.get(role, 0) >= _ROLE_ORDER.get(self.min_role, 0)
 
@@ -105,7 +127,15 @@ class IsAdmin(permissions.BasePermission):
         user = getattr(request, 'user', None)
         if not getattr(user, 'is_authenticated', False):
             return False
-        return _get_role_from_user(user) == 'admin'
+        return _has_role(user, 'admin', 'superadmin')
+
+
+class IsSuperAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = getattr(request, 'user', None)
+        if not getattr(user, 'is_authenticated', False):
+            return False
+        return _has_role(user, 'superadmin')
 
 
 class IsUser(permissions.BasePermission):
@@ -121,7 +151,7 @@ class IsAdminOrUser(permissions.BasePermission):
         user = getattr(request, 'user', None)
         if not getattr(user, 'is_authenticated', False):
             return False
-        return _get_role_from_user(user) in ['admin', 'user']
+        return _has_role(user, 'superadmin', 'admin', 'user')
 
 
 class NoAuthentication(permissions.BasePermission):

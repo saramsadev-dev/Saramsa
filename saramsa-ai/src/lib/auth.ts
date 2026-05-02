@@ -1,4 +1,21 @@
 
+export type OrganizationMembership = {
+  id: string;
+  organizationId: string;
+  userId: string;
+  role: string;
+  status: string;
+  actorId?: string;
+};
+
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  role?: string | null;
+  membership?: OrganizationMembership | null;
+};
 
 export type User = {
   id?: string;
@@ -8,6 +25,9 @@ export type User = {
   user_id?: string;
   first_name?: string;
   last_name?: string;
+  active_organization_id?: string | null;
+  active_organization?: Organization | null;
+  organizations?: Organization[];
 };
 
 type LoginParams = { email: string; password: string };
@@ -17,7 +37,7 @@ type RegisterParams = {
   password: string;
   confirmPassword: string;
   otp: string;
-  role?: 'admin' | 'user' | 'restricted user';
+  role?: 'superadmin' | 'admin' | 'user' | 'restricted user';
 };
 
 type Tokens = { access: string; refresh: string };
@@ -180,6 +200,9 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
       role?: string;
       first_name?: string;
       last_name?: string;
+      active_organization_id?: string | null;
+      active_organization?: Organization | null;
+      organizations?: Organization[];
     };
     message?: string;
   };
@@ -194,6 +217,9 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
     role: data.role,
     first_name: data.first_name,
     last_name: data.last_name,
+    active_organization_id: data.active_organization_id,
+    active_organization: data.active_organization,
+    organizations: data.organizations || [],
   };
 
   return user;
@@ -267,6 +293,64 @@ export async function login(params: LoginParams): Promise<{ user: User } & Token
 
   const user = await getCurrentUser(tokenData.access);
   return { user, ...tokenData };
+}
+
+export async function getOrganizations(): Promise<{
+  organizations: Organization[];
+  active_organization: Organization | null;
+  active_organization_id: string | null;
+}> {
+  const token = await getAuthenticatedToken();
+  const res = await fetch(`${AUTH_BASE}/organizations/`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const data = await safeJson(res);
+    const message = (data && (data.error || data.detail)) || 'Failed to load organizations';
+    throw new Error(message);
+  }
+
+  const response = (await res.json()) as {
+    success: boolean;
+    data: {
+      organizations: Organization[];
+      active_organization: Organization | null;
+      active_organization_id: string | null;
+    };
+  };
+
+  return response.data;
+}
+
+export async function switchActiveOrganization(organizationId: string): Promise<User> {
+  const token = await getAuthenticatedToken();
+  const res = await fetch(`${AUTH_BASE}/organizations/switch/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ organization_id: organizationId }),
+  });
+
+  if (!res.ok) {
+    const data = await safeJson(res);
+    const message = (data && (data.error || data.detail)) || 'Failed to switch organization';
+    throw new Error(message);
+  }
+
+  const response = (await res.json()) as {
+    success: boolean;
+    data: User;
+  };
+
+  setStoredUser(response.data);
+  return response.data;
 }
 
 export async function register(
@@ -380,6 +464,14 @@ async function safeJson(res: Response): Promise<any | null> {
   } catch {
     return null;
   }
+}
+
+async function getAuthenticatedToken(): Promise<string> {
+  const validToken = getValidAccessToken();
+  if (validToken) {
+    return validToken;
+  }
+  return await refreshAccessToken();
 }
 
 

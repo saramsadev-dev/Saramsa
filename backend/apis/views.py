@@ -152,7 +152,7 @@ def reset_performance_stats(request):
     Reset performance statistics (admin only).
     """
     from authentication.permissions import _get_role_from_user
-    if _get_role_from_user(request.user) != "admin":
+    if _get_role_from_user(request.user) not in ("admin", "superadmin"):
         return StandardResponse.error(
             title="Forbidden",
             detail="Only admins can reset performance statistics.",

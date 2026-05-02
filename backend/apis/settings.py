@@ -30,6 +30,11 @@ if not SECRET_KEY:
 # When set, this host is added to ALLOWED_HOSTS so Azure can route to the app.
 BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', '').rstrip('/')
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', '').rstrip('/')
+SUPERADMIN_EMAILS = [
+    email.strip().lower()
+    for email in os.getenv("SUPERADMIN_EMAILS", "").split(",")
+    if email.strip()
+]
 
 _allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
 if _allowed_hosts_env.strip():

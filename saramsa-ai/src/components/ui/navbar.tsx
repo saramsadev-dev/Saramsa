@@ -5,22 +5,25 @@ import { ThemeToggle } from "./theme-toggle";
 import {
   Settings,
   LogOut,
-  User,
-  Bell,
-  Search,
   ChevronDown,
 } from 'lucide-react';
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/useAuth";
 import { BrandLogo } from "./brand-logo";
 import { shouldShowNavbar } from "@/lib/auth-pages";
 import { Button } from "@/components/ui/button";
+import { switchActiveOrganization } from "@/lib/auth";
+import { useAppDispatch } from "@/store/hooks";
+import { setUser } from "@/store/features/auth/authSlice";
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
   const { isAuthenticated, user: currentUser, loading, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [switchingOrg, setSwitchingOrg] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Check if navbar should be shown based on current page and auth state
@@ -54,6 +57,26 @@ export function Navbar() {
       console.error("Logout error:", error);
       // Force redirect even if logout fails
       window.location.href = "/login";
+    }
+  };
+
+  const handleOrganizationSwitch = async (organizationId: string) => {
+    if (!organizationId || organizationId === currentUser?.active_organization_id) {
+      return;
+    }
+
+    try {
+      setSwitchingOrg(true);
+      const updatedUser = await switchActiveOrganization(organizationId);
+      dispatch(setUser(updatedUser));
+      localStorage.removeItem("project_id");
+      setOpen(false);
+      router.refresh();
+      window.location.href = "/projects";
+    } catch (error) {
+      console.error("Organization switch error:", error);
+    } finally {
+      setSwitchingOrg(false);
     }
   };
 
@@ -112,6 +135,26 @@ export function Navbar() {
                           {currentUser.email || "No email"}
                         </div>
                       </div>
+                      {currentUser.organizations && currentUser.organizations.length > 0 && (
+                        <div className="px-4 py-3 border-b border-border/60">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-2">
+                            Workspace
+                          </div>
+                          <select
+                            value={currentUser.active_organization_id || ""}
+                            onChange={(e) => handleOrganizationSwitch(e.target.value)}
+                            disabled={switchingOrg}
+                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+                          >
+                            {currentUser.organizations.map((organization) => (
+                              <option key={organization.id} value={organization.id}>
+                                {organization.name}
+                                {organization.role ? ` (${organization.role})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="py-1">
                         <Button
                           onClick={() => {

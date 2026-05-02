@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, UserRound, PlugZap } from 'lucide-react';
+import { Settings, UserRound, PlugZap, Building2, Bot } from 'lucide-react';
 import { apiRequest } from "@/lib/apiRequest";
 import { IntegrationsPage } from "@/components/ui/settings/IntegrationsPage";
+import { WorkspacePage } from "@/components/ui/settings/WorkspacePage";
+import { PromptSettingsPage } from "@/components/ui/settings/PromptSettingsPage";
 import { Button } from "@/components/ui/button";
 import {
   createStripeBillingPortalSession,
@@ -13,20 +15,25 @@ import {
 } from "@/lib/billingService";
 
 type Profile = { email?: string; username?: string };
+type ProfileWithRole = Profile & { role?: string };
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"profile" | "integrations">("profile");
-  const [profile, setProfile] = useState<Profile>({});
+  const [activeTab, setActiveTab] = useState<"profile" | "workspace" | "integrations" | "prompts">("profile");
+  const [profile, setProfile] = useState<ProfileWithRole>({});
   const [billing, setBilling] = useState<SubscriptionStatus | null>(null);
   const [billingLoading, setBillingLoading] = useState<boolean>(true);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [billingActionLoading, setBillingActionLoading] = useState<"checkout" | "portal" | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+      if (typeof window !== "undefined") {
       const tab = new URLSearchParams(window.location.search).get("tab");
       if (tab === "integrations") {
         setActiveTab("integrations");
+      } else if (tab === "workspace") {
+        setActiveTab("workspace");
+      } else if (tab === "prompts") {
+        setActiveTab("prompts");
       }
     }
   }, []);
@@ -39,6 +46,7 @@ export default function SettingsPage() {
         setProfile({
           email: payload.email || "",
           username: payload.username || "",
+          role: payload.role || "",
         });
       } catch {
         setProfile({});
@@ -105,7 +113,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-card rounded-xl border border-border p-2">
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid gap-2 ${profile.role === "superadmin" ? "grid-cols-4" : "grid-cols-3"}`}>
             <Button
               variant="ghost"
               className={`h-10 text-sm font-medium transition-colors ${
@@ -129,6 +137,26 @@ export default function SettingsPage() {
             <Button
               variant="ghost"
               className={`h-10 text-sm font-medium transition-colors ${
+                activeTab === "workspace"
+                  ? "bg-secondary text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+              }`}
+              onClick={() => setActiveTab("workspace")}
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white transition-opacity ${
+                    activeTab === "workspace" ? "opacity-100" : "opacity-60"
+                  }`}
+                >
+                  <Building2 className="h-4 w-4" />
+                </span>
+                Workspace
+              </span>
+            </Button>
+            <Button
+              variant="ghost"
+              className={`h-10 text-sm font-medium transition-colors ${
                 activeTab === "integrations"
                   ? "bg-secondary text-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
@@ -146,6 +174,28 @@ export default function SettingsPage() {
                 Integrations
               </span>
             </Button>
+            {profile.role === "superadmin" && (
+              <Button
+                variant="ghost"
+                className={`h-10 text-sm font-medium transition-colors ${
+                  activeTab === "prompts"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+                onClick={() => setActiveTab("prompts")}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-saramsa-gradient-from to-saramsa-gradient-to text-white transition-opacity ${
+                      activeTab === "prompts" ? "opacity-100" : "opacity-60"
+                    }`}
+                  >
+                    <Bot className="h-4 w-4" />
+                  </span>
+                  Prompts
+                </span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -209,7 +259,11 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {activeTab === "workspace" && <WorkspacePage />}
+
         {activeTab === "integrations" && <IntegrationsPage />}
+
+        {activeTab === "prompts" && profile.role === "superadmin" && <PromptSettingsPage />}
       </div>
     </div>
   );

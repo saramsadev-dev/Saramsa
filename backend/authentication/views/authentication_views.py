@@ -17,7 +17,7 @@ from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from ..services import get_authentication_service
 
-from ..permissions import NoAuthentication
+from ..permissions import NoAuthentication, IsSuperAdmin
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 import logging
@@ -32,7 +32,8 @@ from ..serializers import (
     AppTokenRefreshSerializer,
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
-    RegistrationOtpRequestSerializer
+    RegistrationOtpRequestSerializer,
+    build_user_auth_context,
 )
 from ..authentication import AppJWTAuthentication, AppUser
 import bcrypt
@@ -88,6 +89,7 @@ class RegisterView(generics.CreateAPIView):
                 "username": user_data['username'],
                 "email": user_data['email'],
                 "user_id": user_data['id'],
+                "user": token_data.get('user'),
                 "access": token_data['access'],
                 "refresh": token_data['refresh']
             },
@@ -147,17 +149,14 @@ class ProfileMeView(APIView):
             )
         
         # Use the authenticated user's ID directly
+        organization_context = auth_service.get_organization_context(user_data)
         return StandardResponse.success(
             data={
+                **build_user_auth_context(user_data, organization_context),
                 "user_id": request.user.id,
-                "username": user_data.get('username'),
-                "email": user_data.get('email'),
-                "first_name": user_data.get('first_name'),
-                "last_name": user_data.get('last_name'),
                 "company_name": user_data.get('company_name'),
                 "company_url": user_data.get('company_url'),
                 "avatar_url": user_data.get('avatar_url'),
-                "role": user_data.get('profile', {}).get('role', 'user'),
                 "date_joined": user_data.get('date_joined')
             },
             message="Profile retrieved successfully"
@@ -251,7 +250,7 @@ class UserListView(APIView):
     def get(self, request):
         """Get all users - admin only."""
         from authentication.permissions import _get_role_from_user
-        if _get_role_from_user(request.user) != "admin":
+        if _get_role_from_user(request.user) not in ("admin", "superadmin"):
             return StandardResponse.error(
                 title="Forbidden",
                 detail="Only admins can list all users.",
@@ -356,6 +355,265 @@ class LoginView(APIView):
         return StandardResponse.success(
             data=token_data,
             message="Login successful"
+        )
+
+
+class OrganizationsView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [AppJWTAuthentication]
+
+    @handle_service_errors
+    def get(self, request):
+        auth_service = get_authentication_service()
+        user_data = auth_service.get_user_by_id(request.user.id)
+        if not user_data:
+            return StandardResponse.not_found(
+                detail="User not found",
+                instance=request.path
+            )
+
+        organization_context = auth_service.get_organization_context(user_data)
+        return StandardResponse.success(
+            data=organization_context,
+            message="Organizations retrieved successfully"
+        )
+
+    @handle_service_errors
+    def post(self, request):
+        name = (request.data.get("name") or "").strip()
+        description = (request.data.get("description") or "").strip()
+        if not name:
+            return StandardResponse.validation_error(
+                detail="Organization name is required.",
+                instance=request.path
+            )
+
+        from integrations.services import get_organization_service
+
+        organization_service = get_organization_service()
+        organization = organization_service.create_organization(
+            name=name,
+            description=description,
+            created_by_user_id=str(request.user.id),
+        )
+        auth_service = get_authentication_service()
+        auth_service.set_active_organization(str(request.user.id), organization["id"])
+        organization_context = auth_service.get_organization_context(
+            auth_service.get_user_by_id(str(request.user.id))
+        )
+
+        return StandardResponse.created(
+            data=organization_context,
+            message="Organization created successfully",
+            instance=f"/api/auth/organizations/{organization['id']}"
+        )
+
+
+class SwitchActiveOrganizationView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [AppJWTAuthentication]
+
+    @handle_service_errors
+    def post(self, request):
+        organization_id = request.data.get("organization_id")
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="organization_id is required.",
+                instance=request.path
+            )
+
+        auth_service = get_authentication_service()
+        try:
+            user_data = auth_service.set_active_organization(str(request.user.id), str(organization_id))
+        except ValueError as exc:
+            return StandardResponse.validation_error(
+                detail=str(exc),
+                instance=request.path
+            )
+
+        organization_context = auth_service.get_organization_context(user_data)
+        return StandardResponse.success(
+            data=build_user_auth_context(user_data, organization_context),
+            message="Active organization updated successfully"
+        )
+
+
+class OrganizationMembersView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [AppJWTAuthentication]
+
+    def _get_active_organization_id(self, request):
+        profile = getattr(request.user, "profile", {}) or {}
+        if isinstance(profile, dict):
+            return profile.get("active_organization_id")
+        return None
+
+    @handle_service_errors
+    def get(self, request):
+        organization_id = self._get_active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.",
+                instance=request.path
+            )
+
+        from integrations.services import get_organization_service
+
+        organization_service = get_organization_service()
+        try:
+            result = organization_service.list_members(str(organization_id), str(request.user.id))
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        return StandardResponse.success(
+            data=result,
+            message="Organization members retrieved successfully"
+        )
+
+    @handle_service_errors
+    def post(self, request):
+        organization_id = self._get_active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.",
+                instance=request.path
+            )
+
+        email = (request.data.get("email") or "").strip() or None
+        user_id = (request.data.get("user_id") or "").strip() or None
+        role = (request.data.get("role") or "member").strip().lower()
+        if not email and not user_id:
+            return StandardResponse.validation_error(
+                detail="email or user_id is required.",
+                instance=request.path
+            )
+
+        from integrations.services import get_organization_service
+
+        organization_service = get_organization_service()
+        try:
+            result = organization_service.add_member(
+                str(organization_id),
+                str(request.user.id),
+                email=email,
+                user_id=user_id,
+                role=role,
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        return StandardResponse.success(
+            data=result,
+            message="Organization member updated successfully"
+        )
+
+    @handle_service_errors
+    def delete(self, request):
+        organization_id = self._get_active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.",
+                instance=request.path
+            )
+
+        user_id = (request.data.get("user_id") or request.query_params.get("user_id") or "").strip()
+        if not user_id:
+            return StandardResponse.validation_error(
+                detail="user_id is required.",
+                instance=request.path
+            )
+
+        from integrations.services import get_organization_service
+
+        organization_service = get_organization_service()
+        try:
+            result = organization_service.remove_member(
+                str(organization_id),
+                str(request.user.id),
+                str(user_id),
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        return StandardResponse.success(
+            data=result,
+            message="Organization member removed successfully"
+        )
+
+
+class AdminPromptSettingsView(APIView):
+    permission_classes = [IsSuperAdmin]
+    authentication_classes = [AppJWTAuthentication]
+
+    @handle_service_errors
+    def get(self, request):
+        organization_id = request.query_params.get("organization_id")
+        from integrations.services import get_prompt_override_service
+
+        service = get_prompt_override_service()
+        data = service.list_admin_prompt_data(organization_id=organization_id)
+        return StandardResponse.success(
+            data=data,
+            message="Prompt settings retrieved successfully"
+        )
+
+    @handle_service_errors
+    def post(self, request):
+        scope = (request.data.get("scope") or "").strip().lower()
+        prompt_type = (request.data.get("prompt_type") or "").strip()
+        content = request.data.get("content") or ""
+        organization_id = (request.data.get("organization_id") or "").strip() or None
+
+        from integrations.services import get_prompt_override_service
+
+        service = get_prompt_override_service()
+        try:
+            saved = service.upsert_prompt(
+                scope=scope,
+                prompt_type=prompt_type,
+                content=content,
+                updated_by_user_id=str(request.user.id),
+                organization_id=organization_id,
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        return StandardResponse.success(
+            data=saved,
+            message="Prompt settings updated successfully"
+        )
+
+    @handle_service_errors
+    def delete(self, request):
+        scope = (request.data.get("scope") or request.query_params.get("scope") or "").strip().lower()
+        prompt_type = (request.data.get("prompt_type") or request.query_params.get("prompt_type") or "").strip()
+        organization_id = (
+            request.data.get("organization_id")
+            or request.query_params.get("organization_id")
+            or ""
+        ).strip() or None
+
+        from integrations.services import get_prompt_override_service
+
+        service = get_prompt_override_service()
+        try:
+            deleted = service.delete_prompt(
+                scope=scope,
+                prompt_type=prompt_type,
+                organization_id=organization_id,
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        if not deleted:
+            return StandardResponse.not_found(
+                detail="Prompt override not found.",
+                instance=request.path
+            )
+
+        return StandardResponse.success(
+            data={},
+            message="Prompt override removed successfully"
         )
 
 

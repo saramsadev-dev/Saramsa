@@ -14,6 +14,55 @@
       "schema_hash": "0bf71857b5a3ce63"
     },
     {
+      "name": "auth_admin_prompts_retrieve",
+      "method": "GET",
+      "path": "/api/auth/admin/prompts/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": [
+        200,
+        403
+      ],
+      "expect_json_keys": [
+        "data"
+      ]
+    },
+    {
+      "name": "auth_admin_prompts_create",
+      "method": "POST",
+      "path": "/api/auth/admin/prompts/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": [
+        200,
+        400,
+        403
+      ],
+      "expect_json_keys": [
+        "data"
+      ],
+      "body": {
+        "scope": "platform",
+        "prompt_type": "sentiment",
+        "content": "Override prompt"
+      }
+    },
+    {
+      "name": "auth_admin_prompts_destroy",
+      "method": "DELETE",
+      "path": "/api/auth/admin/prompts/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": [
+        200,
+        400,
+        403
+      ],
+      "expect_json_keys": [
+        "data"
+      ]
+    },
+    {
       "name": "auth_forgot_password_create",
       "method": "POST",
       "path": "/api/auth/forgot-password/",
@@ -67,6 +116,94 @@
         "data"
       ],
       "schema_hash": "47ab4bd1ae11d2f8"
+    },
+    {
+      "name": "auth_organizations_retrieve",
+      "method": "GET",
+      "path": "/api/auth/organizations/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ]
+    },
+    {
+      "name": "auth_organizations_create",
+      "method": "POST",
+      "path": "/api/auth/organizations/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": [
+        201,
+        400
+      ],
+      "expect_json_keys": [
+        "data"
+      ],
+      "body": {
+        "name": "API Registry Org"
+      }
+    },
+    {
+      "name": "auth_organizations_switch_create",
+      "method": "POST",
+      "path": "/api/auth/organizations/switch/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": [
+        200,
+        400
+      ],
+      "expect_json_keys": [
+        "data"
+      ],
+      "body": {
+        "organization_id": "org_placeholder"
+      }
+    },
+    {
+      "name": "auth_organizations_members_retrieve",
+      "method": "GET",
+      "path": "/api/auth/organizations/members/",
+      "auth": "bearer",
+      "enabled": true,
+      "expected_status": 200,
+      "expect_json_keys": [
+        "data"
+      ]
+    },
+    {
+      "name": "auth_organizations_members_create",
+      "method": "POST",
+      "path": "/api/auth/organizations/members/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": [
+        200,
+        400
+      ],
+      "expect_json_keys": [
+        "data"
+      ],
+      "body": {
+        "email": "member@example.com",
+        "role": "member"
+      }
+    },
+    {
+      "name": "auth_organizations_members_destroy",
+      "method": "DELETE",
+      "path": "/api/auth/organizations/members/",
+      "auth": "bearer",
+      "enabled": false,
+      "expected_status": [
+        200,
+        400
+      ],
+      "expect_json_keys": [
+        "data"
+      ]
     },
     {
       "name": "auth_refresh_create",

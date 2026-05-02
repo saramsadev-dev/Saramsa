@@ -15,6 +15,7 @@ from ..repositories import UserRepository
 import logging
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from integrations.services import get_organization_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,40 @@ class AuthenticationService:
     
     def __init__(self):
         self.user_repo = UserRepository()
+        self.organization_service = get_organization_service()
+
+    def _get_superadmin_emails(self) -> set[str]:
+        return {
+            email.strip().lower()
+            for email in getattr(settings, "SUPERADMIN_EMAILS", [])
+            if str(email).strip()
+        }
+
+    def _normalize_global_role(self, email: str, requested_role: str = "user") -> str:
+        if str(email).strip().lower() in self._get_superadmin_emails():
+            return "superadmin"
+        normalized = (requested_role or "user").strip().lower()
+        if normalized == "restricted user":
+            normalized = "user"
+        if normalized == "superadmin":
+            return "user"
+        if normalized in {"admin", "user"}:
+            return normalized
+        return "user"
+
+    def _sync_superadmin_role(self, user_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not user_data:
+            return user_data
+        expected_role = self._normalize_global_role(
+            user_data.get("email", ""),
+            (user_data.get("profile") or {}).get("role", "user"),
+        )
+        profile = dict(user_data.get("profile") or {})
+        if profile.get("role") == expected_role:
+            return user_data
+        profile["role"] = expected_role
+        user_data["profile"] = profile
+        return self.user_repo.update(user_data["id"], user_data)
     
     def create_user(self, username: str, email: str, password: str, 
                    first_name: str = "", last_name: str = "", 
@@ -45,13 +80,17 @@ class AuthenticationService:
                 "is_staff": False,
                 "date_joined": datetime.now(timezone.utc).isoformat(),
                 "profile": {
-                    "role": role
+                    "role": self._normalize_global_role(email, role)
                 },
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "updatedAt": datetime.now(timezone.utc).isoformat()
             }
             
-            return self.user_repo.create_user(user_data)
+            created_user = self.user_repo.create_user(user_data)
+            default_org = self.organization_service.ensure_default_organization_for_user(created_user)
+            created_user.setdefault("profile", {})
+            created_user["profile"]["active_organization_id"] = default_org["id"]
+            return self.user_repo.update(created_user["id"], created_user)
             
         except Exception as e:
             logger.error(f"Error creating user: {e}")
@@ -79,15 +118,15 @@ class AuthenticationService:
     
     def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user by ID."""
-        return self.user_repo.get_by_id(user_id)
+        return self._sync_superadmin_role(self.user_repo.get_by_id(user_id))
     
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
         """Get user by username."""
-        return self.user_repo.get_by_username(username)
+        return self._sync_superadmin_role(self.user_repo.get_by_username(username))
     
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Get user by email."""
-        return self.user_repo.get_by_email(email)
+        return self._sync_superadmin_role(self.user_repo.get_by_email(email))
     
     def update_user(self, user_id: str, user_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update user data."""
@@ -97,6 +136,25 @@ class AuthenticationService:
         except Exception as e:
             logger.error(f"Error updating user {user_id}: {e}")
             raise
+
+    def get_organization_context(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        profile = user_data.get("profile") or {}
+        active_organization_id = profile.get("active_organization_id")
+        return self.organization_service.get_organization_context_for_user(
+            user_data,
+            active_organization_id=active_organization_id,
+        )
+
+    def set_active_organization(self, user_id: str, organization_id: str) -> Dict[str, Any]:
+        user_data = self.get_user_by_id(user_id)
+        if not user_data:
+            raise ValueError("User not found")
+
+        self.organization_service.require_membership(organization_id, user_id)
+        profile = dict(user_data.get("profile") or {})
+        profile["active_organization_id"] = organization_id
+        user_data["profile"] = profile
+        return self.update_user(user_id, user_data)
 
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Get all users."""

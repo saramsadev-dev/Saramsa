@@ -58,7 +58,7 @@ def _build_company_prompts():
 _build_company_prompts()
 
 
-def get_prompt(company_name=None, prompt_type="sentiment", industry=None, use_confidence=False):
+def get_prompt(company_name=None, prompt_type="sentiment", industry=None, use_confidence=False, organization_id=None, project_id=None):
     """
     Get a prompt template for the specified company and type.
     
@@ -100,6 +100,19 @@ def get_prompt(company_name=None, prompt_type="sentiment", industry=None, use_co
         error_msg += f". Available prompts: {', '.join(available_prompts)}"
         raise ValueError(error_msg)
     
+    # Apply DB-backed overrides after file-based company/default selection
+    try:
+        from integrations.services import get_prompt_override_service
+        base_prompt = get_prompt_override_service().resolve_effective_prompt(
+            prompt_type=actual_prompt_type,
+            default_prompt=base_prompt,
+            organization_id=organization_id,
+            project_id=project_id,
+        )
+    except Exception:
+        # Prompt overrides should not break prompt resolution; fall back silently.
+        pass
+
     # Add industry context if specified
     if industry and industry in INDUSTRY_CONTEXTS and prompt_type == "sentiment":
         industry_context = INDUSTRY_CONTEXTS[industry]
@@ -122,7 +135,8 @@ def add_company_prompts(company_name, prompts_dict):
     PROMPTS[company_name].update(prompts_dict)
 
 def get_enhanced_prompt(prompt_type, feedback_data, platform_name=None, company_name=None, 
-                       industry=None, project_metadata=None, use_confidence=False):
+                       industry=None, project_metadata=None, use_confidence=False,
+                       organization_id=None, project_id=None):
     """
     Get a fully populated prompt with all variables substituted.
     
@@ -143,7 +157,9 @@ def get_enhanced_prompt(prompt_type, feedback_data, platform_name=None, company_
         company_name=company_name, 
         prompt_type=prompt_type, 
         industry=industry,
-        use_confidence=use_confidence
+        use_confidence=use_confidence,
+        organization_id=organization_id,
+        project_id=project_id,
     )
     
     # Substitute variables

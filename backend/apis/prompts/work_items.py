@@ -17,7 +17,9 @@ def getDeepAnalysisPrompt(
     project_metadata=None,
     company_name: str = None,
     feedback_data: str = None,
-    industry: str = None
+    industry: str = None,
+    organization_id: str = None,
+    project_id: str = None,
 ):
     """
     Get deep analysis prompt using the enhanced centralized prompt system.
@@ -44,7 +46,9 @@ def getDeepAnalysisPrompt(
     prompt_template = get_prompt(
         company_name=company_name, 
         prompt_type="deep_analysis",
-        industry=industry
+        industry=industry,
+        organization_id=organization_id,
+        project_id=project_id,
     )
 
     # Log original template before substitution

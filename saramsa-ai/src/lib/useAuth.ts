@@ -56,7 +56,9 @@ export function useAuth(): HookResult {
           return;
         }
 
-        if (storedUser) {
+        const needsProfileRefresh = !storedUser?.active_organization_id || !storedUser?.organizations;
+
+        if (storedUser && !needsProfileRefresh) {
           if (!cancelled) {
             dispatch(setUser(storedUser));
           }

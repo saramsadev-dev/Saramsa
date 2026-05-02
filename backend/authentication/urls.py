@@ -10,7 +10,11 @@ from .views import (
     UserDetailView,
     LoginView,
     ForgotPasswordView,
-    ResetPasswordView
+    ResetPasswordView,
+    OrganizationsView,
+    SwitchActiveOrganizationView,
+    OrganizationMembersView,
+    AdminPromptSettingsView,
 )
 
 urlpatterns = [
@@ -24,6 +28,10 @@ urlpatterns = [
     path('token/', AppTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', AppTokenRefreshView.as_view(), name='token_refresh'),
     path('refresh/', AppTokenRefreshView.as_view(), name='refresh'),  # Frontend expects this endpoint
+    path('organizations/', OrganizationsView.as_view(), name='organization-list-create'),
+    path('organizations/switch/', SwitchActiveOrganizationView.as_view(), name='organization-switch'),
+    path('organizations/members/', OrganizationMembersView.as_view(), name='organization-members'),
+    path('admin/prompts/', AdminPromptSettingsView.as_view(), name='admin-prompt-settings'),
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
 ]

@@ -223,7 +223,11 @@ class UpdateKeywordsView(APIView):
         feedback_data = f"{keyword_context}\n\nFEEDBACK DATA:\n" + "\n".join([str(c) for c in comments])
         
         # Create prompt using structured system
-        prompt = getSentAnalysisPrompt(company_name=company_name, feedback_data=feedback_data)
+        prompt = getSentAnalysisPrompt(
+            company_name=company_name,
+            feedback_data=feedback_data,
+            project_id=project_id,
+        )
         
         result, _usage = await generate_completions(
             prompt,
@@ -843,7 +847,7 @@ class AnalysisByIdView(APIView):
     def _has_project_access(self, user, project_id: str) -> bool:
         if not user or not getattr(user, 'is_authenticated', False):
             return False
-        if _get_role_from_user(user) == 'admin':
+        if _get_role_from_user(user) in ('admin', 'superadmin'):
             return True
         user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
         if not user_id:
@@ -851,10 +855,15 @@ class AnalysisByIdView(APIView):
         project = storage_service.get_project_by_id_any(project_id)
         if isinstance(project, dict):
             owner_id = project.get('owner_user_id') or project.get('userId')
+            organization_id = project.get('organizationId')
+            if organization_id:
+                membership = storage_service.get_organization_membership_for_user(str(organization_id), str(user_id))
+                if not membership:
+                    return False
             if owner_id and str(owner_id) == str(user_id):
                 return True
         role = storage_service.get_project_role_for_user(project_id, str(user_id))
-        return bool(role)
+        return bool(role.get("role") if isinstance(role, dict) else role)
 
 
 class AnalysisRenameView(APIView):
@@ -924,7 +933,7 @@ class AnalysisRenameView(APIView):
     def _has_project_access(self, user, project_id: str) -> bool:
         if not user or not getattr(user, 'is_authenticated', False):
             return False
-        if _get_role_from_user(user) == 'admin':
+        if _get_role_from_user(user) in ('admin', 'superadmin'):
             return True
         user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
         if not user_id:
@@ -932,9 +941,14 @@ class AnalysisRenameView(APIView):
         project = storage_service.get_project_by_id_any(project_id)
         if isinstance(project, dict):
             owner_id = project.get('owner_user_id') or project.get('userId')
+            organization_id = project.get('organizationId')
+            if organization_id:
+                membership = storage_service.get_organization_membership_for_user(str(organization_id), str(user_id))
+                if not membership:
+                    return False
             if owner_id and str(owner_id) == str(user_id):
                 return True
         role = storage_service.get_project_role_for_user(project_id, str(user_id))
-        return bool(role)
+        return bool(role.get("role") if isinstance(role, dict) else role)
 
 

@@ -17,6 +17,7 @@ from feedback_analysis.models import (
     UserData,
 )
 from integrations.models import Project, ProjectRole
+from integrations.models import Organization, OrganizationMembership
 from work_items.models import UserStory, WorkItemCandidate, WorkItemQualityRule
 
 
@@ -51,6 +52,8 @@ class StorageService:
             "registration_otps": RegistrationOtp,
             "projects": Project,
             "project_roles": ProjectRole,
+            "organizations": Organization,
+            "organization_memberships": OrganizationMembership,
             "analysis": Analysis,
             "uploads": Upload,
             "user_data": UserData,
@@ -100,6 +103,8 @@ class StorageService:
             d.setdefault("updatedAt", obj.updated_at.isoformat())
         if hasattr(obj, "project_id"):
             d.setdefault("projectId", obj.project_id)
+        if hasattr(obj, "organization_id"):
+            d.setdefault("organizationId", obj.organization_id)
         if hasattr(obj, "user_id"):
             d.setdefault("userId", obj.user_id)
         if container == "users":
@@ -123,6 +128,29 @@ class StorageService:
                 "description": obj.description,
                 "generated_at": obj.generated_at.isoformat() if obj.generated_at else None,
                 "work_items": [c.to_dict() for c in obj.candidates.all().order_by("-created_at")],
+            })
+        if container == "project_roles":
+            d.update({
+                "role": obj.role,
+                "actorId": obj.actor_id,
+                "type": "project_role",
+            })
+        if container == "organizations":
+            d.update({
+                "name": obj.name,
+                "slug": obj.slug,
+                "description": obj.description,
+                "settings": obj.settings or {},
+                "metadata": obj.metadata or {},
+                "createdByUserId": obj.created_by_id,
+                "type": "organization",
+            })
+        if container == "organization_memberships":
+            d.update({
+                "role": obj.role,
+                "status": obj.status,
+                "actorId": obj.actor_id,
+                "type": "organization_membership",
             })
         return d
 
@@ -178,11 +206,39 @@ class StorageService:
                 id=str(item_id),
                 defaults={
                     "user_id": str(data.get("userId")) if data.get("userId") else None,
+                    "organization_id": str(data.get("organizationId")) if data.get("organizationId") else None,
                     "name": data.get("name", ""),
                     "description": data.get("description", ""),
                     "status": data.get("status", "active"),
                     "external_links": data.get("externalLinks") or [],
                     "metadata": data,
+                    "updated_at": timezone.now(),
+                },
+            )
+            return self._doc(container_name, obj)
+        if container_name == "organizations":
+            obj, _ = Organization.objects.update_or_create(
+                id=str(item_id),
+                defaults={
+                    "name": data.get("name", ""),
+                    "slug": data.get("slug", ""),
+                    "description": data.get("description", ""),
+                    "settings": data.get("settings") or {},
+                    "metadata": data.get("metadata") or {},
+                    "created_by_id": str(data.get("createdByUserId")) if data.get("createdByUserId") else None,
+                    "updated_at": timezone.now(),
+                },
+            )
+            return self._doc(container_name, obj)
+        if container_name == "organization_memberships":
+            obj, _ = OrganizationMembership.objects.update_or_create(
+                organization_id=str(data.get("organizationId")),
+                user_id=str(data.get("userId")),
+                defaults={
+                    "id": str(item_id),
+                    "role": data.get("role", "member"),
+                    "status": data.get("status", "active"),
+                    "actor_id": str(data.get("actorId") or ""),
                     "updated_at": timezone.now(),
                 },
             )
@@ -398,6 +454,26 @@ class StorageService:
 
     def get_project_role_for_user(self, project_id: str, user_id: str):
         return self._doc("project_roles", ProjectRole.objects.filter(project_id=str(project_id), user_id=str(user_id)).first())
+
+    def get_organization_by_id(self, organization_id: str):
+        return self._doc("organizations", Organization.objects.filter(id=str(organization_id)).first())
+
+    def get_organization_membership_for_user(self, organization_id: str, user_id: str):
+        return self._doc(
+            "organization_memberships",
+            OrganizationMembership.objects.filter(
+                organization_id=str(organization_id),
+                user_id=str(user_id),
+                status="active",
+            ).first(),
+        )
+
+    def get_organizations_for_user(self, user_id: str):
+        rows = Organization.objects.filter(
+            memberships__user_id=str(user_id),
+            memberships__status="active",
+        ).distinct().order_by("name")
+        return [self._doc("organizations", row) for row in rows]
 
     def get_project_roles_for_project(self, project_id: str):
         return [self._doc("project_roles", r) for r in ProjectRole.objects.filter(project_id=str(project_id))]

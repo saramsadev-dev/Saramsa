@@ -7,6 +7,23 @@ from datetime import datetime, timedelta
 from django.conf import settings
 import bcrypt
 
+
+def build_user_auth_context(user_data, organization_context=None):
+    organization_context = organization_context or {}
+    active_org = organization_context.get("active_organization") or {}
+    organizations = organization_context.get("organizations") or []
+    return {
+        'id': user_data.get('id'),
+        'username': user_data.get('username'),
+        'email': user_data.get('email'),
+        'first_name': user_data.get('first_name'),
+        'last_name': user_data.get('last_name'),
+        'role': user_data.get('profile', {}).get('role', 'user'),
+        'active_organization_id': organization_context.get('active_organization_id'),
+        'active_organization': active_org or None,
+        'organizations': organizations,
+    }
+
 class AppUserSerializer(serializers.Serializer):
     """Serializer for PostgreSQL user data"""
     username = serializers.CharField(max_length=150)
@@ -84,6 +101,8 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not user_data.get('is_active', True):
             raise serializers.ValidationError("User account is disabled")
         
+        organization_context = user_service.get_organization_context(user_data)
+
         # Create custom token payload
         payload = {
             'user_id': user_data.get('id'),
@@ -91,6 +110,7 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
             'email': user_data.get('email'),
             'is_staff': user_data.get('is_staff', False),
             'profile_role': user_data.get('profile', {}).get('role', 'user'),
+            'active_organization_id': organization_context.get('active_organization_id'),
             'exp': datetime.utcnow() + timedelta(hours=1),  # 1 hour expiry
             'iat': datetime.utcnow()
         }
@@ -102,6 +122,7 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
         refresh_payload = {
             'user_id': user_data.get('id'),
             'username': user_data.get('username'),
+            'active_organization_id': organization_context.get('active_organization_id'),
             'exp': datetime.utcnow() + timedelta(days=7),  # 7 days expiry
             'iat': datetime.utcnow()
         }
@@ -110,14 +131,7 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
         return {
             'access': access_token,
             'refresh': refresh_token,
-            'user': {
-                'id': user_data.get('id'),
-                'username': user_data.get('username'),
-                'email': user_data.get('email'),
-                'first_name': user_data.get('first_name'),
-                'last_name': user_data.get('last_name'),
-                'role': user_data.get('profile', {}).get('role', 'user')
-            }
+            'user': build_user_auth_context(user_data, organization_context)
         }
 
 class AppTokenRefreshSerializer(serializers.Serializer):
@@ -148,6 +162,8 @@ class AppTokenRefreshSerializer(serializers.Serializer):
             if not user_data.get('is_active', True):
                 raise serializers.ValidationError("User account is disabled")
             
+            organization_context = user_service.get_organization_context(user_data)
+
             # Create new access token
             new_payload = {
                 'user_id': user_data.get('id'),
@@ -155,6 +171,7 @@ class AppTokenRefreshSerializer(serializers.Serializer):
                 'email': user_data.get('email'),
                 'is_staff': user_data.get('is_staff', False),
                 'profile_role': user_data.get('profile', {}).get('role', 'user'),
+                'active_organization_id': organization_context.get('active_organization_id'),
                 'exp': datetime.utcnow() + timedelta(hours=1),
                 'iat': datetime.utcnow()
             }
@@ -163,14 +180,7 @@ class AppTokenRefreshSerializer(serializers.Serializer):
             
             return {
                 'access': new_access_token,
-                'user': {
-                    'id': user_data.get('id'),
-                    'username': user_data.get('username'),
-                    'email': user_data.get('email'),
-                    'first_name': user_data.get('first_name'),
-                    'last_name': user_data.get('last_name'),
-                    'role': user_data.get('profile', {}).get('role', 'user')
-                }
+                'user': build_user_auth_context(user_data, organization_context)
             }
             
         except jwt.ExpiredSignatureError:

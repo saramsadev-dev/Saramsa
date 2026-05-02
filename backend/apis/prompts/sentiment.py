@@ -61,7 +61,8 @@ def format_comments_for_prompt(comments, start_index: int = 0):
 
 def getSentAnalysisPrompt(company_name: str = None, feedback_data: str = None, 
                          industry: str = None, use_confidence: bool = False,
-                         suggested_aspects: list = None, comment_start_index: int = 0):
+                         suggested_aspects: list = None, comment_start_index: int = 0,
+                         organization_id: str = None, project_id: str = None):
     """
     Get sentiment analysis prompt using the enhanced centralized prompt system.
     
@@ -89,7 +90,9 @@ def getSentAnalysisPrompt(company_name: str = None, feedback_data: str = None,
         company_name=company_name, 
         prompt_type="sentiment",
         industry=industry,
-        use_confidence=use_confidence
+        use_confidence=use_confidence,
+        organization_id=organization_id,
+        project_id=project_id,
     )
 
     # Log original template before substitution
