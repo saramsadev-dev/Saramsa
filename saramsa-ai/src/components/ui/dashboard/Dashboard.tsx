@@ -78,9 +78,10 @@ function validateSelectedFile(file: File): { isValid: boolean; error?: string } 
   const isSupported = name.endsWith('.csv')
     || name.endsWith('.json')
     || name.endsWith('.pdf')
-    || name.endsWith('.txt');
+    || name.endsWith('.txt')
+    || name.endsWith('.docx');
   if (!isSupported) {
-    return { isValid: false, error: 'Please upload a CSV, JSON, PDF, or TXT file.' };
+    return { isValid: false, error: 'Please upload a CSV, JSON, PDF, TXT, or DOCX file.' };
   }
   if (file.size <= 0) {
     return { isValid: false, error: 'Selected file is empty.' };
@@ -791,9 +792,10 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     const lowerName = fileName.toLowerCase();
     const effectiveProjectId = currentProjectId || personalProjectId || undefined;
 
-    // PDF: backend handles text extraction (the JS bundle stays light).
-    // The ingest endpoint enqueues the same Celery task as /insights/analyze/.
-    if (lowerName.endsWith('.pdf')) {
+    // PDF/DOCX: backend handles text extraction (keeps the JS bundle light
+    // and supports formats no browser can parse natively). The ingest
+    // endpoint enqueues the same Celery task as /insights/analyze/.
+    if (lowerName.endsWith('.pdf') || lowerName.endsWith('.docx')) {
       try {
         setTopError(null);
         dispatch(clearError());
@@ -822,7 +824,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
           (typeof data?.detail === 'string' && data.detail) ||
           (Array.isArray(data?.errors) && data.errors[0]) ||
           e?.message ||
-          'PDF ingestion failed. Please try again.';
+          'File ingestion failed. Please try again.';
         setTopError(message);
       }
       return;

@@ -1,4 +1,4 @@
-"""Generate PDF and TXT fixtures used by feedback-ingestion tests.
+"""Generate PDF, TXT, and DOCX fixtures used by feedback-ingestion tests.
 
 Re-run whenever fixtures need to be rebuilt:
     python backend/scripts/build_pdf_test_fixtures.py
@@ -11,6 +11,8 @@ Outputs into ``backend/tests/fixtures/``:
 * ``mock_feedback_encrypted.pdf`` — password-protected PDF.
 * ``mock_feedback.txt`` — text file with mixed line endings, a UTF-8 BOM, and
   a non-ASCII (Tamil) line.
+* ``mock_feedback.docx`` — Word document with three non-empty paragraphs
+  interspersed with blank paragraphs (which must be filtered out).
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import io
 from pathlib import Path
 
 from PIL import Image
+from docx import Document
 from pypdf import PdfReader, PdfWriter
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.units import inch
@@ -86,6 +89,17 @@ def build_encrypted_pdf(source: Path, target: Path, password: str = "saramsa") -
         writer.write(fh)
 
 
+def build_docx_fixture(target: Path) -> None:
+    """Write a Word document with three non-empty paragraphs and a few blanks."""
+    doc = Document()
+    doc.add_paragraph(PARAGRAPHS[0])
+    doc.add_paragraph("")  # blank paragraph — must be filtered
+    doc.add_paragraph(PARAGRAPHS[1])
+    doc.add_paragraph("   ")  # whitespace-only — must be filtered
+    doc.add_paragraph(PARAGRAPHS[2])
+    doc.save(str(target))
+
+
 def build_text_fixture(target: Path) -> None:
     """Write a text fixture with mixed line endings, a BOM, and Tamil text."""
     body = (
@@ -105,11 +119,13 @@ def main() -> None:
     scanned_pdf = FIXTURES_DIR / "mock_feedback_scanned.pdf"
     encrypted_pdf = FIXTURES_DIR / "mock_feedback_encrypted.pdf"
     text_file = FIXTURES_DIR / "mock_feedback.txt"
+    docx_file = FIXTURES_DIR / "mock_feedback.docx"
 
     build_text_pdf(text_pdf)
     build_scanned_pdf(scanned_pdf)
     build_encrypted_pdf(text_pdf, encrypted_pdf)
     build_text_fixture(text_file)
+    build_docx_fixture(docx_file)
 
     print(f"Wrote fixtures to {FIXTURES_DIR}")
 

@@ -10,8 +10,11 @@ can be unit-tested without bootstrapping the wider feedback-analysis stack.
 
 from __future__ import annotations
 
+import zipfile
 from typing import IO, List
 
+from docx import Document
+from docx.opc.exceptions import PackageNotFoundError
 from pypdf import PdfReader
 from pypdf.errors import FileNotDecryptedError, PdfReadError
 
@@ -66,5 +69,37 @@ def extract_comments_from_pdf(file_obj: IO[bytes]) -> List[str]:
         raise ValueError(
             "PDF contains no extractable text. "
             "Encrypted or image-only (scanned) PDFs are not supported."
+        )
+    return comments
+
+
+def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
+    """Read a Word (.docx) upload and return one comment per non-empty paragraph.
+
+    Also pulls text out of any tables, since users sometimes paste feedback
+    into a single-column table.
+    """
+    try:
+        doc = Document(file_obj)
+    except (PackageNotFoundError, zipfile.BadZipFile) as exc:
+        raise ValueError(
+            "DOCX could not be read. The file may be corrupted or password-protected."
+        ) from exc
+
+    comments: List[str] = []
+    for paragraph in doc.paragraphs:
+        text = (paragraph.text or "").strip()
+        if text:
+            comments.append(text)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                text = (cell.text or "").strip()
+                if text:
+                    comments.append(text)
+
+    if not comments:
+        raise ValueError(
+            "DOCX contains no extractable text. The document appears to be empty."
         )
     return comments

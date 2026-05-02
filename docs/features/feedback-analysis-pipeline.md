@@ -1,11 +1,11 @@
 # Feature: Feedback Analysis Pipeline
 
 ## Overview
-Accepts customer feedback (CSV, JSON, PDF, or plain text), runs sentiment analysis and aspect extraction, and produces structured insights. This is the core feature of Saramsa.
+Accepts customer feedback (CSV, JSON, PDF, plain text, or Word DOCX), runs sentiment analysis and aspect extraction, and produces structured insights. This is the core feature of Saramsa.
 
 ## Entry Points
 - **Upload (sync, CSV/JSON)**: `POST /api/insights/upload/` — accepts `file` + `project_id` (multipart form). Returns the full analysis result inline.
-- **Ingest (async, PDF/TXT)**: `POST /api/insights/ingest/` — accepts `file` + `project_id` (multipart form). Backend extracts text via `feedback_analysis/file_extractors.py`, enqueues the same Celery analysis task as `/analyze/`, and returns `{task_id}` (HTTP 202). Frontend polls `task-status` like `/analyze/`.
+- **Ingest (async, PDF/TXT/DOCX)**: `POST /api/insights/ingest/` — accepts `file` + `project_id` (multipart form). Backend extracts text via `feedback_analysis/file_extractors.py`, enqueues the same Celery analysis task as `/analyze/`, and returns `{task_id}` (HTTP 202). Frontend polls `task-status` like `/analyze/`.
 - **Analyze**: `POST /api/insights/analyze/` — accepts `{"comments": [...], "project_id": "...", "file_name": "..."}`
 - **Task Status**: `GET /api/insights/task-status/<task_id>/`
 - **Task List**: `GET /api/insights/tasks/`
@@ -83,10 +83,11 @@ Mock feedback (10 comments covering all sentiment/intent types):
 - `backend/tests/fixtures/mock_feedback.csv`
 - `backend/tests/fixtures/mock_feedback.pdf` — 3 paragraphs across 2 pages
 - `backend/tests/fixtures/mock_feedback.txt` — mixed line endings + Unicode (Tamil)
+- `backend/tests/fixtures/mock_feedback.docx` — 3 non-empty paragraphs interspersed with blanks
 - `backend/tests/fixtures/mock_feedback_scanned.pdf` — image-only PDF (rejection test)
 - `backend/tests/fixtures/mock_feedback_encrypted.pdf` — password-protected (rejection test)
 
-Regenerate via `python backend/scripts/build_pdf_test_fixtures.py` (requires `pypdf` and `reportlab`).
+Regenerate via `python backend/scripts/build_pdf_test_fixtures.py` (requires `pypdf`, `reportlab`, `python-docx`).
 
 ## File Format Handling
 
@@ -96,3 +97,4 @@ Regenerate via `python backend/scripts/build_pdf_test_fixtures.py` (requires `py
 | `.csv` | Frontend `Dashboard.tsx` (client-side) | Header `comment` column (fallback: first column) |
 | `.txt` | Frontend `Dashboard.tsx` (client-side) | One non-empty line = one comment; `\r\n`/`\r`/`\n` normalized; BOM stripped |
 | `.pdf` | Backend `file_extractors.extract_comments_from_pdf` | One non-empty line per extracted page = one comment. Encrypted/scanned PDFs are rejected with HTTP 400. |
+| `.docx` | Backend `file_extractors.extract_comments_from_docx` | One non-empty paragraph = one comment. Also pulls text out of any tables. Corrupt/password-protected files are rejected with HTTP 400. |
