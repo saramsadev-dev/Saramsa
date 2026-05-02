@@ -24,6 +24,7 @@ type PromptSettingsPayload = {
   platform_prompts: Record<string, PromptOverride>;
   organization_prompts: Record<string, PromptOverride>;
   selected_organization_id?: string | null;
+  default_prompts?: Record<string, string>;
 };
 
 export function PromptSettingsPage() {
@@ -44,14 +45,24 @@ export function PromptSettingsPage() {
       const payload: PromptSettingsPayload = res.data?.data;
       setData(payload);
       setSelectedOrganizationId(payload.selected_organization_id || organizationId || "");
+      const defaults = payload.default_prompts || {};
       setPlatformDrafts(
         Object.fromEntries(
-          payload.available_prompt_types.map((type) => [type, payload.platform_prompts?.[type]?.content || ""]),
+          payload.available_prompt_types.map((type) => [
+            type,
+            payload.platform_prompts?.[type]?.content || defaults[type] || "",
+          ]),
         ),
       );
       setOrganizationDrafts(
         Object.fromEntries(
-          payload.available_prompt_types.map((type) => [type, payload.organization_prompts?.[type]?.content || ""]),
+          payload.available_prompt_types.map((type) => [
+            type,
+            payload.organization_prompts?.[type]?.content
+              || payload.platform_prompts?.[type]?.content
+              || defaults[type]
+              || "",
+          ]),
         ),
       );
     } catch (err: any) {
@@ -115,13 +126,21 @@ export function PromptSettingsPage() {
     const value = drafts[promptType] || "";
     const saveKey = `${scope}:${promptType}`;
     const resetKey = `reset:${scope}:${promptType}`;
+    const hasOverride = scope === "platform"
+      ? !!data?.platform_prompts?.[promptType]
+      : !!data?.organization_prompts?.[promptType];
 
     return (
       <div key={`${scope}-${promptType}`} className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60 p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-foreground">{promptType}</p>
-            <p className="text-xs text-muted-foreground capitalize">{scope} scope</p>
+          <div className="flex items-center gap-2">
+            <div>
+              <p className="text-sm font-medium text-foreground">{promptType}</p>
+              <p className="text-xs text-muted-foreground capitalize">{scope} scope</p>
+            </div>
+            <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${hasOverride ? "bg-saramsa-brand/15 text-saramsa-brand" : "bg-muted text-muted-foreground"}`}>
+              {hasOverride ? "override active" : "using default"}
+            </span>
           </div>
           <div className="flex gap-2">
             <Button

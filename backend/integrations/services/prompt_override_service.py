@@ -13,6 +13,31 @@ PROMPT_TYPES = (
 )
 
 
+def _load_default_prompts() -> Dict[str, str]:
+    """Return the hardcoded default for each prompt type so the admin UI
+    can prefill the editor with what the system uses today."""
+    defaults: Dict[str, str] = {}
+
+    try:
+        from apis.prompts.constants import get_prompt as _get_prompt
+        for ptype in ("sentiment", "deep_analysis", "sentiment_confidence", "clarification"):
+            try:
+                defaults[ptype] = _get_prompt(prompt_type=ptype)
+            except Exception:
+                defaults[ptype] = ""
+    except Exception:
+        for ptype in ("sentiment", "deep_analysis", "sentiment_confidence", "clarification"):
+            defaults[ptype] = ""
+
+    try:
+        from apis.prompts.narration_prompt import _DEFAULT_TEMPLATE as _NARRATION_DEFAULT
+        defaults["work_items_validation"] = _NARRATION_DEFAULT
+    except Exception:
+        defaults.setdefault("work_items_validation", "")
+
+    return defaults
+
+
 class PromptOverrideService:
     def __init__(self):
         self.repo = IntegrationsRepository()
@@ -68,6 +93,7 @@ class PromptOverrideService:
             "platform_prompts": platform_prompts,
             "organization_prompts": organization_prompts,
             "selected_organization_id": organization_id,
+            "default_prompts": _load_default_prompts(),
         }
 
     def upsert_prompt(
