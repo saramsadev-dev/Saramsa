@@ -53,23 +53,22 @@ class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not user_data.get('is_active', True):
             raise serializers.ValidationError("User account is disabled")
 
-        # Use simplejwt RefreshToken — tokens are tracked by the blacklist
+        from .org_context import build_user_with_org_context
+
+        active_org_id = (user_data.get('profile') or {}).get('active_organization_id')
+
         refresh = RefreshToken()
         refresh['user_id'] = user_data.get('id')
         refresh['email'] = user_data.get('email')
         refresh['is_staff'] = user_data.get('is_staff', False)
         refresh['profile_role'] = user_data.get('profile', {}).get('role', 'user')
+        if active_org_id:
+            refresh['active_organization_id'] = active_org_id
 
         return {
             'access': str(refresh.access_token),
             'refresh': str(refresh),
-            'user': {
-                'id': user_data.get('id'),
-                'email': user_data.get('email'),
-                'first_name': user_data.get('first_name'),
-                'last_name': user_data.get('last_name'),
-                'role': user_data.get('profile', {}).get('role', 'user'),
-            }
+            'user': build_user_with_org_context(user_data),
         }
 
 
@@ -102,21 +101,21 @@ class AppTokenRefreshSerializer(serializers.Serializer):
         except Exception:
             pass  # OutstandingToken FK expects numeric user_id; our IDs are strings
 
+        from .org_context import build_user_with_org_context
+
+        active_org_id = (user_data.get('profile') or {}).get('active_organization_id')
+
         new_refresh = RefreshToken()
         new_refresh['user_id'] = user_data.get('id')
         new_refresh['email'] = user_data.get('email')
         new_refresh['is_staff'] = user_data.get('is_staff', False)
         new_refresh['profile_role'] = user_data.get('profile', {}).get('role', 'user')
+        if active_org_id:
+            new_refresh['active_organization_id'] = active_org_id
 
         return {
             'access': str(new_refresh.access_token),
-            'user': {
-                'id': user_data.get('id'),
-                'email': user_data.get('email'),
-                'first_name': user_data.get('first_name'),
-                'last_name': user_data.get('last_name'),
-                'role': user_data.get('profile', {}).get('role', 'user'),
-            }
+            'user': build_user_with_org_context(user_data),
         }
 
 class AppUserProfileSerializer(serializers.Serializer):

@@ -11,22 +11,28 @@ from rest_framework.views import APIView
 from apis.core.error_handlers import handle_service_errors
 from apis.core.response import StandardResponse
 
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from ..authentication import AppJWTAuthentication
+from ..org_context import build_user_with_org_context
 from ..permissions import IsSuperAdmin
 from ..services import get_authentication_service
 
 
-def _build_auth_context(user_data, organization_context):
-    return {
-        "user": {
-            "id": user_data.get("id"),
-            "email": user_data.get("email"),
-            "first_name": user_data.get("first_name"),
-            "last_name": user_data.get("last_name"),
-            "profile": user_data.get("profile") or {},
-        },
-        "organization": organization_context,
-    }
+def _issue_token_pair(user_data):
+    """Mint a fresh JWT pair carrying the (possibly updated) active org claim.
+    Lets the org-switch endpoint hand the frontend a token that already
+    reflects the new tenant — no separate /refresh round-trip needed."""
+    profile = user_data.get('profile') or {}
+    active_org_id = profile.get('active_organization_id')
+    refresh = RefreshToken()
+    refresh['user_id'] = user_data.get('id')
+    refresh['email'] = user_data.get('email')
+    refresh['is_staff'] = user_data.get('is_staff', False)
+    refresh['profile_role'] = profile.get('role', 'user')
+    if active_org_id:
+        refresh['active_organization_id'] = active_org_id
+    return {'access': str(refresh.access_token), 'refresh': str(refresh)}
 
 
 def _active_organization_id(request):
@@ -102,9 +108,11 @@ class SwitchActiveOrganizationView(APIView):
         except ValueError as exc:
             return StandardResponse.validation_error(detail=str(exc), instance=request.path)
 
-        organization_context = auth_service.get_organization_context(user_data)
         return StandardResponse.success(
-            data=_build_auth_context(user_data, organization_context),
+            data={
+                "user": build_user_with_org_context(user_data),
+                **_issue_token_pair(user_data),
+            },
             message="Active organization updated successfully",
         )
 

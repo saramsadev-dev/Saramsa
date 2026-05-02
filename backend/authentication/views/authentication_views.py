@@ -132,25 +132,24 @@ class ProfileMeView(APIView):
     def get(self, request):
         auth_service = get_authentication_service()
         user_data = auth_service.get_user_by_id(str(request.user.id))
-        
+
         if not user_data:
             return StandardResponse.not_found(
                 detail="User not found",
                 instance=request.path
             )
-        
-        # Use the authenticated user's ID directly
+
+        from ..org_context import build_user_with_org_context
+        public_user = build_user_with_org_context(user_data)
+
         return StandardResponse.success(
             data={
+                **public_user,
                 "user_id": request.user.id,
-                "email": user_data.get('email'),
-                "first_name": user_data.get('first_name'),
-                "last_name": user_data.get('last_name'),
                 "company_name": user_data.get('company_name'),
                 "company_url": user_data.get('company_url'),
                 "avatar_url": user_data.get('avatar_url'),
-                "role": user_data.get('profile', {}).get('role', 'user'),
-                "date_joined": user_data.get('date_joined')
+                "date_joined": user_data.get('date_joined'),
             },
             message="Profile retrieved successfully"
         )

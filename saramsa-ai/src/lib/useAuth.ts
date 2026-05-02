@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loginUser, registerUser, setUser, logout as sliceLogout } from '@/store/features/auth/authSlice';
-import { getStoredUser, getTokens, getCurrentUser, setStoredUser, logout as clientLogout, type User } from '@/lib/auth';
+import { getStoredUser, getTokens, getCurrentUser, setStoredUser, logout as clientLogout, switchActiveOrganization, type User } from '@/lib/auth';
 import { authService } from './authService';
 
 type LoginArgs = { email: string; password: string };
@@ -27,6 +27,7 @@ type HookResult = {
   ) => Promise<{ success: true } | { success: false; error?: string }>;
   logout: () => void;
   refreshToken: () => Promise<boolean>;
+  switchOrganization: (organizationId: string) => Promise<{ success: true } | { success: false; error?: string }>;
 };
 
 export function useAuth(): HookResult {
@@ -121,6 +122,16 @@ export function useAuth(): HookResult {
     }
   }, [dispatch]);
 
+  const switchOrganization = useCallback<HookResult['switchOrganization']>(async (organizationId) => {
+    try {
+      const updatedUser = await switchActiveOrganization(organizationId);
+      dispatch(setUser(updatedUser));
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed to switch organization' };
+    }
+  }, [dispatch]);
+
   const refreshToken = useCallback(async (): Promise<boolean> => {
     try {
       const newToken = await authService.refreshTokenIfNeeded();
@@ -140,7 +151,8 @@ export function useAuth(): HookResult {
     register,
     logout,
     refreshToken,
-  }), [auth.user, auth.isAuthenticated, auth.loading, auth.error, hydrating, login, register, logout, refreshToken]);
+    switchOrganization,
+  }), [auth.user, auth.isAuthenticated, auth.loading, auth.error, hydrating, login, register, logout, refreshToken, switchOrganization]);
 }
 
 

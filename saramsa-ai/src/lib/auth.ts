@@ -14,6 +14,7 @@ export type User = {
   user_id?: string;
   first_name?: string;
   last_name?: string;
+  is_staff?: boolean;
   active_organization_id?: string;
   active_organization?: Organization | null;
   organizations?: Organization[];
@@ -183,10 +184,15 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
     success: boolean;
     data: {
       user_id?: string;
+      id?: string;
       email?: string;
       role?: string;
       first_name?: string;
       last_name?: string;
+      is_staff?: boolean;
+      active_organization_id?: string | null;
+      active_organization?: Organization | null;
+      organizations?: Organization[];
     };
     message?: string;
   };
@@ -194,12 +200,15 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
   const data = response.data;
 
   const user: User = {
-    id: data.user_id,
-    user_id: data.user_id,
+    id: data.user_id || data.id,
+    user_id: data.user_id || data.id,
     email: data.email,
     role: data.role,
     first_name: data.first_name,
     last_name: data.last_name,
+    active_organization_id: data.active_organization_id ?? undefined,
+    active_organization: data.active_organization ?? null,
+    organizations: data.organizations ?? [],
   };
 
   return user;
@@ -337,6 +346,39 @@ export async function requestRegistrationOtp(
   };
 
   return response.data;
+}
+
+export async function switchActiveOrganization(organizationId: string): Promise<User> {
+  const token = getValidAccessToken();
+  if (!token) throw new Error('Not authenticated');
+
+  const res = await fetch(`${AUTH_BASE}/organizations/active/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ organization_id: organizationId }),
+  });
+
+  if (!res.ok) {
+    const data = await safeJson(res);
+    const message = (data && (data.error || data.detail)) || 'Failed to switch organization';
+    throw new Error(message);
+  }
+
+  const response = (await res.json()) as {
+    success: boolean;
+    data: {
+      user: User;
+      access: string;
+      refresh: string;
+    };
+  };
+
+  setTokens({ access: response.data.access, refresh: response.data.refresh });
+  setStoredUser(response.data.user);
+  return response.data.user;
 }
 
 export function logout(): void {
