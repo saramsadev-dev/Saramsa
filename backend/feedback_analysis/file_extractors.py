@@ -127,8 +127,11 @@ def _walk_tables(tables, comments: List[str]) -> None:
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
                     _append_lines(comments, paragraph.text)
-                if cell.tables:
-                    _walk_tables(cell.tables, comments)
+                # getattr fallback for python-docx versions that pre-date
+                # _Cell.tables (we pin >=1.2.0 but stay defensive).
+                nested = getattr(cell, "tables", None) or []
+                if nested:
+                    _walk_tables(nested, comments)
 
 
 def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
@@ -139,6 +142,11 @@ def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
     comments — matching the per-line semantics of PDF/TXT. Text inside
     tables (including nested tables) is collected too, since users
     sometimes paste feedback as a single-column table.
+
+    ``file_obj`` must be a seekable byte stream; the size-cap pass rewinds
+    it before handing to python-docx. ``request.FILES`` uploads from
+    Django's MemoryFileUploadHandler / TemporaryFileUploadHandler are
+    seekable, as is ``io.BytesIO``.
     """
     # Stream-decompress every member with a hard byte ceiling. Cannot trust
     # ZipInfo.file_size — a zip-bomb crafts the central directory to claim

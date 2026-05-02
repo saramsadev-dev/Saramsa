@@ -100,6 +100,27 @@ def build_docx_fixture(target: Path) -> None:
     doc.save(str(target))
 
 
+def build_softbreak_docx_fixture(target: Path) -> None:
+    """A single paragraph that contains a soft line break (<w:br/>)."""
+    doc = Document()
+    p = doc.add_paragraph("first line")
+    p.add_run().add_break()
+    p.add_run("second line")
+    doc.save(str(target))
+
+
+def build_nested_table_docx_fixture(target: Path) -> None:
+    """An outer table whose only cell contains a nested table."""
+    doc = Document()
+    outer = doc.add_table(rows=1, cols=1)
+    outer_cell = outer.cell(0, 0)
+    outer_cell.paragraphs[0].text = "Outer cell text"
+    inner = outer_cell.add_table(rows=1, cols=2)
+    inner.cell(0, 0).text = "Inner left"
+    inner.cell(0, 1).text = "Inner right"
+    doc.save(str(target))
+
+
 def build_text_fixture(target: Path) -> None:
     """Write a text fixture with mixed line endings, a BOM, and Tamil text."""
     body = (
@@ -120,12 +141,16 @@ def main() -> None:
     encrypted_pdf = FIXTURES_DIR / "mock_feedback_encrypted.pdf"
     text_file = FIXTURES_DIR / "mock_feedback.txt"
     docx_file = FIXTURES_DIR / "mock_feedback.docx"
+    softbreak_docx = FIXTURES_DIR / "mock_feedback_softbreak.docx"
+    nested_table_docx = FIXTURES_DIR / "mock_feedback_nested_table.docx"
 
     build_text_pdf(text_pdf)
     build_scanned_pdf(scanned_pdf)
     build_encrypted_pdf(text_pdf, encrypted_pdf)
     build_text_fixture(text_file)
     build_docx_fixture(docx_file)
+    build_softbreak_docx_fixture(softbreak_docx)
+    build_nested_table_docx_fixture(nested_table_docx)
 
     print(f"Wrote fixtures to {FIXTURES_DIR}")
 
