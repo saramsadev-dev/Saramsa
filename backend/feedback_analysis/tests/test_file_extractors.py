@@ -120,8 +120,10 @@ class TestExtractCommentsFromDocx:
         with pytest.raises(ValueError):
             extract_comments_from_docx(io.BytesIO(b"this is not a docx"))
 
-    def test_extracts_text_from_table_cells(self):
-        # If users export feedback as a table in Word, we should still pick it up.
+    def test_extracts_text_from_table_cells_in_order(self):
+        # If users export feedback as a table in Word, we should pick it up
+        # in document order: paragraphs first, then table rows in
+        # left-to-right, top-to-bottom order.
         from docx import Document
         buf = io.BytesIO()
         doc = Document()
@@ -129,14 +131,45 @@ class TestExtractCommentsFromDocx:
         table = doc.add_table(rows=2, cols=2)
         table.cell(0, 0).text = "Cell A1"
         table.cell(0, 1).text = "Cell A2"
-        table.cell(1, 0).text = ""
+        table.cell(1, 0).text = ""  # filtered out
         table.cell(1, 1).text = "Cell B2"
         doc.save(buf)
         buf.seek(0)
+        assert extract_comments_from_docx(buf) == [
+            "Header paragraph",
+            "Cell A1",
+            "Cell A2",
+            "Cell B2",
+        ]
+
+    def test_splits_paragraph_with_soft_line_breaks(self):
+        # Shift+Enter inside Word inserts a <w:br/> which renders as \n in
+        # paragraph.text. Each line becomes its own comment.
+        from docx import Document
+        buf = io.BytesIO()
+        doc = Document()
+        p = doc.add_paragraph("first line")
+        p.add_run().add_break()
+        p.add_run("second line")
+        doc.save(buf)
+        buf.seek(0)
+        assert extract_comments_from_docx(buf) == ["first line", "second line"]
+
+    def test_extracts_text_from_nested_tables(self):
+        # Outer table whose cell contains a nested table — both levels
+        # must be collected.
+        from docx import Document
+        buf = io.BytesIO()
+        doc = Document()
+        outer = doc.add_table(rows=1, cols=1)
+        outer_cell = outer.cell(0, 0)
+        outer_cell.paragraphs[0].text = "Outer cell text"
+        inner = outer_cell.add_table(rows=1, cols=2)
+        inner.cell(0, 0).text = "Inner left"
+        inner.cell(0, 1).text = "Inner right"
+        doc.save(buf)
+        buf.seek(0)
         comments = extract_comments_from_docx(buf)
-        assert "Header paragraph" in comments
-        assert "Cell A1" in comments
-        assert "Cell A2" in comments
-        assert "Cell B2" in comments
-        # No empty entries.
-        assert all(c.strip() for c in comments)
+        assert "Outer cell text" in comments
+        assert "Inner left" in comments
+        assert "Inner right" in comments

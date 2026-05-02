@@ -78,11 +78,35 @@ def extract_comments_from_pdf(file_obj: IO[bytes]) -> List[str]:
     return comments
 
 
-def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
-    """Read a Word (.docx) upload and return one comment per non-empty paragraph.
+def _append_lines(comments: List[str], text: str) -> None:
+    """Split ``text`` on newlines (soft line breaks render as ``\\n`` inside
+    a single paragraph) and append each non-empty trimmed line to ``comments``."""
+    for line in (text or "").split("\n"):
+        line = line.strip()
+        if line:
+            comments.append(line)
 
-    Also pulls text out of any top-level tables, since users sometimes paste
-    feedback into a single-column table. Nested tables are not recursed.
+
+def _walk_tables(tables, comments: List[str]) -> None:
+    """Recursively collect text from a list of python-docx tables, including
+    arbitrarily nested sub-tables."""
+    for table in tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    _append_lines(comments, paragraph.text)
+                if cell.tables:
+                    _walk_tables(cell.tables, comments)
+
+
+def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
+    """Read a Word (.docx) upload and return one comment per non-empty line.
+
+    Each paragraph is treated as a comment boundary, and soft line breaks
+    (Shift+Enter / ``<w:br/>``) inside a paragraph are split into separate
+    comments — matching the per-line semantics of PDF/TXT. Text inside
+    tables (including nested tables) is collected too, since users
+    sometimes paste feedback as a single-column table.
     """
     # Peek at the inner ZIP first to reject zip-bombs before lxml expands
     # gigabytes of XML in memory.
@@ -108,15 +132,8 @@ def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
 
     comments: List[str] = []
     for paragraph in doc.paragraphs:
-        text = (paragraph.text or "").strip()
-        if text:
-            comments.append(text)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                text = (cell.text or "").strip()
-                if text:
-                    comments.append(text)
+        _append_lines(comments, paragraph.text)
+    _walk_tables(doc.tables, comments)
 
     if not comments:
         raise ValueError(
