@@ -880,9 +880,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     const lowerName = fileName.toLowerCase();
     const effectiveProjectId = currentProjectId || personalProjectId || undefined;
 
-    // PDF/DOCX: backend handles text extraction (keeps the JS bundle light
-    // and supports formats no browser can parse natively). The ingest
-    // endpoint enqueues the same Celery task as /insights/analyze/.
+    // PDF/DOCX: server-side extraction keeps the JS bundle light.
     if (lowerName.endsWith('.pdf') || lowerName.endsWith('.docx')) {
       try {
         setTopError(null);
@@ -951,7 +949,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
           // ignore, will error below if empty
         }
       } else if (lowerName.endsWith('.txt')) {
-        // Strip UTF-8 BOM if present (matches backend extract_comments_from_text).
+        // Strip UTF-8 BOM if present.
         const stripped = text.startsWith('﻿') ? text.slice(1) : text;
         comments = stripped
           .split(/\r\n|\r|\n/)
@@ -1040,8 +1038,8 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     }
   }
 
-  // Wire a successful analysis result (from either /analyze/ or /ingest/) back
-  // into the dashboard state, replacing the optimistic "analyzing..." entry.
+  // Replaces the optimistic "analyzing..." history entry (`tempId`) with
+  // the resolved analysis state.
   async function applyAnalysisResult(result: any, tempId: string) {
     const payload = (result && (result.analysisData || result.sentimentsummary || result.featureasba))
       ? result

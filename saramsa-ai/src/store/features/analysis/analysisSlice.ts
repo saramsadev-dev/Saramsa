@@ -91,9 +91,6 @@ export const pollTaskStatus = createAsyncThunk<
   }
 });
 
-// Wait for an in-flight Celery analysis task to terminate, then resolve to a
-// canonical { id, analysisData } shape. Used by both `analyzeComments`
-// (POST /insights/analyze/) and `ingestFile` (POST /insights/ingest/).
 async function waitForAnalysisTask(taskId: string, dispatch: any): Promise<{ id: string; analysisData: any }> {
   const resolveAnalysis = async (statusResult: any) => {
     const taskResult = statusResult.result;
@@ -121,7 +118,6 @@ async function waitForAnalysisTask(taskId: string, dispatch: any): Promise<{ id:
     };
   };
 
-  // Try SSE first for efficient streaming, fall back to polling
   const { getValidAccessToken: getToken } = await import('@/lib/auth');
   const token = await getToken();
   const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '')
@@ -200,7 +196,6 @@ async function waitForAnalysisTask(taskId: string, dispatch: any): Promise<{ id:
   });
 }
 
-// Async thunk for analyzing comments (sentiment analysis with Celery)
 export const analyzeComments = createAsyncThunk<
   any,
   { comments: string[]; projectId?: string; fileName?: string },
@@ -238,8 +233,6 @@ export const analyzeComments = createAsyncThunk<
   }
 });
 
-// Async thunk for ingesting PDF / TXT files via the new /insights/ingest/ endpoint.
-// Backend extracts comments and enqueues the same analysis task as `analyzeComments`.
 export const ingestFile = createAsyncThunk<
   any,
   { file: File; projectId?: string },
@@ -258,8 +251,6 @@ export const ingestFile = createAsyncThunk<
     if (!taskId) {
       throw new Error('No task ID received from server');
     }
-    // Backend extracts comments and returns them inline so we can populate
-    // `loadedComments` immediately, matching the CSV/JSON path's UX.
     if (Array.isArray(data?.comments) && data.comments.length > 0) {
       dispatch(setLoadedComments(data.comments));
     }

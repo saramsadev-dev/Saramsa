@@ -33,8 +33,6 @@ logger = logging.getLogger(__name__)
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx"}
 
 
-# --- Lazy seams (patched by tests) -------------------------------------------------
-
 def get_analysis_service():
     from ..services import get_analysis_service as _impl
     return _impl()
@@ -50,9 +48,6 @@ def get_process_feedback_task():
     importing the heavy task module (which pulls in torch/transformers)."""
     from ..services.task_service import process_feedback_task as _task
     return _task
-
-
-# --- View ---------------------------------------------------------------------------
 
 
 class FeedbackFileIngestView(APIView):
@@ -201,9 +196,6 @@ class FeedbackFileIngestView(APIView):
                 "analysis_id": analysis_id,
                 "file_name": upload.name,
                 "comment_count": len(comments),
-                # Include the extracted comments so the frontend can populate
-                # `loadedComments` immediately, matching the CSV/JSON path
-                # where the client already has the parsed list.
                 "comments": comments,
                 "status": "processing",
                 "message": "File ingested and analysis started.",
