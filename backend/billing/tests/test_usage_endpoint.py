@@ -65,3 +65,10 @@ class UsageEndpointTest(TestCase):
         unauthed = APIClient()
         resp = unauthed.get("/api/billing/usage/")
         self.assertEqual(resp.status_code, 401)
+
+    def test_get_does_not_persist_usage_record(self):
+        """GET must be side-effect-free: no UsageRecord row created on read."""
+        self.client.get("/api/billing/usage/")
+        self.assertFalse(
+            UsageRecord.objects.filter(user_id=self.user.id).exists()
+        )

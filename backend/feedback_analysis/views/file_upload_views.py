@@ -15,7 +15,7 @@ import uuid
 from asgiref.sync import async_to_sync, sync_to_async
 import logging
 
-from ..services import get_processing_service
+from ..services import get_analysis_service, get_processing_service
 from authentication.permissions import IsProjectEditor
 from apis.core.response import StandardResponse
 from billing.quota import check_quota, record_usage, QuotaExceeded
@@ -115,7 +115,6 @@ class FeedbackFileUploadView(APIView):
             )
 
         # Get project context using analysis service
-        from ..services import get_analysis_service
         analysis_service = get_analysis_service()
         
         try:
@@ -161,7 +160,10 @@ class FeedbackFileUploadView(APIView):
                 )
 
             if 200 <= response.status_code < 300:
-                await sync_to_async(record_usage, thread_sensitive=True)(user_id, "analysis")
+                try:
+                    await sync_to_async(record_usage, thread_sensitive=True)(user_id, "analysis")
+                except Exception:
+                    logger.exception("record_usage failed after successful upload")
             return response
 
         except Exception as e:

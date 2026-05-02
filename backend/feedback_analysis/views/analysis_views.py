@@ -82,8 +82,7 @@ class AnalyzeCommentsView(APIView):
             )
         
         analysis_service = get_analysis_service()
-        from ..services import get_taxonomy_service
-        
+
         company_name = None
         if hasattr(request, 'user') and request.user.is_authenticated:
             try:
@@ -242,7 +241,10 @@ class UpdateKeywordsView(APIView):
             task_type="keyword_update",
         )
 
-        await sync_to_async(record_usage, thread_sensitive=True)(user_id_str, "analysis")
+        try:
+            await sync_to_async(record_usage, thread_sensitive=True)(user_id_str, "analysis")
+        except Exception:
+            logger.exception("record_usage failed after successful keyword update")
 
         # Parse and normalize the result (same as AnalyzeCommentsView)
         try:
