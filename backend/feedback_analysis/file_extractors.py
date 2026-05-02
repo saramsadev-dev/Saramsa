@@ -18,6 +18,11 @@ from docx.opc.exceptions import PackageNotFoundError
 from pypdf import PdfReader
 from pypdf.errors import FileNotDecryptedError, PdfReadError
 
+# Reject DOCX whose inner ZIP would decompress to more than this many bytes.
+# Defends against zip-bomb / decompression-DoS attacks where a small upload
+# explodes into gigabytes of XML once python-docx + lxml parse it.
+_DOCX_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024  # 50 MB
+
 _BOM = "﻿"
 
 
@@ -76,9 +81,24 @@ def extract_comments_from_pdf(file_obj: IO[bytes]) -> List[str]:
 def extract_comments_from_docx(file_obj: IO[bytes]) -> List[str]:
     """Read a Word (.docx) upload and return one comment per non-empty paragraph.
 
-    Also pulls text out of any tables, since users sometimes paste feedback
-    into a single-column table.
+    Also pulls text out of any top-level tables, since users sometimes paste
+    feedback into a single-column table. Nested tables are not recursed.
     """
+    # Peek at the inner ZIP first to reject zip-bombs before lxml expands
+    # gigabytes of XML in memory.
+    try:
+        with zipfile.ZipFile(file_obj) as zf:
+            uncompressed = sum(zi.file_size for zi in zf.infolist())
+    except zipfile.BadZipFile as exc:
+        raise ValueError(
+            "DOCX could not be read. The file may be corrupted or password-protected."
+        ) from exc
+    if uncompressed > _DOCX_MAX_UNCOMPRESSED_BYTES:
+        raise ValueError(
+            "DOCX is too large to process. Please split it into smaller files."
+        )
+    file_obj.seek(0)
+
     try:
         doc = Document(file_obj)
     except (PackageNotFoundError, zipfile.BadZipFile) as exc:
