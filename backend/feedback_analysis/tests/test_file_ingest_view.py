@@ -181,6 +181,26 @@ class IngestEndpointTests(TestCase):
     @patch("feedback_analysis.views.file_ingest_views.get_cache_service")
     @patch("feedback_analysis.views.file_ingest_views.get_process_feedback_task")
     @patch("feedback_analysis.views.file_ingest_views.get_analysis_service")
+    def test_corrupt_docx_returns_validation_error(
+        self, mock_analysis_svc, mock_task_factory, mock_cache
+    ):
+        task = self._stub_seams(mock_analysis_svc, mock_task_factory, mock_cache)
+
+        bad = SimpleUploadedFile(
+            "feedback.docx",
+            b"not a real zip / docx",
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        response = self._post({"file": bad, "project_id": "proj-1"})
+
+        assert response.status_code == 400
+        assert task.delay.call_count == 0
+        body = str(response.data).lower()
+        assert "docx" in body
+
+    @patch("feedback_analysis.views.file_ingest_views.get_cache_service")
+    @patch("feedback_analysis.views.file_ingest_views.get_process_feedback_task")
+    @patch("feedback_analysis.views.file_ingest_views.get_analysis_service")
     def test_unsupported_extension_rejected(
         self, mock_analysis_svc, mock_task_factory, mock_cache
     ):

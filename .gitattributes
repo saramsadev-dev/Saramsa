@@ -1,0 +1,11 @@
+# Mark binary fixture and asset types so git's CRLF / text-conversion
+# heuristics do not corrupt them on Windows checkouts (autocrlf=true).
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

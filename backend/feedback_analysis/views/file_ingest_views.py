@@ -56,7 +56,7 @@ def get_process_feedback_task():
 
 
 class FeedbackFileIngestView(APIView):
-    """Accept a PDF or .txt upload, extract comments, and enqueue analysis."""
+    """Accept a .pdf, .txt, or .docx upload, extract comments, and enqueue analysis."""
 
     permission_classes = [IsProjectEditor]
     throttle_classes = []
