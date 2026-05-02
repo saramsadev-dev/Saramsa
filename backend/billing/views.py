@@ -11,7 +11,8 @@ from apis.core.error_handlers import handle_service_errors
 from apis.core.response import StandardResponse
 from authentication.authentication import AppJWTAuthentication
 
-from .models import BillingWebhookEvent
+from .models import BillingWebhookEvent, UsageRecord
+from .quota import current_period, get_limits
 from .services import StripeBillingService
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,35 @@ class StripeSubscriptionStatusView(APIView):
         service = StripeBillingService()
         data = service.get_subscription_status(user_id=str(request.user.id))
         return StandardResponse.success(data=data, message="Subscription status fetched.")
+
+
+class UsageStatusView(APIView):
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def get(self, request):
+        user_id = str(request.user.id)
+        period = current_period()
+        record = UsageRecord.objects.filter(user_id=user_id, period=period).first()
+        limits = get_limits(user_id)
+
+        analysis_used = record.analysis_count if record else 0
+        work_item_used = record.work_item_gen_count if record else 0
+        tokens_used = record.llm_tokens_used if record else 0
+
+        def slot(used: int, limit: int) -> dict:
+            return {"used": used, "limit": limit, "remaining": max(0, limit - used)}
+
+        data = {
+            "period": period,
+            "usage": {
+                "analysis": slot(analysis_used, limits["analysis_limit"]),
+                "work_item_gen": slot(work_item_used, limits["work_item_gen_limit"]),
+                "llm_tokens": slot(tokens_used, limits["llm_token_limit"]),
+            },
+        }
+        return StandardResponse.success(data=data, message="Current usage fetched.")
 
 
 @csrf_exempt

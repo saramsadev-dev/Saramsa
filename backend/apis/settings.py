@@ -218,7 +218,8 @@ if not DATABASE_URL:
     )
 
 _database_host = (urlparse(DATABASE_URL).hostname or "").lower()
-if not _database_host.endswith(".neon.tech"):
+_test_db_bypass = os.getenv("DJANGO_TEST_MODE") == "1" and DEBUG
+if not _database_host.endswith(".neon.tech") and not _test_db_bypass:
     raise RuntimeError(
         f"DATABASE_URL must point to Neon PostgreSQL (.neon.tech). Current host: '{_database_host or 'missing'}'."
     )

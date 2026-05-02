@@ -10,7 +10,7 @@ Contains views for analysis operations:
 
 from rest_framework.views import APIView
 from rest_framework import status
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from datetime import datetime
 import json
 import uuid
@@ -21,12 +21,13 @@ from aiCore.services.completion_service import generate_completions
 from authentication.permissions import IsAdminOrUser, IsProjectViewer, IsProjectEditor, _get_role_from_user
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
+from billing.quota import check_quota, record_usage, QuotaExceeded
 from celery.result import AsyncResult
 from apis.infrastructure.cache_service import get_cache_service
 from apis.infrastructure.storage_service import storage_service
 
 from apis.prompts import getSentAnalysisPrompt
-from ..services import get_task_service
+from ..services import get_task_service, get_taxonomy_service
 from ..services.task_service import process_feedback_task
 from ..services import get_analysis_service
 
@@ -45,7 +46,6 @@ class AnalyzeCommentsView(APIView):
     def post(self, request):
         logger.info("AnalyzeCommentsView called (Background Mode)")
 
-        from billing.quota import check_quota, record_usage, QuotaExceeded
         try:
             check_quota(request.user.id, "analysis")
         except QuotaExceeded as exc:
@@ -175,7 +175,7 @@ class AnalyzeCommentsView(APIView):
 
 class UpdateKeywordsView(APIView):
     permission_classes = [IsProjectEditor]
-    
+
     @handle_service_errors
     @async_to_sync
     async def post(self, request):
@@ -187,6 +187,16 @@ class UpdateKeywordsView(APIView):
         comments = request.data.get("comments", [])
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
+
+        try:
+            await sync_to_async(check_quota, thread_sensitive=True)(user_id_str, "analysis")
+        except QuotaExceeded as exc:
+            return StandardResponse.error(
+                title="Quota exceeded",
+                detail=str(exc),
+                status_code=429,
+                instance=request.path,
+            )
 
         if not updated_keywords or not comments:
             return StandardResponse.validation_error(detail="Updated keywords and comments are required.", instance=request.path)
@@ -231,6 +241,8 @@ class UpdateKeywordsView(APIView):
             project_id=project_id,
             task_type="keyword_update",
         )
+
+        await sync_to_async(record_usage, thread_sensitive=True)(user_id_str, "analysis")
 
         # Parse and normalize the result (same as AnalyzeCommentsView)
         try:

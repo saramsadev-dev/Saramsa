@@ -14,13 +14,13 @@ from django.db import models as _  # noqa — ensure app registry is ready
 logger = logging.getLogger(__name__)
 
 
-def _current_period() -> str:
+def current_period() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m")
 
 
 def _get_or_create_record(user_id: str):
     from .models import UsageRecord
-    period = _current_period()
+    period = current_period()
     record, _ = UsageRecord.objects.get_or_create(
         user_id=str(user_id),
         period=period,
@@ -28,7 +28,7 @@ def _get_or_create_record(user_id: str):
     return record
 
 
-def _get_limits(user_id: str) -> dict:
+def get_limits(user_id: str) -> dict:
     from .models import BillingProfile, UsageRecord
     defaults = UsageRecord.default_limits()
     try:
@@ -63,7 +63,7 @@ def check_quota(user_id: str, resource: str) -> None:
     resource: "analysis" | "work_item_gen" | "llm_tokens"
     """
     record = _get_or_create_record(user_id)
-    limits = _get_limits(user_id)
+    limits = get_limits(user_id)
 
     field_map = {
         "analysis": ("analysis_count", "analysis_limit"),
@@ -83,10 +83,15 @@ def check_quota(user_id: str, resource: str) -> None:
 
 
 def record_usage(user_id: str, resource: str, amount: int = 1) -> None:
-    """Increment usage counter after a successful operation."""
+    """Increment usage counter after a successful operation.
+
+    Upserts the per-month UsageRecord row so that a record_usage call without
+    a prior check_quota still persists. Without the upsert, .update() on an
+    empty queryset is a silent no-op and usage is dropped.
+    """
     from .models import UsageRecord
 
-    period = _current_period()
+    period = current_period()
     field_map = {
         "analysis": "analysis_count",
         "work_item_gen": "work_item_gen_count",
@@ -97,6 +102,7 @@ def record_usage(user_id: str, resource: str, amount: int = 1) -> None:
         return
 
     from django.db.models import F
+    UsageRecord.objects.get_or_create(user_id=str(user_id), period=period)
     UsageRecord.objects.filter(
         user_id=str(user_id), period=period,
     ).update(**{field: F(field) + amount})
