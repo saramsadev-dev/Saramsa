@@ -158,7 +158,10 @@ class AnalyzeCommentsView(APIView):
         hour_key = datetime.now().strftime("%Y-%m-%d-%H")
         cache.incr(f"analyses_hour:{project_id}:{hour_key}", 1, ttl=3600)
 
-        record_usage(user_id_str, "analysis")
+        try:
+            record_usage(user_id_str, "analysis")
+        except Exception:
+            logger.exception("record_usage failed after successful task enqueue")
 
         response = StandardResponse.success(
             data={

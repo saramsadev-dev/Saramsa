@@ -27,7 +27,7 @@ class UsageEndpointTest(TestCase):
         self.assertEqual(usage["work_item_gen"]["remaining"], 100)
         self.assertIn("period", body["data"])
 
-    def test_returnscurrent_period_counts(self):
+    def test_returns_current_period_counts(self):
         UsageRecord.objects.create(
             user_id=self.user.id,
             period=current_period(),
