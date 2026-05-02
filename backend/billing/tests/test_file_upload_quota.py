@@ -57,7 +57,7 @@ class FileUploadQuotaTest(TestCase):
         ), patch(
             "feedback_analysis.views.file_upload_views.get_processing_service"
         ) as proc_factory, patch(
-            "feedback_analysis.services.get_analysis_service"
+            "feedback_analysis.views.file_upload_views.get_analysis_service"
         ) as analysis_factory:
             proc_factory.return_value = MagicMock(
                 process_uploaded_data_async=AsyncMock(
