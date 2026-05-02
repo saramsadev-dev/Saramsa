@@ -12,12 +12,13 @@ from http import HTTPStatus
 import json
 import csv
 import uuid
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 import logging
 
-from ..services import get_processing_service
+from ..services import get_analysis_service, get_processing_service
 from authentication.permissions import IsProjectEditor
 from apis.core.response import StandardResponse
+from billing.quota import check_quota, record_usage, QuotaExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -76,14 +77,14 @@ class FeedbackFileUploadView(APIView):
     async def post(self, request, *args, **kwargs):
         file = request.FILES.get('file')
         incoming_project_id = request.POST.get('project_id') or request.query_params.get('project_id')
-        
+
         if not file:
             return StandardResponse.validation_error(
                 detail='No file provided',
                 errors=[{"field": "file", "message": "This field is required."}],
                 instance=request.path
             )
-        
+
         # Get user ID from request
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
         if not user_id:
@@ -91,9 +92,19 @@ class FeedbackFileUploadView(APIView):
                 detail='User authentication required',
                 instance=request.path
             )
-        
+
         # Convert user_id to string for consistency
         user_id = str(user_id)
+
+        try:
+            await sync_to_async(check_quota, thread_sensitive=True)(user_id, "analysis")
+        except QuotaExceeded as exc:
+            return StandardResponse.error(
+                title="Quota exceeded",
+                detail=str(exc),
+                status_code=429,
+                instance=request.path,
+            )
         
         # Validate project ID is provided
         if not incoming_project_id:
@@ -104,7 +115,6 @@ class FeedbackFileUploadView(APIView):
             )
 
         # Get project context using analysis service
-        from ..services import get_analysis_service
         analysis_service = get_analysis_service()
         
         try:
@@ -139,16 +149,23 @@ class FeedbackFileUploadView(APIView):
         file_type = file.content_type
         try:
             if ext == '.json' or file_type == 'application/json':
-                return await self._process_json_file(file, user_id, project_id, project_context, request)
+                response = await self._process_json_file(file, user_id, project_id, project_context, request)
             elif ext == '.csv' or file_type in ['text/csv', 'application/vnd.ms-excel']:
-                return await self._process_csv_file(file, user_id, project_id, project_context, request)
+                response = await self._process_csv_file(file, user_id, project_id, project_context, request)
             else:
                 return StandardResponse.validation_error(
                     detail='Unsupported file type. Please upload a JSON or CSV file.',
                     errors=[{"field": "file", "message": "Only JSON and CSV files are supported."}],
                     instance=request.path
                 )
-        
+
+            if 200 <= response.status_code < 300:
+                try:
+                    await sync_to_async(record_usage, thread_sensitive=True)(user_id, "analysis")
+                except Exception:
+                    logger.exception("record_usage failed after successful upload")
+            return response
+
         except Exception as e:
             return StandardResponse.internal_server_error(
                 detail=f'Server error: {str(e)}',
