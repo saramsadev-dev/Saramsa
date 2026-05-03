@@ -67,20 +67,20 @@ export function BillingPage() {
       : `Not active · ${status?.subscription_status || "inactive"}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header>
         <h2 className="text-lg font-semibold text-foreground">Billing</h2>
-        <p className="text-sm text-muted-foreground mt-1">Subscription and billing preferences.</p>
+        <p className="text-sm text-muted-foreground mt-2">Subscription and billing preferences.</p>
       </header>
 
       <section className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-5 py-3">
+        <div className="border-b border-border px-6 py-4">
           <h3 className="text-sm font-medium text-foreground">Subscription</h3>
         </div>
-        <div className="px-5 py-4 space-y-4">
-          <div className="flex items-center gap-3">
+        <div className="px-6 py-5 space-y-5">
+          <div className="flex items-start gap-3">
             <span
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${
+              className={`inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
                 isSubscribed ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"
               }`}
             >
@@ -88,7 +88,7 @@ export function BillingPage() {
             </span>
             <div>
               <p className="text-sm font-medium text-foreground">{statusLabel}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 {isSubscribed
                   ? "Your workspace has an active subscription."
                   : "Activate a subscription to unlock paid features."}
@@ -96,7 +96,7 @@ export function BillingPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap gap-2 pt-2">
             {!isSubscribed && (
               <Button
                 variant="saramsa"

@@ -35,18 +35,18 @@ export function GeneralPage() {
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header>
         <h2 className="text-lg font-semibold text-foreground">General</h2>
-        <p className="text-sm text-muted-foreground mt-1">Your account details.</p>
+        <p className="text-sm text-muted-foreground mt-2">Your account details.</p>
       </header>
 
       <section className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-5 py-3">
+        <div className="border-b border-border px-6 py-4">
           <h3 className="text-sm font-medium text-foreground">Account</h3>
         </div>
-        <div className="px-5 py-4">
-          <dl className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-6 gap-y-4 text-sm">
+        <div className="px-6 py-5">
+          <dl className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-x-6 gap-y-5 text-sm">
             <dt className="text-muted-foreground">Email</dt>
             <dd className="flex items-center gap-2 text-foreground">
               <Mail className="h-4 w-4 text-muted-foreground" />

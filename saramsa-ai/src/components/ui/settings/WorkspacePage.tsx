@@ -236,11 +236,11 @@ export function WorkspacePage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Workspace</h2>
-          <p className="text-sm text-muted-foreground mt-1">Manage the active organization and its members.</p>
+          <p className="text-sm text-muted-foreground mt-2">Manage the active organization and its members.</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/60 px-2.5 py-1.5 text-xs font-medium text-foreground">
           <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -256,11 +256,11 @@ export function WorkspacePage() {
 
       {canManageMembers && data.organization && (
         <section className="rounded-lg border border-border bg-card">
-          <div className="border-b border-border px-5 py-3">
+          <div className="border-b border-border px-6 py-4">
             <h3 className="text-sm font-medium text-foreground">Workspace name</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Visible to every member in the navbar and switcher.</p>
+            <p className="text-xs text-muted-foreground mt-1">Visible to every member in the navbar and switcher.</p>
           </div>
-          <div className="px-5 py-4">
+          <div className="px-6 py-5">
             <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
               <input
                 value={renameDraft}
@@ -283,13 +283,13 @@ export function WorkspacePage() {
 
       {canManageMembers && (
         <section className="rounded-lg border border-border bg-card">
-          <div className="border-b border-border px-5 py-3">
+          <div className="border-b border-border px-6 py-4">
             <h3 className="text-sm font-medium text-foreground">Invite by email</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-1">
               They'll receive an invite link to create an account (or sign in) and join this workspace.
             </p>
           </div>
-          <div className="px-5 py-4 space-y-4">
+          <div className="px-6 py-5 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
               <input
                 value={inviteEmail}
@@ -340,13 +340,13 @@ export function WorkspacePage() {
 
       {canManageMembers && invites.length > 0 && (
         <section className="rounded-lg border border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+          <div className="flex items-center gap-2 border-b border-border px-6 py-4">
             <Mail className="h-4 w-4 text-muted-foreground" />
             <h3 className="text-sm font-medium text-foreground">Pending invites</h3>
           </div>
           <ul className="divide-y divide-border">
             {invites.map((inv) => (
-              <li key={inv.id} className="flex items-center justify-between gap-4 px-5 py-3">
+              <li key={inv.id} className="flex items-center justify-between gap-4 px-6 py-4">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{inv.email}</p>
                   <p className="text-xs text-muted-foreground">
@@ -369,7 +369,7 @@ export function WorkspacePage() {
       )}
 
       <section className="rounded-lg border border-border bg-card">
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+        <div className="flex items-center gap-2 border-b border-border px-6 py-4">
           <Users className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-medium text-foreground">Members</h3>
         </div>
@@ -387,7 +387,7 @@ export function WorkspacePage() {
                 member.email ||
                 member.user_id;
               return (
-                <li key={member.membership_id} className="flex items-center justify-between gap-4 px-5 py-3.5">
+                <li key={member.membership_id} className="flex items-center justify-between gap-4 px-6 py-4">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
                     <p className="text-xs text-muted-foreground truncate">{member.email || member.user_id}</p>
@@ -414,7 +414,7 @@ export function WorkspacePage() {
               );
             })}
             {!data.members.length && (
-              <li className="px-5 py-8 text-sm text-muted-foreground">No members found for this workspace.</li>
+              <li className="px-6 py-10 text-sm text-muted-foreground">No members found for this workspace.</li>
             )}
           </ul>
         )}
@@ -422,16 +422,16 @@ export function WorkspacePage() {
 
       {isOwner && data.organization && (
         <section className="rounded-lg border border-destructive/30 bg-destructive/5">
-          <div className="flex items-center gap-2 border-b border-destructive/30 px-5 py-3">
+          <div className="flex items-center gap-2 border-b border-destructive/30 px-6 py-4">
             <AlertTriangle className="h-4 w-4 text-destructive" />
             <h3 className="text-sm font-semibold text-destructive">Danger zone</h3>
           </div>
 
-          <div className="px-5 py-4 space-y-5 divide-y divide-destructive/20">
-            <div className="space-y-3">
+          <div className="px-6 py-5 space-y-6 divide-y divide-destructive/20">
+            <div className="space-y-4">
               <div>
                 <p className="text-sm font-medium text-foreground">Transfer ownership</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-muted-foreground mt-1">
                   Hand this workspace to another member. You will be demoted to admin.
                 </p>
               </div>
@@ -462,10 +462,10 @@ export function WorkspacePage() {
               </div>
             </div>
 
-            <div className="pt-5 space-y-3">
+            <div className="pt-6 space-y-4">
               <div>
                 <p className="text-sm font-medium text-destructive">Delete workspace</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-muted-foreground mt-1">
                   Permanently removes this workspace and every project, integration, and credit balance attached to it. This cannot be undone.
                 </p>
               </div>

@@ -70,22 +70,22 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-background text-foreground">
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-        <header className="mb-6 lg:mb-8">
+      <div className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-10 lg:py-14">
+        <header className="mb-8 lg:mb-12">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-2">
             Manage your account, workspace, and connected integrations.
           </p>
         </header>
 
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-12">
-          <aside className="lg:w-56 lg:flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-16">
+          <aside className="lg:w-60 lg:flex-shrink-0">
             {/* Mobile: horizontal scroll. Desktop: vertical sticky sidebar. */}
             <nav
               aria-label="Settings sections"
-              className="lg:sticky lg:top-6 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto lg:overflow-visible"
+              className="lg:sticky lg:top-8 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto lg:overflow-visible"
             >
-              <ul className="flex lg:flex-col gap-1 lg:gap-0.5 min-w-max lg:min-w-0">
+              <ul className="flex lg:flex-col gap-1 lg:gap-1 min-w-max lg:min-w-0">
                 {tabs.map(({ key, label, Icon }) => {
                   const selected = activeTab === key;
                   return (
@@ -94,7 +94,7 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => handleSelect(key)}
                         aria-current={selected ? "page" : undefined}
-                        className={`group w-full flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap lg:whitespace-normal ${
+                        className={`group w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors whitespace-nowrap lg:whitespace-normal ${
                           selected
                             ? "bg-secondary text-foreground"
                             : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"

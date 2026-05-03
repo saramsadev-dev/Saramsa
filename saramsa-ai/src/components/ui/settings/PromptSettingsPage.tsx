@@ -132,7 +132,7 @@ export function PromptSettingsPage() {
 
     return (
       <section key={`${scope}-${promptType}`} className="rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2 min-w-0">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground truncate">{promptType}</p>
@@ -165,7 +165,7 @@ export function PromptSettingsPage() {
             </Button>
           </div>
         </div>
-        <div className="px-5 py-4">
+        <div className="px-6 py-5">
           <textarea
             value={value}
             onChange={(e) => setDrafts((current) => ({ ...current, [promptType]: e.target.value }))}
@@ -191,11 +191,11 @@ export function PromptSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Prompts</h2>
-          <p className="text-sm text-muted-foreground mt-1">Manage platform-wide and tenant-specific AI prompt overrides.</p>
+          <p className="text-sm text-muted-foreground mt-2">Manage platform-wide and tenant-specific AI prompt overrides.</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/60 px-2.5 py-1.5 text-xs font-medium text-foreground">
           <Bot className="h-3.5 w-3.5 text-muted-foreground" />
@@ -210,11 +210,11 @@ export function PromptSettingsPage() {
       )}
 
       <section className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-5 py-3">
+        <div className="border-b border-border px-6 py-4">
           <h3 className="text-sm font-medium text-foreground">Tenant target</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Choose a workspace to load its tenant-specific overrides.</p>
+          <p className="text-xs text-muted-foreground mt-1">Choose a workspace to load its tenant-specific overrides.</p>
         </div>
-        <div className="px-5 py-4">
+        <div className="px-6 py-5">
           <select
             value={selectedOrganizationId}
             onChange={(e) => {
@@ -234,21 +234,21 @@ export function PromptSettingsPage() {
         </div>
       </section>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground px-1">Platform-wide prompts</h3>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {data.available_prompt_types.map((promptType) => renderPromptEditor("platform", promptType))}
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground px-1">Tenant-specific prompts</h3>
         {selectedOrganizationId ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {data.available_prompt_types.map((promptType) => renderPromptEditor("organization", promptType))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-border bg-card px-5 py-8 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border bg-card px-6 py-10 text-sm text-muted-foreground">
             Select a workspace above to manage tenant-specific prompt overrides.
           </div>
         )}
