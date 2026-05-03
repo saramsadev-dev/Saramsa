@@ -302,10 +302,21 @@ class ProjectService:
         if project is None:
             project = self.storage_service.get_project_by_id_any(project_id)
         owner_id = None
+        org_id = None
         if isinstance(project, dict):
             owner_id = project.get("owner_user_id") or project.get("userId")
+            org_id = project.get("organizationId")
         if owner_id and str(owner_id) == str(user_id):
             return "owner"
+        # Workspace admins can manage any project in their org, even ones
+        # another member created — matches B2B "shared workspace" expectations.
+        if org_id:
+            try:
+                membership = self.organization_service.get_membership(str(org_id), str(user_id))
+                if membership and membership.get("role") in ("owner", "admin"):
+                    return "admin"
+            except Exception:
+                pass
         role_doc = self.storage_service.get_project_role_for_user(project_id, str(user_id))
         if isinstance(role_doc, dict):
             return role_doc.get("role")

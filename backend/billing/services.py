@@ -46,6 +46,19 @@ class StripeBillingService:
 
     def _get_or_create_profile(self, user_id: str) -> BillingProfile:
         profile, _ = BillingProfile.objects.get_or_create(user_id=str(user_id))
+        # Backfill organization_id whenever we touch a profile so new
+        # rows (and any old user-keyed ones) end up org-scoped — billing
+        # is per-workspace in the B2B model, even though we still
+        # one-to-one map a profile to the user who set it up.
+        try:
+            user = UserAccount.objects.filter(id=str(user_id)).first()
+            active_org = (user.profile or {}).get("active_organization_id") if user else None
+            if active_org and profile.organization_id != active_org:
+                profile.organization_id = active_org
+                profile.updated_at = dj_timezone.now()
+                profile.save(update_fields=["organization_id", "updated_at"])
+        except Exception:
+            pass
         return profile
 
     def _ensure_customer(self, user: UserAccount, profile: BillingProfile) -> str:

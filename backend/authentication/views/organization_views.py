@@ -347,10 +347,11 @@ class OrganizationInvitesView(APIView):
         # Best-effort email send. We never fail the whole request if email
         # delivery hits a problem — the invite link is also returned in
         # the response so the inviter can copy/paste it as a fallback.
+        # Log failures loudly so misconfigured SMTP doesn't go unnoticed.
+        invite_url = _build_invite_url(request, invite["token"])
+        invite["invite_url"] = invite_url
         try:
-            from authentication.services import get_authentication_service
             auth_service = get_authentication_service()
-            invite_url = _build_invite_url(request, invite["token"])
             org_name = (invite.get("organization") or {}).get("name") or "your team"
             inviter = auth_service.get_user_by_id(str(request.user.id)) or {}
             inviter_name = (
@@ -365,8 +366,14 @@ class OrganizationInvitesView(APIView):
                 role=invite["role"],
             )
             invite["email_sent"] = True
-        except Exception:
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Invite email failed for %s (org=%s) — falling back to copy/paste URL %s. Error: %s",
+                invite["email"], invite.get("organization_id"), invite_url, exc,
+            )
             invite["email_sent"] = False
+            invite["email_error"] = str(exc)
 
         return StandardResponse.success(data=invite, message="Invitation sent successfully")
 
