@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Building2, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Building2, Copy, Loader2, Mail, Save, Trash2, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/apiRequest";
 import { useAuth } from "@/lib/useAuth";
@@ -31,6 +31,16 @@ type WorkspacePayload = {
   members: WorkspaceMember[];
 };
 
+type PendingInvite = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expires_at: string;
+  invited_by_user_id?: string | null;
+  created_at?: string;
+};
+
 export function WorkspacePage() {
   const { user } = useAuth();
   const [data, setData] = useState<WorkspacePayload>({ members: [] });
@@ -42,15 +52,24 @@ export function WorkspacePage() {
   const [renameDraft, setRenameDraft] = useState("");
   const [transferTarget, setTransferTarget] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [invites, setInvites] = useState<PendingInvite[]>([]);
+  const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  const [lastInviteEmail, setLastInviteEmail] = useState<string | null>(null);
+  const [lastInviteEmailSent, setLastInviteEmailSent] = useState<boolean>(true);
 
   const loadMembers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await apiRequest("get", "/auth/organizations/members/", undefined, true);
-      const payload = res.data?.data || { members: [] };
+      const [memRes, invRes] = await Promise.all([
+        apiRequest("get", "/auth/organizations/members/", undefined, true),
+        apiRequest("get", "/auth/organizations/invites/", undefined, true).catch(() => null),
+      ]);
+      const payload = memRes.data?.data || { members: [] };
       setData(payload);
       setRenameDraft(payload.organization?.name || "");
+      const invitesPayload = invRes?.data?.data?.invites || [];
+      setInvites(invitesPayload);
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || "Failed to load workspace members.");
     } finally {
@@ -75,19 +94,57 @@ export function WorkspacePage() {
     try {
       setSaving(true);
       setError(null);
+      setLastInviteUrl(null);
+      setLastInviteEmail(null);
       const res = await apiRequest(
         "post",
-        "/auth/organizations/members/",
+        "/auth/organizations/invites/",
         { email: inviteEmail.trim(), role: inviteRole },
         true,
       );
-      setData(res.data?.data || { members: [] });
+      const invite = res.data?.data;
+      const token: string | undefined = invite?.token;
+      const emailSent: boolean = invite?.email_sent !== false;
+      const inviteUrl = token
+        ? `${window.location.origin}/signup?invite=${encodeURIComponent(token)}`
+        : null;
+      setLastInviteUrl(inviteUrl);
+      setLastInviteEmail(invite?.email || inviteEmail.trim());
+      setLastInviteEmailSent(emailSent);
       setInviteEmail("");
       setInviteRole("member");
+      await loadMembers();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Failed to add member.");
+      setError(err?.response?.data?.detail || err?.message || "Failed to send invitation.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    try {
+      setSaving(true);
+      setError(null);
+      await apiRequest(
+        "delete",
+        `/auth/organizations/invites/?invite_id=${encodeURIComponent(inviteId)}`,
+        undefined,
+        true,
+      );
+      await loadMembers();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || "Failed to revoke invitation.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (!lastInviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(lastInviteUrl);
+    } catch {
+      // ignore — link is also visible in the panel
     }
   };
 
@@ -220,14 +277,16 @@ export function WorkspacePage() {
       {canManageMembers && (
         <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60 p-4 space-y-4">
           <div>
-            <p className="text-sm font-medium text-foreground">Add member</p>
-            <p className="text-xs text-muted-foreground">Add an existing Saramsa user to this workspace by email.</p>
+            <p className="text-sm font-medium text-foreground">Invite by email</p>
+            <p className="text-xs text-muted-foreground">
+              We'll email an invite link. They'll create an account (or sign in if they already have one) and join this workspace.
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
             <input
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="member@example.com"
+              placeholder="teammate@example.com"
               className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
             />
             <select
@@ -240,9 +299,62 @@ export function WorkspacePage() {
               <option value="admin">Admin</option>
             </select>
             <Button onClick={handleInvite} disabled={saving} variant="saramsa" className="h-10 flex items-center gap-2">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Add
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Send invite
             </Button>
+          </div>
+
+          {lastInviteUrl && lastInviteEmail && (
+            <div className="rounded-md border border-saramsa-brand/30 bg-saramsa-brand/5 px-3 py-3 space-y-2">
+              <p className="text-xs font-medium text-foreground">
+                Invite sent to <span className="font-semibold">{lastInviteEmail}</span>
+                {lastInviteEmailSent ? '.' : '. (Email delivery failed — share the link below manually.)'}
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate rounded border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground">
+                  {lastInviteUrl}
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-2"
+                  onClick={handleCopyInviteLink}
+                  title="Copy invite link"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {canManageMembers && invites.length > 0 && (
+        <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60">
+          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Pending invites</p>
+          </div>
+          <div className="divide-y divide-border">
+            {invites.map((inv) => (
+              <div key={inv.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{inv.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {inv.role} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => handleRevokeInvite(inv.id)}
+                  disabled={saving}
+                  variant="ghost"
+                  className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                  title="Revoke invitation"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
       )}

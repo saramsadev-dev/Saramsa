@@ -25,8 +25,20 @@ type RegisterParams = {
   email: string;
   password: string;
   confirmPassword: string;
-  otp: string;
+  otp?: string;
+  first_name?: string;
+  last_name?: string;
+  workspace_name?: string;
+  invite_token?: string;
   role?: 'admin' | 'user' | 'restricted user';
+};
+
+export type InviteContext = {
+  id: string;
+  email: string;
+  role: string;
+  organization: { id: string; name?: string; slug?: string };
+  expires_at: string;
 };
 
 type Tokens = { access: string; refresh: string };
@@ -347,6 +359,42 @@ export async function requestRegistrationOtp(
   };
 
   return response.data;
+}
+
+export async function lookupInvite(token: string): Promise<InviteContext> {
+  const res = await fetch(`${AUTH_BASE}/invites/${encodeURIComponent(token)}/`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const data = await safeJson(res);
+    const message = (data && (data.error || data.detail)) || 'Invite link is invalid.';
+    throw new Error(message);
+  }
+  const response = (await res.json()) as { success: boolean; data: InviteContext };
+  return response.data;
+}
+
+export async function acceptInviteAsLoggedInUser(token: string): Promise<User> {
+  const access = getValidAccessToken();
+  if (!access) throw new Error('Not authenticated');
+
+  const res = await fetch(`${AUTH_BASE}/invites/${encodeURIComponent(token)}/accept/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
+  });
+  if (!res.ok) {
+    const data = await safeJson(res);
+    const message = (data && (data.error || data.detail)) || 'Failed to accept invitation.';
+    throw new Error(message);
+  }
+  const response = (await res.json()) as {
+    success: boolean;
+    data: { user: User; access: string; refresh: string };
+  };
+  setTokens({ access: response.data.access, refresh: response.data.refresh });
+  setStoredUser(response.data.user);
+  return response.data.user;
 }
 
 export async function switchActiveOrganization(organizationId: string): Promise<User> {
