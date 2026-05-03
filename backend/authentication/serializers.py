@@ -194,8 +194,11 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 class AppUserRegisterWithOtpSerializer(AppUserSerializer):
-    """Serializer for registration with OTP."""
-    otp = serializers.CharField(write_only=True, min_length=6, max_length=6)
+    """Serializer for registration with OTP. The `otp` field is optional
+    here because invite-token signups skip the OTP step (the invite
+    itself proves email ownership). The view enforces that one of
+    invite_token or otp must be present."""
+    otp = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=6, max_length=6)
 
 
 class RegistrationOtpRequestSerializer(serializers.Serializer):

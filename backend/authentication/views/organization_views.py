@@ -11,11 +11,12 @@ from rest_framework.views import APIView
 from apis.core.error_handlers import handle_service_errors
 from apis.core.response import StandardResponse
 
+from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from ..authentication import AppJWTAuthentication
 from ..org_context import build_user_with_org_context
-from ..permissions import IsSuperAdmin
+from ..permissions import IsSuperAdmin, NoAuthentication
 from ..services import get_authentication_service
 
 
@@ -295,6 +296,193 @@ class OrganizationMembersView(APIView):
         return StandardResponse.success(
             data=result, message="Organization member removed successfully"
         )
+
+
+class OrganizationInvitesView(APIView):
+    """List / create / revoke pending invitations for the active workspace."""
+
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def get(self, request):
+        from integrations.services import get_organization_invite_service
+
+        organization_id = _active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.", instance=request.path
+            )
+        try:
+            invites = get_organization_invite_service().list_pending(
+                str(organization_id), str(request.user.id),
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+        return StandardResponse.success(
+            data={"invites": invites}, message="Pending invites retrieved successfully"
+        )
+
+    @handle_service_errors
+    def post(self, request):
+        from integrations.services import get_organization_invite_service
+
+        organization_id = _active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.", instance=request.path
+            )
+        email = (request.data.get("email") or "").strip()
+        role = (request.data.get("role") or "member").strip().lower()
+        try:
+            invite = get_organization_invite_service().create_invite(
+                organization_id=str(organization_id),
+                actor_user_id=str(request.user.id),
+                email=email,
+                role=role,
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        # Best-effort email send. We never fail the whole request if email
+        # delivery hits a problem — the invite link is also returned in
+        # the response so the inviter can copy/paste it as a fallback.
+        try:
+            from authentication.services import get_authentication_service
+            auth_service = get_authentication_service()
+            invite_url = _build_invite_url(request, invite["token"])
+            org_name = (invite.get("organization") or {}).get("name") or "your team"
+            inviter = auth_service.get_user_by_id(str(request.user.id)) or {}
+            inviter_name = (
+                f"{inviter.get('first_name','')} {inviter.get('last_name','')}".strip()
+                or inviter.get("email") or "A teammate"
+            )
+            _send_invite_email(
+                to_email=invite["email"],
+                inviter_name=inviter_name,
+                org_name=org_name,
+                invite_url=invite_url,
+                role=invite["role"],
+            )
+            invite["email_sent"] = True
+        except Exception:
+            invite["email_sent"] = False
+
+        return StandardResponse.success(data=invite, message="Invitation sent successfully")
+
+    @handle_service_errors
+    def delete(self, request):
+        from integrations.services import get_organization_invite_service
+
+        invite_id = (
+            request.data.get("invite_id")
+            or request.query_params.get("invite_id")
+            or ""
+        ).strip()
+        if not invite_id:
+            return StandardResponse.validation_error(
+                detail="invite_id is required.", instance=request.path
+            )
+        try:
+            get_organization_invite_service().revoke_invite(invite_id, str(request.user.id))
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+        return StandardResponse.success(data={}, message="Invite revoked successfully")
+
+
+class InviteLookupView(APIView):
+    """Public endpoint so the signup page can show the invitee what
+    workspace they're joining before they create an account."""
+
+    permission_classes = [NoAuthentication]
+    authentication_classes = []
+
+    @handle_service_errors
+    def get(self, request, token):
+        from integrations.services import get_organization_invite_service
+
+        try:
+            invite = get_organization_invite_service().get_by_token(token)
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+        return StandardResponse.success(data=invite, message="Invite retrieved successfully")
+
+
+class InviteAcceptView(APIView):
+    """Logged-in user accepts an invite they were sent. After acceptance
+    we mint a fresh JWT pair so the new active org claim travels with
+    the response and the navbar/switcher refresh immediately."""
+
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def post(self, request, token):
+        from integrations.services import get_organization_invite_service
+
+        auth_service = get_authentication_service()
+        user_data = auth_service.get_user_by_id(str(request.user.id))
+        if not user_data:
+            return StandardResponse.not_found(detail="User not found", instance=request.path)
+        try:
+            result = get_organization_invite_service().accept_invite(
+                token=token,
+                user_id=str(request.user.id),
+                user_email=user_data.get("email") or "",
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        # Switch the user into the workspace they just joined so the
+        # next page they land on is the right one.
+        try:
+            user_data = auth_service.set_active_organization(
+                str(request.user.id), result["organization_id"]
+            )
+        except Exception:
+            user_data = auth_service.get_user_by_id(str(request.user.id))
+
+        return StandardResponse.success(
+            data={
+                "user": build_user_with_org_context(user_data),
+                "organization_id": result["organization_id"],
+                **_issue_token_pair(user_data),
+            },
+            message="Invitation accepted successfully",
+        )
+
+
+def _build_invite_url(request, token: str) -> str:
+    import os
+    base = os.getenv("FRONTEND_BASE_URL", "").rstrip("/")
+    if not base:
+        host = request.get_host()
+        scheme = "https" if request.is_secure() else "http"
+        base = f"{scheme}://{host}"
+    return f"{base}/signup?invite={token}"
+
+
+def _send_invite_email(*, to_email: str, inviter_name: str, org_name: str, invite_url: str, role: str) -> None:
+    """Reuse the same Azure Communication Email path the OTP flow uses."""
+    from django.conf import settings
+    from django.core.mail import EmailMultiAlternatives
+
+    subject = f"{inviter_name} invited you to {org_name} on Saramsa"
+    text_body = (
+        f"{inviter_name} invited you to join {org_name} on Saramsa as {role}.\n\n"
+        f"Open this link to accept:\n{invite_url}\n\n"
+        "This invite expires in 7 days."
+    )
+    html_body = (
+        f"<p>{inviter_name} invited you to join <strong>{org_name}</strong> on Saramsa "
+        f"as <strong>{role}</strong>.</p>"
+        f'<p><a href="{invite_url}">Accept invitation</a></p>'
+        f"<p>This invite expires in 7 days.</p>"
+    )
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None)
+    msg = EmailMultiAlternatives(subject=subject, body=text_body, from_email=from_email, to=[to_email])
+    msg.attach_alternative(html_body, "text/html")
+    msg.send(fail_silently=False)
 
 
 class AdminPromptSettingsView(APIView):

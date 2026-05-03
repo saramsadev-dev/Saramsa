@@ -27,15 +27,21 @@ class AuthenticationService:
     
     def create_user(self, email: str, password: str,
                    first_name: str = "", last_name: str = "",
-                   role: str = "user") -> Dict[str, Any]:
+                   role: str = "user",
+                   workspace_name: str = "",
+                   invite_token: str = "") -> Dict[str, Any]:
         """Create a new user with hashed password.
 
-        Also bootstraps a personal organization for the user (the B2B
-        "one company per user" tenant model) so the new account has
-        somewhere to put projects, integrations, and credits the moment
-        it logs in. The user is set as the org owner and the org id is
-        written to profile.active_organization_id so the JWT issued on
-        first login carries it.
+        Workspace handling depends on whether the signup is an invite:
+
+        - With ``invite_token``: skip the personal-org bootstrap entirely.
+          The caller is expected to consume the invite token after the
+          user is created, which adds them to the inviting workspace.
+        - Without ``invite_token``: bootstrap a workspace with the
+          name they provided (B2B "one company per user" — workspace
+          name should be the company, not the user). If they didn't
+          supply a name we fall back to email-prefix → "<that> Workspace"
+          so existing self-serve callers keep working.
         """
         try:
             # Hash password
@@ -61,8 +67,15 @@ class AuthenticationService:
 
             created = self.user_repo.create_user(user_data)
 
+            if invite_token:
+                # Skip workspace bootstrap — the invite consumer will
+                # attach this user to the inviting workspace instead.
+                return created
+
             try:
-                self._bootstrap_default_organization(created, first_name, last_name, email)
+                self._bootstrap_default_organization(
+                    created, first_name, last_name, email, workspace_name=workspace_name,
+                )
             except Exception as exc:
                 # Don't fail signup if org bootstrap hits a snag — the user
                 # account is real and recoverable; the org can be created
@@ -81,17 +94,22 @@ class AuthenticationService:
         first_name: str,
         last_name: str,
         email: str,
+        workspace_name: str = "",
     ) -> None:
         """Create a fresh org for a brand-new user, install them as owner,
         and persist the org id into their profile so login picks it up."""
         from integrations.services import get_organization_service
 
-        display_name = (
-            (f"{first_name} {last_name}".strip())
-            or email.split("@")[0]
-            or "My Workspace"
-        )
-        org_name = f"{display_name}'s Workspace"
+        cleaned_workspace_name = (workspace_name or "").strip()
+        if cleaned_workspace_name:
+            org_name = cleaned_workspace_name
+        else:
+            display_name = (
+                (f"{first_name} {last_name}".strip())
+                or email.split("@")[0]
+                or "My Workspace"
+            )
+            org_name = f"{display_name}'s Workspace"
 
         organization = get_organization_service().create_organization(
             name=org_name,

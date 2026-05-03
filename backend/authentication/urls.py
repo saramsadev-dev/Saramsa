@@ -14,6 +14,9 @@ from .views import (
     OrganizationDetailView,
     OrganizationTransferView,
     OrganizationMembersView,
+    OrganizationInvitesView,
+    InviteLookupView,
+    InviteAcceptView,
     AdminPromptSettingsView,
 )
 
@@ -32,6 +35,9 @@ urlpatterns = [
     path('organizations/current/', OrganizationDetailView.as_view(), name='organizations-current'),
     path('organizations/transfer/', OrganizationTransferView.as_view(), name='organizations-transfer'),
     path('organizations/members/', OrganizationMembersView.as_view(), name='organizations-members'),
+    path('organizations/invites/', OrganizationInvitesView.as_view(), name='organizations-invites'),
+    path('invites/<str:token>/', InviteLookupView.as_view(), name='invite-lookup'),
+    path('invites/<str:token>/accept/', InviteAcceptView.as_view(), name='invite-accept'),
     path('admin/prompts/', AdminPromptSettingsView.as_view(), name='admin-prompts'),
 ]
 

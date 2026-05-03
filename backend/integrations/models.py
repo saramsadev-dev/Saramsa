@@ -62,6 +62,56 @@ class OrganizationMembership(TimestampedModel):
         ]
 
 
+class OrganizationInvite(TimestampedModel):
+    """Pending invitation to join a workspace. Locked to the email it
+    was sent to so the token can't be forwarded and accepted by a
+    different account."""
+
+    id = models.CharField(max_length=128, primary_key=True)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="invites",
+    )
+    email = models.EmailField(db_index=True)
+    role = models.CharField(max_length=32, default="member")
+    token = models.CharField(max_length=128, unique=True, db_index=True)
+    invited_by = models.ForeignKey(
+        "authentication.UserAccount",
+        on_delete=models.SET_NULL,
+        related_name="sent_invites",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(max_length=32, default="pending", db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey(
+        "authentication.UserAccount",
+        on_delete=models.SET_NULL,
+        related_name="accepted_invites",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "organization_invites"
+        constraints = [
+            # One pending invite per (org, email). Re-inviting the same
+            # email refreshes the existing row instead of duplicating.
+            models.UniqueConstraint(
+                fields=["organization", "email"],
+                name="uq_invite_org_email_pending",
+                condition=models.Q(status="pending"),
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["email", "status"]),
+            models.Index(fields=["expires_at"]),
+        ]
+
+
 class PromptOverride(TimestampedModel):
     id = models.CharField(max_length=128, primary_key=True)
     scope = models.CharField(max_length=32, db_index=True)

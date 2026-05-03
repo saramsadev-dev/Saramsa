@@ -27,6 +27,9 @@ from .organization_views import (
     OrganizationDetailView,
     OrganizationTransferView,
     OrganizationMembersView,
+    OrganizationInvitesView,
+    InviteLookupView,
+    InviteAcceptView,
     AdminPromptSettingsView,
 )
 
@@ -46,6 +49,9 @@ __all__ = [
     'OrganizationDetailView',
     'OrganizationTransferView',
     'OrganizationMembersView',
+    'OrganizationInvitesView',
+    'InviteLookupView',
+    'InviteAcceptView',
     'AdminPromptSettingsView',
 ]
 
