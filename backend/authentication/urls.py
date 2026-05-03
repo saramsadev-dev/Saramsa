@@ -11,6 +11,8 @@ from .views import (
     ResetPasswordView,
     OrganizationsView,
     SwitchActiveOrganizationView,
+    OrganizationDetailView,
+    OrganizationTransferView,
     OrganizationMembersView,
     AdminPromptSettingsView,
 )
@@ -27,6 +29,8 @@ urlpatterns = [
     path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
     path('organizations/', OrganizationsView.as_view(), name='organizations'),
     path('organizations/active/', SwitchActiveOrganizationView.as_view(), name='organizations-active'),
+    path('organizations/current/', OrganizationDetailView.as_view(), name='organizations-current'),
+    path('organizations/transfer/', OrganizationTransferView.as_view(), name='organizations-transfer'),
     path('organizations/members/', OrganizationMembersView.as_view(), name='organizations-members'),
     path('admin/prompts/', AdminPromptSettingsView.as_view(), name='admin-prompts'),
 ]

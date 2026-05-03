@@ -117,6 +117,104 @@ class SwitchActiveOrganizationView(APIView):
         )
 
 
+class OrganizationDetailView(APIView):
+    """Manage the caller's active workspace: rename, transfer ownership,
+    delete. All gated to admin/owner roles inside the service layer."""
+
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def patch(self, request):
+        from integrations.services import get_organization_service
+
+        organization_id = _active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.", instance=request.path
+            )
+        name = request.data.get("name") if "name" in request.data else None
+        description = request.data.get("description") if "description" in request.data else None
+        try:
+            updated = get_organization_service().update_organization(
+                str(organization_id), str(request.user.id),
+                name=name, description=description,
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        # Echo the fresh user payload so the frontend's org switcher and
+        # navbar pick up the new name without an extra /me round-trip.
+        auth_service = get_authentication_service()
+        return StandardResponse.success(
+            data={
+                "organization": updated,
+                "user": build_user_with_org_context(auth_service.get_user_by_id(str(request.user.id))),
+            },
+            message="Workspace updated successfully",
+        )
+
+    @handle_service_errors
+    def delete(self, request):
+        from integrations.services import get_organization_service
+
+        organization_id = _active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.", instance=request.path
+            )
+        try:
+            get_organization_service().delete_organization(
+                str(organization_id), str(request.user.id),
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+
+        # The user's active org just got reassigned (or cleared) inside
+        # delete_organization; mint a fresh JWT so the new active org
+        # claim travels with the response.
+        auth_service = get_authentication_service()
+        user_data = auth_service.get_user_by_id(str(request.user.id))
+        return StandardResponse.success(
+            data={
+                "user": build_user_with_org_context(user_data),
+                **_issue_token_pair(user_data),
+            },
+            message="Workspace deleted successfully",
+        )
+
+
+class OrganizationTransferView(APIView):
+    """POST { new_owner_user_id } to hand the workspace to another member."""
+
+    authentication_classes = [AppJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    @handle_service_errors
+    def post(self, request):
+        from integrations.services import get_organization_service
+
+        organization_id = _active_organization_id(request)
+        if not organization_id:
+            return StandardResponse.validation_error(
+                detail="Active organization is required.", instance=request.path
+            )
+        new_owner_user_id = (request.data.get("new_owner_user_id") or "").strip()
+        if not new_owner_user_id:
+            return StandardResponse.validation_error(
+                detail="new_owner_user_id is required.", instance=request.path
+            )
+        try:
+            result = get_organization_service().transfer_ownership(
+                str(organization_id), str(request.user.id), new_owner_user_id,
+            )
+        except ValueError as exc:
+            return StandardResponse.validation_error(detail=str(exc), instance=request.path)
+        return StandardResponse.success(
+            data=result, message="Workspace ownership transferred successfully"
+        )
+
+
 class OrganizationMembersView(APIView):
     """List/add/remove members of the caller's active organization."""
 

@@ -190,6 +190,101 @@ class OrganizationService:
         self.repo.delete_organization_membership(organization_id, target_user_id)
         return self.list_members(organization_id, actor_user_id)
 
+    def update_organization(
+        self,
+        organization_id: str,
+        actor_user_id: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        actor_membership = self.require_membership(organization_id, actor_user_id)
+        if not self.has_min_role(actor_membership, "admin"):
+            raise ValueError("Only workspace admins can rename or update the workspace.")
+
+        updates: Dict[str, Any] = {}
+        if name is not None:
+            cleaned = name.strip()
+            if not cleaned:
+                raise ValueError("Workspace name cannot be empty.")
+            updates["name"] = cleaned
+            updates["slug"] = self._ensure_unique_slug(self._slugify(cleaned))
+        if description is not None:
+            updates["description"] = description.strip()
+
+        if not updates:
+            return self.repo.get_organization_by_id(organization_id)
+        return self.repo.update_organization(organization_id, updates)
+
+    def transfer_ownership(
+        self,
+        organization_id: str,
+        actor_user_id: str,
+        new_owner_user_id: str,
+    ) -> Dict[str, Any]:
+        """Hand the owner role to another existing member. Caller must be
+        the current owner; the new owner must already be a member."""
+        actor_membership = self.require_membership(organization_id, actor_user_id)
+        if actor_membership.get("role") != "owner":
+            raise ValueError("Only the current owner can transfer ownership.")
+        if str(new_owner_user_id) == str(actor_user_id):
+            raise ValueError("You already own this workspace.")
+
+        target_membership = self.repo.get_organization_membership(
+            organization_id, str(new_owner_user_id)
+        )
+        if not target_membership:
+            raise ValueError("Target user is not a member of this workspace.")
+
+        # Demote current owner first so the upsert below doesn't see two
+        # owner rows in transit.
+        self.repo.upsert_organization_membership(
+            organization_id, str(actor_user_id), "admin", actor_id=str(actor_user_id),
+        )
+        self.repo.upsert_organization_membership(
+            organization_id, str(new_owner_user_id), "owner", actor_id=str(actor_user_id),
+        )
+        return self.list_members(organization_id, str(actor_user_id))
+
+    def delete_organization(self, organization_id: str, actor_user_id: str) -> Dict[str, Any]:
+        """Hard-delete a workspace. Cascades to memberships, prompt
+        overrides, projects, integrations, feedback sources via the FKs
+        already declared with on_delete=CASCADE in the org-management
+        migration. Members whose active workspace was this one will need
+        to be redirected to another org on their next request."""
+        actor_membership = self.require_membership(organization_id, actor_user_id)
+        if actor_membership.get("role") != "owner":
+            raise ValueError("Only the workspace owner can delete the workspace.")
+
+        from ..models import Organization
+
+        organization = Organization.objects.filter(id=organization_id).first()
+        if not organization:
+            raise ValueError("Workspace not found.")
+
+        # Reassign every user whose active org was this one to one of
+        # their remaining workspaces (or clear it). This avoids the
+        # frontend showing "no workspace" with a broken state.
+        from authentication.models import UserAccount
+
+        memberships = self.repo.list_organization_memberships(organization_id)
+        affected_user_ids = [m["userId"] for m in memberships]
+
+        organization.delete()
+
+        for uid in affected_user_ids:
+            user = UserAccount.objects.filter(id=uid).first()
+            if not user:
+                continue
+            profile = user.profile or {}
+            if profile.get("active_organization_id") == organization_id:
+                remaining = self.list_organizations_for_user(uid)
+                profile["active_organization_id"] = remaining[0]["id"] if remaining else None
+                user.profile = profile
+                user.save(update_fields=["profile", "updated_at"])
+
+        return {"deleted_organization_id": organization_id}
+
     def get_organization_context_for_user(
         self,
         user: Dict[str, Any],
