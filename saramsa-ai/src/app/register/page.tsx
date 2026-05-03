@@ -210,7 +210,7 @@ function RegisterPageInner() {
             <>
               <div className="text-center">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground leading-tight">
-                  Accept invitation
+                  {inviteError ? 'Invitation problem' : 'Accept invitation'}
                 </h2>
                 {invite && invite.organization.name && (
                   <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -224,9 +224,18 @@ function RegisterPageInner() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4"
+                  className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 space-y-3"
                 >
                   <p className="text-sm text-destructive">{inviteError}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ask your workspace admin to send a fresh invitation link, then open it in this browser.
+                  </p>
+                  <Link
+                    href="/login"
+                    className="inline-block text-saramsa-brand hover:text-saramsa-brand-hover font-medium text-sm transition-colors"
+                  >
+                    Back to sign in
+                  </Link>
                 </motion.div>
               )}
 
