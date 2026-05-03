@@ -70,7 +70,7 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-background text-foreground">
-      <div className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-10 lg:py-14">
+      <div className="max-w-screen-2xl mx-auto px-4 py-8 sm:px-6 lg:px-6 lg:py-14">
         <header className="mb-8 lg:mb-12">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
           <p className="text-sm text-muted-foreground mt-2">
