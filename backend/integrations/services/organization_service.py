@@ -291,9 +291,16 @@ class OrganizationService:
         active_organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         organizations = self.list_organizations_for_user(str(user["id"]))
+
+        # Saramsa is invite-only: an org membership only exists by invitation
+        # acceptance. A user with no orgs gets an empty context — never an
+        # auto-bootstrapped personal workspace.
         if not organizations:
-            default_org = self.ensure_default_organization_for_user(user)
-            organizations = self.list_organizations_for_user(str(user["id"])) or [default_org]
+            return {
+                "organizations": [],
+                "active_organization": None,
+                "active_organization_id": None,
+            }
 
         selected = None
         if active_organization_id:

@@ -12,9 +12,7 @@ type RegisterArgs = {
   email: string;
   password: string;
   confirmPassword: string;
-  otp?: string;
-  workspace_name?: string;
-  invite_token?: string;
+  invite_token: string;
   first_name?: string;
   last_name?: string;
   role?: 'admin' | 'user' | 'restricted user';

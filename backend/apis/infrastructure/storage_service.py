@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from django.utils import timezone
 
-from authentication.models import PasswordResetToken, RegistrationOtp, UserAccount
+from authentication.models import PasswordResetToken, UserAccount
 from feedback_analysis.models import (
     Analysis,
     CommentExtraction,
@@ -48,7 +48,6 @@ class StorageService:
         self.containers = {
             "users": UserAccount,
             "password_resets": PasswordResetToken,
-            "registration_otps": RegistrationOtp,
             "projects": Project,
             "project_roles": ProjectRole,
             "analysis": Analysis,
@@ -148,24 +147,6 @@ class StorageService:
                     "is_staff": data.get("is_staff", False),
                     "date_joined": _as_dt(data.get("date_joined") or data.get("createdAt")),
                     "profile": data.get("profile") or {},
-                    "extra": data,
-                    "updated_at": timezone.now(),
-                },
-            )
-            return self._doc(container_name, obj)
-        if container_name == "registration_otps":
-            obj, _ = RegistrationOtp.objects.update_or_create(
-                email=data.get("email", partition_key),
-                defaults={
-                    "id": str(item_id),
-                    "otp_hash": data.get("otp_hash", ""),
-                    "expires_at": _as_dt(data.get("expires_at")),
-                    "attempts": int(data.get("attempts", 0)),
-                    "max_attempts": int(data.get("max_attempts", 5)),
-                    "send_count": int(data.get("send_count", 1)),
-                    "last_sent_at": _as_dt(data.get("last_sent_at")),
-                    "used": bool(data.get("used", False)),
-                    "used_at": _as_dt(data.get("used_at")) if data.get("used_at") else None,
                     "extra": data,
                     "updated_at": timezone.now(),
                 },
