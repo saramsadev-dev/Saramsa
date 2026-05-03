@@ -21,6 +21,8 @@ os.environ.setdefault(
     "DATABASE_URL",
     "postgresql://test:test@dummy.neon.tech:5432/dummy",
 )
+# Tests must not depend on a reachable Redis. Cache falls back in-memory.
+os.environ.setdefault("ALLOW_IN_MEMORY_CACHE", "true")
 
 from .settings import *  # noqa: E402,F401,F403
 

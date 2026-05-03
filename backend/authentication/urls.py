@@ -1,7 +1,6 @@
 from django.urls import path
 from .views import (
     RegisterView,
-    RegisterOtpRequestView,
     ProfileMeView,
     AppTokenRefreshView,
     UserListView,
@@ -22,7 +21,6 @@ from .views import (
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
-    path('register/request-otp/', RegisterOtpRequestView.as_view(), name='register_request_otp'),
     path('login/', LoginView.as_view(), name='login'),
     path('me/', ProfileMeView.as_view(), name='profile'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),

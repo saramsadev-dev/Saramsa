@@ -25,11 +25,9 @@ type RegisterParams = {
   email: string;
   password: string;
   confirmPassword: string;
-  otp?: string;
   first_name?: string;
   last_name?: string;
-  workspace_name?: string;
-  invite_token?: string;
+  invite_token: string;
   role?: 'admin' | 'user' | 'restricted user';
 };
 
@@ -333,32 +331,6 @@ export async function register(
 
   const user = await getCurrentUser(tokens.access);
   return { user, ...tokens };
-}
-
-export async function requestRegistrationOtp(
-  email: string,
-): Promise<{ expires_in_seconds: number; cooldown_seconds: number }> {
-  const res = await fetch(`${AUTH_BASE}/register/request-otp/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-
-  if (!res.ok) {
-    const data = await safeJson(res);
-    const message = (data && (data.error || data.detail)) || 'Failed to send code';
-    const err: any = new Error(message);
-    (err.response = { status: res.status, data }), (err.code = undefined);
-    throw err;
-  }
-
-  const response = (await res.json()) as {
-    success: boolean;
-    data: { expires_in_seconds: number; cooldown_seconds: number };
-    message?: string;
-  };
-
-  return response.data;
 }
 
 export async function lookupInvite(token: string): Promise<InviteContext> {

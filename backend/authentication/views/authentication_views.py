@@ -25,20 +25,19 @@ from datetime import datetime, timedelta, timezone
 import secrets
 from django.conf import settings
 from ..serializers import (
-    AppUserSerializer, 
-    AppUserRegisterWithOtpSerializer,
+    AppUserSerializer,
+    AppUserRegisterSerializer,
     AppTokenObtainPairSerializer,
     AppTokenRefreshSerializer,
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
-    RegistrationOtpRequestSerializer
 )
 from ..authentication import AppJWTAuthentication
 
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [NoAuthentication]
-    serializer_class = AppUserRegisterWithOtpSerializer
+    serializer_class = AppUserRegisterSerializer
     logger = logging.getLogger(__name__)
     
     def get(self, request):
@@ -49,60 +48,43 @@ class RegisterView(generics.CreateAPIView):
 
     @handle_service_errors
     def create(self, request, *args, **kwargs):
-        # Pull invite_token + workspace_name from raw request data — they
-        # aren't on the serializer because invite signups skip the OTP +
-        # workspace contract.
         invite_token = (request.data.get("invite_token") or "").strip()
-        workspace_name = (request.data.get("workspace_name") or "").strip()
+        if not invite_token:
+            return StandardResponse.validation_error(
+                detail="Registration is invite-only. Please use the invitation link sent by your workspace admin.",
+                instance=request.path,
+            )
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         auth_service = get_authentication_service()
 
-        # Validate the invite up-front so we can give a clean error before
-        # creating any account state. Email lock is enforced inside the
-        # accept call after the user exists.
-        invite_data = None
-        if invite_token:
-            from integrations.services import get_organization_invite_service
-            try:
-                invite_data = get_organization_invite_service().get_by_token(invite_token)
-            except ValueError as e:
-                return StandardResponse.validation_error(detail=str(e), instance=request.path)
-            if invite_data["email"] != serializer.validated_data["email"].strip().lower():
-                return StandardResponse.validation_error(
-                    detail="This invite was sent to a different email address.",
-                    instance=request.path,
-                )
+        from django.db import transaction
+        from integrations.services import get_organization_invite_service
+        try:
+            invite_data = get_organization_invite_service().get_by_token(invite_token)
+        except ValueError as e:
+            return StandardResponse.validation_error(detail=str(e), instance=request.path)
+        if invite_data["email"] != serializer.validated_data["email"].strip().lower():
+            return StandardResponse.validation_error(
+                detail="This invite was sent to a different email address.",
+                instance=request.path,
+            )
 
-        # OTP is required only for self-serve signup. Invite tokens prove
-        # the email is real (the link was emailed there) so we skip OTP
-        # — same convention as Linear / Vercel / GitHub.
-        if not invite_token:
-            otp_code = serializer.validated_data.get('otp')
-            try:
-                auth_service.verify_registration_otp(
+        # Atomic so a mid-flow accept_invite failure (race, expiry,
+        # revocation between lookup and accept) rolls back the user
+        # row. Otherwise we'd leave behind an account with no
+        # workspace, violating the invite-only invariant.
+        try:
+            with transaction.atomic():
+                user_data = auth_service.create_user(
                     email=serializer.validated_data['email'],
-                    code=otp_code
+                    password=serializer.validated_data['password'],
+                    first_name=serializer.validated_data.get('first_name', ''),
+                    last_name=serializer.validated_data.get('last_name', ''),
+                    role=serializer.validated_data.get('role', 'user'),
                 )
-            except ValueError as e:
-                return StandardResponse.validation_error(detail=str(e), instance=request.path)
-
-        user_data = auth_service.create_user(
-            email=serializer.validated_data['email'],
-            password=serializer.validated_data['password'],
-            first_name=serializer.validated_data.get('first_name', ''),
-            last_name=serializer.validated_data.get('last_name', ''),
-            role=serializer.validated_data.get('role', 'user'),
-            workspace_name=workspace_name,
-            invite_token=invite_token,
-        )
-
-        # Now consume the invite (creates the membership + flips active org).
-        if invite_token:
-            from integrations.services import get_organization_invite_service
-            try:
                 accept_result = get_organization_invite_service().accept_invite(
                     token=invite_token,
                     user_id=str(user_data["id"]),
@@ -111,10 +93,8 @@ class RegisterView(generics.CreateAPIView):
                 auth_service.set_active_organization(
                     str(user_data["id"]), accept_result["organization_id"]
                 )
-            except ValueError as e:
-                logger.warning("Invite accept failed for new user %s: %s", user_data["id"], e)
-                # Don't fail the signup — they're a real account, they
-                # just won't be auto-joined to the inviting workspace.
+        except ValueError as e:
+            return StandardResponse.validation_error(detail=str(e), instance=request.path)
 
         # Generate JWT tokens for the newly created user
         token_serializer = AppTokenObtainPairSerializer()
@@ -133,29 +113,6 @@ class RegisterView(generics.CreateAPIView):
             },
             message="User created successfully",
             instance=f"/api/auth/users/{user_data['id']}"
-        )
-
-
-class RegisterOtpRequestView(APIView):
-    permission_classes = [NoAuthentication]
-    logger = logging.getLogger(__name__)
-
-    @handle_service_errors
-    def post(self, request):
-        serializer = RegistrationOtpRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        auth_service = get_authentication_service()
-        email = serializer.validated_data['email']
-
-        try:
-            result = auth_service.request_registration_otp(email=email)
-        except ValueError as e:
-            return StandardResponse.validation_error(detail=str(e), instance=request.path)
-
-        return StandardResponse.success(
-            data=result,
-            message="Registration code sent successfully"
         )
 
 

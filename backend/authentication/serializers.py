@@ -199,14 +199,8 @@ class ResetPasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"Password hashing failed: {str(e)}")
 
 
-class AppUserRegisterWithOtpSerializer(AppUserSerializer):
-    """Serializer for registration with OTP. The `otp` field is optional
-    here because invite-token signups skip the OTP step (the invite
-    itself proves email ownership). The view enforces that one of
-    invite_token or otp must be present."""
-    otp = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=6, max_length=6)
-
-
-class RegistrationOtpRequestSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+class AppUserRegisterSerializer(AppUserSerializer):
+    """Serializer for invite-only registration. The view layer enforces
+    a valid invite_token before this serializer's data is used."""
+    pass
 

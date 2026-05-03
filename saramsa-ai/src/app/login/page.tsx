@@ -332,18 +332,21 @@ function LoginPageInner() {
               )}
             </Button>
 
-            {/* Register Link */}
-            <div className="text-center">
-              <p className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-muted-foreground">
-                New to Saramsa AI?{' '}
-                <Link
-                  href={inviteToken ? `/register?invite=${encodeURIComponent(inviteToken)}` : '/register'}
-                  className="text-saramsa-brand hover:text-saramsa-brand-hover font-medium transition-colors"
-                >
-                  Sign up
-                </Link>
-              </p>
-            </div>
+            {/* Register link only shown when an invite token is present.
+                Saramsa is invite-only — there is no public sign-up path. */}
+            {inviteToken && (
+              <div className="text-center">
+                <p className="text-xs sm:text-sm md:text-base lg:text-sm xl:text-xs 2xl:text-sm text-muted-foreground">
+                  New to Saramsa AI?{' '}
+                  <Link
+                    href={`/register?invite=${encodeURIComponent(inviteToken)}`}
+                    className="text-saramsa-brand hover:text-saramsa-brand-hover font-medium transition-colors"
+                  >
+                    Accept invitation
+                  </Link>
+                </p>
+              </div>
+            )}
           </form>
         </motion.div>
       </div>

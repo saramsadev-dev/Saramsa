@@ -45,16 +45,14 @@ export const loginUser = createAsyncThunk<
   }
 });
 
-// Async thunk for register
+// Async thunk for register (invite-only)
 export const registerUser = createAsyncThunk<
   User,
   {
     email: string;
     password: string;
     confirmPassword: string;
-    otp?: string;
-    workspace_name?: string;
-    invite_token?: string;
+    invite_token: string;
     first_name?: string;
     last_name?: string;
     role?: 'admin' | 'user' | 'restricted user';
@@ -66,8 +64,6 @@ export const registerUser = createAsyncThunk<
       email: data.email,
       password: data.password,
       confirmPassword: data.confirmPassword,
-      otp: data.otp,
-      workspace_name: data.workspace_name,
       invite_token: data.invite_token,
       first_name: data.first_name,
       last_name: data.last_name,
