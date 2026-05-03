@@ -12,14 +12,12 @@ def make_admin_user(uid="test-admin"):
     """
     UserAccount.objects.create(
         id=uid,
-        username=f"{uid}_name",
         email=f"{uid}@test.local",
         password="h",
         profile={"role": "admin"},
     )
     return AppUser({
         "id": uid,
-        "username": f"{uid}_name",
         "email": f"{uid}@test.local",
         "is_active": True,
         "is_staff": True,

@@ -94,7 +94,7 @@ def backfill_legacy_organizations(apps, schema_editor):
             display_name = (
                 getattr(user, "company_name", "")
                 or f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip()
-                or user.username
+                or (user.email.split("@")[0] if getattr(user, "email", None) else "")
                 or "My Workspace"
             )
             if not display_name.lower().endswith("workspace"):
