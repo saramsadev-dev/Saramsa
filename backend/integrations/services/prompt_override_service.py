@@ -1,7 +1,10 @@
+import logging
 from typing import Dict, Optional
 
 from apis.infrastructure.storage_service import storage_service
 from ..repositories import IntegrationsRepository
+
+logger = logging.getLogger(__name__)
 
 
 PROMPT_TYPES = (
@@ -15,7 +18,9 @@ PROMPT_TYPES = (
 
 def _load_default_prompts() -> Dict[str, str]:
     """Return the hardcoded default for each prompt type so the admin UI
-    can prefill the editor with what the system uses today."""
+    can prefill the editor with what the system uses today. Per-prompt
+    failures are logged so a missing/broken default doesn't go invisible
+    behind an empty textarea."""
     defaults: Dict[str, str] = {}
 
     try:
@@ -24,8 +29,10 @@ def _load_default_prompts() -> Dict[str, str]:
             try:
                 defaults[ptype] = _get_prompt(prompt_type=ptype)
             except Exception:
+                logger.exception("Failed to load default prompt for type=%s", ptype)
                 defaults[ptype] = ""
     except Exception:
+        logger.exception("apis.prompts.constants import failed; admin prompt UI will show empty defaults")
         for ptype in ("sentiment", "deep_analysis", "sentiment_confidence", "clarification"):
             defaults[ptype] = ""
 
@@ -33,6 +40,7 @@ def _load_default_prompts() -> Dict[str, str]:
         from apis.prompts.narration_prompt import _DEFAULT_TEMPLATE as _NARRATION_DEFAULT
         defaults["work_items_validation"] = _NARRATION_DEFAULT
     except Exception:
+        logger.exception("Failed to load narration default template; work_items_validation will be empty")
         defaults.setdefault("work_items_validation", "")
 
     return defaults
@@ -139,12 +147,17 @@ class PromptOverrideService:
     @staticmethod
     def _invalidate_resolver_cache() -> None:
         """Drop the apis.prompts.resolver in-process cache so admin edits
-        take effect on the next LLM call instead of after the TTL."""
+        take effect on the next LLM call instead of after the TTL.
+        Failure is logged so a stuck cache shows up — admins would
+        otherwise wonder why their saved override isn't taking effect."""
         try:
             from apis.prompts.resolver import invalidate_cache
             invalidate_cache()
         except Exception:
-            pass
+            logger.exception(
+                "Failed to invalidate prompt resolver cache after override save/delete — "
+                "admin edits will take up to 5s (the TTL) to propagate"
+            )
 
 
 _prompt_override_service = None

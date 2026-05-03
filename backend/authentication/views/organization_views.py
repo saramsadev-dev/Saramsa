@@ -441,12 +441,20 @@ class InviteAcceptView(APIView):
             return StandardResponse.validation_error(detail=str(exc), instance=request.path)
 
         # Switch the user into the workspace they just joined so the
-        # next page they land on is the right one.
+        # next page they land on is the right one. If the switch itself
+        # fails (rare — they're already a confirmed member), log it and
+        # fall back to whatever active org they had before.
         try:
             user_data = auth_service.set_active_organization(
                 str(request.user.id), result["organization_id"]
             )
         except Exception:
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                "Invite accepted but set_active_organization failed for user_id=%s org_id=%s — "
+                "user will need to switch manually via the navbar.",
+                request.user.id, result["organization_id"],
+            )
             user_data = auth_service.get_user_by_id(str(request.user.id))
 
         return StandardResponse.success(

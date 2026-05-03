@@ -143,8 +143,13 @@ export function WorkspacePage() {
     if (!lastInviteUrl) return;
     try {
       await navigator.clipboard.writeText(lastInviteUrl);
-    } catch {
-      // ignore — link is also visible in the panel
+    } catch (err) {
+      // Clipboard API may be blocked in insecure contexts or when the
+      // tab isn't focused. Logged so it isn't completely invisible — the
+      // URL is still visible in the panel for manual copy.
+      if (typeof console !== "undefined") {
+        console.warn("WorkspacePage: clipboard copy failed", err);
+      }
     }
   };
 

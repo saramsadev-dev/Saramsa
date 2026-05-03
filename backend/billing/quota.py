@@ -30,17 +30,30 @@ def _current_period() -> str:
 def _resolve_active_org_id(user_id: str) -> Optional[str]:
     """Look up the user's active workspace. Returns None if the user
     has no active org (e.g. signup bootstrap failed); callers fall back
-    to user-keyed records so quotas don't disappear."""
+    to user-keyed records so quotas don't disappear. Both the missing-org
+    case and the lookup-error case log so corrupt accounts don't go
+    invisible behind quota fallback."""
     from authentication.models import UserAccount
     try:
         user = UserAccount.objects.filter(id=str(user_id)).first()
         if not user:
+            logger.warning("quota: user_id=%s not found — quota will use user-keyed fallback", user_id)
             return None
         profile = user.profile or {}
         org_id = profile.get("active_organization_id")
-        return str(org_id) if org_id else None
-    except Exception as exc:
-        logger.warning("Could not resolve active_organization for user %s: %s", user_id, exc)
+        if not org_id:
+            logger.warning(
+                "quota: user_id=%s has no active_organization_id — quota will use user-keyed fallback. "
+                "This usually means signup bootstrap failed.",
+                user_id,
+            )
+            return None
+        return str(org_id)
+    except Exception:
+        logger.exception(
+            "quota: active_organization lookup raised for user_id=%s — falling back to user-keyed quota",
+            user_id,
+        )
         return None
 
 
@@ -70,7 +83,10 @@ def _get_or_create_record(user_id: str):
 def _get_limits(user_id: str) -> dict:
     """Limits attach to the org first (so all teammates share one plan),
     falling back to a user-keyed BillingProfile for legacy single-user
-    accounts that pre-date organizations, then to env-var defaults."""
+    accounts that pre-date organizations, then to env-var defaults.
+    Failure here drops back to env-var defaults so quota enforcement is
+    never disabled — but the failure is logged so a corrupt
+    BillingProfile doesn't go invisible."""
     from .models import BillingProfile, UsageRecord
     defaults = UsageRecord.default_limits()
     try:
@@ -86,7 +102,10 @@ def _get_limits(user_id: str) -> dict:
                 if key in overrides:
                     defaults[key] = int(overrides[key])
     except Exception:
-        pass
+        logger.exception(
+            "Quota limits lookup failed for user_id=%s — falling back to env defaults %s",
+            user_id, defaults,
+        )
     return defaults
 
 

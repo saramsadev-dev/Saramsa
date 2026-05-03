@@ -8,19 +8,29 @@ means the frontend can rely on `user.active_organization_id` and
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_org_context(user_data: Dict[str, Any], active_org_id: Optional[str]) -> Dict[str, Any]:
     """Look up the user's org list + active org. If anything goes wrong
     (org service not bootstrapped, no membership rows yet), return an empty
-    context — auth must keep working even when org wiring is incomplete."""
+    context — auth must keep working even when org wiring is incomplete.
+    The fallback is intentional but the failure is always logged so
+    misbehaviour shows up in the backend log instead of being invisible."""
     try:
         from integrations.services import get_organization_service
         return get_organization_service().get_organization_context_for_user(
             user_data, active_organization_id=active_org_id
         )
     except Exception:
+        logger.exception(
+            "Failed to load organization context for user_id=%s active_org=%s — "
+            "returning empty context so /me + /login don't 500.",
+            user_data.get("id"), active_org_id,
+        )
         return {"active_organization_id": None, "active_organization": None, "organizations": []}
 
 

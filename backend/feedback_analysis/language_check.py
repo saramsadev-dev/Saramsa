@@ -7,9 +7,12 @@ boundary instead of burning a Celery slot on it.
 
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 from langdetect import DetectorFactory, LangDetectException, detect_langs
+
+logger = logging.getLogger(__name__)
 
 # langdetect is non-deterministic by default — seeding makes the same input
 # produce the same verdict across requests.
@@ -69,14 +72,20 @@ def assert_english(comments: Iterable[str]) -> None:
     """
     sample = _sample(comments)
     if len(sample) < MIN_CHARS_FOR_DETECTION:
+        logger.debug("language_check skipped: sample too short (%d chars)", len(sample))
         return
 
     try:
         candidates = detect_langs(sample)
-    except LangDetectException:
+    except LangDetectException as exc:
+        logger.warning(
+            "langdetect failed on %d-char sample (%s) — letting input through",
+            len(sample), exc,
+        )
         return
 
     if not candidates:
+        logger.debug("language_check: no candidates returned, letting input through")
         return
 
     top = candidates[0]

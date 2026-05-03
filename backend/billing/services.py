@@ -49,7 +49,10 @@ class StripeBillingService:
         # Backfill organization_id whenever we touch a profile so new
         # rows (and any old user-keyed ones) end up org-scoped — billing
         # is per-workspace in the B2B model, even though we still
-        # one-to-one map a profile to the user who set it up.
+        # one-to-one map a profile to the user who set it up. A failure
+        # here doesn't break the request (Stripe/checkout flows still
+        # work against user_id) but it does mean the profile isn't
+        # org-scoped, which is worth surfacing in the log.
         try:
             user = UserAccount.objects.filter(id=str(user_id)).first()
             active_org = (user.profile or {}).get("active_organization_id") if user else None
@@ -58,7 +61,10 @@ class StripeBillingService:
                 profile.updated_at = dj_timezone.now()
                 profile.save(update_fields=["organization_id", "updated_at"])
         except Exception:
-            pass
+            logger.exception(
+                "BillingProfile org_id backfill failed for user_id=%s — profile remains user-keyed",
+                user_id,
+            )
         return profile
 
     def _ensure_customer(self, user: UserAccount, profile: BillingProfile) -> str:

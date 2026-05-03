@@ -74,9 +74,13 @@ export function useAuth(): HookResult {
                 dispatch(setUser(fresh));
               }
             })
-            .catch(() => {
+            .catch((err) => {
               // Stale stored user is fine; user keeps using cached state
-              // until next active call surfaces the auth error.
+              // until next active call surfaces the auth error. Logged
+              // so a broken /me doesn't go invisible during dev.
+              if (typeof console !== 'undefined') {
+                console.warn('useAuth: background /me refresh failed', err);
+              }
             });
         } else {
           try {
