@@ -236,113 +236,117 @@ export function WorkspacePage() {
   );
 
   return (
-    <div className="bg-card rounded-xl border border-border p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-6">
+      <header className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Workspace</h2>
-          <p className="text-muted-foreground text-sm">Manage the active organization and its members.</p>
+          <h2 className="text-lg font-semibold text-foreground">Workspace</h2>
+          <p className="text-sm text-muted-foreground mt-1">Manage the active organization and its members.</p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-sm text-foreground">
-          <Building2 className="h-4 w-4" />
-          <span>{user?.active_organization?.name || "No workspace selected"}</span>
+        <div className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary/60 px-2.5 py-1.5 text-xs font-medium text-foreground">
+          <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="truncate max-w-[12rem]">{user?.active_organization?.name || "No workspace selected"}</span>
         </div>
-      </div>
+      </header>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
       {canManageMembers && data.organization && (
-        <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60 p-4 space-y-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Workspace name</p>
-            <p className="text-xs text-muted-foreground">Visible to every member in the navbar and switcher.</p>
+        <section className="rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-5 py-3">
+            <h3 className="text-sm font-medium text-foreground">Workspace name</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Visible to every member in the navbar and switcher.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-            <input
-              value={renameDraft}
-              onChange={(e) => setRenameDraft(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-            />
-            <Button
-              onClick={handleRename}
-              disabled={saving || !renameDraft.trim() || renameDraft.trim() === data.organization.name}
-              variant="saramsa"
-              className="h-10 flex items-center gap-2"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save
-            </Button>
+          <div className="px-5 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+              <input
+                value={renameDraft}
+                onChange={(e) => setRenameDraft(e.target.value)}
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              />
+              <Button
+                onClick={handleRename}
+                disabled={saving || !renameDraft.trim() || renameDraft.trim() === data.organization.name}
+                variant="saramsa"
+                className="h-10 flex items-center gap-2"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save
+              </Button>
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
       {canManageMembers && (
-        <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60 p-4 space-y-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Invite by email</p>
-            <p className="text-xs text-muted-foreground">
-              We'll email an invite link. They'll create an account (or sign in if they already have one) and join this workspace.
+        <section className="rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-5 py-3">
+            <h3 className="text-sm font-medium text-foreground">Invite by email</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              They'll receive an invite link to create an account (or sign in) and join this workspace.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
-            <input
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="teammate@example.com"
-              className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-            />
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="viewer">Viewer</option>
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-            <Button onClick={handleInvite} disabled={saving} variant="saramsa" className="h-10 flex items-center gap-2">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Send invite
-            </Button>
-          </div>
-
-          {lastInviteUrl && lastInviteEmail && (
-            <div className="rounded-md border border-saramsa-brand/30 bg-saramsa-brand/5 px-3 py-3 space-y-2">
-              <p className="text-xs font-medium text-foreground">
-                Invite sent to <span className="font-semibold">{lastInviteEmail}</span>
-                {lastInviteEmailSent ? '.' : '. (Email delivery failed — share the link below manually.)'}
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 truncate rounded border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground">
-                  {lastInviteUrl}
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-8 px-2"
-                  onClick={handleCopyInviteLink}
-                  title="Copy invite link"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+          <div className="px-5 py-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
+              <input
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="teammate@example.com"
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              />
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value)}
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              >
+                <option value="viewer">Viewer</option>
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              <Button onClick={handleInvite} disabled={saving} variant="saramsa" className="h-10 flex items-center gap-2">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                Send invite
+              </Button>
             </div>
-          )}
-        </div>
+
+            {lastInviteUrl && lastInviteEmail && (
+              <div className="rounded-md border border-saramsa-brand/30 bg-saramsa-brand/5 px-3 py-3 space-y-2">
+                <p className="text-xs font-medium text-foreground">
+                  Invite sent to <span className="font-semibold">{lastInviteEmail}</span>
+                  {lastInviteEmailSent ? '.' : '. (Email delivery failed — share the link below manually.)'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground">
+                    {lastInviteUrl}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 px-2"
+                    onClick={handleCopyInviteLink}
+                    title="Copy invite link"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {canManageMembers && invites.length > 0 && (
-        <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <section className="rounded-lg border border-border bg-card">
+          <div className="flex items-center gap-2 border-b border-border px-5 py-3">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-medium text-foreground">Pending invites</p>
+            <h3 className="text-sm font-medium text-foreground">Pending invites</h3>
           </div>
-          <div className="divide-y divide-border">
+          <ul className="divide-y divide-border">
             {invites.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-4 px-4 py-3">
+              <li key={inv.id} className="flex items-center justify-between gap-4 px-5 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{inv.email}</p>
                   <p className="text-xs text-muted-foreground">
@@ -358,16 +362,16 @@ export function WorkspacePage() {
                 >
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </section>
       )}
 
-      <div className="rounded-lg border border-border bg-secondary/80 dark:border-border/60 dark:bg-background/60">
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <section className="rounded-lg border border-border bg-card">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
           <Users className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium text-foreground">Members</p>
+          <h3 className="text-sm font-medium text-foreground">Members</h3>
         </div>
 
         {loading ? (
@@ -375,7 +379,7 @@ export function WorkspacePage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <ul className="divide-y divide-border">
             {data.members.map((member) => {
               const displayName =
                 `${member.first_name || ""} ${member.last_name || ""}`.trim() ||
@@ -383,13 +387,13 @@ export function WorkspacePage() {
                 member.email ||
                 member.user_id;
               return (
-                <div key={member.membership_id} className="flex items-center justify-between gap-4 px-4 py-4">
+                <li key={member.membership_id} className="flex items-center justify-between gap-4 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">{displayName}</p>
-                    <p className="text-xs text-muted-foreground">{member.email || member.user_id}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{member.email || member.user_id}</p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-background px-3 py-1 text-xs font-medium capitalize text-foreground border border-border">
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium capitalize text-foreground">
                       {member.role}
                     </span>
                     {member.is_current_user && (
@@ -406,83 +410,85 @@ export function WorkspacePage() {
                       </Button>
                     )}
                   </div>
-                </div>
+                </li>
               );
             })}
             {!data.members.length && (
-              <div className="px-4 py-8 text-sm text-muted-foreground">No members found for this workspace.</div>
+              <li className="px-5 py-8 text-sm text-muted-foreground">No members found for this workspace.</li>
             )}
-          </div>
+          </ul>
         )}
-      </div>
+      </section>
 
       {isOwner && data.organization && (
-        <div className="rounded-lg border border-red-300/60 bg-red-50/40 dark:border-red-900/40 dark:bg-red-950/10 p-4 space-y-5">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-            <p className="text-sm font-semibold text-red-700 dark:text-red-300">Danger zone</p>
+        <section className="rounded-lg border border-destructive/30 bg-destructive/5">
+          <div className="flex items-center gap-2 border-b border-destructive/30 px-5 py-3">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <h3 className="text-sm font-semibold text-destructive">Danger zone</h3>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm font-medium text-foreground">Transfer ownership</p>
-              <p className="text-xs text-muted-foreground">
-                Hand this workspace to another member. You will be demoted to admin.
-              </p>
+          <div className="px-5 py-4 space-y-5 divide-y divide-destructive/20">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Transfer ownership</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Hand this workspace to another member. You will be demoted to admin.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+                <select
+                  value={transferTarget}
+                  onChange={(e) => setTransferTarget(e.target.value)}
+                  disabled={transferableMembers.length === 0}
+                  className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60"
+                >
+                  <option value="">{transferableMembers.length === 0 ? "No eligible members" : "Choose a new owner"}</option>
+                  {transferableMembers.map((m) => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {(m.first_name || m.last_name) ? `${m.first_name || ""} ${m.last_name || ""}`.trim() : m.email || m.user_id}
+                      {m.email ? ` (${m.email})` : ""}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  onClick={handleTransfer}
+                  disabled={saving || !transferTarget}
+                  variant="outline"
+                  className="h-10 flex items-center gap-2"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
+                  Transfer
+                </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-              <select
-                value={transferTarget}
-                onChange={(e) => setTransferTarget(e.target.value)}
-                disabled={transferableMembers.length === 0}
-                className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
-              >
-                <option value="">{transferableMembers.length === 0 ? "No eligible members" : "Choose a new owner"}</option>
-                {transferableMembers.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {(m.first_name || m.last_name) ? `${m.first_name || ""} ${m.last_name || ""}`.trim() : m.email || m.user_id}
-                    {m.email ? ` (${m.email})` : ""}
-                  </option>
-                ))}
-              </select>
-              <Button
-                onClick={handleTransfer}
-                disabled={saving || !transferTarget}
-                variant="outline"
-                className="h-10 flex items-center gap-2"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRightLeft className="h-4 w-4" />}
-                Transfer
-              </Button>
-            </div>
-          </div>
 
-          <div className="border-t border-red-300/60 dark:border-red-900/30 pt-4 space-y-3">
-            <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-300">Delete workspace</p>
-              <p className="text-xs text-muted-foreground">
-                Permanently removes this workspace and every project, integration, and credit balance attached to it. This cannot be undone.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-              <input
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value)}
-                placeholder={`Type "${data.organization.name}" to confirm`}
-                className="h-10 rounded-lg border border-red-300 bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-red-400 dark:border-red-900/60"
-              />
-              <Button
-                onClick={handleDelete}
-                disabled={saving || deleteConfirm !== data.organization.name}
-                variant="ghost"
-                className="h-10 flex items-center gap-2 text-red-700 hover:bg-red-100 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-900/30"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                Delete workspace
-              </Button>
+            <div className="pt-5 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-destructive">Delete workspace</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Permanently removes this workspace and every project, integration, and credit balance attached to it. This cannot be undone.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+                <input
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder={`Type "${data.organization.name}" to confirm`}
+                  className="h-10 rounded-md border border-destructive/40 bg-background px-3 text-sm text-foreground outline-none focus:border-destructive focus:ring-2 focus:ring-destructive/30"
+                />
+                <Button
+                  onClick={handleDelete}
+                  disabled={saving || deleteConfirm !== data.organization.name}
+                  variant="ghost"
+                  className="h-10 flex items-center gap-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  Delete workspace
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );
