@@ -91,24 +91,27 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
     def test_workspace_admin_passes_project_admin_permission(self) -> None:
         permission = IsProjectAdmin()
         request = type("Request", (), {"user": _RequestUser(self.admin_user.id, self.admin_user.profile), "query_params": {}, "data": {}})()
-        original_get_project = storage_service.get_project_by_id_any
-        storage_service.get_project_by_id_any = lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"}
-        self.assertTrue(permission.has_permission(request, _View(project_id="proj-1")))
-        storage_service.get_project_by_id_any = original_get_project
+        with patch.object(
+            storage_service, "get_project_by_id_any",
+            lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"},
+        ):
+            self.assertTrue(permission.has_permission(request, _View(project_id="proj-1")))
 
     def test_workspace_member_does_not_pass_project_admin_permission(self) -> None:
         permission = IsProjectAdmin()
         request = type("Request", (), {"user": _RequestUser(self.member_user.id, self.member_user.profile), "query_params": {}, "data": {}})()
-        original_get_project = storage_service.get_project_by_id_any
-        storage_service.get_project_by_id_any = lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"}
-        self.assertFalse(permission.has_permission(request, _View(project_id="proj-1")))
-        storage_service.get_project_by_id_any = original_get_project
+        with patch.object(
+            storage_service, "get_project_by_id_any",
+            lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"},
+        ):
+            self.assertFalse(permission.has_permission(request, _View(project_id="proj-1")))
 
     def test_workspace_admin_can_delete_member_project(self) -> None:
-        original_get_project = storage_service.get_project_by_id_any
-        storage_service.get_project_by_id_any = lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"}
-        self.assertTrue(ProjectService().delete_project("proj-1", self.admin_user.id))
-        storage_service.get_project_by_id_any = original_get_project
+        with patch.object(
+            storage_service, "get_project_by_id_any",
+            lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"},
+        ):
+            self.assertTrue(ProjectService().delete_project("proj-1", self.admin_user.id))
         self.assertFalse(Project.objects.filter(id="proj-1").exists())
 
     def test_member_cannot_manage_integrations(self) -> None:
@@ -639,12 +642,11 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
         storage_service.upsert_project_role("proj-1", self.member_user.id, "viewer", actor_id=self.admin_user.id)
         permission = IsProjectAdmin()
         request = type("Request", (), {"user": _RequestUser(self.member_user.id, self.member_user.profile), "query_params": {}, "data": {}})()
-        original_get_project = storage_service.get_project_by_id_any
-        storage_service.get_project_by_id_any = lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"}
-        try:
+        with patch.object(
+            storage_service, "get_project_by_id_any",
+            lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"},
+        ):
             self.assertFalse(permission.has_permission(request, _View(project_id="proj-1")))
             OrganizationService().remove_member("org-1", self.admin_user.id, self.member_user.id)
             self.assertIsNone(OrganizationMembership.objects.filter(organization_id="org-1", user_id=self.member_user.id).first())
             self.assertIsNone(storage_service.get_project_role_for_user("proj-1", self.member_user.id))
-        finally:
-            storage_service.get_project_by_id_any = original_get_project

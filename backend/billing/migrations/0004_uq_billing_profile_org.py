@@ -1,6 +1,47 @@
 from django.db import migrations, models
 
 
+def dedup_billing_profiles_per_org(apps, schema_editor):
+    """Pre-org-scoping code created one BillingProfile per user. An org
+    with N members can therefore have N rows. The unique constraint we
+    add below would fail with IntegrityError on those rows, so collapse
+    duplicates first: keep the most-recently-updated row per
+    organization_id (it carries the freshest Stripe state) and delete
+    the rest.
+
+    Rows with empty organization_id (legacy single-user accounts that
+    pre-date workspaces) are left alone — the partial constraint
+    excludes them.
+    """
+    BillingProfile = apps.get_model("billing", "BillingProfile")
+
+    duplicate_org_ids = (
+        BillingProfile.objects
+        .exclude(organization_id="")
+        .values("organization_id")
+        .annotate(row_count=models.Count("id"))
+        .filter(row_count__gt=1)
+        .values_list("organization_id", flat=True)
+    )
+
+    for org_id in duplicate_org_ids:
+        rows = list(
+            BillingProfile.objects
+            .filter(organization_id=org_id)
+            .order_by("-updated_at", "-created_at")
+        )
+        # rows[0] is the keeper.
+        for stale in rows[1:]:
+            stale.delete()
+
+
+def noop_reverse(apps, schema_editor):
+    # Deletion of duplicate rows is not reversible; the constraint
+    # removal below is enough to make the schema reversible. We don't
+    # try to recreate the deleted rows.
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -8,6 +49,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(dedup_billing_profiles_per_org, noop_reverse),
         migrations.AddConstraint(
             model_name="billingprofile",
             constraint=models.UniqueConstraint(

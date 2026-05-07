@@ -303,6 +303,7 @@ class UpdateKeywordsView(APIView):
             user_id=user_id_str,
             project_id=project_id,
             task_type="keyword_update",
+            organization_id=project_org_id,
         )
 
         try:

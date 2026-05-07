@@ -537,22 +537,19 @@ export const UserStoryList = ({
             summary: updatedSummary,
           }));
 
+          // The canonical render path reads UserStory.work_items[].external_id /
+          // .external_url (updated above). The per-ActionItem mirror only
+                  // tracks the submitted/submittedAt flags now — external id/url is
+                  // intentionally not duplicated here to avoid drift.
           submissionResults.forEach((res: any) => {
             const targetAction = actionItems.find((action) => action.id === res.story_id);
             if (targetAction) {
-              const externalIdRaw = res.work_item_id ?? res.issue_key;
-              const externalId =
-                externalIdRaw === undefined || externalIdRaw === null
-                  ? undefined
-                  : String(externalIdRaw);
               dispatch(
                 updateActionItem({
                   ...targetAction,
                   status: 'done',
                   submitted: true,
                   submittedAt: submissionTimestamp,
-                  externalId,
-                  externalUrl: res.url,
                 })
               );
             }

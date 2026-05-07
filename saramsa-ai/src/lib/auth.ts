@@ -157,7 +157,8 @@ export function setStoredUser(user: User | null): void {
     // re-rendering it from localStorage would surface a stale "Workspace
     // unavailable — retry" chip on every page load until /me succeeds, even
     // when the org service is currently healthy.
-    const { organization_context_error: _ignored, ...persistable } = user;
+    const persistable: User = { ...user };
+    delete persistable.organization_context_error;
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
   } else {
     localStorage.removeItem(USER_STORAGE_KEY);
