@@ -101,7 +101,7 @@ class NarrationService:
         parsed["_meta"] = {"status": "OK"}
         if actual_usage:
             parsed["_token_usage"] = actual_usage
-        self._record_narration_metrics(project_id, user_id, actual_usage, cache_hit=False)
+        self._record_narration_metrics(project_id, user_id, actual_usage)
         self._increment_usage_counters(project_id, actual_usage)
         return parsed
 
@@ -190,8 +190,17 @@ class NarrationService:
             future = executor.submit(_run)
             return future.result()
 
-    def _record_narration_metrics(self, project_id: Optional[str], user_id: Optional[str],
-                      actual_usage: Optional[Dict[str, Any]], cache_hit: bool) -> None:
+    def _record_narration_metrics(
+        self,
+        project_id: Optional[str],
+        user_id: Optional[str],
+        actual_usage: Optional[Dict[str, Any]],
+    ) -> None:
+        """Roll narration token counts into the per-project per-day and
+        per-project per-month usage docs. No cache_hit param: every call
+        reaches the LLM (there's no narration-level result cache today),
+        so the underlying usage_service's cache_hit defaults to False.
+        """
         if not project_id:
             return
         input_tokens = (actual_usage or {}).get("input_tokens") or 0
@@ -200,12 +209,10 @@ class NarrationService:
         period_month = datetime.now().strftime("%Y-%m")
         usage_service = get_usage_service()
         usage_service.record_narration_usage(
-            project_id, period_day, input_tokens, output_tokens,
-            cache_hit=cache_hit, user_id=user_id,
+            project_id, period_day, input_tokens, output_tokens, user_id=user_id,
         )
         usage_service.record_narration_usage(
-            project_id, period_month, input_tokens, output_tokens,
-            cache_hit=cache_hit, user_id=user_id,
+            project_id, period_month, input_tokens, output_tokens, user_id=user_id,
         )
         self.last_cost = {"input_tokens": input_tokens, "output_tokens": output_tokens}
 

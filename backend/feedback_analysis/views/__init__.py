@@ -2,7 +2,8 @@
 Views package for feedback analysis.
 
 Organized into logical modules:
-- analysis_views: Core analysis operations
+- analysis_views: Core analysis operations + per-analysis read/edit
+- task_status_views: Celery task status (JSON + SSE) and recent-task list
 - insights_views: Insights and reporting views
 - file_upload_views: File upload and processing views
 - file_ingest_views: PDF/DOCX/TXT ingestion endpoint
@@ -14,10 +15,12 @@ from .analysis_views import (
     AnalyzeCommentsView,
     UpdateKeywordsView,
     GetUserCommentsView,
-    TaskStatusView,
-    TaskListView,
     AnalysisByIdView,
     AnalysisRenameView,
+)
+from .task_status_views import (
+    TaskStatusView,
+    TaskListView,
 )
 from .insights_views import (
     InsightsListView,
