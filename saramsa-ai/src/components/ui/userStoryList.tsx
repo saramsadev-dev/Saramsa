@@ -81,6 +81,7 @@ export const UserStoryList = ({
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentProjectUserStories } = useAppSelector((state) => state.userStories);
   const { projects } = useAppSelector((state) => state.projects);
+  const [currentProjectRole, setCurrentProjectRole] = useState<string | null>(null);
   
   const isPushing = analysisLoading;
   
@@ -93,6 +94,13 @@ export const UserStoryList = ({
   ) || false;
   const isDraftFromContext = projectContext?.is_draft === true || projectContext?.config_state === 'unconfigured';
   const isDraftProject = isDraftFromContext || (!hasIntegrations && projectId) || (!hasPlatformIntegration && projectId);
+  const canManageAdminActions =
+    !!projectId && (
+      user?.role === 'admin' ||
+      (!!currentProject?.userId && !!user?.id && String(currentProject.userId) === String(user.id)) ||
+      currentProjectRole === 'owner' ||
+      currentProjectRole === 'admin'
+    );
   const currentProjectUserStoryIds = currentProjectUserStories.map(story => story.id);
   const currentProjectUserStoryWorkItems = currentProjectUserStories.flatMap(story => story.work_items || []);
   const currentProjectUserStoryWorkItemIds = currentProjectUserStoryWorkItems.map(item => item.id);
@@ -128,6 +136,32 @@ export const UserStoryList = ({
       ? rawInsights.map((insight: unknown) => String(insight)).filter(Boolean)
       : [];
   }, [analysisData]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCurrentRole = async () => {
+      if (!projectId || !isAuthenticated) {
+        if (active) setCurrentProjectRole(null);
+        return;
+      }
+
+      try {
+        const response = await apiRequest('get', `/integrations/projects/${projectId}/roles/`, undefined, true);
+        const role = response?.data?.data?.current_user_role;
+        if (active) {
+          setCurrentProjectRole(typeof role === 'string' ? role : null);
+        }
+      } catch {
+        if (active) setCurrentProjectRole(null);
+      }
+    };
+
+    void loadCurrentRole();
+    return () => {
+      active = false;
+    };
+  }, [projectId, isAuthenticated]);
 
   const relatedInsightsByActionId = useMemo(() => {
     if (!insightsList.length || actionItems.length === 0) return new Map<string, string[]>();
@@ -869,7 +903,7 @@ export const UserStoryList = ({
           )}
 
           {/* Push + Edit (row-level push avoids scrolling to header) */}
-          {!isSubmitted && (
+          {!isSubmitted && canManageAdminActions && (
             <div
               className="flex items-center gap-0.5 shrink-0"
               onClick={(e) => e.stopPropagation()}
@@ -942,8 +976,8 @@ export const UserStoryList = ({
                 {submittedData.submittedAt && (
                   <span>Submitted {new Date(submittedData.submittedAt).toLocaleDateString()}</span>
                 )}
-                {submittedData.external_work_item_id && (
-                  <span>ID: {submittedData.external_work_item_id}</span>
+                {(submittedData.external_work_item_id || submittedData.external_id) && (
+                  <span>ID: {submittedData.external_work_item_id || submittedData.external_id}</span>
                 )}
                 {submittedData.external_url && (
                   <Button
@@ -992,34 +1026,38 @@ export const UserStoryList = ({
           {selectedActions.length > 0 && (
             <span className="text-xs text-muted-foreground mr-1">{selectedActions.length} selected</span>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDeleteSelected}
-            disabled={selectedActions.length === 0}
-            className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20 h-8 text-xs"
-          >
-            <Trash2 className="w-3.5 h-3.5 mr-1" />
-            Delete
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleReviewClick}
-            disabled={selectedActions.length === 0 || isPushing || qualityLoading}
-            className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white h-8 text-xs px-3"
-          >
-            {isPushing || qualityLoading ? (
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>{qualityLoading ? 'Checking...' : 'Pushing...'}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <Send className="w-3.5 h-3.5" />
-                <span>{isDraftProject ? 'Configure & Push' : 'Review & Push'}</span>
-              </div>
-            )}
-          </Button>
+          {canManageAdminActions && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeleteSelected}
+                disabled={selectedActions.length === 0}
+                className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20 h-8 text-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                Delete
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleReviewClick}
+                disabled={selectedActions.length === 0 || isPushing || qualityLoading}
+                className="bg-gradient-to-r from-saramsa-gradient-from to-saramsa-gradient-to hover:from-saramsa-brand-hover hover:to-saramsa-gradient-to text-white h-8 text-xs px-3"
+              >
+                {isPushing || qualityLoading ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>{qualityLoading ? 'Checking...' : 'Pushing...'}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isDraftProject ? 'Configure & Push' : 'Review & Push'}</span>
+                  </div>
+                )}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

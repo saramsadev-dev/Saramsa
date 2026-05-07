@@ -17,33 +17,51 @@ PROMPT_TYPES = (
 
 
 def _load_default_prompts() -> Dict[str, str]:
-    """Return the hardcoded default for each prompt type so the admin UI
-    can prefill the editor with what the system uses today. Per-prompt
-    failures are logged so a missing/broken default doesn't go invisible
-    behind an empty textarea."""
+    """Hardcoded defaults for each prompt type (UI prefill).
+
+    Returns a {prompt_type: content} map. Failures are logged AND
+    surfaced via the companion `_load_default_prompt_errors` so the
+    admin UI can render "default unavailable" instead of silently
+    showing an empty textarea (which an admin could mistake for "no
+    default exists" and accidentally save an empty override over).
+    """
+    defaults: Dict[str, str] = {}
+    _, defaults = _load_default_prompts_with_errors()
+    return defaults
+
+
+def _load_default_prompts_with_errors() -> tuple[Dict[str, str], Dict[str, str]]:
+    """Return (errors, defaults). errors maps prompt_type → reason for any
+    type whose default could not be loaded."""
+    errors: Dict[str, str] = {}
     defaults: Dict[str, str] = {}
 
     try:
         from apis.prompts.constants import get_prompt as _get_prompt
+    except Exception as exc:
+        logger.exception("apis.prompts.constants import failed; admin prompt UI will show 'default unavailable'")
+        msg = f"Default unavailable: {exc}"
+        for ptype in ("sentiment", "deep_analysis", "sentiment_confidence", "clarification"):
+            defaults[ptype] = ""
+            errors[ptype] = msg
+    else:
         for ptype in ("sentiment", "deep_analysis", "sentiment_confidence", "clarification"):
             try:
                 defaults[ptype] = _get_prompt(prompt_type=ptype)
-            except Exception:
+            except Exception as exc:
                 logger.exception("Failed to load default prompt for type=%s", ptype)
                 defaults[ptype] = ""
-    except Exception:
-        logger.exception("apis.prompts.constants import failed; admin prompt UI will show empty defaults")
-        for ptype in ("sentiment", "deep_analysis", "sentiment_confidence", "clarification"):
-            defaults[ptype] = ""
+                errors[ptype] = f"Default unavailable: {exc}"
 
     try:
         from apis.prompts.narration_prompt import _DEFAULT_TEMPLATE as _NARRATION_DEFAULT
         defaults["work_items_validation"] = _NARRATION_DEFAULT
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to load narration default template; work_items_validation will be empty")
-        defaults.setdefault("work_items_validation", "")
+        defaults["work_items_validation"] = ""
+        errors["work_items_validation"] = f"Default unavailable: {exc}"
 
-    return defaults
+    return errors, defaults
 
 
 class PromptOverrideService:
@@ -95,13 +113,15 @@ class PromptOverrideService:
                 )
             }
 
+        default_errors, default_prompts = _load_default_prompts_with_errors()
         return {
             "available_prompt_types": list(PROMPT_TYPES),
             "organizations": self.repo.list_all_organizations(),
             "platform_prompts": platform_prompts,
             "organization_prompts": organization_prompts,
             "selected_organization_id": organization_id,
-            "default_prompts": _load_default_prompts(),
+            "default_prompts": default_prompts,
+            "default_prompts_errors": default_errors,
         }
 
     def upsert_prompt(

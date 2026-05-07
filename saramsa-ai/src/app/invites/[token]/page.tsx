@@ -40,7 +40,7 @@ export default function AcceptInvitePage() {
         const stored = authApi.getStoredUser();
         const access = authApi.getValidAccessToken();
         if (!access) {
-          router.replace(`/signup?invite=${encodeURIComponent(token)}`);
+          router.replace(`/register?invite=${encodeURIComponent(token)}`);
           return;
         }
         if (stored?.email && stored.email.toLowerCase() !== data.email.toLowerCase()) {

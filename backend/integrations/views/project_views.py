@@ -22,6 +22,7 @@ from authentication.permissions import IsProjectAdmin, IsProjectViewer, IsProjec
 from apis.infrastructure.storage_service import storage_service
 
 from ..services import get_project_service
+from ..services import get_organization_service
 
 
 def _get_active_organization_id(request):
@@ -166,7 +167,7 @@ class ProjectDetailView(APIView):
 
     def get_permissions(self):
         if self.request and self.request.method == "DELETE":
-            return [IsProjectOwner()]
+            return [IsProjectAdmin()]
         return [permission() for permission in self.permission_classes]
 
     @handle_service_errors
@@ -381,7 +382,12 @@ class ProjectRolesView(APIView):
         current_user_id = getattr(request.user, "id", None)
         current_role = "owner" if current_user_id and owner_id and str(current_user_id) == str(owner_id) else None
         if current_role is None and current_user_id:
-            current_role = storage_service.get_project_role_for_user(project_id, str(current_user_id))
+            membership = get_organization_service().get_membership(project.get("organizationId"), str(current_user_id))
+            if membership and membership.get("role") in ("owner", "admin"):
+                current_role = membership.get("role")
+            else:
+                role_doc = storage_service.get_project_role_for_user(project_id, str(current_user_id))
+                current_role = role_doc.get("role") if isinstance(role_doc, dict) else role_doc
 
         return StandardResponse.success(
             data={
@@ -414,6 +420,21 @@ class ProjectRolesView(APIView):
         if owner_id and str(owner_id) == str(user_id):
             return StandardResponse.validation_error(
                 detail="Owner role cannot be modified.",
+                instance=request.path
+            )
+
+        project_org_id = project.get("organizationId")
+        if not project_org_id:
+            return StandardResponse.validation_error(
+                detail="Project is missing organization context.",
+                instance=request.path
+            )
+
+        from integrations.services import get_organization_service
+        membership = get_organization_service().get_membership(str(project_org_id), str(user_id))
+        if not membership:
+            return StandardResponse.validation_error(
+                detail="Project roles can only be granted to members of this workspace.",
                 instance=request.path
             )
 

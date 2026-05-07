@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 
-from ..services import get_integration_service, get_external_api_service
+from ..services import get_integration_service
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +85,14 @@ def create_azure_integration(request):
     # If fetching projects (GET or POST without create_integration flag)
     if fetch_projects:
         try:
-            external_api_service = get_external_api_service()
-            projects = external_api_service.fetch_azure_projects(organization, pat_token)
+            integration_service = get_integration_service()
+            projects = integration_service.get_external_projects(
+                request.user.id,
+                "azure",
+                organization_id=organization_id,
+                organization=organization,
+                pat_token=pat_token,
+            )
             
             return StandardResponse.success(
                 data={

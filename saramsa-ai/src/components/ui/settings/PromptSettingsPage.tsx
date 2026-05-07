@@ -25,6 +25,7 @@ type PromptSettingsPayload = {
   organization_prompts: Record<string, PromptOverride>;
   selected_organization_id?: string | null;
   default_prompts?: Record<string, string>;
+  default_prompts_errors?: Record<string, string>;
 };
 
 export function PromptSettingsPage() {
@@ -166,6 +167,11 @@ export function PromptSettingsPage() {
           </div>
         </div>
         <div className="px-6 py-5">
+          {data?.default_prompts_errors?.[promptType] && (
+            <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+              System default unavailable — saving an empty override could disable this prompt. ({data.default_prompts_errors[promptType]})
+            </p>
+          )}
           <textarea
             value={value}
             onChange={(e) => setDrafts((current) => ({ ...current, [promptType]: e.target.value }))}

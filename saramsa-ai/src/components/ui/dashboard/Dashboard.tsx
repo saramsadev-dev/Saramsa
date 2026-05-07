@@ -111,7 +111,6 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
     fetchingAnalysisById,
   } = useSelector((state: RootState) => state.analysis);
   
-  const { analysis: jiraAnalysis, isAnalyzing: isJiraAnalyzing } = useSelector((state: RootState) => state.jira);
   const { projects, loading: projectsLoading } = useSelector((state: RootState) => state.projects);
   const { accounts: integrationAccounts, loading: integrationsLoading } = useSelector((state: RootState) => state.integrations);
   const { user } = useSelector((state: RootState) => state.auth);
@@ -1158,8 +1157,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
           
           if (selectedJiraProjectId) {
             try {
-              const metadataResponse = await apiRequest('get', `/workitems/jira/project-metadata?projectId=${selectedJiraProjectId}`, {}, true, false);
-              jiraProjectMetadata = metadataResponse.data.metadata;
+              jiraProjectMetadata = null;
             } catch (e) {
               console.warn('⚠️ Failed to fetch Jira project metadata, proceeding without it:', e);
             }
@@ -2062,8 +2060,7 @@ export function DashboardComponent({ data, onProjectSelect, initialProjectId, in
                                   
                                   if (selectedJiraProjectId) {
                                     try {
-                                      const metadataResponse = await apiRequest('get', `/workitems/jira/project-metadata?projectId=${selectedJiraProjectId}`, {}, true, false);
-                                      jiraProjectMetadata = metadataResponse.data.metadata;
+                                      jiraProjectMetadata = null;
                                     } catch (e) {
                                       console.warn('Failed to fetch Jira project metadata:', e);
                                     }

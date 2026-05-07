@@ -106,7 +106,7 @@ export function WorkspacePage() {
       const token: string | undefined = invite?.token;
       const emailSent: boolean = invite?.email_sent !== false;
       const inviteUrl = token
-        ? `${window.location.origin}/signup?invite=${encodeURIComponent(token)}`
+        ? `${window.location.origin}/register?invite=${encodeURIComponent(token)}`
         : null;
       setLastInviteUrl(inviteUrl);
       setLastInviteEmail(invite?.email || inviteEmail.trim());

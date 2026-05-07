@@ -1,17 +1,18 @@
 """Usage quota enforcement.
 
 Call `check_quota` before expensive operations. Call `record_usage` after
-the operation succeeds. Quotas are scoped to the user's active
-organization so all members of a workspace share one credit pool. Limits
-come from env vars by default and can be overridden per-org via
+the operation succeeds. Quotas are scoped to an organization so all
+members of a workspace share one credit pool. Limits come from env vars
+by default and can be overridden per-org via
 BillingProfile.metadata["quota_overrides"].
 
-The public API still takes a user_id (so the views never had to change),
-but internally we resolve the user's active_organization_id and key all
-counters and limits by that. If a user somehow has no active org (only
-possible for accounts whose signup-time bootstrap failed), we fall back
-to user-keyed counters so quotas still apply rather than silently going
-unlimited.
+Callers that operate on a specific resource (e.g. running analysis on a
+project) should pass `organization_id=project.organization_id` so the
+charge lands on the project's owning org. When `organization_id` is
+omitted, we fall back to the user's active organization. If a user has
+no active org either (only possible for accounts whose signup-time
+bootstrap failed), we fall back to user-keyed counters so quotas still
+apply rather than silently going unlimited.
 """
 
 import logging
@@ -57,11 +58,18 @@ def _resolve_active_org_id(user_id: str) -> Optional[str]:
         return None
 
 
-def _record_lookup_keys(user_id: str) -> Tuple[dict, dict]:
+def _resolve_org_id(user_id: str, organization_id: Optional[str]) -> Optional[str]:
+    """Pick the org to charge: explicit arg wins, else the user's active org."""
+    if organization_id:
+        return str(organization_id)
+    return _resolve_active_org_id(user_id)
+
+
+def _record_lookup_keys(user_id: str, organization_id: Optional[str] = None) -> Tuple[dict, dict]:
     """Return (filter_kwargs, create_defaults) for UsageRecord:
-    org-keyed when an active org exists, user-keyed otherwise."""
+    org-keyed when an org is resolvable, user-keyed otherwise."""
     period = _current_period()
-    org_id = _resolve_active_org_id(user_id)
+    org_id = _resolve_org_id(user_id, organization_id)
     if org_id:
         return (
             {"organization_id": org_id, "period": period},
@@ -73,14 +81,14 @@ def _record_lookup_keys(user_id: str) -> Tuple[dict, dict]:
     )
 
 
-def _get_or_create_record(user_id: str):
+def _get_or_create_record(user_id: str, organization_id: Optional[str] = None):
     from .models import UsageRecord
-    filter_kwargs, defaults = _record_lookup_keys(user_id)
+    filter_kwargs, defaults = _record_lookup_keys(user_id, organization_id)
     record, _ = UsageRecord.objects.get_or_create(defaults=defaults, **filter_kwargs)
     return record
 
 
-def _get_limits(user_id: str) -> dict:
+def _get_limits(user_id: str, organization_id: Optional[str] = None) -> dict:
     """Limits attach to the org first (so all teammates share one plan),
     falling back to a user-keyed BillingProfile for legacy single-user
     accounts that pre-date organizations, then to env-var defaults.
@@ -90,7 +98,7 @@ def _get_limits(user_id: str) -> dict:
     from .models import BillingProfile, UsageRecord
     defaults = UsageRecord.default_limits()
     try:
-        org_id = _resolve_active_org_id(user_id)
+        org_id = _resolve_org_id(user_id, organization_id)
         profile = None
         if org_id:
             profile = BillingProfile.objects.filter(organization_id=org_id).first()
@@ -103,8 +111,8 @@ def _get_limits(user_id: str) -> dict:
                     defaults[key] = int(overrides[key])
     except Exception:
         logger.exception(
-            "Quota limits lookup failed for user_id=%s — falling back to env defaults %s",
-            user_id, defaults,
+            "Quota limits lookup failed for user_id=%s org_id=%s — falling back to env defaults %s",
+            user_id, organization_id, defaults,
         )
     return defaults
 
@@ -122,14 +130,16 @@ class QuotaExceeded(Exception):
         )
 
 
-def check_quota(user_id: str, resource: str) -> None:
-    """Raise QuotaExceeded if the caller's workspace has hit its limit
-    for `resource`.
+def check_quota(user_id: str, resource: str, organization_id: Optional[str] = None) -> None:
+    """Raise QuotaExceeded if the workspace has hit its limit for `resource`.
+
+    Pass `organization_id` to charge a specific workspace (e.g. the project's
+    owning org); omit it to fall back to the user's active org.
 
     resource: "analysis" | "work_item_gen" | "llm_tokens"
     """
-    record = _get_or_create_record(user_id)
-    limits = _get_limits(user_id)
+    record = _get_or_create_record(user_id, organization_id)
+    limits = _get_limits(user_id, organization_id)
 
     field_map = {
         "analysis": ("analysis_count", "analysis_limit"),
@@ -148,8 +158,12 @@ def check_quota(user_id: str, resource: str) -> None:
         raise QuotaExceeded(resource, limit, used)
 
 
-def record_usage(user_id: str, resource: str, amount: int = 1) -> None:
-    """Increment the workspace's usage counter after a successful operation."""
+def record_usage(user_id: str, resource: str, amount: int = 1, organization_id: Optional[str] = None) -> None:
+    """Increment the workspace's usage counter after a successful operation.
+
+    Pass `organization_id` to charge a specific workspace; omit it to fall back
+    to the user's active org.
+    """
     from django.db.models import F
     from .models import UsageRecord
 
@@ -165,6 +179,6 @@ def record_usage(user_id: str, resource: str, amount: int = 1) -> None:
     # Ensure the row exists before .update() — .update() on an empty
     # queryset is a silent no-op, so a record_usage call without a prior
     # check_quota would otherwise drop usage.
-    _get_or_create_record(user_id)
-    filter_kwargs, _defaults = _record_lookup_keys(user_id)
+    _get_or_create_record(user_id, organization_id)
+    filter_kwargs, _defaults = _record_lookup_keys(user_id, organization_id)
     UsageRecord.objects.filter(**filter_kwargs).update(**{field: F(field) + amount})

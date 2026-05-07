@@ -23,6 +23,12 @@ logger = logging.getLogger(__name__)
 # for a few seconds so a single analysis run (which dispatches dozens of
 # LLM batches) doesn't hammer the DB. TTL is short so a freshly saved
 # override takes effect within seconds, not minutes.
+#
+# Caveat: this cache is per-process and per-machine. With multiple gunicorn
+# and Celery workers, `invalidate_cache()` after a save only clears the
+# current process — other workers will see stale prompts until the TTL
+# expires (so up to 5s of cross-worker drift, not "instant"). Move to a
+# Redis-backed cache when you need stronger consistency than TTL provides.
 _CACHE_TTL_SECONDS = 5
 _cache: dict[Tuple[str, Optional[str], Optional[str]], Tuple[float, str]] = {}
 _cache_lock = RLock()

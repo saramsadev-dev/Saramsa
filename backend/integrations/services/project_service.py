@@ -229,6 +229,18 @@ class ProjectService:
                     self.organization_service.require_membership(str(project_org_id), str(user_id))
                 return self._normalize_project(project) if project else None
 
+            # Workspace owners/admins can access projects in their org
+            # even without an explicit per-project role row.
+            project = self.storage_service.get_project_by_id_any(project_id)
+            if not project:
+                project = self.integrations_repo.get_project_by_id(project_id)
+            if project:
+                project_org_id = project.get("organizationId")
+                if project_org_id:
+                    membership = self.organization_service.get_membership(str(project_org_id), str(user_id))
+                    if membership and membership.get("role") in ("owner", "admin"):
+                        return self._normalize_project(project)
+
             return None
         except Exception as e:
             logger.error(f"Error getting project {project_id}: {e}")
@@ -291,9 +303,10 @@ class ProjectService:
             if not project:
                 return False
             role = self._get_project_role(project_id, user_id, project)
-            if role != "owner":
+            if not self._has_min_role(role, "admin"):
                 return False
-            return self.integrations_repo.delete_project(project_id, user_id)
+            delete_as_user = None if role == "admin" else user_id
+            return self.integrations_repo.delete_project(project_id, delete_as_user)
         except Exception as e:
             logger.error(f"Error deleting project {project_id}: {e}")
             raise
@@ -326,6 +339,20 @@ class ProjectService:
         if not role:
             return False
         return self._ROLE_ORDER.get(role, 0) >= self._ROLE_ORDER.get(required, 0)
+
+    def require_project_role(
+        self,
+        project_id: str,
+        user_id: str,
+        min_role: str = "viewer",
+    ) -> Dict[str, Any]:
+        project = self.get_project(project_id, user_id)
+        if not project:
+            raise ValueError("Project not found or access denied.")
+        role = self._get_project_role(project_id, user_id, project)
+        if not self._has_min_role(role, min_role):
+            raise ValueError(f"You do not have permission to access this project as a {min_role}.")
+        return project
     
     def get_projects_by_provider(self, user_id: str, provider: str, organization_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """

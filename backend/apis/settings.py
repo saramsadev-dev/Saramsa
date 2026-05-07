@@ -374,6 +374,13 @@ _cors_extra = os.getenv('CORS_EXTRA_ORIGINS', '')
 if _cors_extra:
     CORS_ALLOWED_ORIGINS = list(CORS_ALLOWED_ORIGINS) + [o.strip() for o in _cors_extra.split(',') if o.strip()]
 
+# Regex CORS allowlist (comma-separated regex patterns). Lets us match Vercel
+# preview deployments like https://saramsa-ai-<branch-hash>-<team>.vercel.app
+# without enumerating every preview URL. Empty default keeps prod strict.
+_cors_regexes = os.getenv('CORS_ALLOWED_ORIGIN_REGEXES', '')
+if _cors_regexes:
+    CORS_ALLOWED_ORIGIN_REGEXES = [r.strip() for r in _cors_regexes.split(',') if r.strip()]
+
 CORS_ALLOW_METHODS = [
     'GET',
     'POST',

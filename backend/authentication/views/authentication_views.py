@@ -420,9 +420,6 @@ class ResetPasswordView(APIView):
                     instance=request.path
                 )
             
-            # Hash new password
-            hashed_password = ResetPasswordSerializer().hash_password(new_password)
-            
             # Update user password using service layer
             auth_service.change_password(email, new_password)
             

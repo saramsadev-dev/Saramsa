@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 
 from authentication.models import UserAccount
 from integrations.models import Organization, OrganizationInvite, OrganizationMembership
+from authentication.views.organization_views import _build_invite_url
 
 
 def _make_user(uid: str = "admin-1", email: str = "admin@example.com", role: str = "admin") -> UserAccount:
@@ -232,3 +233,14 @@ class RegisterInviteOnlyTest(TestCase):
         detail = (body.get("detail") or "").lower()
         self.assertIn("invit", detail)
         self.assertIn("admin", detail)
+
+    def test_invite_links_point_to_register_route(self) -> None:
+        class _Request:
+            def get_host(self):
+                return "example.com"
+
+            def is_secure(self):
+                return False
+
+        invite_url = _build_invite_url(_Request(), "tok-123")
+        self.assertEqual(invite_url, "http://example.com/register?invite=tok-123")

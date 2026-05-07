@@ -17,21 +17,34 @@ logger = logging.getLogger(__name__)
 def _safe_org_context(user_data: Dict[str, Any], active_org_id: Optional[str]) -> Dict[str, Any]:
     """Look up the user's org list + active org. If anything goes wrong
     (org service not bootstrapped, no membership rows yet), return an empty
-    context — auth must keep working even when org wiring is incomplete.
-    The fallback is intentional but the failure is always logged so
-    misbehaviour shows up in the backend log instead of being invisible."""
+    context plus an `error` key — auth must keep working even when org
+    wiring is incomplete, but the frontend needs to know that the empty
+    workspace list is "load failed" and not "no memberships" so it can
+    surface a retry/diagnostics affordance instead of pretending the user
+    has no workspaces."""
     try:
         from integrations.services import get_organization_service
-        return get_organization_service().get_organization_context_for_user(
+        ctx = get_organization_service().get_organization_context_for_user(
             user_data, active_organization_id=active_org_id
         )
-    except Exception:
+        ctx.setdefault("error", None)
+        return ctx
+    except Exception as exc:
         logger.exception(
             "Failed to load organization context for user_id=%s active_org=%s — "
             "returning empty context so /me + /login don't 500.",
             user_data.get("id"), active_org_id,
         )
-        return {"active_organization_id": None, "active_organization": None, "organizations": []}
+        return _empty_org_context(error=str(exc) or exc.__class__.__name__)
+
+
+def _empty_org_context(*, error: Optional[str]) -> Dict[str, Any]:
+    return {
+        "active_organization_id": None,
+        "active_organization": None,
+        "organizations": [],
+        "error": error,
+    }
 
 
 def build_user_with_org_context(user_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -50,4 +63,5 @@ def build_user_with_org_context(user_data: Dict[str, Any]) -> Dict[str, Any]:
         'active_organization_id': org_context.get('active_organization_id') or active_org_id,
         'active_organization': org_context.get('active_organization'),
         'organizations': org_context.get('organizations', []),
+        'organization_context_error': org_context.get('error'),
     }

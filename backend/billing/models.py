@@ -13,7 +13,7 @@ class TimestampedModel(models.Model):
 
 
 class BillingProfile(TimestampedModel):
-    user_id = models.CharField(max_length=64, unique=True, db_index=True)
+    user_id = models.CharField(max_length=64, db_index=True)
     organization_id = models.CharField(max_length=64, db_index=True, blank=True, default="")
     stripe_customer_id = models.CharField(max_length=128, unique=True, blank=True, default="")
     stripe_subscription_id = models.CharField(max_length=128, unique=True, blank=True, default="")

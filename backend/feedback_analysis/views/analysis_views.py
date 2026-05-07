@@ -37,12 +37,47 @@ logger = logging.getLogger(__name__)
 
 
 class _AllowAnyContentNegotiation(BaseContentNegotiation):
-    """Allow any Accept header so SSE (text/event-stream) isn't rejected by DRF."""
+    """Permissive content negotiation used only by `TaskStatusView` so the
+    SSE stream (text/event-stream) isn't rejected by DRF's default
+    parsers/renderers. Don't reuse on regular JSON endpoints — it
+    bypasses negotiation entirely and would silently route to whatever
+    parser happens to be first in the list."""
     def select_parser(self, request, parsers):
         return parsers[0]
 
     def select_renderer(self, request, renderers, format_suffix=None):
         return (renderers[0], renderers[0].media_type)
+
+
+def _user_has_project_access(user, project_id: str) -> bool:
+    """Project access check shared by AnalysisListView and AnalysisDetailView.
+
+    Returns True if the user is a global admin, the project's owner, an
+    org-level owner/admin of the project's workspace, or has any project
+    role row. Returns False for non-members of the project's workspace.
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if _get_role_from_user(user) == 'admin':
+        return True
+    user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
+    if not user_id:
+        return False
+    project = storage_service.get_project_by_id_any(project_id)
+    if isinstance(project, dict):
+        owner_id = project.get('owner_user_id') or project.get('userId')
+        organization_id = project.get('organizationId')
+        if owner_id and str(owner_id) == str(user_id):
+            return True
+        if organization_id:
+            from integrations.services import get_organization_service
+            membership = get_organization_service().get_membership(str(organization_id), str(user_id))
+            if membership and membership.get("role") in ("owner", "admin"):
+                return True
+            if not membership:
+                return False
+    role = storage_service.get_project_role_for_user(project_id, str(user_id))
+    return bool(role)
 
 
 class AnalyzeCommentsView(APIView):
@@ -56,11 +91,6 @@ class AnalyzeCommentsView(APIView):
     @handle_service_errors
     def post(self, request):
         logger.info("AnalyzeCommentsView called (Background Mode)")
-
-        try:
-            check_quota(request.user.id, "analysis")
-        except QuotaExceeded as exc:
-            return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)
 
         comments = request.data.get("comments")
         incoming_project_id = request.data.get("project_id")
@@ -113,7 +143,7 @@ class AnalyzeCommentsView(APIView):
                 logger.warning(f"Could not get company_name for user: {e}")
 
         try:
-            project_id, _, _ = analysis_service.ensure_project_context(
+            project_id, project_doc, _ = analysis_service.ensure_project_context(
                 incoming_project_id,
                 user_id_str,
             )
@@ -123,7 +153,13 @@ class AnalyzeCommentsView(APIView):
                 errors=[{"field": "project_id", "message": str(e)}],
                 instance=request.path
             )
-        
+
+        project_org_id = (project_doc or {}).get("organizationId") or (project_doc or {}).get("organization_id")
+        try:
+            check_quota(user_id_str, "analysis", organization_id=project_org_id)
+        except QuotaExceeded as exc:
+            return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)
+
         # Generate idempotency key for analysis
         analysis_id = str(uuid.uuid4())
 
@@ -179,7 +215,7 @@ class AnalyzeCommentsView(APIView):
         cache.incr(f"analyses_hour:{project_id}:{hour_key}", 1, ttl=3600)
 
         try:
-            record_usage(user_id_str, "analysis")
+            record_usage(user_id_str, "analysis", organization_id=project_org_id)
         except Exception:
             logger.exception("record_usage failed after successful task enqueue")
 
@@ -668,6 +704,10 @@ class TaskStatusView(APIView):
         return StandardResponse.success(data=data)
 
     def _stream_sse(self, task_id):
+        # SSE events are intentionally NOT wrapped in StandardResponse — each
+        # `data:` line is the raw status dict (same shape as _build_status
+        # returns). The frontend EventSource handler expects this; the
+        # non-streaming GET path is the one that wraps in StandardResponse.
         import json as _json, time
         from django.http import StreamingHttpResponse
 
@@ -888,20 +928,7 @@ class AnalysisByIdView(APIView):
         return work_items
 
     def _has_project_access(self, user, project_id: str) -> bool:
-        if not user or not getattr(user, 'is_authenticated', False):
-            return False
-        if _get_role_from_user(user) == 'admin':
-            return True
-        user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
-        if not user_id:
-            return False
-        project = storage_service.get_project_by_id_any(project_id)
-        if isinstance(project, dict):
-            owner_id = project.get('owner_user_id') or project.get('userId')
-            if owner_id and str(owner_id) == str(user_id):
-                return True
-        role = storage_service.get_project_role_for_user(project_id, str(user_id))
-        return bool(role)
+        return _user_has_project_access(user, project_id)
 
 
 class AnalysisRenameView(APIView):
@@ -969,19 +996,6 @@ class AnalysisRenameView(APIView):
         )
 
     def _has_project_access(self, user, project_id: str) -> bool:
-        if not user or not getattr(user, 'is_authenticated', False):
-            return False
-        if _get_role_from_user(user) == 'admin':
-            return True
-        user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
-        if not user_id:
-            return False
-        project = storage_service.get_project_by_id_any(project_id)
-        if isinstance(project, dict):
-            owner_id = project.get('owner_user_id') or project.get('userId')
-            if owner_id and str(owner_id) == str(user_id):
-                return True
-        role = storage_service.get_project_role_for_user(project_id, str(user_id))
-        return bool(role)
+        return _user_has_project_access(user, project_id)
 
 

@@ -2,6 +2,8 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 
+from django.db import transaction
+
 from ..repositories import IntegrationsRepository
 from authentication.repositories import UserRepository
 
@@ -58,24 +60,6 @@ class OrganizationService:
         )
         return organization
 
-    def ensure_default_organization_for_user(self, user: Dict[str, Any]) -> Dict[str, Any]:
-        user_id = str(user["id"])
-        organizations = self.list_organizations_for_user(user_id)
-        if organizations:
-            return organizations[0]
-
-        name = (
-            user.get("company_name")
-            or f"{user.get('first_name', '').strip()} {user.get('last_name', '').strip()}".strip()
-            or user.get("username")
-            or "My Workspace"
-        )
-        if not name.lower().endswith("workspace"):
-            name = f"{name} Workspace"
-        organization = self.create_organization(name=name, created_by_user_id=user_id)
-        self.repo.assign_legacy_records_to_organization(user_id, organization["id"])
-        return organization
-
     def list_organizations_for_user(self, user_id: str) -> List[Dict[str, Any]]:
         organizations = self.repo.list_organizations_for_user(user_id)
         memberships = {
@@ -103,6 +87,12 @@ class OrganizationService:
         membership = self.get_membership(organization_id, user_id)
         if not membership:
             raise ValueError("You do not have access to this organization.")
+        return membership
+
+    def require_min_role(self, organization_id: str, user_id: str, required_role: str) -> Dict[str, Any]:
+        membership = self.require_membership(organization_id, user_id)
+        if not self.has_min_role(membership, required_role):
+            raise ValueError(f"Only workspace {required_role}s can perform this action.")
         return membership
 
     def has_min_role(self, membership: Optional[Dict[str, Any]], required_role: str) -> bool:
@@ -150,6 +140,9 @@ class OrganizationService:
         actor_membership = self.require_membership(organization_id, actor_user_id)
         if not self.has_min_role(actor_membership, "admin"):
             raise ValueError("Only workspace admins can manage members.")
+        # 'owner' is intentionally absent here. Ownership is granted by
+        # create_organization (the creator becomes owner) and reassigned
+        # only by transfer_ownership; admins can't promote themselves.
         if role not in ("viewer", "member", "admin"):
             raise ValueError("Role must be viewer, member, or admin.")
 
@@ -186,8 +179,20 @@ class OrganizationService:
             raise ValueError("Owner membership cannot be removed.")
         if str(target_user_id) == str(actor_user_id):
             raise ValueError("Use another admin account to remove yourself from the workspace.")
+        from authentication.models import UserAccount
 
-        self.repo.delete_organization_membership(organization_id, target_user_id)
+        with transaction.atomic():
+            self.repo.delete_project_roles_for_user_in_organization(organization_id, target_user_id)
+            self.repo.delete_organization_membership(organization_id, target_user_id)
+
+            user = UserAccount.objects.filter(id=str(target_user_id)).first()
+            if user:
+                profile = user.profile or {}
+                if profile.get("active_organization_id") == organization_id:
+                    remaining = self.list_organizations_for_user(str(target_user_id))
+                    profile["active_organization_id"] = remaining[0]["id"] if remaining else None
+                    user.profile = profile
+                    user.save(update_fields=["profile", "updated_at"])
         return self.list_members(organization_id, actor_user_id)
 
     def update_organization(
@@ -236,15 +241,52 @@ class OrganizationService:
         if not target_membership:
             raise ValueError("Target user is not a member of this workspace.")
 
-        # Demote current owner first so the upsert below doesn't see two
-        # owner rows in transit.
-        self.repo.upsert_organization_membership(
-            organization_id, str(actor_user_id), "admin", actor_id=str(actor_user_id),
-        )
-        self.repo.upsert_organization_membership(
-            organization_id, str(new_owner_user_id), "owner", actor_id=str(actor_user_id),
-        )
+        with transaction.atomic():
+            # Demote current owner first so the upsert below doesn't see two
+            # owner rows in transit, but keep both writes in one transaction
+            # so a failure can't strand the workspace without an owner.
+            self.repo.upsert_organization_membership(
+                organization_id, str(actor_user_id), "admin", actor_id=str(actor_user_id),
+            )
+            self.repo.upsert_organization_membership(
+                organization_id, str(new_owner_user_id), "owner", actor_id=str(actor_user_id),
+            )
         return self.list_members(organization_id, str(actor_user_id))
+
+    def _cleanup_billing_for_organization(self, organization_id: str) -> None:
+        from billing.models import BillingProfile, UsageRecord
+        from billing.services import StripeBillingService
+
+        profiles = list(BillingProfile.objects.filter(organization_id=str(organization_id)))
+        if not profiles:
+            UsageRecord.objects.filter(organization_id=str(organization_id)).delete()
+            return
+
+        billing_service = StripeBillingService()
+        stripe_client = None
+        needs_stripe = any((profile.stripe_subscription_id or "").strip() for profile in profiles)
+        if needs_stripe:
+            try:
+                billing_service._ensure_configured()
+                stripe_client = billing_service._stripe()
+            except Exception as exc:
+                raise ValueError(
+                    "Workspace has an active Stripe subscription and could not be cancelled automatically. "
+                    "Resolve billing before deleting the workspace."
+                ) from exc
+
+        for profile in profiles:
+            sub_id = (profile.stripe_subscription_id or "").strip()
+            if sub_id and stripe_client is not None:
+                try:
+                    stripe_client.Subscription.cancel(sub_id)
+                except Exception as exc:
+                    raise ValueError(
+                        "Failed to cancel the workspace Stripe subscription. Resolve billing before deleting the workspace."
+                    ) from exc
+
+        BillingProfile.objects.filter(organization_id=str(organization_id)).delete()
+        UsageRecord.objects.filter(organization_id=str(organization_id)).delete()
 
     def delete_organization(self, organization_id: str, actor_user_id: str) -> Dict[str, Any]:
         """Hard-delete a workspace. Cascades to memberships, prompt
@@ -270,18 +312,20 @@ class OrganizationService:
         memberships = self.repo.list_organization_memberships(organization_id)
         affected_user_ids = [m["userId"] for m in memberships]
 
-        organization.delete()
+        with transaction.atomic():
+            self._cleanup_billing_for_organization(organization_id)
+            organization.delete()
 
-        for uid in affected_user_ids:
-            user = UserAccount.objects.filter(id=uid).first()
-            if not user:
-                continue
-            profile = user.profile or {}
-            if profile.get("active_organization_id") == organization_id:
-                remaining = self.list_organizations_for_user(uid)
-                profile["active_organization_id"] = remaining[0]["id"] if remaining else None
-                user.profile = profile
-                user.save(update_fields=["profile", "updated_at"])
+            for uid in affected_user_ids:
+                user = UserAccount.objects.filter(id=uid).first()
+                if not user:
+                    continue
+                profile = user.profile or {}
+                if profile.get("active_organization_id") == organization_id:
+                    remaining = self.list_organizations_for_user(uid)
+                    profile["active_organization_id"] = remaining[0]["id"] if remaining else None
+                    user.profile = profile
+                    user.save(update_fields=["profile", "updated_at"])
 
         return {"deleted_organization_id": organization_id}
 
@@ -308,13 +352,40 @@ class OrganizationService:
         if selected is None:
             selected = organizations[0]
         if selected:
-            self.repo.assign_legacy_records_to_organization(str(user["id"]), selected["id"])
+            self._maybe_assign_legacy_records(user, selected["id"])
 
         return {
             "organizations": organizations,
             "active_organization": selected,
             "active_organization_id": selected["id"] if selected else None,
         }
+
+    def _maybe_assign_legacy_records(self, user: Dict[str, Any], organization_id: str) -> None:
+        """Move pre-org-context records (Project/FeedbackSource/etc with
+        NULL organization_id) into `organization_id`, but only once per
+        user. The repo call is read-heavy and was previously running on
+        every /me, /login, switch-org, accept-invite, transfer, delete
+        — moving it behind a profile flag drops it to a single bootstrap
+        per user. After backfill there are no null-org rows left for
+        this user, so a second call would be a no-op anyway."""
+        profile = user.get("profile") or {}
+        if profile.get("legacy_records_assigned"):
+            return
+        user_id = str(user["id"])
+        self.repo.assign_legacy_records_to_organization(user_id, organization_id)
+        # Persist the flag so the next /me skips the work. Best-effort:
+        # if the profile write fails, the worst case is we redo the
+        # backfill (idempotent) on the next request.
+        try:
+            new_profile = {**profile, "legacy_records_assigned": True}
+            self.user_repo.update(user_id, {"profile": new_profile})
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Failed to set legacy_records_assigned flag for user_id=%s; "
+                "next request will redo the (idempotent) backfill",
+                user_id,
+            )
 
 
 _organization_service = None

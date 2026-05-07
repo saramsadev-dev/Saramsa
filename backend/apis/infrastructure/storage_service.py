@@ -101,6 +101,8 @@ class StorageService:
             d.setdefault("projectId", obj.project_id)
         if hasattr(obj, "user_id"):
             d.setdefault("userId", obj.user_id)
+        if hasattr(obj, "organization_id"):
+            d.setdefault("organizationId", obj.organization_id)
         if container == "users":
             d.update({
                 "email": obj.email,
@@ -121,6 +123,11 @@ class StorageService:
                 "description": obj.description,
                 "generated_at": obj.generated_at.isoformat() if obj.generated_at else None,
                 "work_items": [c.to_dict() for c in obj.candidates.all().order_by("-created_at")],
+            })
+        if container == "project_roles":
+            d.update({
+                "role": obj.role,
+                "actorId": obj.actor_id,
             })
         return d
 
@@ -289,19 +296,34 @@ class StorageService:
         item_id = str(user_story_data.get("id") or f"user_story_{timezone.now().timestamp()}")
         return self.update_document("user_stories", item_id, str(user_story_data.get("projectId") or user_story_data.get("userId") or item_id), user_story_data)
 
-    def get_user_story(self, user_story_id: str, user_id: str):
-        obj = UserStory.objects.filter(id=str(user_story_id), user_id=str(user_id)).first()
+    def get_user_story(self, user_story_id: str, user_id: Optional[str] = None, project_id: Optional[str] = None):
+        qs = UserStory.objects.filter(id=str(user_story_id))
+        if user_id is not None:
+            qs = qs.filter(user_id=str(user_id))
+        if project_id is not None:
+            qs = qs.filter(project_id=str(project_id))
+        obj = qs.first()
         return self._doc("user_stories", obj)
 
     def get_user_story_by_id(self, user_story_id: str):
-        return self.get_document("user_stories", user_story_id, user_story_id)
+        obj = UserStory.objects.filter(id=str(user_story_id)).first()
+        return self._doc("user_stories", obj)
 
-    def delete_user_story(self, user_story_id: str, user_id: str) -> bool:
-        deleted, _ = UserStory.objects.filter(id=str(user_story_id), user_id=str(user_id)).delete()
+    def delete_user_story(self, user_story_id: str, user_id: Optional[str] = None, project_id: Optional[str] = None) -> bool:
+        qs = UserStory.objects.filter(id=str(user_story_id))
+        if user_id is not None:
+            qs = qs.filter(user_id=str(user_id))
+        if project_id is not None:
+            qs = qs.filter(project_id=str(project_id))
+        deleted, _ = qs.delete()
         return deleted > 0
 
-    def bulk_delete_user_stories(self, ids: List[str], user_id: str) -> Dict[str, Any]:
-        qs = UserStory.objects.filter(id__in=[str(i) for i in ids], user_id=str(user_id))
+    def bulk_delete_user_stories(self, ids: List[str], user_id: Optional[str] = None, project_id: Optional[str] = None) -> Dict[str, Any]:
+        qs = UserStory.objects.filter(id__in=[str(i) for i in ids])
+        if user_id is not None:
+            qs = qs.filter(user_id=str(user_id))
+        if project_id is not None:
+            qs = qs.filter(project_id=str(project_id))
         found_ids = list(qs.values_list("id", flat=True))
         deleted, _ = qs.delete()
         missing = [i for i in ids if i not in found_ids]

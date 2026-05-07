@@ -102,19 +102,9 @@ class FeedbackFileIngestView(APIView):
             )
         user_id_str = str(user.id)
 
-        try:
-            check_quota(user_id_str, "analysis")
-        except QuotaExceeded as exc:
-            return StandardResponse.error(
-                title="Quota exceeded",
-                detail=str(exc),
-                status_code=429,
-                instance=request.path,
-            )
-
         analysis_service = get_analysis_service()
         try:
-            project_id, _project_doc, _is_draft = analysis_service.ensure_project_context(
+            project_id, project_doc, _is_draft = analysis_service.ensure_project_context(
                 incoming_project_id,
                 user_id_str,
             )
@@ -122,6 +112,17 @@ class FeedbackFileIngestView(APIView):
             return StandardResponse.validation_error(
                 detail=str(exc),
                 errors=[{"field": "project_id", "message": str(exc)}],
+                instance=request.path,
+            )
+
+        project_org_id = (project_doc or {}).get("organizationId") or (project_doc or {}).get("organization_id")
+        try:
+            check_quota(user_id_str, "analysis", organization_id=project_org_id)
+        except QuotaExceeded as exc:
+            return StandardResponse.error(
+                title="Quota exceeded",
+                detail=str(exc),
+                status_code=429,
                 instance=request.path,
             )
 
@@ -191,7 +192,7 @@ class FeedbackFileIngestView(APIView):
             raise
 
         try:
-            record_usage(user_id_str, "analysis")
+            record_usage(user_id_str, "analysis", organization_id=project_org_id)
         except Exception:
             logger.exception("record_usage failed after successful ingest")
 

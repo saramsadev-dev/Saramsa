@@ -17,6 +17,8 @@ from .models import (
     OrganizationMembership,
     PromptOverride,
     Project,
+    ProjectRole,
+    SlackFeedbackItem,
 )
 
 
@@ -194,7 +196,7 @@ class IntegrationsRepository:
         return _organization_to_dict(item)
 
     def upsert_organization_membership(self, organization_id: str, user_id: str, role: str, actor_id: Optional[str] = None) -> Dict[str, Any]:
-        item, _ = OrganizationMembership.objects.update_or_create(
+        item, created = OrganizationMembership.objects.get_or_create(
             organization_id=str(organization_id),
             user_id=str(user_id),
             defaults={
@@ -205,6 +207,12 @@ class IntegrationsRepository:
                 "updated_at": timezone.now(),
             },
         )
+        if not created:
+            item.role = role
+            item.status = "active"
+            item.actor_id = str(actor_id or "")
+            item.updated_at = timezone.now()
+            item.save(update_fields=["role", "status", "actor_id", "updated_at"])
         return _organization_membership_to_dict(item)
 
     def get_organization_membership(self, organization_id: str, user_id: str) -> Optional[Dict[str, Any]]:
@@ -228,6 +236,13 @@ class IntegrationsRepository:
             user_id=str(user_id),
         ).delete()
         return deleted > 0
+
+    def delete_project_roles_for_user_in_organization(self, organization_id: str, user_id: str) -> int:
+        deleted, _ = ProjectRole.objects.filter(
+            project__organization_id=str(organization_id),
+            user_id=str(user_id),
+        ).delete()
+        return deleted
 
     def assign_legacy_records_to_organization(self, user_id: str, organization_id: str) -> None:
         user_id = str(user_id)
@@ -563,6 +578,20 @@ class IntegrationsRepository:
             provider=provider, type="feedbackSource", status="active"
         ).order_by("created_at")
         return [_feedback_source_to_dict(row) for row in rows]
+
+    def get_feedback_sources_by_account(self, account_id: str) -> List[Dict[str, Any]]:
+        rows = FeedbackSource.objects.filter(
+            account_id=str(account_id),
+            type="feedbackSource",
+        ).order_by("-created_at")
+        return [_feedback_source_to_dict(row) for row in rows]
+
+    def delete_feedback_sources_by_account(self, account_id: str) -> int:
+        deleted, _ = FeedbackSource.objects.filter(
+            account_id=str(account_id),
+            type="feedbackSource",
+        ).delete()
+        return deleted
 
     def create_project(self, data: Dict[str, Any]) -> Dict[str, Any]:
         project = Project.objects.create(

@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 
-from ..services import get_external_api_service, get_project_service, get_integration_service
+from ..services import get_project_service, get_integration_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ def get_azure_projects(request):
     """Get Azure DevOps projects directly from Azure API (for config page)."""
     organization = request.data.get('organization')
     pat_token = request.data.get('pat_token')
+    organization_id = _get_active_organization_id(request)
     
     if not organization or not pat_token:
         return StandardResponse.validation_error(
@@ -44,9 +45,14 @@ def get_azure_projects(request):
             instance=request.path
         )
     
-    # Fetch projects directly from Azure DevOps API
-    external_api_service = get_external_api_service()
-    projects = external_api_service.fetch_azure_projects(organization, pat_token)
+    integration_service = get_integration_service()
+    projects = integration_service.get_external_projects(
+        request.user.id,
+        "azure",
+        organization_id=organization_id,
+        organization=organization,
+        pat_token=pat_token,
+    )
     
     return StandardResponse.success(
         data={
@@ -65,6 +71,7 @@ def get_jira_projects(request):
     domain = request.data.get('domain')
     email = request.data.get('email')
     api_token = request.data.get('api_token')
+    organization_id = _get_active_organization_id(request)
     
     if not domain or not email or not api_token:
         return StandardResponse.validation_error(
@@ -77,9 +84,15 @@ def get_jira_projects(request):
             instance=request.path
         )
     
-    # Fetch projects directly from Jira API
-    external_api_service = get_external_api_service()
-    projects = external_api_service.fetch_jira_projects(domain, email, api_token)
+    integration_service = get_integration_service()
+    projects = integration_service.get_external_projects(
+        request.user.id,
+        "jira",
+        organization_id=organization_id,
+        domain=domain,
+        email=email,
+        api_token=api_token,
+    )
     
     return StandardResponse.success(
         data={

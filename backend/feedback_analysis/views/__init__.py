@@ -71,6 +71,13 @@ __all__ = [
     'UserStoryUpdateView',
     'UserStoryDeleteView',
     'UserStoryBulkDeleteView',
+    'InsightReviewListView',
+    'InsightReviewUpdateView',
+    'InsightRulesView',
+    'InsightRulesApplyView',
+    # Ingestion schedule views
+    'IngestionScheduleView',
+    'IngestionRunNowView',
     # File upload views
     'FeedbackFileUploadView',
     'FeedbackFileIngestView',

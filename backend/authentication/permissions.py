@@ -1,7 +1,7 @@
 from rest_framework import permissions
 from apis.infrastructure.storage_service import storage_service
 
-#check
+
 def _get_role_from_user(user):
     if not user:
         return None
@@ -38,6 +38,24 @@ def _get_project_id_from_request(request, view):
         if value:
             return value
 
+    # Infer project from user-story endpoints when project_id is not passed explicitly.
+    story_id = kwargs.get('user_story_id') or data.get('user_story_id')
+    if story_id:
+        story = storage_service.get_user_story_by_id(str(story_id))
+        if isinstance(story, dict):
+            project_id = story.get('projectId') or story.get('project_id')
+            if project_id:
+                return project_id
+
+    story_ids = data.get('ids')
+    if isinstance(story_ids, list):
+        for story_id in story_ids:
+            story = storage_service.get_user_story_by_id(str(story_id))
+            if isinstance(story, dict):
+                project_id = story.get('projectId') or story.get('project_id')
+                if project_id:
+                    return project_id
+
     return None
 
 
@@ -47,6 +65,29 @@ _ROLE_ORDER = {
     'admin': 3,
     'owner': 4,
 }
+
+
+def _get_org_membership_role(user, project):
+    if not user or not isinstance(project, dict):
+        return None
+    org_id = project.get('organizationId')
+    user_id = _get_user_id(user)
+    if not org_id or not user_id:
+        return None
+    try:
+        from integrations.services import get_organization_service
+        membership = get_organization_service().get_membership(str(org_id), str(user_id))
+        if membership:
+            return membership.get('role')
+    except Exception:
+        return None
+    return None
+
+
+def _get_project_role_name(role):
+    if isinstance(role, dict):
+        return role.get('role')
+    return role
 
 
 class ProjectRolePermission(permissions.BasePermission):
@@ -77,11 +118,17 @@ class ProjectRolePermission(permissions.BasePermission):
         if owner_id and str(owner_id) == str(user_id):
             return True
 
+        membership_role = _get_org_membership_role(user, project)
+        if membership_role in ('owner', 'admin'):
+            return _ROLE_ORDER.get('admin', 0) >= _ROLE_ORDER.get(self.min_role, 0)
+
         role = storage_service.get_project_role_for_user(project_id, str(user_id))
         if not role:
             return False
+        if not membership_role:
+            return False
 
-        return _ROLE_ORDER.get(role, 0) >= _ROLE_ORDER.get(self.min_role, 0)
+        return _ROLE_ORDER.get(_get_project_role_name(role), 0) >= _ROLE_ORDER.get(self.min_role, 0)
 
 
 class IsProjectViewer(ProjectRolePermission):

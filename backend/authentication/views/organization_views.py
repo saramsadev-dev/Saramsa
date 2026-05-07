@@ -474,7 +474,7 @@ def _build_invite_url(request, token: str) -> str:
         host = request.get_host()
         scheme = "https" if request.is_secure() else "http"
         base = f"{scheme}://{host}"
-    return f"{base}/signup?invite={token}"
+    return f"{base}/register?invite={token}"
 
 
 def _send_invite_email(*, to_email: str, inviter_name: str, org_name: str, invite_url: str, role: str) -> None:
