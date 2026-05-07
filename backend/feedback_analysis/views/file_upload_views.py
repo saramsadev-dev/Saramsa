@@ -97,16 +97,6 @@ class FeedbackFileUploadView(APIView):
         # Convert user_id to string for consistency
         user_id = str(user_id)
 
-        try:
-            await sync_to_async(check_quota, thread_sensitive=True)(user_id, "analysis")
-        except QuotaExceeded as exc:
-            return StandardResponse.error(
-                title="Quota exceeded",
-                detail=str(exc),
-                status_code=429,
-                instance=request.path,
-            )
-        
         # Validate project ID is provided
         if not incoming_project_id:
             return StandardResponse.validation_error(
@@ -117,7 +107,7 @@ class FeedbackFileUploadView(APIView):
 
         # Get project context using analysis service
         analysis_service = get_analysis_service()
-        
+
         try:
             resolved_project_id, project_doc, is_draft = analysis_service.ensure_project_context(
                 incoming_project_id,
@@ -129,7 +119,7 @@ class FeedbackFileUploadView(APIView):
                 errors=[{"field": "project_id", "message": str(e)}],
                 instance=request.path
             )
-            
+
         project_id = resolved_project_id
         project_context = {
             "project_id": project_id,
@@ -137,6 +127,19 @@ class FeedbackFileUploadView(APIView):
             "config_state": project_doc.get("config_state", "unconfigured" if is_draft else "complete"),
             "is_draft": is_draft,
         }
+        project_org_id = (project_doc or {}).get("organizationId") or (project_doc or {}).get("organization_id")
+
+        try:
+            await sync_to_async(check_quota, thread_sensitive=True)(
+                user_id, "analysis", organization_id=project_org_id
+            )
+        except QuotaExceeded as exc:
+            return StandardResponse.error(
+                title="Quota exceeded",
+                detail=str(exc),
+                status_code=429,
+                instance=request.path,
+            )
 
         ext = os.path.splitext(file.name or '')[1].lower()
         allowed_extensions = {'.json', '.csv'}
@@ -162,7 +165,9 @@ class FeedbackFileUploadView(APIView):
 
             if 200 <= response.status_code < 300:
                 try:
-                    await sync_to_async(record_usage, thread_sensitive=True)(user_id, "analysis")
+                    await sync_to_async(record_usage, thread_sensitive=True)(
+                        user_id, "analysis", organization_id=project_org_id
+                    )
                 except Exception:
                     logger.exception("record_usage failed after successful upload")
             return response

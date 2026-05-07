@@ -511,7 +511,7 @@ export const UserStoryList = ({
                   submitted: true,
                   submittedAt: submissionTimestamp,
                   submittedTo: platform,
-                  external_work_item_id: match?.work_item_id ?? item.external_work_item_id,
+                  external_id: match?.work_item_id ?? match?.issue_key ?? item.external_id,
                   external_url: match?.url ?? item.external_url,
                 };
               }
@@ -976,8 +976,8 @@ export const UserStoryList = ({
                 {submittedData.submittedAt && (
                   <span>Submitted {new Date(submittedData.submittedAt).toLocaleDateString()}</span>
                 )}
-                {(submittedData.external_work_item_id || submittedData.external_id) && (
-                  <span>ID: {submittedData.external_work_item_id || submittedData.external_id}</span>
+                {submittedData.external_id && (
+                  <span>ID: {submittedData.external_id}</span>
                 )}
                 {submittedData.external_url && (
                   <Button

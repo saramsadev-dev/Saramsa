@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Building2, Check, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, Building2, Check, Loader2, Plus } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 import { Button } from "@/components/ui/button";
 
@@ -27,8 +27,28 @@ export function OrgSwitcher() {
     user?.active_organization?.name ||
     orgs.find((o) => o.id === activeId)?.name ||
     "No workspace";
+  const contextError = user?.organization_context_error;
 
   if (!user) return null;
+
+  // Backend failed to load workspace context — show an explicit warning chip
+  // so the user knows the empty org list is "load failed", not "no memberships".
+  if (orgs.length === 0 && contextError) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          if (typeof window !== "undefined") window.location.reload();
+        }}
+        title={`Workspace context unavailable: ${contextError}. Click to retry.`}
+        className="h-9 px-3 inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 text-xs font-medium text-amber-300 hover:bg-amber-500/15"
+      >
+        <AlertTriangle className="h-3.5 w-3.5" />
+        Workspace unavailable — retry
+      </button>
+    );
+  }
+
   if (orgs.length === 0) return null;
 
   const handleSwitch = async (id: string) => {

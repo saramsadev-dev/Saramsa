@@ -76,10 +76,13 @@ class StripeBillingService:
                 legacy.updated_at = dj_timezone.now()
                 legacy.save(update_fields=["organization_id", "updated_at"])
                 return legacy
-            return BillingProfile.objects.create(
-                user_id=str(user.id),
+            # Use get_or_create to avoid a race when two requests arrive
+            # simultaneously for the same workspace's first BillingProfile.
+            profile, _ = BillingProfile.objects.get_or_create(
                 organization_id=active_org,
+                defaults={"user_id": str(user.id)},
             )
+            return profile
 
         profile, _ = BillingProfile.objects.get_or_create(user_id=str(user.id), organization_id="")
         return profile

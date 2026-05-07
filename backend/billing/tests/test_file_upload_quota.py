@@ -31,9 +31,19 @@ class FileUploadQuotaTest(TestCase):
         UsageRecord.objects.create(
             user_id=self.user.id, period=current_period(), analysis_count=50
         )
+        # Project context is resolved before the quota check (so the charge can
+        # land on the project's owning org, not the user's active org). Mock it
+        # so the test focuses on the quota gate.
         with patch(
             "feedback_analysis.views.file_upload_views.get_processing_service"
-        ) as proc_factory:
+        ) as proc_factory, patch(
+            "feedback_analysis.views.file_upload_views.get_analysis_service"
+        ) as analysis_factory:
+            analysis_factory.return_value = MagicMock(
+                ensure_project_context=MagicMock(
+                    return_value=("p-1", {"status": "active", "config_state": "complete"}, False)
+                )
+            )
             resp = self.client.post(
                 "/api/insights/upload/",
                 {"file": _json_file(), "project_id": "p-1"},

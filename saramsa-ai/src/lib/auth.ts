@@ -18,6 +18,10 @@ export type User = {
   active_organization_id?: string;
   active_organization?: Organization | null;
   organizations?: Organization[];
+  // Backend sets this when /me or /login could not load the workspace context.
+  // Lets the UI distinguish "load failed" from "no memberships" so we can show
+  // a retry banner instead of pretending the user has no workspaces.
+  organization_context_error?: string | null;
 };
 
 type LoginParams = { email: string; password: string };
@@ -203,6 +207,7 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
       active_organization_id?: string | null;
       active_organization?: Organization | null;
       organizations?: Organization[];
+      organization_context_error?: string | null;
     };
     message?: string;
   };
@@ -220,6 +225,7 @@ export async function getCurrentUser(accessToken?: string): Promise<User> {
     active_organization_id: data.active_organization_id ?? undefined,
     active_organization: data.active_organization ?? null,
     organizations: data.organizations ?? [],
+    organization_context_error: data.organization_context_error ?? null,
   };
 
   return user;

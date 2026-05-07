@@ -242,6 +242,81 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
         self.assertEqual(result["results"][0]["work_item_id"], 1234)
         self.assertIn("/_apis/wit/workitems/$Feature", post_mock.call_args.args[0])
 
+    def test_bulk_push_returns_partial_success_per_item(self) -> None:
+        """When one work item succeeds and another fails in the same bulk push,
+        the service must return per-item success/failure state instead of a
+        single overall flag. The previous bug was: the view treated a 'not all
+        succeeded' result as 'persist nothing', so successful pushes lost
+        external_id/pushed_at and re-pushing duplicated them. The view now
+        iterates result['results'] and persists each item independently — the
+        contract this test pins is the per-item shape."""
+        encrypted_pat = get_encryption_service().encrypt_token("azure-secret")
+        IntegrationAccount.objects.create(
+            id="ia-azure-partial",
+            user=self.admin_user,
+            organization_id="org-1",
+            provider="azure",
+            type="integration_account",
+            account_name="Azure",
+            credentials={"tokenEncrypted": encrypted_pat, "tokenType": "pat"},
+            config={
+                "displayName": "Acme (Azure DevOps)",
+                "metadata": {
+                    "organization": "acme-devops",
+                    "baseUrl": "https://dev.azure.com/acme-devops",
+                },
+            },
+            is_active=True,
+        )
+
+        success_response = Mock()
+        success_response.status_code = 201
+        success_response.json.return_value = {
+            "id": 4242,
+            "url": "https://dev.azure.com/acme-devops/project/_workitems/edit/4242",
+        }
+        failure_response = Mock()
+        failure_response.status_code = 500
+        failure_response.text = "Internal Server Error"
+
+        work_items = [
+            {"id": "wi-good", "title": "Good", "description": "ok", "type": "feature"},
+            {"id": "wi-bad", "title": "Bad", "description": "fail", "type": "feature"},
+        ]
+
+        with patch("work_items.services.devops_service.requests.post") as post_mock:
+            post_mock.side_effect = [success_response, failure_response]
+
+            result = DevOpsService().submit_to_external_platform(
+                user_id=self.admin_user.id,
+                work_items=work_items,
+                platform="azure",
+                project_config={
+                    "organizationId": "org-1",
+                    "name": "Partial Project",
+                    "externalLinks": [{"provider": "azure", "externalId": "Partial Project"}],
+                },
+            )
+
+        # Overall flag is False because at least one failed,
+        # but the results array exposes per-item state for the view to persist.
+        self.assertFalse(result["success"])
+        self.assertEqual(result["submitted_count"], 1)
+        self.assertEqual(result["failed_count"], 1)
+        self.assertEqual(len(result["results"]), 2)
+
+        good = next(r for r in result["results"] if r["story_id"] == "wi-good")
+        self.assertTrue(good["success"])
+        self.assertEqual(good["work_item_id"], 4242)
+        self.assertTrue(good.get("url"))
+
+        bad = next(r for r in result["results"] if r["story_id"] == "wi-bad")
+        self.assertFalse(bad["success"])
+        self.assertIn("500", bad["error"])
+        # Failed entries must NOT carry a work_item_id or the view would
+        # mistakenly mark them pushed.
+        self.assertNotIn("work_item_id", bad)
+
     def test_project_roles_view_returns_workspace_admin_role_name(self) -> None:
         request = self.factory.get("/api/integrations/projects/proj-1/roles/")
         force_authenticate(request, user=self.admin_user)

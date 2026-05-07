@@ -246,21 +246,11 @@ class UpdateKeywordsView(APIView):
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
 
-        try:
-            await sync_to_async(check_quota, thread_sensitive=True)(user_id_str, "analysis")
-        except QuotaExceeded as exc:
-            return StandardResponse.error(
-                title="Quota exceeded",
-                detail=str(exc),
-                status_code=429,
-                instance=request.path,
-            )
-
         if not updated_keywords or not comments:
             return StandardResponse.validation_error(detail="Updated keywords and comments are required.", instance=request.path)
 
         analysis_service = get_analysis_service()
-        
+
         project_id, project_doc, is_draft = analysis_service.ensure_project_context(
             incoming_project_id,
             user_id_str,
@@ -271,6 +261,19 @@ class UpdateKeywordsView(APIView):
             'config_state': project_doc.get("config_state", "unconfigured" if is_draft else "complete"),
             'is_draft': is_draft,
         }
+        project_org_id = (project_doc or {}).get("organizationId") or (project_doc or {}).get("organization_id")
+
+        try:
+            await sync_to_async(check_quota, thread_sensitive=True)(
+                user_id_str, "analysis", organization_id=project_org_id
+            )
+        except QuotaExceeded as exc:
+            return StandardResponse.error(
+                title="Quota exceeded",
+                detail=str(exc),
+                status_code=429,
+                instance=request.path,
+            )
 
         # Get company name from user profile for company-specific prompts
         company_name = None
@@ -303,7 +306,9 @@ class UpdateKeywordsView(APIView):
         )
 
         try:
-            await sync_to_async(record_usage, thread_sensitive=True)(user_id_str, "analysis")
+            await sync_to_async(record_usage, thread_sensitive=True)(
+                user_id_str, "analysis", organization_id=project_org_id
+            )
         except Exception:
             logger.exception("record_usage failed after successful keyword update")
 
@@ -823,7 +828,7 @@ class AnalysisByIdView(APIView):
             analysis.pop("feedback", None)
 
         project_id = analysis.get('projectId')
-        if project_id and not self._has_project_access(request.user, project_id):
+        if project_id and not _user_has_project_access(request.user, project_id):
             return StandardResponse.forbidden(
                 detail="You do not have permission to access this project.",
                 instance=request.path
@@ -927,9 +932,6 @@ class AnalysisByIdView(APIView):
                 logger.info(f"Work item {item.get('id')} is submitted: {item.get('submitted_to')} at {item.get('submitted_at')}")
         return work_items
 
-    def _has_project_access(self, user, project_id: str) -> bool:
-        return _user_has_project_access(user, project_id)
-
 
 class AnalysisRenameView(APIView):
     """Rename an analysis run and persist the name in storage."""
@@ -973,7 +975,7 @@ class AnalysisRenameView(APIView):
         project_id = analysis.get("projectId")
         analysis_owner_id = analysis.get("userId")
         if str(analysis_owner_id) != str(user_id):
-            if project_id and not self._has_project_access(request.user, project_id):
+            if project_id and not _user_has_project_access(request.user, project_id):
                 return StandardResponse.forbidden(
                     detail="You do not have permission to update this analysis.",
                     instance=request.path
@@ -994,8 +996,5 @@ class AnalysisRenameView(APIView):
             },
             message="Analysis name updated successfully"
         )
-
-    def _has_project_access(self, user, project_id: str) -> bool:
-        return _user_has_project_access(user, project_id)
 
 

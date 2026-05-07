@@ -20,13 +20,12 @@ def _load_default_prompts() -> Dict[str, str]:
     """Hardcoded defaults for each prompt type (UI prefill).
 
     Returns a {prompt_type: content} map. Failures are logged AND
-    surfaced via the companion `_load_default_prompt_errors` so the
+    surfaced via the companion `_load_default_prompts_with_errors` so the
     admin UI can render "default unavailable" instead of silently
     showing an empty textarea (which an admin could mistake for "no
     default exists" and accidentally save an empty override over).
     """
-    defaults: Dict[str, str] = {}
-    _, defaults = _load_default_prompts_with_errors()
+    _errors, defaults = _load_default_prompts_with_errors()
     return defaults
 
 

@@ -45,10 +45,6 @@ class WorkItemGenerationView(APIView):
         logger.info("WorkItemGenerationView called")
 
         from billing.quota import check_quota, record_usage, QuotaExceeded
-        try:
-            await sync_to_async(check_quota, thread_sensitive=True)(request.user.id, "work_item_gen")
-        except QuotaExceeded as exc:
-            return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)
 
         analysis_data = request.data.get("analysis_data")
         process_template = request.data.get("process_template", "Agile")
@@ -57,13 +53,13 @@ class WorkItemGenerationView(APIView):
         company_name = request.data.get("company_name")
         project_metadata = request.data.get("project_metadata")
         comments = request.data.get("comments", [])
-        
+
         user_id = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else "anonymous"
         user_id_str = str(user_id)
 
         if not analysis_data:
             return StandardResponse.validation_error(detail="Analysis data is required.", instance=request.path)
-        
+
         # Validate project ID is provided
         if not incoming_project_id:
             return StandardResponse.validation_error(
@@ -75,7 +71,7 @@ class WorkItemGenerationView(APIView):
         # Get project context
         from feedback_analysis.services import get_analysis_service
         analysis_service = get_analysis_service()
-        
+
         try:
             resolved_project_id, project_doc, is_draft = await sync_to_async(
                 analysis_service.ensure_project_context, thread_sensitive=True
@@ -85,9 +81,17 @@ class WorkItemGenerationView(APIView):
             )
         except ValueError as e:
             return StandardResponse.error(
-                detail=str(e), 
+                detail=str(e),
                 instance=request.path
             )
+
+        project_org_id = (project_doc or {}).get("organizationId") or (project_doc or {}).get("organization_id")
+        try:
+            await sync_to_async(check_quota, thread_sensitive=True)(
+                request.user.id, "work_item_gen", organization_id=project_org_id
+            )
+        except QuotaExceeded as exc:
+            return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)
 
         # Generate work items using DevOps service
         devops_service = get_devops_service()
@@ -150,7 +154,9 @@ class WorkItemGenerationView(APIView):
             devops_service.group_work_items_by_feature, thread_sensitive=True
         )(work_items)
 
-        await sync_to_async(record_usage, thread_sensitive=True)(user_id_str, "work_item_gen")
+        await sync_to_async(record_usage, thread_sensitive=True)(
+            user_id_str, "work_item_gen", organization_id=project_org_id
+        )
 
         return StandardResponse.success(data=result, message="Work items generated successfully")
 
