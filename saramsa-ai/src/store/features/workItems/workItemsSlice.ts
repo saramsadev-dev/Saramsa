@@ -18,7 +18,7 @@ export interface ActionItem {
   featureArea?: string;
   submitted?: boolean;
   submittedAt?: string;
-  externalWorkItemId?: string | number;
+  externalId?: string | number;
   externalUrl?: string;
   review_status?: 'pending' | 'approved' | 'dismissed' | 'snoozed' | 'merged';
   push_status?: 'not_pushed' | 'pushed' | 'failed';

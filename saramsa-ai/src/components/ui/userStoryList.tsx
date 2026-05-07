@@ -540,13 +540,18 @@ export const UserStoryList = ({
           submissionResults.forEach((res: any) => {
             const targetAction = actionItems.find((action) => action.id === res.story_id);
             if (targetAction) {
+              const externalIdRaw = res.work_item_id ?? res.issue_key;
+              const externalId =
+                externalIdRaw === undefined || externalIdRaw === null
+                  ? undefined
+                  : String(externalIdRaw);
               dispatch(
                 updateActionItem({
                   ...targetAction,
                   status: 'done',
                   submitted: true,
                   submittedAt: submissionTimestamp,
-                  externalWorkItemId: res.work_item_id?.toString?.() || String(res.work_item_id ?? ''),
+                  externalId,
                   externalUrl: res.url,
                 })
               );

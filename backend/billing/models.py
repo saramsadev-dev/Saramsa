@@ -28,6 +28,16 @@ class BillingProfile(TimestampedModel):
 
     class Meta:
         db_table = "billing_profiles"
+        constraints = [
+            # One billing profile per workspace. Race-safe creation in
+            # _get_or_create_profile depends on this; without a DB-level
+            # constraint, two concurrent first-creations would each insert.
+            models.UniqueConstraint(
+                fields=["organization_id"],
+                name="uq_billing_profile_org",
+                condition=models.Q(organization_id__gt=""),
+            ),
+        ]
         indexes = [
             models.Index(fields=["user_id"]),
             models.Index(fields=["organization_id"]),

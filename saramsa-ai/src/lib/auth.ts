@@ -152,7 +152,13 @@ export function clearTokens(): void {
 export function setStoredUser(user: User | null): void {
   if (!isBrowser()) return;
   if (user) {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    // Strip transient health signals before persisting. organization_context_error
+    // is a snapshot of "did the org service fail on this particular response" —
+    // re-rendering it from localStorage would surface a stale "Workspace
+    // unavailable — retry" chip on every page load until /me succeeds, even
+    // when the org service is currently healthy.
+    const { organization_context_error: _ignored, ...persistable } = user;
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
   } else {
     localStorage.removeItem(USER_STORAGE_KEY);
   }

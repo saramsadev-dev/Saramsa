@@ -88,7 +88,7 @@ class WorkItemGenerationView(APIView):
         project_org_id = (project_doc or {}).get("organizationId") or (project_doc or {}).get("organization_id")
         try:
             await sync_to_async(check_quota, thread_sensitive=True)(
-                request.user.id, "work_item_gen", organization_id=project_org_id
+                user_id_str, "work_item_gen", organization_id=project_org_id
             )
         except QuotaExceeded as exc:
             return StandardResponse.error(title="Quota exceeded", detail=str(exc), status_code=429, instance=request.path)

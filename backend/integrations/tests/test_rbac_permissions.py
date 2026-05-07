@@ -317,6 +317,74 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
         # mistakenly mark them pushed.
         self.assertNotIn("work_item_id", bad)
 
+    def test_jira_bulk_push_returns_partial_success_per_item(self) -> None:
+        """Same as the Azure partial-push test, but for Jira. The Jira branch
+        produces issue_key instead of work_item_id, so a regression that only
+        propagates work_item_id would silently leave Jira pushes without a
+        persisted external_id."""
+        encrypted_token = get_encryption_service().encrypt_token("jira-secret")
+        IntegrationAccount.objects.create(
+            id="ia-jira-partial",
+            user=self.admin_user,
+            organization_id="org-1",
+            provider="jira",
+            type="integration_account",
+            account_name="Jira",
+            credentials={"tokenEncrypted": encrypted_token, "tokenType": "api_token"},
+            config={
+                "displayName": "Acme (Jira)",
+                "metadata": {
+                    "domain": "acme.atlassian.net",
+                    "email": "ops@example.com",
+                },
+            },
+            is_active=True,
+        )
+
+        success_response = Mock()
+        success_response.status_code = 201
+        success_response.json.return_value = {"key": "ACME-123"}
+        failure_response = Mock()
+        failure_response.status_code = 500
+        failure_response.text = "Internal Server Error"
+
+        work_items = [
+            {"id": "ji-good", "title": "Good", "description": "ok", "type": "story"},
+            {"id": "ji-bad", "title": "Bad", "description": "fail", "type": "story"},
+        ]
+
+        with patch("work_items.services.devops_service.requests.post") as post_mock:
+            post_mock.side_effect = [success_response, failure_response]
+
+            result = DevOpsService().submit_to_external_platform(
+                user_id=self.admin_user.id,
+                work_items=work_items,
+                platform="jira",
+                project_config={
+                    "organizationId": "org-1",
+                    "name": "Partial Project",
+                    "externalLinks": [{"provider": "jira", "externalKey": "ACME"}],
+                },
+            )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["submitted_count"], 1)
+        self.assertEqual(result["failed_count"], 1)
+        self.assertEqual(len(result["results"]), 2)
+
+        good = next(r for r in result["results"] if r["story_id"] == "ji-good")
+        self.assertTrue(good["success"])
+        # Jira identifies issues by key, not numeric id — the view's persistence
+        # loop falls back to issue_key when work_item_id is absent.
+        self.assertEqual(good["issue_key"], "ACME-123")
+        self.assertNotIn("work_item_id", good)
+        self.assertTrue(good.get("url"))
+
+        bad = next(r for r in result["results"] if r["story_id"] == "ji-bad")
+        self.assertFalse(bad["success"])
+        self.assertIn("500", bad["error"])
+        self.assertNotIn("issue_key", bad)
+
     def test_project_roles_view_returns_workspace_admin_role_name(self) -> None:
         request = self.factory.get("/api/integrations/projects/proj-1/roles/")
         force_authenticate(request, user=self.admin_user)

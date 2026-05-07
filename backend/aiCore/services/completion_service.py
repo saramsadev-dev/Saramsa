@@ -156,11 +156,35 @@ async def generate_completions(prompt_instruction, max_tokens=None, user_id=None
                         from billing.quota import record_usage
                         from asgiref.sync import sync_to_async
 
+                        # Resolve the project's owning org so token charges
+                        # land on the workspace that owns the project being
+                        # analysed, not the user's currently-active workspace.
+                        # Lookup failure falls back to active-org-keying inside
+                        # record_usage so billing still happens.
+                        project_org_id = None
+                        if project_id:
+                            try:
+                                from apis.infrastructure.storage_service import storage_service
+                                project_doc = await sync_to_async(
+                                    storage_service.get_project_by_id_any
+                                )(str(project_id))
+                                if isinstance(project_doc, dict):
+                                    project_org_id = (
+                                        project_doc.get("organizationId")
+                                        or project_doc.get("organization_id")
+                                    )
+                            except Exception as lookup_err:
+                                logger.warning(
+                                    "Could not resolve project org for billing (project_id=%s): %s",
+                                    project_id, lookup_err,
+                                )
+
                         # Use sync_to_async because record_usage touches the ORM
                         await sync_to_async(record_usage)(
                             user_id,
                             "llm_tokens",
                             actual_usage["total_tokens"],
+                            organization_id=project_org_id,
                         )
                     except Exception as billing_err:
                         # Don't fail the request if billing tracking fails, but log the root cause
