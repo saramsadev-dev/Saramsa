@@ -15,17 +15,29 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_org_context(user_data: Dict[str, Any], active_org_id: Optional[str]) -> Dict[str, Any]:
-    """Look up the user's org list + active org. If anything goes wrong
-    (org service not bootstrapped, no membership rows yet), return an empty
-    context plus an `error` key — auth must keep working even when org
-    wiring is incomplete, but the frontend needs to know that the empty
-    workspace list is "load failed" and not "no memberships" so it can
-    surface a retry/diagnostics affordance instead of pretending the user
-    has no workspaces."""
+    """Look up the user's org list + active org and run the legacy-records
+    backfill if we haven't already done so for this user.
+
+    If anything goes wrong (org service not bootstrapped, no membership
+    rows yet), return an empty context plus an `error` key — auth must
+    keep working even when org wiring is incomplete, but the frontend
+    needs to know that the empty workspace list is "load failed" and
+    not "no memberships" so it can surface a retry/diagnostics
+    affordance instead of pretending the user has no workspaces.
+
+    The legacy-records backfill is idempotent and gated by a profile
+    flag so it runs at most once per user. We call it explicitly at the
+    auth boundary rather than as a side effect of the read so test
+    code and other read-only callers see a pure getter.
+    """
     try:
         from integrations.services import get_organization_service
-        ctx = get_organization_service().get_organization_context_for_user(
+        org_service = get_organization_service()
+        ctx = org_service.get_organization_context_for_user(
             user_data, active_organization_id=active_org_id
+        )
+        org_service.bootstrap_legacy_records_if_needed(
+            user_data, ctx.get("active_organization_id"),
         )
         ctx.setdefault("error", None)
         return ctx

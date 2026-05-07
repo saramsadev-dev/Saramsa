@@ -19,7 +19,13 @@ import logging
 import os
 
 from aiCore.services.completion_service import generate_completions
-from authentication.permissions import IsAdminOrUser, IsProjectViewer, IsProjectEditor, _get_role_from_user
+from authentication.permissions import (
+    IsAdminOrUser,
+    IsProjectViewer,
+    IsProjectEditor,
+    _get_role_from_user,
+    user_has_project_access,
+)
 from apis.core.response import StandardResponse
 from apis.core.error_handlers import handle_service_errors
 from billing.quota import check_quota, record_usage, QuotaExceeded
@@ -49,35 +55,10 @@ class _AllowAnyContentNegotiation(BaseContentNegotiation):
         return (renderers[0], renderers[0].media_type)
 
 
-def _user_has_project_access(user, project_id: str) -> bool:
-    """Project access check shared by AnalysisListView and AnalysisDetailView.
-
-    Returns True if the user is a global admin, the project's owner, an
-    org-level owner/admin of the project's workspace, or has any project
-    role row. Returns False for non-members of the project's workspace.
-    """
-    if not user or not getattr(user, 'is_authenticated', False):
-        return False
-    if _get_role_from_user(user) == 'admin':
-        return True
-    user_id = getattr(user, 'id', None) or getattr(user, 'user_id', None)
-    if not user_id:
-        return False
-    project = storage_service.get_project_by_id_any(project_id)
-    if isinstance(project, dict):
-        owner_id = project.get('owner_user_id') or project.get('userId')
-        organization_id = project.get('organizationId')
-        if owner_id and str(owner_id) == str(user_id):
-            return True
-        if organization_id:
-            from integrations.services import get_organization_service
-            membership = get_organization_service().get_membership(str(organization_id), str(user_id))
-            if membership and membership.get("role") in ("owner", "admin"):
-                return True
-            if not membership:
-                return False
-    role = storage_service.get_project_role_for_user(project_id, str(user_id))
-    return bool(role)
+# Authorization helper now lives in authentication.permissions as
+# user_has_project_access — the line above imports it. Keeping this
+# block as documentation that the move was deliberate so a future
+# reader doesn't redefine it locally.
 
 
 class AnalyzeCommentsView(APIView):
@@ -829,7 +810,7 @@ class AnalysisByIdView(APIView):
             analysis.pop("feedback", None)
 
         project_id = analysis.get('projectId')
-        if project_id and not _user_has_project_access(request.user, project_id):
+        if project_id and not user_has_project_access(request.user, project_id):
             return StandardResponse.forbidden(
                 detail="You do not have permission to access this project.",
                 instance=request.path
@@ -976,7 +957,7 @@ class AnalysisRenameView(APIView):
         project_id = analysis.get("projectId")
         analysis_owner_id = analysis.get("userId")
         if str(analysis_owner_id) != str(user_id):
-            if project_id and not _user_has_project_access(request.user, project_id):
+            if project_id and not user_has_project_access(request.user, project_id):
                 return StandardResponse.forbidden(
                     detail="You do not have permission to update this analysis.",
                     instance=request.path

@@ -17,6 +17,41 @@ def _get_user_id(user):
     return getattr(user, 'id', None) or getattr(user, 'user_id', None)
 
 
+def user_has_project_access(user, project_id: str) -> bool:
+    """Return True if `user` may read this project.
+
+    True when any of: user is a global admin, the project's owner, an
+    org-level owner/admin of the project's workspace, or has any
+    project-role row. False for non-members of the project's workspace.
+
+    This is a *read* check — write/admin operations should go through
+    the IsProjectEditor / IsProjectAdmin permission classes which layer
+    role checks on top.
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if _get_role_from_user(user) == 'admin':
+        return True
+    user_id = _get_user_id(user)
+    if not user_id:
+        return False
+    project = storage_service.get_project_by_id_any(project_id)
+    if isinstance(project, dict):
+        owner_id = project.get('owner_user_id') or project.get('userId')
+        organization_id = project.get('organizationId')
+        if owner_id and str(owner_id) == str(user_id):
+            return True
+        if organization_id:
+            from integrations.services import get_organization_service
+            membership = get_organization_service().get_membership(str(organization_id), str(user_id))
+            if membership and membership.get("role") in ("owner", "admin"):
+                return True
+            if not membership:
+                return False
+    role = storage_service.get_project_role_for_user(project_id, str(user_id))
+    return bool(role)
+
+
 def _get_project_id_from_request(request, view):
     # Check URL kwargs first
     kwargs = getattr(view, 'kwargs', {}) or {}

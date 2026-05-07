@@ -101,7 +101,7 @@ class NarrationService:
         parsed["_meta"] = {"status": "OK"}
         if actual_usage:
             parsed["_token_usage"] = actual_usage
-        self._record_usage(project_id, user_id, actual_usage, cache_hit=False)
+        self._record_narration_metrics(project_id, user_id, actual_usage, cache_hit=False)
         self._increment_usage_counters(project_id, actual_usage)
         return parsed
 
@@ -190,7 +190,7 @@ class NarrationService:
             future = executor.submit(_run)
             return future.result()
 
-    def _record_usage(self, project_id: Optional[str], user_id: Optional[str],
+    def _record_narration_metrics(self, project_id: Optional[str], user_id: Optional[str],
                       actual_usage: Optional[Dict[str, Any]], cache_hit: bool) -> None:
         if not project_id:
             return

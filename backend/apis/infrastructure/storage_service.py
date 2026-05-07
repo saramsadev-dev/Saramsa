@@ -466,8 +466,30 @@ def get_storage_service() -> StorageService:
 
 
 class _StorageServiceProxy:
+    """Lazy proxy around the StorageService singleton.
+
+    Modules import `storage_service` at module top-level, but
+    StorageService instantiation depends on Django apps being ready —
+    so we defer construction to first attribute access. The proxy
+    raises an explicit AttributeError that names itself, so typos like
+    `storage_service.fooo()` produce a clear "no attribute on
+    storage_service" error instead of an opaque "StorageService has
+    no attribute" error.
+    """
+
     def __getattr__(self, name):
-        return getattr(get_storage_service(), name)
+        # Avoid forwarding dunders that are tested with hasattr() during
+        # framework introspection; let the default AttributeError flow
+        # so callers like `pickle` see the right shape.
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        try:
+            return getattr(get_storage_service(), name)
+        except AttributeError as exc:
+            raise AttributeError(
+                f"storage_service has no attribute {name!r} "
+                "(check spelling; storage_service is a lazy proxy over StorageService)"
+            ) from exc
 
     def __dir__(self):
         return dir(get_storage_service())

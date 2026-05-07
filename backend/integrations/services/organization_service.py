@@ -334,6 +334,15 @@ class OrganizationService:
         user: Dict[str, Any],
         active_organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """PURE READ: returns the user's org context. Does not mutate state.
+
+        If you also need the lazy legacy-records backfill (which the
+        login / /me / accept-invite paths do), call
+        `bootstrap_legacy_records_if_needed` AFTER this getter. We keep
+        them separate so test code, internal lookups, and other
+        read-only callers can resolve org context without surprise
+        write side effects.
+        """
         organizations = self.list_organizations_for_user(str(user["id"]))
 
         # Saramsa is invite-only: an org membership only exists by invitation
@@ -351,8 +360,6 @@ class OrganizationService:
             selected = next((org for org in organizations if org["id"] == active_organization_id), None)
         if selected is None:
             selected = organizations[0]
-        if selected:
-            self._maybe_assign_legacy_records(user, selected["id"])
 
         return {
             "organizations": organizations,
@@ -360,14 +367,23 @@ class OrganizationService:
             "active_organization_id": selected["id"] if selected else None,
         }
 
-    def _maybe_assign_legacy_records(self, user: Dict[str, Any], organization_id: str) -> None:
+    def bootstrap_legacy_records_if_needed(
+        self,
+        user: Dict[str, Any],
+        organization_id: Optional[str],
+    ) -> None:
         """Move pre-org-context records (Project/FeedbackSource/etc with
         NULL organization_id) into `organization_id`, but only once per
-        user. The repo call is read-heavy and was previously running on
-        every /me, /login, switch-org, accept-invite, transfer, delete
-        — moving it behind a profile flag drops it to a single bootstrap
-        per user. After backfill there are no null-org rows left for
-        this user, so a second call would be a no-op anyway."""
+        user.
+
+        Intentionally a separate, explicit call: previously this was a
+        side effect inside `get_organization_context_for_user`, which
+        meant every read of org context could trigger a write. Splitting
+        them lets read-only code paths resolve context cheaply, and
+        makes the write call site visible at the auth boundary.
+        """
+        if not organization_id:
+            return
         profile = user.get("profile") or {}
         if profile.get("legacy_records_assigned"):
             return
