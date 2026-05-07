@@ -29,6 +29,19 @@ class _RequestUser:
         self.is_authenticated = True
 
 
+class _FakeRequest:
+    """Minimal request stub for permission-class unit tests.
+
+    Permission classes only read `request.user`, `request.query_params`,
+    and `request.data`; spinning up a full DRF request via APIRequestFactory
+    pulls in middleware/authentication that these tests don't exercise.
+    """
+    def __init__(self, user, query_params=None, data=None):
+        self.user = user
+        self.query_params = query_params or {}
+        self.data = data or {}
+
+
 class _View:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -90,7 +103,7 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
 
     def test_workspace_admin_passes_project_admin_permission(self) -> None:
         permission = IsProjectAdmin()
-        request = type("Request", (), {"user": _RequestUser(self.admin_user.id, self.admin_user.profile), "query_params": {}, "data": {}})()
+        request = _FakeRequest(_RequestUser(self.admin_user.id, self.admin_user.profile))
         with patch.object(
             storage_service, "get_project_by_id_any",
             lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"},
@@ -99,7 +112,7 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
 
     def test_workspace_member_does_not_pass_project_admin_permission(self) -> None:
         permission = IsProjectAdmin()
-        request = type("Request", (), {"user": _RequestUser(self.member_user.id, self.member_user.profile), "query_params": {}, "data": {}})()
+        request = _FakeRequest(_RequestUser(self.member_user.id, self.member_user.profile))
         with patch.object(
             storage_service, "get_project_by_id_any",
             lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"},
@@ -641,7 +654,7 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
     def test_removed_member_loses_project_role_access(self) -> None:
         storage_service.upsert_project_role("proj-1", self.member_user.id, "viewer", actor_id=self.admin_user.id)
         permission = IsProjectAdmin()
-        request = type("Request", (), {"user": _RequestUser(self.member_user.id, self.member_user.profile), "query_params": {}, "data": {}})()
+        request = _FakeRequest(_RequestUser(self.member_user.id, self.member_user.profile))
         with patch.object(
             storage_service, "get_project_by_id_any",
             lambda project_id: {"id": project_id, "userId": self.owner_user.id, "organizationId": "org-1"},

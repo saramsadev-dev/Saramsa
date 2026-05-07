@@ -2,7 +2,6 @@ from .openai_client import get_azure_client, get_azure_deployment_name
 from .utilities import fix_json_string, validate_json_structure
 from apis.infrastructure.usage_logging import log_token_usage
 from apis.core.error_handlers import handle_service_errors
-import functools
 import os
 import time
 import logging
@@ -48,23 +47,42 @@ def get_async_azure_client_instance():
             str(e) if "Missing" in str(e) or "Set these env" in str(e) else f"Azure OpenAI service unavailable: {e}"
         )
 
-@functools.lru_cache(maxsize=256)
+_PROJECT_ORG_CACHE_MAX = 1024
+_project_org_cache: dict[str, str] = {}
+
+
 def _project_org_id_for_billing(project_id: str) -> Optional[str]:
     """Resolve project_id → organization_id for billing attribution.
 
-    Cached because batch operations (e.g. narration over many comments)
-    can fire dozens of LLM calls for the same project; without the
-    cache each call hits the projects table. The cache lives for the
-    process lifetime, which is acceptable: a project's owning org is
-    immutable once set (workspace transfer creates a new org context;
-    the project's organizationId doesn't change underneath us).
-    Returns None on lookup failure so billing falls back to user-keyed.
+    Caches positive results so batch operations (e.g. narration over many
+    comments) don't hit the projects table per LLM call. Negative
+    results (project missing, organizationId still NULL because the
+    legacy backfill hasn't run) are NOT cached: a project's
+    organization_id can transition NULL → set when
+    `assign_legacy_records_to_organization` runs, and a long-lived
+    Celery worker that cached `None` would keep mis-billing the user's
+    active org for the rest of its lifetime.
+
+    Bounded at _PROJECT_ORG_CACHE_MAX entries; once full, new entries
+    evict the oldest insertion. Project→org is immutable once set
+    (workspace transfer creates a new org context, doesn't mutate
+    Project.organization_id), so cached positive entries can live for
+    the process lifetime safely.
     """
+    cached = _project_org_cache.get(project_id)
+    if cached is not None:
+        return cached
     try:
         from apis.infrastructure.storage_service import storage_service
         project_doc = storage_service.get_project_by_id_any(str(project_id))
         if isinstance(project_doc, dict):
-            return project_doc.get("organizationId") or project_doc.get("organization_id")
+            org_id = project_doc.get("organizationId") or project_doc.get("organization_id")
+            if org_id:
+                if len(_project_org_cache) >= _PROJECT_ORG_CACHE_MAX:
+                    # Pop oldest insertion (dict preserves insertion order in 3.7+).
+                    _project_org_cache.pop(next(iter(_project_org_cache)), None)
+                _project_org_cache[project_id] = str(org_id)
+                return str(org_id)
     except Exception as exc:
         logger.warning(
             "Could not resolve project org for billing (project_id=%s): %s",
@@ -203,6 +221,16 @@ async def generate_completions(
                             billing_org_id = await sync_to_async(
                                 _project_org_id_for_billing
                             )(str(project_id))
+                            if not billing_org_id:
+                                # Project lookup couldn't produce an org (project
+                                # missing or its organization_id still NULL).
+                                # record_usage will fall back to the user's
+                                # active org. Log so audits can correlate.
+                                logger.info(
+                                    "Billing fallback: no org for project_id=%s, "
+                                    "charging user's active org instead",
+                                    project_id,
+                                )
 
                         # Use sync_to_async because record_usage touches the ORM
                         await sync_to_async(record_usage)(

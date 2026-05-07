@@ -165,12 +165,25 @@ class NarrationService:
 
         return trimmed
 
-    def _call_generate_completions(self, prompt: str, user_id: Optional[str] = None, project_id: Optional[str] = None):
-        """Call async generate_completions from sync code. Safe when already inside an async event loop."""
+    def _call_generate_completions(
+        self,
+        prompt: str,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
+    ):
+        """Call async generate_completions from sync code. Safe when already inside an async event loop.
+
+        Caller passes organization_id when known (skips the project→org
+        cache lookup in completion_service); narration runs over many
+        candidates per analysis and benefits from threading the org
+        through directly.
+        """
         def _run():
             return async_to_sync(generate_completions)(
                 prompt, max_tokens=self.MAX_OUTPUT_TOKENS,
                 user_id=user_id, project_id=project_id, task_type="narration",
+                organization_id=organization_id,
             )
 
         try:

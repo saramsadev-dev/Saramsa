@@ -539,8 +539,8 @@ export const UserStoryList = ({
 
           // The canonical render path reads UserStory.work_items[].external_id /
           // .external_url (updated above). The per-ActionItem mirror only
-                  // tracks the submitted/submittedAt flags now — external id/url is
-                  // intentionally not duplicated here to avoid drift.
+          // tracks the submitted/submittedAt flags now — external id/url is
+          // intentionally not duplicated here to avoid drift.
           submissionResults.forEach((res: any) => {
             const targetAction = actionItems.find((action) => action.id === res.story_id);
             if (targetAction) {

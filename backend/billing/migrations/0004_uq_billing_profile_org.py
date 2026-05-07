@@ -29,10 +29,13 @@ def dedup_billing_profiles_per_org(apps, schema_editor):
             BillingProfile.objects
             .filter(organization_id=org_id)
             .order_by("-updated_at", "-created_at")
+            .values_list("id", flat=True)
         )
-        # rows[0] is the keeper.
-        for stale in rows[1:]:
-            stale.delete()
+        # rows[0] is the keeper; bulk-delete the rest in one round-trip
+        # rather than one DELETE per stale row.
+        stale_ids = list(rows[1:])
+        if stale_ids:
+            BillingProfile.objects.filter(id__in=stale_ids).delete()
 
 
 def noop_reverse(apps, schema_editor):
