@@ -78,10 +78,20 @@ def _project_org_id_for_billing(project_id: str) -> Optional[str]:
         if isinstance(project_doc, dict):
             org_id = project_doc.get("organizationId") or project_doc.get("organization_id")
             if org_id:
-                if len(_project_org_cache) >= _PROJECT_ORG_CACHE_MAX:
-                    # Pop oldest insertion (dict preserves insertion order in 3.7+).
-                    _project_org_cache.pop(next(iter(_project_org_cache)), None)
-                _project_org_cache[project_id] = str(org_id)
+                # If caching is disabled (MAX <= 0), skip the eviction
+                # block entirely — `next(iter({}))` would StopIteration.
+                # Thread-safety: the read-then-write pair below is not
+                # atomic under multi-threaded WSGI (gunicorn --threads),
+                # so the bounded size is approximate, not strict. CPython
+                # GIL keeps individual dict ops safe; worst case is a few
+                # extra entries or an evicted-then-re-fetched key. Not a
+                # correctness issue — billing attribution stays correct
+                # because evicted entries just fall back to a DB lookup.
+                if _PROJECT_ORG_CACHE_MAX > 0:
+                    if len(_project_org_cache) >= _PROJECT_ORG_CACHE_MAX:
+                        # Pop oldest insertion (dict preserves insertion order in 3.7+).
+                        _project_org_cache.pop(next(iter(_project_org_cache)), None)
+                    _project_org_cache[project_id] = str(org_id)
                 return str(org_id)
     except Exception as exc:
         logger.warning(

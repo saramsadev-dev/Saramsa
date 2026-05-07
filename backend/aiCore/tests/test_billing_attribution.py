@@ -60,28 +60,46 @@ class ProjectOrgResolverTest(TestCase):
             mock_lookup.side_effect = RuntimeError("DB offline")
             self.assertIsNone(completion_service._project_org_id_for_billing("p-broken"))
 
+    @patch.object(completion_service, "_PROJECT_ORG_CACHE_MAX", 3)
     def test_resolver_evicts_oldest_when_cache_full(self) -> None:
-        completion_service._project_org_cache.clear()
-        original_max = completion_service._PROJECT_ORG_CACHE_MAX
-        completion_service._PROJECT_ORG_CACHE_MAX = 3
+        with patch(
+            "apis.infrastructure.storage_service.storage_service.get_project_by_id_any"
+        ) as mock_lookup:
+            mock_lookup.side_effect = lambda pid: {"id": pid, "organizationId": f"org-{pid}"}
+            completion_service._project_org_id_for_billing("p-1")
+            completion_service._project_org_id_for_billing("p-2")
+            completion_service._project_org_id_for_billing("p-3")
+            # Cache full; next insertion evicts p-1 (oldest).
+            completion_service._project_org_id_for_billing("p-4")
 
-        try:
-            with patch(
-                "apis.infrastructure.storage_service.storage_service.get_project_by_id_any"
-            ) as mock_lookup:
-                mock_lookup.side_effect = lambda pid: {"id": pid, "organizationId": f"org-{pid}"}
-                completion_service._project_org_id_for_billing("p-1")
-                completion_service._project_org_id_for_billing("p-2")
-                completion_service._project_org_id_for_billing("p-3")
-                # Cache full; next insertion evicts p-1 (oldest).
-                completion_service._project_org_id_for_billing("p-4")
+            self.assertNotIn("p-1", completion_service._project_org_cache)
+            self.assertIn("p-2", completion_service._project_org_cache)
+            self.assertIn("p-3", completion_service._project_org_cache)
+            self.assertIn("p-4", completion_service._project_org_cache)
 
-                self.assertNotIn("p-1", completion_service._project_org_cache)
-                self.assertIn("p-2", completion_service._project_org_cache)
-                self.assertIn("p-3", completion_service._project_org_cache)
-                self.assertIn("p-4", completion_service._project_org_cache)
-        finally:
-            completion_service._PROJECT_ORG_CACHE_MAX = original_max
+    @patch.object(completion_service, "_PROJECT_ORG_CACHE_MAX", 0)
+    def test_resolver_with_caching_disabled_does_not_raise(self) -> None:
+        """MAX=0 means caching is disabled. The defensive guard skips the
+        eviction block (which would raise StopIteration on an empty dict)
+        and still returns the resolved org without storing it."""
+        with patch(
+            "apis.infrastructure.storage_service.storage_service.get_project_by_id_any"
+        ) as mock_lookup:
+            mock_lookup.return_value = {"id": "p-cold", "organizationId": "org-cold"}
+
+            # First call resolves and returns; nothing cached.
+            self.assertEqual(
+                completion_service._project_org_id_for_billing("p-cold"),
+                "org-cold",
+            )
+            self.assertNotIn("p-cold", completion_service._project_org_cache)
+
+            # Second call hits the DB again because nothing was cached.
+            self.assertEqual(
+                completion_service._project_org_id_for_billing("p-cold"),
+                "org-cold",
+            )
+            self.assertEqual(mock_lookup.call_count, 2)
 
     def test_resolver_supports_snake_case_organization_id_key(self) -> None:
         with patch(

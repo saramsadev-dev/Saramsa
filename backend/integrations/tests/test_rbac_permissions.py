@@ -33,13 +33,15 @@ class _FakeRequest:
     """Minimal request stub for permission-class unit tests.
 
     Permission classes only read `request.user`, `request.query_params`,
-    and `request.data`; spinning up a full DRF request via APIRequestFactory
-    pulls in middleware/authentication that these tests don't exercise.
+    `request.data`, and `request.path`; spinning up a full DRF request via
+    APIRequestFactory pulls in middleware/authentication that these tests
+    don't exercise.
     """
-    def __init__(self, user, query_params=None, data=None):
+    def __init__(self, user, query_params=None, data=None, path=""):
         self.user = user
         self.query_params = query_params or {}
         self.data = data or {}
+        self.path = path
 
 
 class _View:
@@ -139,15 +141,11 @@ class ProjectPermissionAndIntegrationRbacTest(TestCase):
             )
 
     def test_non_member_project_role_is_rejected(self) -> None:
-        request = type(
-            "Request",
-            (),
-            {
-                "data": {"user_id": self.outsider_user.id, "role": "viewer"},
-                "user": self.owner_user,
-                "path": "/api/integrations/projects/proj-1/roles/",
-            },
-        )()
+        request = _FakeRequest(
+            user=self.owner_user,
+            data={"user_id": self.outsider_user.id, "role": "viewer"},
+            path="/api/integrations/projects/proj-1/roles/",
+        )
         response = ProjectRolesView().post(request, "proj-1")
         self.assertEqual(response.status_code, 400)
         self.assertIn("workspace", response.data.get("detail", "").lower())

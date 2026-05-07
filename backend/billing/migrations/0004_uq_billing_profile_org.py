@@ -39,9 +39,15 @@ def dedup_billing_profiles_per_org(apps, schema_editor):
 
 
 def noop_reverse(apps, schema_editor):
-    # Deletion of duplicate rows is not reversible; the constraint
-    # removal below is enough to make the schema reversible. We don't
-    # try to recreate the deleted rows.
+    """Reverse pair for the dedup step.
+
+    DATA LOSS WARNING: rolling back this migration removes the unique
+    constraint but does NOT restore the duplicate BillingProfile rows
+    deleted by `dedup_billing_profiles_per_org`. Those rows are gone.
+    Re-running `migrate billing 0003` (rolling back to before this
+    migration) will leave the schema able to accept new duplicates,
+    but historical duplicates from before round 4 are not recovered.
+    """
     pass
 
 

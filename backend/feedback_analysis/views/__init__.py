@@ -3,9 +3,11 @@ Views package for feedback analysis.
 
 Organized into logical modules:
 - analysis_views: Core analysis operations
-- insights_views: Insights and reporting views  
+- insights_views: Insights and reporting views
 - file_upload_views: File upload and processing views
-- helpers: Shared helper functions
+- file_ingest_views: PDF/DOCX/TXT ingestion endpoint
+- digest_views: Insight digest preferences + previews
+- ingestion_schedule_views: Slack-source ingestion scheduling
 """
 
 from .analysis_views import (
